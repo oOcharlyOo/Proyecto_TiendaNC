@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Punto de Venta - INVENTARIO</title>
+    <!-- Incluir Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos base del sistema POS */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url(resources/fondo2.png);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed; /* Keep background fixed when scrolling */
+        }
+        .panel-transparent { /* New class for panels */
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+        }
+        /* Estilos generales del POS */
+        .main-container {
+            background-color: transparent; /* Remove solid background */
+            height: calc(100vh - 4.5rem); 
+            display: flex;
+            padding: 1rem;
+            gap: 1rem; 
+        }
+
+        /* Estilo para la tabla general */
+        .product-table thead {
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+            color: #1f2937; /* Keep color for contrast */
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .product-table tbody tr { /* Apply background to rows directly for transparency */
+            background-color: rgba(255, 255, 255, 0.7); /* Slightly more transparent */
+        }
+        .product-table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
+        }
+
+        /* Estilo para la tabla de bajo inventario */
+        .low-stock-table thead {
+            background-color: rgba(239, 68, 68, 0.85); /* Semi-transparent red (Red 500 with opacity) */
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .low-stock-row { /* This class is applied to the tr element */
+             background-color: rgba(254, 226, 226, 0.85); /* Semi-transparent Red 100 */
+             font-weight: 600;
+             border-left: 4px solid #b91c1c; /* Red 700 */
+        }
+        .low-stock-table tbody tr { /* Apply background to rows directly for transparency */
+            background-color: rgba(255, 255, 255, 0.7); /* Base transparency for rows */
+        }
+        .low-stock-table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
+        }
+        .header-low-stock-transparent { /* New class for low stock panel header */
+            background-color: rgba(239, 68, 68, 0.85); /* Red 500 with 85% opacity */
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar-placeholder"></div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-container flex-col md:flex-row p-2 md:p-4 gap-2 md:gap-4">
+        
+        <!-- PANEL IZQUIERDO: PRODUCTOS CON BAJO INVENTARIO (40%) -->
+        <div class="w-full md:w-2/5 flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
+            
+            <div class="p-3 border-b border-gray-200 header-low-stock-transparent rounded-t-lg">
+                <h2 class="text-lg sm:text-xl font-bold text-white flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Aviso: Bajo Stock (<span id="lowStockCount">0</span>)
+                </h2>
+            </div>
+
+            <!-- Contenedor de la Tabla de Bajo Stock -->
+            <div class="flex-grow overflow-y-auto">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left low-stock-table text-sm">
+                        <thead>
+                            <tr>
+                                <th class="p-3 w-[15%]">ID</th>
+                                <th class="p-3 w-[45%]">Producto</th>
+                                <th class="p-3 w-[20%] text-center">Mínimo</th>
+                                <th class="p-3 w-[20%] text-center">Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockTableBody">
+                            <!-- Los productos con bajo stock se cargarán aquí -->
+                            <tr><td colspan="4" class="text-center p-8 text-gray-500">Cargando datos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PANEL DERECHO: CATÁLOGO COMPLETO (60%) -->
+        <div class="w-full md:w-3/5 flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
+            
+            <div class="p-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0">Catálogo de Inventario (<span id="totalProductCount">0</span> Productos)</h2>
+                <div class="text-base sm:text-lg font-bold text-gray-700">Costo Total Inventario: <span id="totalInventoryCostDisplay">$0.00</span></div>
+            </div>
+
+            <!-- Contenedor de la Tabla Completa -->
+            <div class="flex-grow overflow-y-auto" style=" max-height: calc(100vh - 6rem); overflow-y: auto; height: max-content;">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left product-table text-sm">
+                        <thead>
+                            <tr>
+                                <th class="p-3 w-[10%]">ID</th>
+                                <th class="p-3 w-[35%]">Producto</th>
+                                <th class="p-3 w-[15%] text-right">Costo</th>
+                                <th class="p-3 w-[15%] text-right">Venta</th>
+                                <th class="p-3 w-[10%] text-center">Mínimo</th>
+                                <th class="p-3 w-[15%] text-center">Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allProductsTableBody">
+                            <!-- Todos los productos se cargarán aquí -->
+                            <tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando datos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
+        const API_BASE_URL = 'http://192.168.0.248:8080/'; 
+        let allProducts = []; // Array para almacenar la lista completa de productos
+        let lowStockProducts = []; // Array para almacenar productos con bajo stock
+
+        // Variables del DOM
+        const lowStockTableBody = document.getElementById('lowStockTableBody');
+        const allProductsTableBody = document.getElementById('allProductsTableBody');
+        const lowStockCount = document.getElementById('lowStockCount');
+        const totalProductCount = document.getElementById('totalProductCount');
+        const totalInventoryCostDisplay = document.getElementById('totalInventoryCostDisplay');
+
+        // --- FUNCIONES DE UTILIDAD ---
+
+        /**
+         * Función para realizar llamadas a la API de Quarkus.
+         */
+        async function fetchApi(endpoint, method = 'GET', data = null) {
+            const url = `${API_BASE_URL}${endpoint}`;
+            const options = {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            try {
+                console.log(`[API Call] ${method} ${url}`);
+                const response = await fetch(url, options);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.codigo === 200 && result.datos) {
+                    return result.datos;
+                } else {
+                    throw new Error(`API returned an error: ${result.mensaje || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                console.error("Error en la llamada a la API:", error.message);
+                
+                // *** SIMULACIÓN DE RESPUESTA PARA FUNCIONAMIENTO EN EL EDITOR ***
+                if (endpoint.includes('listarProductos')) {
+                    console.log("Usando datos de simulación.");
+                    return [
+                        { idProducto: 1, nombre: "Laptop Modelo X", precio_costo: 800, precio_venta: 1200.5, cantidad_min: 5, cantidad_max: 50, stock: 20 },
+                        { idProducto: 2, nombre: "Mouse Inalámbrico", precio_costo: 15.5, precio_venta: 25, cantidad_min: 20, cantidad_max: 200, stock: 150 },
+                        { idProducto: 3, nombre: "Teclado Mecánico RGB", precio_costo: 60, precio_venta: 95.75, cantidad_min: 10, cantidad_max: 100, stock: 4 }, // Bajo stock
+                        { idProducto: 4, nombre: "Takis Fuego", precio_costo: 15, precio_venta: 19, cantidad_min: 3, cantidad_max: 20, stock: 10 },
+                        { idProducto: 5, nombre: "Monitor Curvo 27\"", precio_costo: 250, precio_venta: 400, cantidad_min: 10, cantidad_max: 50, stock: 8 }, // Bajo stock
+                        { idProducto: 6, nombre: "Cable HDMI 2m", precio_costo: 5, precio_venta: 10, cantidad_min: 50, cantidad_max: 300, stock: 45 }, // Bajo stock
+                        { idProducto: 7, nombre: "Café Molido Premium", precio_costo: 8, precio_venta: 12.50, cantidad_min: 15, cantidad_max: 100, stock: 30 },
+                    ];
+                }
+                throw new Error(`Fallo de conexión o API: ${error.message}`); 
+            }
+        }
+
+        /**
+         * Muestra una notificación temporal.
+         */
+        function alertUser(message, type = 'info') {
+            let existingAlert = document.getElementById('tempAlert');
+            if (existingAlert) existingAlert.remove();
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'tempAlert';
+            alertDiv.textContent = message;
+            alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 transition-all duration-300 transform`;
+
+            if (type === 'success') {
+                alertDiv.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                alertDiv.classList.add('bg-red-500');
+            } else {
+                alertDiv.classList.add('bg-blue-500');
+            }
+
+            document.body.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // --- MANEJO DE LA LISTA DE PRODUCTOS ---
+
+        /**
+         * Carga los productos de la API, los clasifica y renderiza ambas tablas.
+         */
+        async function loadInventory() {
+            try {
+                // Mensajes de carga inicial
+                const loadingHtml = `<tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`;
+                allProductsTableBody.innerHTML = loadingHtml;
+                lowStockTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-8 text-gray-500">Filtrando bajo stock...</td></tr>`;
+                
+                // 1. LLAMADA API REAL: GET /productos/listarProductos
+                const rawProducts = await fetchApi('/productos/listarProductos', 'GET');
+                
+                allProducts = rawProducts;
+                
+                // 2. Filtrar productos con bajo inventario (stock < cantidad_min)
+                lowStockProducts = allProducts.filter(p => p.stock < p.cantidad_min);
+
+                renderAllProductsTable();
+                renderLowStockProductsTable();
+                
+                totalProductCount.textContent = allProducts.length;
+                lowStockCount.textContent = lowStockProducts.length;
+
+                const totalInventoryCost = allProducts.reduce((sum, product) => {
+                    return sum + (product.precio_costo * product.stock);
+                }, 0);
+                totalInventoryCostDisplay.textContent = `$${totalInventoryCost.toFixed(2)}`;
+
+            } catch (error) {
+                alertUser(`Error al cargar el inventario: ${error.message}`, 'error');
+                const errorHtml = `<tr><td colspan="6" class="text-center p-8 text-red-500">Error de conexión.</td></tr>`;
+                allProductsTableBody.innerHTML = errorHtml;
+                lowStockTableBody.innerHTML = errorHtml;
+            }
+        }
+
+        /**
+         * Renderiza la tabla completa de productos.
+         */
+        function renderAllProductsTable() {
+            allProductsTableBody.innerHTML = ''; 
+
+            if (allProducts.length === 0) {
+                 allProductsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`;
+                 return;
+            }
+
+            allProducts.forEach(product => {
+                const isLowStock = product.stock < product.cantidad_min;
+                
+                const row = document.createElement('tr');
+                row.className = `border-b bg-white ${isLowStock ? 'low-stock-row' : ''}`;
+                row.innerHTML = `
+                    <td class="p-3">${product.idProducto}</td>
+                    <td class="p-3 font-medium">${product.nombre}</td>
+                    <td class="p-3 text-right text-gray-500">$${product.precio_costo.toFixed(2)}</td>
+                    <td class="p-3 text-right text-rose-600 font-semibold">$${product.precio_venta.toFixed(2)}</td>
+                    <td class="p-3 text-center">${product.cantidad_min}</td>
+                    <td class="p-3 text-center">${product.stock}</td>
+                `;
+                
+                allProductsTableBody.appendChild(row);
+            });
+        }
+        
+        /**
+         * Renderiza la tabla de productos con bajo inventario.
+         */
+        function renderLowStockProductsTable() {
+            lowStockTableBody.innerHTML = ''; 
+
+            if (lowStockProducts.length === 0) {
+                 lowStockTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-8 text-gray-500">¡Inventario OK! Ningún producto por debajo del mínimo.</td></tr>`;
+                 return;
+            }
+
+            lowStockProducts.forEach(product => {
+                const row = document.createElement('tr');
+                // Usamos la clase low-stock-row definida en CSS para resaltarlo
+                row.className = `border-b low-stock-row`; 
+                row.innerHTML = `
+                    <td class="p-3">${product.idProducto}</td>
+                    <td class="p-3 font-semibold">${product.nombre}</td>
+                    <td class="p-3 text-center text-red-700">${product.cantidad_min}</td>
+                    <td class="p-3 text-center text-red-700 font-extrabold">${product.stock}</td>
+                `;
+                
+                lowStockTableBody.appendChild(row);
+            });
+        }
+
+
+        // --- INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInventory();
+        });
+        
+    </script>
+    <script src="nav.js" defer></script>  
+
+</body>
+</html>

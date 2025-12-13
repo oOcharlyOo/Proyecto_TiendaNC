@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Punto de Venta - VENTA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url(resources/fondo.png);
+            background-size: cover; /* Ensure background covers the entire body */
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed; /* Keep background fixed when scrolling */
+        }
+        
+        /* Make various elements transparent */
+        .main-container {
+            background-color: transparent; /* Remove solid background */
+            height: calc(100vh - 4.5rem);
+            display: flex;
+            padding: 0 1rem 1rem 1rem;
+            gap: 1rem;
+        }
+        .panel-transparent { /* New class for panels */
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+        }
+        .ticket-table thead {
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+            color: #1f2937;
+        }
+        .importe-green {
+            color: #10b981;
+            font-weight: 600;
+        }
+        #exit-btn {
+            background-color: #ef4444;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
+            min-width: 80px;
+        }
+        #exit-btn:hover {
+            background-color: #dc2626;
+        }
+        #codigoProductoInput {
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+            border: 2px solid #f472b6;
+            box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.2);
+        }
+        .summary-row {
+            @apply flex justify-between items-center py-2 text-gray-700;
+        }
+        .summary-total {
+            @apply flex justify-between items-center py-3 font-bold text-xl border-t-2 border-gray-300;
+        }
+        .qty-btn {
+            @apply px-2 py-0.5 bg-gray-200 rounded hover:bg-gray-300;
+        }
+        #paymentModal {
+            z-index: 100;
+        }
+        .modal-input {
+            @apply mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-rose-500 focus:border-rose-500 sm:text-sm;
+        }
+        /* Estilos para la búsqueda de productos */
+        #searchResultsContainer { /* Targeting the container for its background */
+             background-color: rgba(255, 255, 255, 0.95); /* Slightly less transparent for readability */
+        }
+        #searchResultsContainer .search-result-item {
+            @apply px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100 flex justify-between items-center;
+        }
+        #searchResultsContainer .search-result-item:last-child {
+            @apply border-b-0;
+        }
+        #tablaEditada {
+            /* No background-image here, it's on the body now */
+            background-color: rgba(255, 255, 255, 0.85);
+            background-color: transparent; /* Ensure it's transparent */
+            background-size: cover; /* Inherit or ensure the image shows through */
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        /* Estilo para las filas de productos en la tabla */
+        #ticketItems tr {
+            background-color: rgba(255, 255, 255, 0.85); /* Fondo blanco con 85% de opacidad */
+        }
+        /* Modal content should remain mostly opaque */
+        .modal-content {
+            background-color: rgba(255, 255, 255, 0.95); /* Mostly opaque white */
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .has-products-bg {
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+
+    <div class="main-container flex-col md:flex-row p-2 md:p-4 gap-2 md:gap-4">
+                    <div id="ticketPanel" class="flex-grow flex flex-col rounded-lg shadow-xl overflow-hidden">            <div class="p-4 border-b border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800" style="color: #0357b8;">VENTA - Ticket <span id="ticketIdDisplay">Cargando...</span>
+                </h2>
+                <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
+                    <div class="relative flex-grow">
+                        <label for="codigoProducto" class="block text-sm font-medium text-rose-600 self-center" style="color: rgb(31, 26, 26);">Código o Nombre del Producto:</label>
+                        <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                            disabled>
+                        <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
+                            <!-- Los resultados de la búsqueda se inyectarán aquí -->
+                        </div>  
+                    </div>
+                    <button id="agregarProductoBtn"
+                        class="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600 transition duration-150 shadow-md self-end"
+                        disabled>ENTER - Agregar por Código</button>
+                </div>
+            </div>
+            <div class="flex-grow flex flex-col overflow-hidden">
+                <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">
+                    <div class="overflow-x-auto">
+                        <table id="ticketTable" class="w-full text-left ticket-table text-sm">
+                            <thead>
+                                <tr>
+                                    <th class="p-2 w-[15%]">Código</th>
+                                    <th class="p-2 w-[40%]">Descripción</th>
+                                    <th class="p-2 w-[15%] text-right">Precio</th>
+                                    <th class="p-2 w-[15%] text-center">Cantidad</th>
+                                    <th class="p-2 w-[15%] text-right">Importe</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ticketItems"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+                    <div class="w-full md:w-1/4 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4">            <h3 class="text-lg font-bold text-gray-800 mb-4">Resumen de Venta</h3>
+            <div class="flex-grow">
+                <div class="summary-row"><span>Subtotal:</span><span id="subtotalDisplay">$0.00</span></div>
+                <div class="summary-total mt-4 border-t-2 border-gray-200"><span>TOTAL:</span><span id="totalDisplay"
+                        class="text-rose-600">$0.00</span></div>
+            </div>
+            <div class="mt-4 space-y-3">
+                <button id="cobrarEfectivoBtn"
+                    class="w-full bg-rose-600 text-white font-semibold py-3 rounded-lg hover:bg-rose-700 transition duration-150 shadow-md">F12
+                    - Cobrar (Efectivo)</button>
+                <button id="cobrarTarjetaBtn"
+                    class="w-full bg-yellow-400 text-gray-900 font-semibold py-3 rounded-lg hover:bg-yellow-500 transition duration-150 shadow-md">Cobrar
+                    (Tarjeta)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Cobro en Efectivo</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">Total a Pagar:</p>
+                    <p id="modalTotalAmount" class="text-3xl font-bold text-rose-600">$0.00</p>
+                    <div class="mt-4">
+                        <label for="amountPaid" class="block text-sm font-medium text-gray-700">Monto Recibido</label>
+                        <input type="number" id="amountPaid"
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-rose-500 focus:border-rose-500 sm:text-sm"
+                            placeholder="0.00">
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-500">Cambio:</p>
+                        <p id="changeAmount" class="text-2xl font-bold text-green-500">$0.00</p>
+                    </div>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="confirmPaymentBtn"
+                        class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+                        Confirmar Pago
+                    </button>
+                    <button id="cancelPaymentBtn"
+                        class="mt-2 px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://192.168.0.248:8080';
+        const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
+
+        // Only initialize page logic if a user is logged in.
+        // The nav.js script handles redirection for unauthenticated users.
+        if (activeUser) {
+            const ID_USUARIO = activeUser.idUsuario;
+            let activeSaleId = null;
+            let ticket = [];
+
+            const codigoProductoInput = document.getElementById('codigoProducto');
+            const agregarProductoBtn = document.getElementById('agregarProductoBtn');
+            const ticketItemsTableBody = document.getElementById('ticketItems');
+            const ticketIdDisplay = document.getElementById('ticketIdDisplay');
+            const subtotalDisplay = document.getElementById('subtotalDisplay');
+            const totalDisplay = document.getElementById('totalDisplay');
+            const cobrarEfectivoBtn = document.getElementById('cobrarEfectivoBtn');
+            const cobrarTarjetaBtn = document.getElementById('cobrarTarjetaBtn');
+            
+            const searchResultsContainer = document.getElementById('searchResultsContainer');
+            let debounceTimer;
+
+            const paymentModal = document.getElementById('paymentModal');
+            const modalTotalAmount = document.getElementById('modalTotalAmount');
+            const amountPaid = document.getElementById('amountPaid');
+            const changeAmount = document.getElementById('changeAmount');
+            const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+            const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
+
+            const ticketPanel = document.getElementById('ticketPanel'); // Nuevo: Referencia al panel principal del ticket
+
+            async function fetchApi(endpoint, method = 'GET', data = null) {
+                let url = `${API_BASE_URL}${endpoint}`;
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (endpoint.includes('/ventas/completarVenta/') && data && typeof data.montoTotal !== 'undefined') {
+                    url += `?montoTotal=${data.montoTotal}`;
+                } else if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                try {
+                    const response = await fetch(url, options);
+                    let responseData = {};
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        responseData = await response.json();
+                    }
+                    if (!response.ok) {
+                        const errorMessage = (responseData && (responseData.mensaje || responseData.error)) || `Error HTTP: ${response.status}`;
+                        throw new Error(errorMessage);
+                    }
+                    
+                    if (responseData.hasOwnProperty('datos')) {
+                       return responseData.datos;
+                    }
+                    return responseData;
+                } catch (error) {
+                    console.error("Error en la llamada a la API:", error);
+                    throw error;
+                }
+            }
+
+            function alertUser(message, type = 'info') {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+                alertDiv.textContent = message;
+                document.body.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 3000);
+            }
+
+            function updateTotals() {
+                const total = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
+                subtotalDisplay.textContent = totalDisplay.textContent = `$${total.toFixed(2)}`;
+            }
+
+            function renderTicket() {
+                ticketItemsTableBody.innerHTML = '';
+                if (ticket.length === 0) {
+                    ticketItemsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No hay productos</td></tr>`;
+                    ticketPanel.classList.remove('has-products-bg'); // Remover fondo si no hay productos
+                } else {
+                    ticket.forEach((item, index) => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b';
+                        row.innerHTML = `
+                            <td class="p-2">${item.idProducto}</td>
+                            <td class="p-2">${item.nombreProducto || 'Cargando...'}</td>
+                            <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
+                            <td class="p-2 text-center">
+                                <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
+                                <span class="mx-2">${item.cantidad}</span>
+                                <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
+                            </td>
+                            <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
+                        `;
+                        ticketItemsTableBody.appendChild(row);
+                    });
+                    ticketPanel.classList.add('has-products-bg'); // Añadir fondo si hay productos
+                }
+                updateTotals();
+            }
+
+            async function updateQuantity(index, change) {
+                const item = ticket[index];
+                const newQuantity = item.cantidad + change;
+                if (change > 0 && newQuantity > item.existence) {
+                    alertUser('No se puede exceder la cantidad en inventario.', 'error');
+                    return;
+                }
+                if (newQuantity < 1) {
+                    await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, 'DELETE');
+                    ticket.splice(index, 1);
+                } else {
+                    const updatedItem = { ...item, cantidad: newQuantity };
+                    await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${item.idVentaDetalle}`, 'PUT', updatedItem);
+                    ticket[index] = updatedItem;
+                }
+                renderTicket();
+            }
+
+            async function addProduct(code) {
+                if (!code) return;
+                codigoProductoInput.disabled = true;
+                agregarProductoBtn.textContent = 'Buscando...';
+                try {
+                    const productData = await fetchApi(`/productos/buscarProductoPorId/${String(code).trim()}`);
+                    if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
+                    
+                    if (ticket.find(item => item.idProducto === productData.idProducto)) {
+                        if ((ticket.find(item => item.idProducto === productData.idProducto).cantidad + 1) > productData.stock) {
+                           alertUser(`Stock insuficiente para "${productData.nombre}".`, 'error');
+                           return;
+                        }
+                    } else {
+                        if (!productData.stock || productData.stock <= 0) {
+                            alertUser(`El producto "${productData.nombre}" no tiene existencias.`, 'error');
+                            return;
+                        }
+                    }
+
+                    if (!activeSaleId) {
+                        await createNewSale();
+                    }
+
+                    if (!activeSaleId) throw new Error("No se pudo crear una nueva venta.");
+
+                    const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
+                    if (existingItemIndex !== -1) {
+                        await updateQuantity(existingItemIndex, 1);
+                    } else {
+                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
+                        const detailPayload = {
+                            cantidad: 1,
+                            precioUnitarioVenta: productData.precio_venta,
+                            Venta: ventaData,
+                            Producto: productData
+                        };
+                        const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
+                        ticket.push({
+                            idProducto: productData.idProducto, // Direct ID
+                            nombreProducto: productData.nombre, // Direct name for display
+                            cantidad: 1,
+                            precioUnitarioVenta: productData.precio_venta,
+                            existence: productData.stock,
+                            idVentaDetalle: newDetail.idVentaDetalle,
+                            Venta: ventaData,
+                            Producto: productData
+                        });
+                        renderTicket();
+                    }
+                } catch (error) {
+                    alertUser(`Error: ${error.message}`, 'error');
+                } finally {
+                    codigoProductoInput.value = '';
+                    codigoProductoInput.disabled = false;
+                    agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
+                    codigoProductoInput.focus();
+                }
+            }
+
+            async function createNewSale() {
+                try {
+                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, montoTotal: 0, estatus: 'P' };
+                    const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
+                    if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
+                    activeSaleId = createdSale.idVenta;
+                    ticket = [];
+                    ticketIdDisplay.textContent = createdSale.numeroTicket;
+                    renderTicket();
+                    alertUser(`Nueva venta #${createdSale.numeroTicket} iniciada.`, 'success');
+                } catch (error) {
+                    ticketIdDisplay.textContent = 'ERROR';
+                    alertUser(`Error al crear nueva venta: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+
+            async function initializeSale() {
+                ticketIdDisplay.textContent = 'Buscando...';
+                try {
+                    const allSales = await fetchApi('/ventas/obetenerVentas');
+                    const pendingSale = Array.isArray(allSales) ? allSales.find(v => v.estatus === 'P' && v.usuario?.idUsuario === ID_USUARIO) : null;
+                    if (pendingSale) {
+                        activeSaleId = pendingSale.idVenta;
+                        ticketIdDisplay.textContent = pendingSale.numeroTicket;
+                        const allDetails = await fetchApi('/ventasDetalle/obtenerTodosLosVentasDetalles');
+                        ticket = Array.isArray(allDetails) ? allDetails.filter(d => d.Venta.idVenta === activeSaleId).map(detail => ({
+                            idProducto: detail.Producto.idProducto,
+                            nombreProducto: detail.Producto.nombre,
+                            cantidad: detail.cantidad,
+                            precioUnitarioVenta: detail.precioUnitarioVenta,
+                            existence: detail.Producto.stock, // Stock del producto al momento de añadirlo
+                            idVentaDetalle: detail.idVentaDetalle,
+                            Venta: detail.Venta,
+                            Producto: detail.Producto
+                        })) : [];
+                        renderTicket();
+                    } else {
+                        activeSaleId = null;
+                        ticket = [];
+                        ticketIdDisplay.textContent = 'Pendiente';
+                        renderTicket();
+                    }
+                } catch (error) {
+                    alertUser(`Error al inicializar: ${error.message}`, 'error');
+                    activeSaleId = null; ticket = []; ticketIdDisplay.textContent = 'ERROR'; renderTicket();
+                } finally {
+                    codigoProductoInput.disabled = false;
+                    agregarProductoBtn.disabled = false;
+                    codigoProductoInput.focus();
+                }
+            }
+
+            function openPaymentModal() {
+                if (!activeSaleId || ticket.length === 0) {
+                    alertUser('No hay productos para cobrar.', 'error');
+                    return;
+                }
+                const total = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
+                modalTotalAmount.textContent = `$${total.toFixed(2)}`;
+                amountPaid.value = '';
+                changeAmount.textContent = '$0.00';
+                paymentModal.classList.remove('hidden');
+                amountPaid.focus();
+            }
+
+            function closePaymentModal() {
+                paymentModal.classList.add('hidden');
+            }
+
+            function calculateChange() {
+                const total = parseFloat(modalTotalAmount.textContent.replace('$', ''));
+                const paid = parseFloat(amountPaid.value) || 0;
+                const change = paid - total;
+                changeAmount.textContent = `$${change < 0 ? '0.00' : change.toFixed(2)}`;
+            }
+
+            async function handlePayment() {
+                const total = parseFloat(modalTotalAmount.textContent.replace('$', ''));
+                const paid = parseFloat(amountPaid.value) || 0;
+                if (paid < total) {
+                    alertUser('El monto pagado es menor al total.', 'error');
+                    return;
+                }
+                await completeSale('Efectivo');
+                closePaymentModal();
+            }
+
+            async function completeSale(paymentMethod) {
+                if (!activeSaleId || ticket.length === 0) return;
+                try {
+                    const montoTotal = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
+                    await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', { montoTotal });
+                    alertUser(`Venta #${activeSaleId} completada con ${paymentMethod}.`, 'success');
+                    await initializeSale();
+                } catch (error) {
+                    alertUser(`Error al completar la venta: ${error.message}`, 'error');
+                }
+            }
+            
+            // --- Lógica de Búsqueda por Nombre ---
+            function renderSearchResults(products) {
+                searchResultsContainer.innerHTML = '';
+                if (!products || products.length === 0) {
+                    searchResultsContainer.classList.add('hidden');
+                    return;
+                }
+                products.forEach(product => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `
+                        <div>
+                            <p class="font-semibold">${product.nombre}</p>
+                            <p class="text-sm text-gray-500">Stock: ${product.stock}</p>
+                        </div>
+                        <p class="font-bold text-rose-500">$${product.precio_venta.toFixed(2)}</p>
+                    `;
+                    item.addEventListener('click', () => {
+                        searchResultsContainer.classList.add('hidden');
+                        codigoProductoInput.value = '';
+                        addProduct(product.idProducto);
+                    });
+                    searchResultsContainer.appendChild(item);
+                });
+                searchResultsContainer.classList.remove('hidden');
+            }
+
+            async function searchProductsByName(query) {
+                if(isNaN(query)){
+                    try {
+                        const results = await fetchApi(`/productos/buscar?nombre=${query}`);
+                        renderSearchResults(results);
+                    } catch (error) {
+                        console.error('Error en búsqueda por nombre:', error);
+                        searchResultsContainer.classList.add('hidden');
+                    }
+                } else {
+                    searchResultsContainer.classList.add('hidden');
+                }
+            }
+
+            codigoProductoInput.addEventListener('input', e => {
+                clearTimeout(debounceTimer);
+                const query = e.target.value.trim();
+                if (query.length < 2) {
+                    searchResultsContainer.classList.add('hidden');
+                    return;
+                }
+                debounceTimer = setTimeout(() => {
+                    searchProductsByName(query);
+                }, 300);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!searchResultsContainer.contains(e.target) && e.target !== codigoProductoInput) {
+                    searchResultsContainer.classList.add('hidden');
+                }
+            });
+
+            // --- Event Listeners ---
+            codigoProductoInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addProduct(e.target.value);
+                    searchResultsContainer.classList.add('hidden');
+                }
+            });
+            agregarProductoBtn.addEventListener('click', () => addProduct(codigoProductoInput.value));
+            
+            cobrarEfectivoBtn.addEventListener('click', openPaymentModal);
+            cobrarTarjetaBtn.addEventListener('click', () => completeSale('Tarjeta'));
+            cancelPaymentBtn.addEventListener('click', closePaymentModal);
+            confirmPaymentBtn.addEventListener('click', handlePayment);
+            amountPaid.addEventListener('input', calculateChange);
+            ticketItemsTableBody.addEventListener('click', async e => {
+                const target = e.target;
+                if (target.classList.contains('btn-qty-plus')) await updateQuantity(target.dataset.index, 1);
+                if (target.classList.contains('btn-qty-minus')) await updateQuantity(target.dataset.index, -1);
+            });
+            document.addEventListener('keydown', e => {
+                if (e.key === 'F12') { e.preventDefault(); openPaymentModal(); }
+            });
+
+            document.addEventListener('DOMContentLoaded', initializeSale);
+        }
+    </script>
+    <script src="nav.js" defer></script>
+</body>
+
+</html>

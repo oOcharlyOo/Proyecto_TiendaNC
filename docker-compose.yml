@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./Proyecto_TiendaNC
+      dockerfile: src/main/docker/Dockerfile.legacy-jar
+    ports:
+      - "8080:8080"
+    container_name: quarkus-backend
+    restart: on-failure
+    depends_on:
+      - database 
+
+  frontend:
+    build:
+      context: ./Proyecto_TiendaNC_interfaz
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80"
+    container_name: html-frontend
+    depends_on:
+      - backend
+
+  database: 
+    image: postgres:13
+    environment:
+      POSTGRES_DB: dulcesnc
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    container_name: postgres-db
+    ports:
+      - "5432:5432" 
+
+  adminer:
+    image: adminer
+    ports:
+      - "8082:8080"
+    container_name: adminer-db-manager
+    depends_on:
+      - database
+
+volumes:
+  db-data:

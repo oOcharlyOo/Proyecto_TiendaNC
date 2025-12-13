@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Punto de Venta - CORTE DE CAJA</title>
+    <!-- Incluir Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Incluir Chart.js para la gráfica -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url(resources/fondo2.png);
+            background-size: cover; /* Ensure background covers the entire body */
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed; /* Keep background fixed when scrolling */
+        }
+        /* Estilos de la BARRA SUPERIOR */
+        .header-btn { 
+            @apply flex items-center justify-center p-3 rounded-lg text-sm font-semibold transition duration-200; 
+            min-width: 110px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        }
+        .inactive-header-btn { 
+            @apply bg-gray-200 text-gray-700 hover:bg-gray-300; 
+        }
+        /* Botón ACTIVO (CORTE) */
+        .active-header-btn { 
+            @apply bg-rose-600 text-white shadow-lg shadow-rose-500/50 hover:bg-rose-700; 
+        }
+        /* Botón Salir (Añadido para completar la barra de navegación) */
+        #exit-btn {
+            background-color: #ef4444; /* Red 500 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
+            min-width: 80px;
+        }
+        #exit-btn:hover {
+            background-color: #dc2626; /* Red 600 */
+        }
+
+        /* Contenedor Principal */
+        .main-container { 
+            background-color: transparent; /* Remove solid background */
+            min-height: calc(100vh - 4.5rem); 
+            padding: 1rem; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; 
+        }
+        .panel-transparent { /* New class for panels */
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+        }
+
+        /* Tarjetas de Resumen */
+        .summary-card { 
+            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
+            padding: 1.5rem; /* Adjusted for consistency with login/interfaz */
+            border-radius: 1rem; /* Adjusted for consistency */
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04); /* Adjusted for consistency */
+            border-bottom: 4px solid transparent; /* Re-add bottom border, default transparent */
+            transition: all 0.3s ease; /* Maintain transition */
+        }
+        .summary-card:hover { /* Custom hover for consistency */
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.15), 0 0 15px -5px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        /* Colores Específicos */
+        .income-card { border-color: #10b981; } /* Green */
+        .profit-card { border-color: #0ea5e9; } /* Blue */
+        .cash-flow-card { border-color: #f97316; } /* Orange */
+        .expense-card { border-color: #ef4444; } /* Red */
+    </style>
+</head>
+<body>
+    
+    <!-- BARRA SUPERIOR DE NAVEGACIÓN -->
+    <div id="navbar-placeholder"></div>
+
+    <div class="main-container p-2 sm:p-4 md:p-6">
+        <div class="w-full max-w-5xl panel-transparent rounded-lg shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 md:space-y-8">
+            <header class="border-b pb-4">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Corte de Caja</h1>
+                <p class="text-sm sm:text-base text-gray-600 mt-1">Genera y visualiza el reporte de tu corte de caja.</p>
+            </header>
+
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4 sm:mb-8 justify-center">
+                <button id="generateCorteBtn" class="bg-rose-600 text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg hover:bg-rose-700 transition duration-150 shadow-md text-base sm:text-lg">
+                    Generar Corte de Caja
+                </button>
+                <button id="downloadPdfBtn" class="bg-blue-600 text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg hover:bg-blue-700 transition duration-150 shadow-md text-base sm:text-lg hidden">
+                    Descargar Reporte PDF
+                </button>
+            </div>
+
+            <section id="corteReporte" class="hidden">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">Reporte del Corte</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="summary-card income-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm">Fecha del Corte</p>
+                        <p id="reporteFechaCorte" class="summary-value text-xl sm:text-2xl text-gray-800"></p>
+                    </div>
+                    <div class="summary-card income-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm">Cajero</p>
+                        <p id="reporteCajero" class="summary-value text-xl sm:text-2xl text-gray-800"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-4 sm:mt-6">
+                    <div class="summary-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #10b981;">Monto Inicial</p>
+                        <p id="reporteMontoInicial" class="summary-value text-xl sm:text-2xl income-value"></p>
+                    </div>
+                    <div class="summary-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #10b981;">Total Ventas</p>
+                        <p id="reporteTotalVentas" class="summary-value text-xl sm:text-2xl income-value"></p>
+                    </div>
+                    <div class="summary-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #af7810;">Tickets del Día</p>
+                        <p id="reporteTotalTicketsDia" class="summary-value text-xl sm:text-2xl">0</p>
+                    </div>
+                    <div class="summary-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #73793c;">Otros Ingresos</p>
+                        <p id="reporteOtrosIngresos" class="summary-value text-xl sm:text-2xl income-value"></p>
+                    </div>
+                    <div class="summary-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #bb0a0a;">Total Egresos</p>
+                        <p id="reporteTotalEgresos" class="summary-value text-xl sm:text-2xl expense-value"></p>
+                    </div>
+                    <!-- Ganancia Total: Queda en la segunda fila debido a md:grid-cols-4 -->
+                    <div class="summary-card profit-card p-4 sm:p-6">
+                        <p class="summary-title text-xs sm:text-sm" style="color: #14baec;">Ganancia Total</p>
+                        <p id="reporteGananciaTotal" class="summary-value text-xl sm:text-2xl profit-value"></p>
+                        <p class="text-xs text-gray-500 mt-1">Beneficio total del corte</p>
+                    </div>
+                </div>
+
+                <div class="summary-card cash-flow-card mt-4 sm:mt-6 p-4 sm:p-6">
+                    <p class="summary-title text-sm sm:text-base" style="color: #14baec;">SALDO FINAL CALCULADO</p>
+                    <p id="reporteSaldoFinalCalculado" class="summary-value text-3xl sm:text-4xl cash-flow-value"></p>
+                </div>
+                
+                <!-- GRÁFICA PIE CHART AGREGADA AQUÍ -->
+                <div class="mt-6 sm:mt-8">
+                    <h3 class="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4 border-t pt-3 sm:pt-4">Composición del Flujo de Efectivo Bruto (Entradas)</h3>
+                    <div class="panel-transparent p-4 sm:p-6 rounded-xl shadow-lg flex justify-center items-center h-64 sm:h-80 md:h-96">
+                        <canvas id="cashFlowChart"></canvas>
+                    </div>
+                </div>
+                <!-- FIN GRÁFICA -->
+                
+                <div class="flex justify-center pt-6 sm:pt-8">
+                    <button id="cerrarTurnoBtn" class="bg-blue-500 text-white font-semibold py-2 px-8 sm:py-3 sm:px-12 rounded-lg hover:bg-blue-600 transition duration-150 shadow-xl text-base sm:text-lg">
+                        Cerrar Turno
+                    </button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN Y UTILIDADES ---
+        const API_BASE_URL = 'http://192.168.0.248:8080';
+        
+        // Simulación de usuario activo (se asumiría que viene de un inicio de sesión o sesión)
+        // Usamos sessionStorage, si no está definido, usamos un valor por defecto.
+        const activeUser = JSON.parse(sessionStorage.getItem('activeUser')) || { idUsuario: 1, nombre: 'Usuario Desconocido' };
+        const ID_USUARIO = activeUser.idUsuario;
+        let currentCorteDTO = null; // Variable global para almacenar el DTO del corte actual
+
+        const generateCorteBtn = document.getElementById('generateCorteBtn');
+        const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        const cerrarTurnoBtn = document.getElementById('cerrarTurnoBtn'); // Nuevo botón de cerrar turno
+        const corteReporte = document.getElementById('corteReporte'); // Ahora hidden por defecto en HTML
+
+        // Elementos del reporte
+        const reporteFechaCorte = document.getElementById('reporteFechaCorte');
+        const reporteCajero = document.getElementById('reporteCajero');
+        const reporteMontoInicial = document.getElementById('reporteMontoInicial');
+        const reporteTotalVentas = document.getElementById('reporteTotalVentas');
+        const reporteOtrosIngresos = document.getElementById('reporteOtrosIngresos');
+        const reporteTotalEgresos = document.getElementById('reporteTotalEgresos');
+        const reporteSaldoFinalCalculado = document.getElementById('reporteSaldoFinalCalculado');
+        const reporteGananciaTotal = document.getElementById('reporteGananciaTotal');
+
+        const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 });
+        function formatCurrency(amount) { return formatter.format(amount || 0); }
+
+        function alertUser(message, type = 'info') {
+            let existingAlert = document.getElementById('tempAlert');
+            if (existingAlert) existingAlert.remove();
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'tempAlert';
+            alertDiv.textContent = message;
+            alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 transition-all duration-300 transform`;
+            
+            if (type === 'success') {
+                alertDiv.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                alertDiv.classList.add('bg-red-500');
+            } else {
+                alertDiv.classList.add('bg-blue-500');
+            }
+            
+            document.body.appendChild(alertDiv);
+            setTimeout(() => {
+                alertDiv.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+
+        /**
+         * Función para realizar llamadas a la API de Quarkus con SIMULACIÓN, 
+         * manteniendo la estructura de endpoint tal cual la necesitas.
+         */
+        async function fetchApi(endpoint, method = 'GET', data = null) {
+            let url = `${API_BASE_URL}${endpoint}`;
+            
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (data) options.body = JSON.stringify(data);
+            
+            console.log(`[API Call] ${method} ${url}`, data);
+            
+            try {
+                const response = await fetch(url, options); // The Response object is created here
+                
+                let responseText = null;
+                // Read the response body as text first, if there's content
+                if (response.status !== 204) {
+                    responseText = await response.text();
+                }
+
+                let responseData;
+                const contentType = response.headers.get("content-type");
+
+                if (responseText !== null && contentType && contentType.includes("application/json")) {
+                    try {
+                        responseData = JSON.parse(responseText); // Try to parse text as JSON
+                    } catch (e) {
+                        // If parsing as JSON fails, treat the text as the response data
+                        responseData = responseText;
+                        console.warn(`API response claimed JSON but failed to parse for ${url}:`, e);
+                    }
+                } else {
+                    // If no content, not JSON, or JSON parsing failed, use the text directly
+                    responseData = responseText;
+                }
+
+                if (!response.ok) {
+                    const errorDetail = (responseData && (responseData.mensaje || responseData.error || responseData.message))
+                                        ? (typeof responseData === 'object' ? JSON.stringify(responseData) : responseData)
+                                        : `Error HTTP: ${response.status} ${response.statusText}`;
+                    throw new Error(`API Error: ${errorDetail}`);
+                }
+                
+                // Return 'datos' property if it exists and is not null, otherwise return the whole responseData
+                return (typeof responseData === 'object' && responseData !== null && responseData.hasOwnProperty('datos') && responseData.datos !== null) ? responseData.datos : responseData;
+            } catch (error) {
+                console.error("Error en la llamada a la API:", error);
+                throw error;
+            }
+        }
+        
+        // Variable global para almacenar la instancia del gráfico
+        let cashFlowChartInstance = null;
+
+        function drawCashFlowChart(data) {
+            const ctx = document.getElementById('cashFlowChart').getContext('2d');
+            
+            // Destruir la instancia anterior si existe
+            if (cashFlowChartInstance) {
+                cashFlowChartInstance.destroy();
+            }
+
+            const chartData = {
+                labels: ['Monto Inicial', 'Total Ventas', 'Otros Ingresos'],
+                datasets: [{
+                    data: [data.montoInicial, data.totalVentas, data.otrosIngresos],
+                    backgroundColor: [
+                        '#f97316', // Cash Flow/Naranja
+                        '#10b981', // Income/Verde
+                        '#3b82f6', // Azul (un ingreso secundario)
+                    ],
+                    hoverOffset: 15
+                }]
+            };
+
+            const totalBruto = data.montoInicial + data.totalVentas + data.otrosIngresos;
+            
+            cashFlowChartInstance = new Chart(ctx, {
+                type: 'doughnut', // Usamos donut/doughnut que es visualmente similar a pastel pero más moderno
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                },
+                                // Personalizar las etiquetas para incluir el valor y porcentaje
+                                generateLabels: (chart) => {
+                                    const data = chart.data;
+                                    if (data.labels.length && data.datasets.length) {
+                                        return data.labels.map((label, i) => {
+                                            const value = data.datasets[0].data[i];
+                                            const percentage = ((value / totalBruto) * 100).toFixed(1);
+                                            return {
+                                                text: `${label}: ${formatCurrency(value)} (${percentage}%)`,
+                                                fillStyle: data.datasets[0].backgroundColor[i],
+                                                strokeStyle: data.datasets[0].backgroundColor[i],
+                                                lineWidth: 1,
+                                                hidden: isNaN(value) || value === 0,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                    return [];
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `Total Entradas: ${formatCurrency(totalBruto)}`,
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                bottom: 20
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const percentage = ((value / totalBruto) * 100).toFixed(1);
+                                    return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        function renderCorteReport(corteDTO) {
+            reporteFechaCorte.textContent = new Date(corteDTO.fechaCorte).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' });
+            reporteCajero.textContent = activeUser.nombre; 
+            reporteMontoInicial.textContent = formatCurrency(corteDTO.montoInicial);
+            reporteTotalVentas.textContent = formatCurrency(corteDTO.totalVentas);
+            reporteOtrosIngresos.textContent = formatCurrency(corteDTO.otrosIngresos);
+            reporteTotalEgresos.textContent = formatCurrency(corteDTO.totalEgresos);
+            reporteSaldoFinalCalculado.textContent = formatCurrency(corteDTO.saldoFinalCalculado);
+            reporteGananciaTotal.textContent = formatCurrency(corteDTO.gananciaTotal); 
+            
+            corteReporte.classList.remove('hidden'); // Mostrar el reporte
+            downloadPdfBtn.classList.remove('hidden'); // Mostrar botón de descarga PDF
+            cerrarTurnoBtn.classList.remove('hidden'); // Mostrar botón de cerrar turno
+
+            // Almacenar el DTO del corte para usarlo en el botón de cerrar turno
+            currentCorteDTO = corteDTO;
+
+            // Dibuja la nueva gráfica con los datos
+            drawCashFlowChart(corteDTO);
+        }
+
+        async function generateCorteReport() {
+            const initialCashAmount = parseFloat(sessionStorage.getItem('initialCashAmount'));
+            
+            if (isNaN(initialCashAmount) || initialCashAmount < 0) {
+                alertUser('Error: Monto inicial de caja no encontrado o inválido. Por favor, inicia sesión nuevamente.', 'error');
+                console.error('Monto inicial de caja no encontrado en sessionStorage o es inválido.');
+                return;
+            }
+
+            generateCorteBtn.disabled = true;
+            generateCorteBtn.textContent = 'Calculando...';
+            downloadPdfBtn.classList.add('hidden');
+            cerrarTurnoBtn.classList.add('hidden');
+            corteReporte.classList.add('hidden');
+
+            try {
+                // 1. Generar el reporte de corte principal
+                const corteResponse = await fetchApi(`/caja/corte?idUsuario=${ID_USUARIO}&montoInicial=${initialCashAmount}`, 'POST');
+                renderCorteReport(corteResponse);
+                alertUser('Corte de caja generado con éxito.', 'success');
+
+                // 2. Obtener todas las ventas y calcular el total de tickets del día
+                try {
+                    const allSalesResponse = await fetchApi('/ventas/obetenerVentas');
+                    const allSales = Array.isArray(allSalesResponse) ? allSalesResponse : (allSalesResponse.datos || []);
+                    
+                    // Asegurar que corteDate se interprete como UTC
+                    const corteDate = new Date(corteResponse.fechaCorte + 'Z'); 
+                    const corteYear = corteDate.getUTCFullYear();
+                    const corteMonth = corteDate.getUTCMonth();
+                    const corteDay = corteDate.getUTCDate();
+
+                    const salesToday = allSales.filter(sale => {
+                        // Lógica original de comparación de fechas
+                        if (!sale.fechaVenta) return false;
+                        const saleDate = new Date(sale.fechaVenta + 'Z'); 
+                        
+                        const saleYear = saleDate.getUTCFullYear();
+                        const saleMonth = saleDate.getUTCMonth();
+                        const saleDay = saleDate.getUTCDate();
+
+                        const isSameDay = saleYear === corteYear &&
+                                          saleMonth === corteMonth &&
+                                          saleDay === corteDay;
+                        
+                        // Nuevo filtro de estatus: solo ventas con estatus 'C' (Completado)
+                        const isCompleted = sale.estatus === 'C';
+
+                        return isSameDay && isCompleted;
+                    });
+                    
+                    document.getElementById('reporteTotalTicketsDia').textContent = salesToday.length;
+                } catch (salesError) {
+                    console.error("Error al obtener el total de tickets del día:", salesError);
+                    document.getElementById('reporteTotalTicketsDia').textContent = 'Error';
+                }
+
+            } catch (error) {
+                alertUser(`Error al generar el corte: ${error.message}`, 'error');
+            } finally {
+                generateCorteBtn.disabled = false;
+                generateCorteBtn.textContent = 'Generar Corte de Caja';
+            }
+        }
+
+        // Función para descargar el reporte en PDF
+        async function downloadCortePdf() {
+            alertUser('Generando PDF... (funcionalidad no implementada en backend)', 'info');
+            // Aquí iría la lógica para llamar al endpoint del backend que genera el PDF
+            // Por ejemplo:
+            // const pdfBlob = await fetchApi('/caja/corte/pdf', 'GET');
+            // const url = window.URL.createObjectURL(pdfBlob);
+            // const a = document.createElement('a');
+            // a.href = url;
+            // a.download = `corte_caja_${new Date().toISOString().slice(0,10)}.pdf`;
+            // document.body.appendChild(a);
+            // a.click();
+            // a.remove();
+        }
+
+        // Función para cerrar el turno y cambiar el estado de las ventas
+        async function cerrarTurno() {
+            if (!currentCorteDTO) {
+                alertUser('Primero genera un reporte de corte de caja.', 'error');
+                return;
+            }
+
+            // Deshabilitar el botón para evitar múltiples clics
+            cerrarTurnoBtn.disabled = true;
+            cerrarTurnoBtn.textContent = 'Cerrando Turno...';
+            
+            try {
+                const endOfDay = new Date(currentCorteDTO.fechaCorte + 'Z');
+
+                // Crear una fecha para el inicio del día en UTC
+                const startOfDay = new Date(endOfDay); // Clonar la fecha
+                startOfDay.setUTCHours(0, 0, 0, 0); // Establecer la hora a 00:00:00.000 UTC
+
+                const formattedStartDate = startOfDay.toISOString();
+                const formattedEndDate = endOfDay.toISOString();
+
+                const payload = {
+                    idUsuario: ID_USUARIO,
+                    startDate: formattedStartDate, 
+                    endDate: formattedEndDate,
+                    oldStatus: 'C',
+                    newStatus: 'F'  
+                };
+
+                console.log("Payload enviado a /caja/ventas/status:", payload); // Debug log
+
+                await fetchApi('/caja/ventas/status', 'PUT', payload);
+                alertUser('Turno cerrado con éxito. Cerrando sesión...', 'success');
+
+                // Cerrar sesión
+                sessionStorage.clear();
+                setTimeout(() => {
+                    window.location.href = 'Login.html';
+                }, 1500); // Pequeño delay para ver el mensaje
+                
+            } catch (error) {
+                alertUser(`Error al cerrar el turno: ${error.message}`, 'error');
+            } finally {
+                cerrarTurnoBtn.disabled = false;
+                cerrarTurnoBtn.textContent = 'Cerrar Turno y Descargar Reporte';
+            }
+        }
+
+        generateCorteBtn.addEventListener('click', generateCorteReport);
+        downloadPdfBtn.addEventListener('click', downloadCortePdf);
+        cerrarTurnoBtn.addEventListener('click', cerrarTurno); // Event Listener para el nuevo botón
+        
+        // Asignar el nombre del cajero al cargar, si está disponible.
+        document.addEventListener('DOMContentLoaded', () => {
+             reporteCajero.textContent = activeUser.nombre;
+             // Asegurarse de que el reporte esté oculto al cargar la página inicialmente
+             corteReporte.classList.add('hidden');
+             downloadPdfBtn.classList.add('hidden');
+             cerrarTurnoBtn.classList.add('hidden'); // Ocultar botón de cerrar turno al inicio
+        });
+
+    </script>
+    <script src="nav.js" defer></script>  
+</body>
+</html>
