@@ -163,6 +163,11 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="precioMayoreoInput">Precio de Mayoreo ($)</label>
+                    <input type="number" id="precioMayoreoInput" step="0.01" min="0">
+                </div>
+
+                <div class="form-group">
                     <label for="precioCosto">Precio de Costo ($)</label>
                     <input type="number" id="precioCosto" step="0.01" min="0" required>
                 </div>
@@ -218,6 +223,7 @@
         const codigoBarrasInput = document.getElementById('codigoBarras');
         const nombreProductoInput = document.getElementById('nombreProducto');
         const precioVentaInput = document.getElementById('precioVenta');
+        const precioMayoreoInput = document.getElementById('precioMayoreoInput'); // NUEVO
         const precioCostoInput = document.getElementById('precioCosto');
         const stockActualInput = document.getElementById('stockActual');
         const cantidadMinInput = document.getElementById('cantidadMin');
@@ -295,7 +301,7 @@
          */
         async function loadProducts() {
             try {
-                productsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`;
+                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan
                 
                 // 1. LLAMADA API REAL: GET /productos/listarProductos
                 products = await fetchApi('/productos/listarProductos', 'GET');
@@ -304,7 +310,7 @@
 
             } catch (error) {
                 alertUser(`Error al cargar productos: ${error.message}`, 'error');
-                productsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`;
+                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`; // Updated colspan
             }
         }
 
@@ -315,7 +321,7 @@
             productsTableBody.innerHTML = ''; 
 
             if (products.length === 0) {
-                 productsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`;
+                 productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`; // Updated colspan
                  return;
             }
 
@@ -328,8 +334,9 @@
                 row.innerHTML = `
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-medium">${product.nombre}</td>
-                    <td class="p-3 text-right text-rose-600 font-semibold">$${product.precio_venta.toFixed(2)}</td>
-                    <td class="p-3 text-right text-gray-500">$${product.precio_costo.toFixed(2)}</td>
+                    <td class="p-3 text-right text-rose-600 font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
+                    <td class="p-3 text-right">$${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : 0).toFixed(2)}</td> // NEW
+                    <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
                     <td class="p-3 text-center">${product.stock}</td>
                 `;
                 
@@ -347,6 +354,7 @@
             codigoBarrasInput.value = product.idProducto;
             nombreProductoInput.value = product.nombre;
             precioVentaInput.value = product.precio_venta;
+            precioMayoreoInput.value = product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : ''; // NEW
             precioCostoInput.value = product.precio_costo;
             stockActualInput.value = product.stock;
             cantidadMinInput.value = product.cantidad_min;
@@ -369,6 +377,9 @@
             submitBtn.textContent = 'Guardar Producto';
             deleteBtn.classList.add('hidden'); // Ocultar botón de eliminar
             renderProductsTable(null); // Deseleccionar filas
+            
+            // Clear new input
+            precioMayoreoInput.value = ''; // NEW
         }
 
         // Event listener para seleccionar una fila en la tabla
@@ -396,6 +407,7 @@
             const data = {
                 nombre: nombreProductoInput.value,
                 precio_venta: parseFloat(precioVentaInput.value),
+                precio_mayoreo: precioMayoreoInput.value !== '' ? parseFloat(precioMayoreoInput.value) : null, // NEW
                 precio_costo: parseFloat(precioCostoInput.value),
                 stock: parseInt(stockActualInput.value),
                 cantidad_min: parseInt(cantidadMinInput.value),
