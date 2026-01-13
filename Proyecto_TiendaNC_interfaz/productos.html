@@ -122,7 +122,7 @@
 
     <script>
         // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
-        const API_BASE_URL = 'http://localhost:8080'; 
+        const API_BASE_URL = 'http://192.168.0.248:8080'; 
         let products = []; // Array para almacenar la lista local de productos
 
         // Variables del DOM
@@ -238,6 +238,8 @@
                 
                 // 1. LLAMADA API REAL: GET /productos/listarProductos
                 products = await fetchApi('/productos/listarProductos', 'GET');
+                // Sort products by idProducto
+                products.sort((a, b) => a.idProducto - b.idProducto);
                 
                 renderProductsTable();
 

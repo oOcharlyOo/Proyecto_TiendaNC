@@ -151,7 +151,7 @@
 
 
     <script>
-        const API_BASE_URL = 'http://localhost:8080';
+        const API_BASE_URL = 'http://192.168.0.248:8080';
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
 
         // Only initialize page logic if a user is logged in.
@@ -318,13 +318,13 @@
                 // Update table header for new column
                 const tableHeader = document.querySelector('#ticketTable thead tr');
                 tableHeader.innerHTML = `
-                    <th class="p-2 w-[10%]">Código</th>
-                    <th class="p-2 w-[30%]">Descripción</th>
-                    <th class="p-2 w-[12%] text-right">Precio</th>
+                    <th class="p-2 w-[8%]">Código</th>
+                    <th class="p-2 w-[35%] whitespace-normal break-words">Descripción</th>
+                    <th class="p-2 w-[10%] text-right">Precio</th>
                     <th class="p-2 w-[8%] text-center">Mayoreo</th>
-                    <th class="p-2 w-[10%] text-center">Cantidad</th>
+                    <th class="p-2 w-[12%] text-center">Cantidad</th>
                     <th class="p-2 w-[15%] text-right">Importe</th>
-                    <th class="p-2 w-[5%] text-center">Eliminar</th> <!-- New column -->
+                    <th class="p-2 w-[12%] text-center">Eliminar</th> <!-- New column -->
                 `;
 
                 ticketItemsTableBody.innerHTML = '';
@@ -338,14 +338,14 @@
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
                         row.innerHTML = `
                             <td class="p-2">${item.idProducto}</td>
-                            <td class="p-2">${item.nombreProducto || 'Cargando...'}</td>
+                            <td class="p-2 whitespace-normal break-words">${item.nombreProducto || 'Cargando...'}</td>
                             <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
                             <td class="p-2 text-center">
                                 <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
                             </td>
                             <td class="p-2 text-center">
                                 <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
-                                <span class="mx-2">${item.cantidad}</span>
+                                <span class="mx-1 sm:mx-2">${item.cantidad}</span>
                                 <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
                             </td>
                             <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>

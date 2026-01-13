@@ -38,9 +38,30 @@
     letter-spacing: 3px;
     /* Efecto de relieve sutil */
     text-shadow: 3px 3px 0px #1e3d1a, 5px 5px 15px rgba(0,0,0,0.5);
-    
+    white-space: normal; /* Ensure text wraps */
     margin: 0 auto;
 }
+
+@media (max-width: 639px) { /* Tailind's sm breakpoint is 640px */
+    .encabezado-zelda {
+        font-size: 1.2rem; /* Smaller font size for mobile */
+        padding: 15px; /* Adjust padding */
+        letter-spacing: 2px; /* Slightly reduce letter spacing */
+    }
+}
+
+@media (min-width: 1024px) { /* Tailwind's lg breakpoint */
+    .encabezado-zelda {
+        font-size: 1.8rem;
+    }
+}
+
+@media (min-width: 1280px) { /* Tailwind's xl breakpoint */
+    .encabezado-zelda {
+        font-size: 2rem;
+    }
+}
+
 .encabezado-zelda-menu {
     font-family: 'HyliaSerif', serif;
     font-size: 1rem;
@@ -54,6 +75,26 @@
     text-shadow: 3px 3px 0px #1e3d1a, 5px 5px 15px rgba(0,0,0,0.5);
     
     margin: 0 auto;
+}
+
+@media (max-width: 639px) { /* Tailind's sm breakpoint is 640px */
+    .encabezado-zelda-menu {
+        font-size: 0.9rem; /* Slightly smaller font size for mobile navigation */
+        letter-spacing: 1px; /* Reduce letter spacing */
+        padding: 10px; /* Adjust padding */
+    }
+}
+
+@media (min-width: 1024px) { /* Tailwind's lg breakpoint */
+    .encabezado-zelda-menu {
+        font-size: 1.1rem;
+    }
+}
+
+@media (min-width: 1280px) { /* Tailwind's xl breakpoint */
+    .encabezado-zelda-menu {
+        font-size: 1.2rem;
+    }
 }
 .encabezado-zelda-text {
     font-family: 'HyliaSerif', serif;
@@ -208,11 +249,27 @@ body {
 
 .main-container {
     background-color: transparent;
-    height: calc(100vh - 4.5rem); 
+    min-height: calc(100vh - 4.5rem); 
     display: flex;
     padding: 0 1rem 1rem 1rem;
     gap: 1rem; 
-    width: 80%; /* Ensure it takes full width */
+    width: 100%; /* Full width on small screens */
+    margin: 0; /* Remove default margin */
+}
+
+@media (min-width: 768px) { /* md breakpoint for Tailwind CSS */
+    .main-container {
+        width: 80%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media (min-width: 1280px) { /* xl breakpoint for Tailwind CSS */
+    .main-container {
+        width: 70%; /* Wider for large desktops */
+        max-width: 1440px; /* Constrain maximum width for readability */
+    }
 }
 
 .product-table thead {

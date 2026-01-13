@@ -36,62 +36,62 @@
                 <h2 id="reportTitle" class="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">Reporte del Corte</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div class="summary-card income-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm">Fecha del Reporte</p>
-                        <p id="reporteFechaCorte" class="summary-value text-xl sm:text-2xl text-gray-800"></p>
+                        <p class="summary-title text-xs sm:text-sm whitespace-normal break-words">Fecha del Reporte</p>
+                        <p id="reporteFechaCorte" class="summary-value text-xl sm:text-2xl text-gray-800 whitespace-normal break-words"></p>
                     </div>
                     <div class="summary-card income-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm">Cajero</p>
-                        <p id="reporteCajero" class="summary-value text-xl sm:text-2xl text-gray-800"></p>
+                        <p class="summary-title text-xs sm:text-sm whitespace-normal break-words">Cajero</p>
+                        <p id="reporteCajero" class="summary-value text-xl sm:text-2xl text-gray-800 whitespace-normal break-words"></p>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-4 sm:mt-6">
                     <div class="summary-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-income-color">Monto Inicial</p>
-                        <p id="reporteMontoInicial" class="summary-value text-xl sm:text-2xl income-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Monto Inicial</p>
+                        <p id="reporteMontoInicial" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
                     <!-- New card for Ventas en Efectivo -->
                     <div class="summary-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-income-color">Ventas en Efectivo</p>
-                        <p id="reporteVentasEfectivo" class="summary-value text-xl sm:text-2xl income-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Ventas en Efectivo</p>
+                        <p id="reporteVentasEfectivo" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
                     <!-- Ventas por Transferencia (formerly Otros Ingresos) -->
                     <div class="summary-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-profit-color">Ventas por Transferencia</p>
-                        <p id="reporteOtrosIngresos" class="summary-value text-xl sm:text-2xl income-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-profit-color whitespace-normal break-words">Ventas por Transferencia</p>
+                        <p id="reporteOtrosIngresos" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
                     <!-- Tickets del Día -->
                     <div class="summary-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-cash-flow-color">Tickets del Día</p>
-                        <p id="reporteTotalTicketsDia" class="summary-value text-xl sm:text-2xl">0</p>
+                        <p class="summary-title text-xs sm:text-sm text-cash-flow-color whitespace-normal break-words">Tickets del Día</p>
+                        <p id="reporteTotalTicketsDia" class="summary-value text-xl sm:text-2xl whitespace-normal break-words">0</p>
                     </div>
                     <!-- Total Ventas (SPANS 2 COLUMNS) -->
                     <div class="summary-card p-4 sm:p-6 md:col-span-2">
-                        <p class="summary-title text-xs sm:text-sm text-income-color">Total Ventas</p>
-                        <p id="reporteTotalVentas" class="summary-value text-xl sm:text-2xl income-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Total Ventas</p>
+                        <p id="reporteTotalVentas" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
                     <!-- Total Egresos -->
                     <div class="summary-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-danger">Total Egresos</p>
-                        <p id="reporteTotalEgresos" class="summary-value text-xl sm:text-2xl expense-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-danger whitespace-normal break-words">Total Egresos</p>
+                        <p id="reporteTotalEgresos" class="summary-value text-xl sm:text-2xl expense-value whitespace-normal break-words"></p>
                     </div>
                     <!-- Ganancia Total -->
                     <div class="summary-card profit-card p-4 sm:p-6">
-                        <p class="summary-title text-xs sm:text-sm text-profit-color">Ganancia Total</p>
-                        <p id="reporteGananciaTotal" class="summary-value text-xl sm:text-2xl profit-value"></p>
+                        <p class="summary-title text-xs sm:text-sm text-profit-color whitespace-normal break-words">Ganancia Total</p>
+                        <p id="reporteGananciaTotal" class="summary-value text-xl sm:text-2xl profit-value whitespace-normal break-words"></p>
                         <p class="text-xs text-gray-500 mt-1">Beneficio total del corte</p>
                     </div>
                 </div>
 
                 <div class="summary-card cash-flow-card mt-4 sm:mt-6 p-4 sm:p-6">
-                    <p class="summary-title text-sm sm:text-base text-profit-color">SALDO FINAL CALCULADO</p>
-                    <p id="reporteSaldoFinalCalculado" class="summary-value text-3xl sm:text-4xl cash-flow-value"></p>
+                    <p class="summary-title text-sm sm:text-base text-profit-color whitespace-normal break-words">SALDO FINAL CALCULADO</p>
+                    <p id="reporteSaldoFinalCalculado" class="summary-value text-3xl sm:text-4xl cash-flow-value whitespace-normal break-words"></p>
                 </div>
                 
                 <!-- GRÁFICA PIE CHART AGREGADA AQUÍ -->
                 <div class="mt-6 sm:mt-8">
                     <h3 id="chartTitle" class="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4 border-t pt-3 sm:pt-4">Composición del Flujo de Efectivo Bruto (Entradas)</h3>
-                    <div class="panel-transparent p-4 sm:p-6 rounded-xl shadow-lg flex justify-center items-center h-64 sm:h-80 md:h-85">
+                    <div class="panel-transparent p-4 sm:p-6 rounded-xl shadow-lg flex justify-center items-center min-h-0">
                         <canvas id="cashFlowChart"></canvas>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
 
     <!-- Modal para seleccionar fecha de reporte diario -->
     <div id="dailyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
             <div class="mt-3 text-center">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">Generar Reporte por Día</h3>
                 <div class="mt-4 px-7 py-3">
@@ -130,7 +130,7 @@
 
     <script>
         // --- CONFIGURACIÓN Y UTILIDADES ---
-        const API_BASE_URL = 'http://localhost:8080';
+        const API_BASE_URL = 'http://192.168.0.248:8080';
         
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser')) || { idUsuario: 1, nombre: 'Usuario Desconocido' };
         const ID_USUARIO = activeUser.idUsuario;
