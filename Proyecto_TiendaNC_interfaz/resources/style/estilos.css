@@ -252,6 +252,7 @@ body {
     /* min-height: calc(100vh - 4.5rem); */ /* Eliminado */
     flex-grow: 1; /* Añadido para ocupar el espacio restante */
     display: flex;
+    flex-direction: column; /* CRUCIAL: Añadido para que el contenido se apile verticalmente */
     padding: 0 1rem 1rem 1rem;
     gap: 1rem;
     width: 100%; /* Full width on small screens */
