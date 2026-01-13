@@ -260,7 +260,15 @@
                 lowStockCount.textContent = lowStockProducts.length;
 
                 const totalInventoryCost = allProducts.reduce((sum, product) => {
-                    return sum + (product.precio_costo * product.stock);
+                    let cost = 0;
+                    if (product.is_gramaje) {
+                        // Assuming product.stock is in grams and product.precio_costo is per kilo
+                        cost = (product.stock / 1000) * product.precio_costo;
+                    } else {
+                        // For regular products, stock is in units
+                        cost = product.precio_costo * product.stock;
+                    }
+                    return sum + cost;
                 }, 0);
                 totalInventoryCostDisplay.textContent = `$${totalInventoryCost.toFixed(2)}`;
 

@@ -65,6 +65,103 @@
         .modal-input {
             @apply mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-rose-500 focus:border-rose-500 sm:text-sm;
         }
+        .modal-display { /* New class for non-editable display elements in modals */
+            @apply mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm text-gray-900;
+        }
+        /* New Gramaje Calculator Styles */
+        /* body style not included to avoid conflicts */
+
+        .calc-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px; /* Inherited from parent div in actual implementation */
+        }
+
+        .grid-table {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
+        }
+        @media (max-width: 640px) { /* Tailwind's 'sm' breakpoint for mobile */
+            .grid-table {
+                grid-template-columns: 1fr; /* Stack on mobile */
+                gap: 1rem;
+            }
+        }
+
+        .header-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .big-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #1f2937;
+            width: 100%;
+            border: none;
+            outline: none;
+            background: transparent;
+        }
+        @media (max-width: 640px) { /* Reduce font size on mobile */
+            .big-number {
+                font-size: 2rem; /* Smaller font for mobile */
+            }
+        }
+
+        .input-focus:focus {
+            color: #2563eb;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 640px) { /* Stack on mobile */
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+        }
+
+        .btn-reset {
+            grid-column: span 2;
+            background-color: #ef4444;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: background 0.2s;
+        }
+
+        .btn-reset:hover {
+            background-color: #dc2626;
+        }
         /* Estilos para la búsqueda de productos */
         #searchResultsContainer { /* Targeting the container for its background */
              background-color: rgba(255, 255, 255, 0.95); /* Slightly less transparent for readability */
@@ -141,12 +238,6 @@
                         <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
                             class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
                             disabled>
-                        <div class="mt-2 flex items-center">
-                            <input type="checkbox" id="ventaMayoreoCheckbox" class="h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500">
-                            <label for="ventaMayoreoCheckbox" class="ml-2 block text-sm text-gray-900 font-medium">
-                                Venta por Mayoreo
-                            </label>
-                        </div>
                         <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
                             <!-- Los resultados de la búsqueda se inyectarán aquí -->
                         </div>  
@@ -236,7 +327,7 @@
         <div class="historial-modal-content relative">
             <h3 class="text-xl leading-6 font-bold text-gray-900 mb-4">Historial de Ventas del Día</h3>
             
-            <div class="grid grid-cols-2 gap-4 mb-4 text-left">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
                 <div class="bg-gray-100 p-3 rounded-lg">
                     <p class="text-sm text-gray-600">Cobro Total del Día</p>
                     <p id="historialCobroTotal" class="text-2xl font-bold text-green-600">$0.00</p>
@@ -247,7 +338,7 @@
                 </div>
             </div>
 
-            <div class="max-h-96 overflow-y-auto">
+            <div class="max-h-96 overflow-y-auto overflow-x-auto">
                 <table class="historial-table">
                     <thead>
                         <tr>
@@ -285,28 +376,87 @@
             let activeSaleId = null;
             let ticket = [];
 
-            const codigoProductoInput = document.getElementById('codigoProducto');
-            const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
-            const agregarProductoBtn = document.getElementById('agregarProductoBtn');
-            const ticketItemsTableBody = document.getElementById('ticketItems');
-            const ticketIdDisplay = document.getElementById('ticketIdDisplay');
-            const subtotalDisplay = document.getElementById('subtotalDisplay');
-            const totalDisplay = document.getElementById('totalDisplay');
-            const cobrarEfectivoBtn = document.getElementById('cobrarEfectivoBtn');
-            
-            const searchResultsContainer = document.getElementById('searchResultsContainer');
-            let debounceTimer;
+            // Gramaje Calculator Modal DOM elements declared here, inside activeUser check
+            let gramajeCalculatorModal;
+            let calcProductName;
+            let calcProductId;
+            let calcProductPricePerKilo; // Original price_venta from product
+            let calcProductStock; // Original stock from product
 
-            const paymentModal = document.getElementById('paymentModal');
-            const modalTotalAmount = document.getElementById('modalTotalAmount');
-            const amountPaid = document.getElementById('amountPaid');
-            const changeAmount = document.getElementById('changeAmount');
-            const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
-            const confirmPaymentSpeiBtn = document.getElementById('confirmPaymentSpeiBtn');
-            const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
+            let gramajeInput; // New ID for Grams input
+            let precioTotal; // New ID for Total Price display (div)
+            let precioBase; // New ID for Price per Kilo input
+            let calcResetBtn; // New ID for Reset Button
 
-            const ticketPanel = document.getElementById('ticketPanel'); // Nuevo: Referencia al panel principal del ticket
+            let calcAddToCartBtn;
+            let calcCancelBtn;
 
+
+            // Moved function definitions outside DOMContentLoaded for broader scope if needed
+            function openGramajeCalculator(product) {
+                if (!gramajeCalculatorModal) { // Check if elements are initialized
+                    console.error("Gramaje calculator modal elements not initialized.");
+                    return;
+                }
+                calcProductName.value = product.nombre;
+                calcProductId.value = product.idProducto;
+                calcProductPricePerKilo.value = product.precio_venta; // Hidden input for original product price_venta
+                calcProductStock.value = product.stock; // Hidden input for stock in grams
+
+                // Populate new visible elements
+                precioBase.value = product.precio_venta; // Set initial price per kilo
+                gramajeInput.value = ''; // Clear gramaje input
+                precioTotal.value = ''; // Changed from .textContent to .value
+
+                gramajeCalculatorModal.classList.remove('hidden');
+                gramajeInput.focus(); // Focus on the main gramaje input
+            }
+
+            function closeGramajeCalculator() {
+                if (gramajeCalculatorModal) { // Check if element is initialized
+                    gramajeCalculatorModal.classList.add('hidden');
+                }
+            }
+
+            // All other DOM-related variables and event listeners should be inside DOMContentLoaded
+            document.addEventListener('DOMContentLoaded', () => { 
+                const codigoProductoInput = document.getElementById('codigoProducto');
+                const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
+                const agregarProductoBtn = document.getElementById('agregarProductoBtn');
+                const ticketItemsTableBody = document.getElementById('ticketItems');
+                const ticketIdDisplay = document.getElementById('ticketIdDisplay');
+                const subtotalDisplay = document.getElementById('subtotalDisplay');
+                const totalDisplay = document.getElementById('totalDisplay');
+                const cobrarEfectivoBtn = document.getElementById('cobrarEfectivoBtn');
+                
+                const searchResultsContainer = document.getElementById('searchResultsContainer');
+                let debounceTimer;
+
+                const paymentModal = document.getElementById('paymentModal');
+                const modalTotalAmount = document.getElementById('modalTotalAmount');
+                const amountPaid = document.getElementById('amountPaid');
+                const changeAmount = document.getElementById('changeAmount');
+                const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+                const confirmPaymentSpeiBtn = document.getElementById('confirmPaymentSpeiBtn');
+                const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
+
+                const ticketPanel = document.getElementById('ticketPanel'); // Nuevo: Referencia al panel principal del ticket
+
+                // Initialize Gramaje Calculator Modal DOM elements inside DOMContentLoaded
+                gramajeCalculatorModal = document.getElementById('gramajeCalculatorModal');
+                calcProductName = document.getElementById('calcProductName');
+                calcProductId = document.getElementById('calcProductId');
+                calcProductPricePerKilo = document.getElementById('calcProductPricePerKilo'); // Hidden input for original product price_venta
+                calcProductStock = document.getElementById('calcProductStock');
+
+                // New visible elements
+                gramajeInput = document.getElementById('gramajeInput');
+                precioTotal = document.getElementById('precioTotal'); // This is a div, so .textContent
+                precioBase = document.getElementById('precioBase'); // This is an input for the user to adjust price per kilo
+
+                calcAddToCartBtn = document.getElementById('calcAddToCartBtn');
+                calcCancelBtn = document.getElementById('calcCancelBtn');
+                calcResetBtn = document.getElementById('calcResetBtn');
             async function fetchApi(endpoint, method = 'GET', data = null) {
                 let url = `${API_BASE_URL}${endpoint}`;
                 const options = { method, headers: { 'Content-Type': 'application/json' } };
@@ -380,24 +530,47 @@
             }
 
             function renderTicket() {
+                // Update table header for new column
+                const tableHeader = document.querySelector('#ticketTable thead tr');
+                tableHeader.innerHTML = `
+                    <th class="p-2 w-[10%]">Código</th>
+                    <th class="p-2 w-[30%]">Descripción</th>
+                    <th class="p-2 w-[12%] text-right">Precio</th>
+                    <th class="p-2 w-[8%] text-center">Mayoreo</th>
+                    <th class="p-2 w-[10%] text-center">Cantidad</th>
+                    <th class="p-2 w-[15%] text-right">Importe</th>
+                    <th class="p-2 w-[5%] text-center">Eliminar</th> <!-- New column -->
+                `;
+
                 ticketItemsTableBody.innerHTML = '';
                 if (ticket.length === 0) {
-                    ticketItemsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No hay productos</td></tr>`;
+                    ticketItemsTableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-gray-500">No hay productos</td></tr>`;
                     ticketPanel.classList.remove('has-products-bg');
                 } else {
                     ticket.forEach((item, index) => {
                         const row = document.createElement('tr');
                         row.className = 'border-b';
+                        const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
                         row.innerHTML = `
                             <td class="p-2">${item.idProducto}</td>
                             <td class="p-2">${item.nombreProducto || 'Cargando...'}</td>
                             <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
+                            <td class="p-2 text-center">
+                                <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
+                            </td>
                             <td class="p-2 text-center">
                                 <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
                                 <span class="mx-2">${item.cantidad}</span>
                                 <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
                             </td>
                             <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
+                            <td class="p-2 text-center"> <!-- New column -->
+                                <button class="btn-delete-item p-1 rounded-full hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" data-index="${index}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </td>
                         `;
                         ticketItemsTableBody.appendChild(row);
                     });
@@ -432,21 +605,6 @@
                     const productData = await fetchApi(`/productos/buscarProductoPorId/${String(code).trim()}`);
                     if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
                     
-                    // Determine price based on checkbox
-                    const esVentaMayoreo = ventaMayoreoCheckbox.checked;
-                    let precioAUtilizar;
-
-                    if (esVentaMayoreo) {
-                        if (productData.precio_mayoreo === null || productData.precio_mayoreo === undefined || productData.precio_mayoreo <= 0) {
-                            alertUser(`El producto "${productData.nombre}" no tiene un precio por mayoreo válido. Se usará el precio normal.`, 'info');
-                            precioAUtilizar = productData.precio_venta; // Fallback to retail price
-                        } else {
-                            precioAUtilizar = productData.precio_mayoreo;
-                        }
-                    } else {
-                        precioAUtilizar = productData.precio_venta;
-                    }
-                    
                     if (ticket.find(item => item.idProducto === productData.idProducto)) {
                         if ((ticket.find(item => item.idProducto === productData.idProducto).cantidad + 1) > productData.stock) {
                            alertUser(`Stock insuficiente para "${productData.nombre}".`, 'error');
@@ -459,6 +617,11 @@
                         }
                     }
 
+                    if (productData.is_gramaje) {
+                        openGramajeCalculator(productData);
+                        return;
+                    }
+
                     if (!activeSaleId) {
                         await createNewSale();
                     }
@@ -467,28 +630,27 @@
 
                     const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
                     if (existingItemIndex !== -1) {
-                        // For simplicity, if adding existing item, it retains its original price type
-                        // A more complex logic might update the price type if the checkbox state changed
-                        // For now, we only update quantity.
                         await updateQuantity(existingItemIndex, 1);
                     } else {
                         const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
                         const detailPayload = {
                             cantidad: 1,
-                            precioUnitarioVenta: precioAUtilizar, // Use the determined price
+                            precioUnitarioVenta: productData.precio_venta, // Default to retail
                             Venta: ventaData,
-                            Producto: productData
+                            Producto: productData,
+                            tipoPrecioAplicado: "VENTA" // Default to VENTA
                         };
                         const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
                         ticket.push({
                             idProducto: productData.idProducto,
                             nombreProducto: productData.nombre,
                             cantidad: 1,
-                            precioUnitarioVenta: precioAUtilizar, // Use the determined price
+                            precioUnitarioVenta: productData.precio_venta, // Default to retail
                             existence: productData.stock,
                             idVentaDetalle: newDetail.idVentaDetalle,
                             Venta: ventaData,
-                            Producto: productData
+                            Producto: productData,
+                            isMayoreo: false // Add flag
                         });
                         renderTicket();
                     }
@@ -536,7 +698,8 @@
                             existence: detail.Producto.stock,
                             idVentaDetalle: detail.idVentaDetalle,
                             Venta: detail.Venta,
-                            Producto: detail.Producto
+                            Producto: detail.Producto,
+                            isMayoreo: (detail.Producto.precio_mayoreo && detail.precioUnitarioVenta === detail.Producto.precio_mayoreo) // Infer state
                         })) : [];
                         renderTicket();
                     } else {
@@ -572,6 +735,41 @@
                 paymentModal.classList.add('hidden');
             }
 
+            // New Gramaje Calculator Functions
+            function updateCalculatorDisplay(source) {
+                let grams = parseFloat(gramajeInput.value) || 0;
+                let totalPrice = parseFloat(precioTotal.value) || 0;
+                const pricePerKilo = parseFloat(precioBase.value) || 0;
+
+                if (source === 'grams') {
+                    if (!isNaN(grams) && !isNaN(pricePerKilo) && grams >= 0) {
+                        totalPrice = (grams / 1000) * pricePerKilo;
+                        precioTotal.value = totalPrice.toFixed(2);
+                    } else {
+                        precioTotal.value = '';
+                    }
+                } else if (source === 'totalPrice') {
+                    if (!isNaN(totalPrice) && !isNaN(pricePerKilo) && pricePerKilo > 0 && totalPrice >= 0) {
+                        grams = (totalPrice / pricePerKilo) * 1000;
+                        gramajeInput.value = grams.toFixed(0);
+                    } else {
+                        gramajeInput.value = '';
+                    }
+                }
+            }
+
+            function setGramaje(grams) {
+                gramajeInput.value = grams;
+                updateCalculatorDisplay('grams'); // Corrected function call
+            }
+
+            function resetGramajeCalculator() { // Renamed from reset() to avoid conflict
+                gramajeInput.value = '';
+                precioTotal.value = ''; // Changed from .textContent to .value
+                precioBase.value = calcProductPricePerKilo.value; // Reset to product's original price per kilo
+                gramajeInput.focus();
+            }
+
             function calculateChange() {
                 const total = parseFloat(modalTotalAmount.textContent.replace('$', ''));
                 const paid = parseFloat(amountPaid.value) || 0;
@@ -594,11 +792,9 @@
                 if (!activeSaleId || ticket.length === 0) return;
                 try {
                     const montoTotal = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
-                    const tipoVenta = ventaMayoreoCheckbox.checked ? 'MAYOREO' : 'MENUDEO'; // NEW
                     const payload = {
                         montoTotal: montoTotal,
-                        metodoPago: 'TRANSFERENCIA',
-                        tipoVenta: tipoVenta // NEW
+                        metodoPago: 'TRANSFERENCIA'
                     };
                     await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', payload);
                     alertUser(`Venta #${activeSaleId} completada con Transferencia.`, 'success');
@@ -614,8 +810,8 @@
                 if (!activeSaleId || ticket.length === 0) return;
                 try {
                     const montoTotal = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
-                    const tipoVenta = ventaMayoreoCheckbox.checked ? 'MAYOREO' : 'MENUDEO'; // NEW
-                    await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', { montoTotal, tipoVenta }); // NEW
+                    // Eliminar tipoVenta del payload, ya que se gestiona por producto individual
+                    await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', { montoTotal }); 
                     alertUser(`Venta #${activeSaleId} completada con ${paymentMethod}.`, 'success');
                     await initializeSale();
                 } catch (error) {
@@ -669,6 +865,50 @@
                 }
             }
 
+            function handleMayoreoToggle(e) {
+                if (e.target.classList.contains('mayoreo-checkbox')) {
+                    const index = parseInt(e.target.dataset.index);
+                    const item = ticket[index];
+                    const isChecked = e.target.checked;
+                    
+                    let newPrecio;
+                    let newIsMayoreo;
+
+                    if (isChecked) {
+                        if (item.Producto.precio_mayoreo === null || item.Producto.precio_mayoreo === undefined || item.Producto.precio_mayoreo <= 0) {
+                            alertUser(`El producto "${item.nombreProducto}" no tiene un precio por mayoreo válido.`, 'error');
+                            e.target.checked = false; // Revert checkbox state
+                            return;
+                        }
+                        newPrecio = item.Producto.precio_mayoreo;
+                        newIsMayoreo = true;
+                    } else {
+                        newPrecio = item.Producto.precio_venta;
+                        newIsMayoreo = false;
+                    }
+                    
+                    const updatedItem = {
+                        ...item,
+                        precioUnitarioVenta: newPrecio,
+                        isMayoreo: newIsMayoreo,
+                        tipoPrecioAplicado: newIsMayoreo ? "MAYOREO" : "VENTA"
+                    };
+                    fetchApi(`/ventasDetalle/actualizarVentaDetalle/${item.idVentaDetalle}`, 'PUT', updatedItem)
+                        .then(() => {
+                            ticket[index] = updatedItem; // Update local ticket state
+                            renderTicket();
+                        })
+                        .catch(err => {
+                            alertUser(`Error al actualizar precio: ${err.message}`, 'error');
+                            e.target.checked = !isChecked; // Revert checkbox state on API error
+                            // Revert local state to match UI
+                            item.precioUnitarioVenta = isChecked ? item.Producto.precio_venta : item.Producto.precio_mayoreo;
+                            item.isMayoreo = !isChecked;
+                            renderTicket(); // Re-render to ensure UI reflects correct state
+                        }); 
+                }
+            }
+
             codigoProductoInput.addEventListener('input', e => {
                 clearTimeout(debounceTimer);
                 const query = e.target.value.trim();
@@ -704,13 +944,18 @@
             ticketItemsTableBody.addEventListener('click', async e => {
                 const target = e.target;
                 if (target.classList.contains('btn-qty-plus')) await updateQuantity(target.dataset.index, 1);
-                if (target.classList.contains('btn-qty-minus')) await updateQuantity(target.dataset.index, -1);
+                else if (target.classList.contains('btn-qty-minus')) await updateQuantity(target.dataset.index, -1);
+                else if (target.classList.contains('mayoreo-checkbox')) handleMayoreoToggle(e);
+                else if (target.closest('.btn-delete-item')) { // New condition for delete button
+                    const index = target.closest('.btn-delete-item').dataset.index;
+                    await removeProductFromTicket(index);
+                }
             });
             document.addEventListener('keydown', e => {
                 if (e.key === 'F12') { e.preventDefault(); openPaymentModal(); }
             });
 
-            document.addEventListener('DOMContentLoaded', initializeSale);
+
 
             // --- Lógica para la Modal de Historial de Ventas ---
             const historialModal = document.getElementById('historialVentasModal');
@@ -813,6 +1058,19 @@
                 }
             }
 
+            async function removeProductFromTicket(index) {
+                const itemToRemove = ticket[index];
+                try {
+                    await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${itemToRemove.idVentaDetalle}`, 'DELETE');
+                    ticket.splice(index, 1); // Remove from local array
+                    renderTicket(); // Re-render the table
+                    alertUser(`Producto "${itemToRemove.nombreProducto}" eliminado del ticket.`, 'success');
+                } catch (error) {
+                    alertUser(`Error al eliminar producto: ${error.message}`, 'error');
+                }
+            }
+
+
             verHistorialBtn.addEventListener('click', () => {
                 historialModal.classList.remove('hidden');
                 cargarHistorialVentas();
@@ -828,10 +1086,186 @@
                 }
             });
 
-            historialVentasBody.addEventListener('click', handleCancelarVenta);
-        }
-    </script>
+            async function addGramajeProductToSale() {
+                const productId = calcProductId.value;
+                const productName = calcProductName.value;
+                let grams = parseFloat(gramajeInput.value); // New ID
+                let totalPrice = parseFloat(precioTotal.value); // Read from .value now
+
+                const pricePerKiloFromProduct = parseFloat(calcProductPricePerKilo.value); // Hidden original price_venta from product
+                const stockAvailable = parseFloat(calcProductStock.value); // Stock is also in grams for gramaje products
+                const currentPricePerKilo = parseFloat(precioBase.value); // Current visible price per kilo from input
+
+                if (isNaN(grams) || grams <= 0 || isNaN(totalPrice) || totalPrice <= 0) {
+                    alertUser('Por favor, ingrese un gramaje o precio total válido.', 'error');
+                    return;
+                }
+                
+                // Ensure grams is a whole number if that's the intention, or adjust precision
+                grams = Math.round(grams); 
+                totalPrice = parseFloat(totalPrice.toFixed(2)); // Ensure consistent precision
+
+                if (grams > stockAvailable) {
+                    alertUser(`Stock insuficiente para "${productName}". Disponible: ${stockAvailable} gramos.`, 'error');
+                    return;
+                }
+
+                try {
+                    if (!activeSaleId) {
+                        await createNewSale();
+                    }
+
+                    if (!activeSaleId) throw new Error("No se pudo crear una nueva venta.");
+
+                    const existingItemIndex = ticket.findIndex(item => item.idProducto === productId);
+
+                    // For gramaje products, if already in ticket, we treat it as a new line item
+                    // or ask the user if they want to add to existing. For simplicity, let's add as new.
+                    // If the user wants to combine, they can do it manually after.
+                    // OR, if the requirement is to always add to existing if same product:
+                    if (existingItemIndex !== -1) {
+                        const existingItem = ticket[existingItemIndex];
+                        const newTotalGrams = existingItem.cantidad + grams; // Assuming cantidad for gramaje product is in grams
+
+                        if (newTotalGrams > stockAvailable) {
+                            alertUser(`Stock insuficiente para "${productName}". Al intentar agregar ${grams}g, excedería el stock total. Disponible: ${stockAvailable} gramos.`, 'error');
+                            return;
+                        }
+
+                        // Update existing item
+                        const updatedItem = {
+                            ...existingItem,
+                            cantidad: newTotalGrams,
+                            // Use the currentPricePerKilo from the modal for calculation, not the average
+                            precioUnitarioVenta: totalPrice / grams, // This is price per gram based on current modal calculation
+                        };
+                        await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', {
+                            cantidad: updatedItem.cantidad,
+                            precioUnitarioVenta: updatedItem.precioUnitarioVenta,
+                        });
+                        ticket[existingItemIndex] = updatedItem;
+                    } else {
+                        // Add as new item
+                        const productData = {
+                            idProducto: productId,
+                            nombre: productName,
+                            precio_venta: currentPricePerKilo, // Use the current price per kilo from modal
+                            stock: stockAvailable,
+                            is_gramaje: true
+                        };
+                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
+                        const detailPayload = {
+                            cantidad: grams, // Quantity is in grams
+                            precioUnitarioVenta: totalPrice / grams, // Price per gram
+                            Venta: ventaData,
+                            Producto: productData,
+                            tipoPrecioAplicado: "VENTA_GRAMAJE" // New type for gramaje sales
+                        };
+                        const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
+                        ticket.push({
+                            idProducto: productId,
+                            nombreProducto: productName,
+                            cantidad: grams,
+                            precioUnitarioVenta: totalPrice / grams,
+                            existence: stockAvailable,
+                            idVentaDetalle: newDetail.idVentaDetalle,
+                            Venta: ventaData,
+                            Producto: productData,
+                            isMayoreo: false // Gramaje products typically don't have mayoreo in the same way
+                        });
+                    }
+
+                    renderTicket();
+                    closeGramajeCalculator();
+                    alertUser(`Producto por gramaje "${productName}" agregado a la venta.`, 'success');
+
+                } catch (error) {
+                    alertUser(`Error al agregar producto por gramaje: ${error.message}`, 'error');
+                } finally {
+                    codigoProductoInput.value = '';
+                    codigoProductoInput.disabled = false;
+                    agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
+                    codigoProductoInput.focus();
+                }
+            }
+
+            // Gramaje Calculator Event Listeners
+            gramajeInput.addEventListener('input', () => updateCalculatorDisplay('grams'));
+            precioTotal.addEventListener('input', () => updateCalculatorDisplay('totalPrice'));
+            precioBase.addEventListener('input', () => updateCalculatorDisplay('grams')); // Changing priceBase affects total price which is derived from grams
+
+            calcCancelBtn.addEventListener('click', closeGramajeCalculator);
+            calcAddToCartBtn.addEventListener('click', addGramajeProductToSale);
+            calcResetBtn.addEventListener('click', resetGramajeCalculator); // Reset button event listener
+
+            // Event listeners for quick action buttons
+            document.querySelectorAll('[data-gramaje]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const grams = parseFloat(e.target.dataset.gramaje);
+                    if (!isNaN(grams)) {
+                        setGramaje(grams);
+                    }
+                });
+            });
+            initializeSale(); // Call initializeSale here after everything is set up
+        }); // Correctly closing DOMContentLoaded
+    } // Correctly closing if (activeUser)
+</script>
     <script src="nav.js" defer></script>
+
+    <!-- Modal para Calculadora de Gramaje -->
+    <div id="gramajeCalculatorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center z-50">
+        <div class="relative p-5 border w-11/12 md:max-w-3xl shadow-lg rounded-md bg-white text-center">
+            <div class="calc-container">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Calculadora de Gramaje</h3>
+                <div class="mb-3">
+                    <label for="calcProductName" class="block text-sm font-medium text-gray-700">Producto:</label>
+                    <input type="text" id="calcProductName" class="config-input" readonly>
+                    <input type="hidden" id="calcProductId">
+                    <input type="hidden" id="calcProductPricePerKilo"> <!-- This will be the original price_venta from product, used in calculations -->
+                    <input type="hidden" id="calcProductStock">
+                </div>
+                
+                <div class="grid-table">
+                    <!-- Fila 1: Títulos -->
+                    <div class="header-text">Gramaje a vender (g)</div>
+                    <div class="header-text">Precio Total ($)</div>
+
+                    <!-- Fila 2: Inputs/Valores -->
+                    <div>
+                        <input type="number" id="gramajeInput" class="big-number input-focus" value="" step="10" placeholder="0"> <!-- Initial value will be set by JS -->
+                    </div>
+                    <div>
+                        <input type="number" id="precioTotal" class="big-number text-blue-600" value="0.00" step="0.01" placeholder="0"> <!-- Changed back to input -->
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div>
+                        <label class="label">Precio por Kilogramo (1000g)</label>
+                        <input type="number" id="precioBase" class="config-input" value="" step="0.5"> <!-- Initial value will be set by JS -->
+                    </div>
+                    <div>
+                        <label class="label">Acciones rápidas</label>
+                        <div class="flex gap-2">
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="250">250g</button>
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="500">500g</button>
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="1000">1kg</button>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="calcResetBtn" class="btn-reset">Limpiar Campos</button>
+                </div>
+                <div class="flex justify-around items-center space-x-2 mt-4">
+                    <button id="calcAddToCartBtn" class="w-full bg-rose-600 text-white font-semibold py-2 rounded-lg hover:bg-rose-700 transition duration-150 shadow-md">
+                        Agregar a Venta
+                    </button>
+                    <button id="calcCancelBtn" class="w-full bg-gray-400 text-white font-semibold py-2 rounded-lg hover:bg-gray-500 transition duration-150 shadow-md">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+    </div>
 </body>
 
 </html>

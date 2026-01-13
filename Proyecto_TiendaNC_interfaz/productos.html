@@ -124,16 +124,17 @@
                     <table class="w-full text-left product-table text-sm">
                         <thead>
                             <tr>
-                                <th class="p-3 w-[10%]">ID</th>
-                                <th class="p-3 w-[45%]">Descripción</th>
+                                <th class="p-3 w-[8%]">ID</th>
+                                <th class="p-3 w-[37%]">Descripción</th>
                                 <th class="p-3 w-[15%] text-right">Precio Venta</th>
-                                <th class="p-3 w-[15%] text-right">Costo</th>
+                                <th class="p-3 w-[15%] text-right">Precio Mayoreo</th>
+                                <th class="p-3 w-[10%] text-right">Costo</th>
                                 <th class="p-3 w-[15%] text-center">Stock</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
                             <!-- Los productos se cargarán aquí -->
-                            <tr><td colspan="5" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
+                            <tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -187,6 +188,11 @@
                     <label for="cantidadMax">Cantidad Máxima</label>
                     <input type="number" id="cantidadMax" min="0" required>
                 </div>
+
+                <div class="form-group flex items-center space-x-2">
+                    <input type="checkbox" id="isGramaje" class="h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500">
+                    <label for="isGramaje" class="text-sm font-medium text-gray-700">Usa Gramaje (Venta por peso)</label>
+                </div>
                 
                 <!-- El apartado de Categoría ha sido eliminado según solicitud -->
 
@@ -228,6 +234,24 @@
         const stockActualInput = document.getElementById('stockActual');
         const cantidadMinInput = document.getElementById('cantidadMin');
         const cantidadMaxInput = document.getElementById('cantidadMax');
+        const isGramajeInput = document.getElementById('isGramaje'); // NEW: Gramaje checkbox
+        
+        // Labels for dynamic text
+        const precioVentaLabel = document.querySelector('label[for="precioVenta"]');
+        const precioCostoLabel = document.querySelector('label[for="precioCosto"]');
+        const stockActualLabel = document.querySelector('label[for="stockActual"]');
+
+        function updateGramajeLabels(isGramaje) {
+            if (isGramaje) {
+                precioVentaLabel.textContent = 'Precio de Venta (por Kg)';
+                precioCostoLabel.textContent = 'Precio de Costo (por Kg)';
+                stockActualLabel.textContent = 'Stock/Existencia (en gramos)';
+            } else {
+                precioVentaLabel.textContent = 'Precio de Venta ($)';
+                precioCostoLabel.textContent = 'Precio de Costo ($)';
+                stockActualLabel.textContent = 'Stock/Existencia';
+            }
+        }
         // const categoriaInput = document.getElementById('categoria'); // Eliminado
 
 
@@ -335,7 +359,7 @@
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-medium">${product.nombre}</td>
                     <td class="p-3 text-right text-rose-600 font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
-                    <td class="p-3 text-right">$${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : 0).toFixed(2)}</td> // NEW
+                    <td class="p-3 text-right">${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined && product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</td>
                     <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
                     <td class="p-3 text-center">${product.stock}</td>
                 `;
@@ -359,6 +383,8 @@
             stockActualInput.value = product.stock;
             cantidadMinInput.value = product.cantidad_min;
             cantidadMaxInput.value = product.cantidad_max;
+            isGramajeInput.checked = product.is_gramaje || false; // NEW: Set gramaje checkbox
+            updateGramajeLabels(product.is_gramaje || false); // Update labels based on gramaje status
             // La asignación de categoría ha sido eliminada
             
             formTitle.textContent = `Modificar Producto #${product.idProducto}`;
@@ -380,6 +406,8 @@
             
             // Clear new input
             precioMayoreoInput.value = ''; // NEW
+            isGramajeInput.checked = false; // NEW: Reset gramaje checkbox
+            updateGramajeLabels(false); // Reset labels to default
         }
 
         // Event listener para seleccionar una fila en la tabla
@@ -397,6 +425,11 @@
         // Event listener para el botón de "Nuevo Producto"
         clearSelectionBtn.addEventListener('click', resetForm);
 
+        // Event listener para el checkbox de gramaje
+        isGramajeInput.addEventListener('change', () => {
+            updateGramajeLabels(isGramajeInput.checked);
+        });
+
         // --- MANEJO DE SUBMIT DEL FORMULARIO ---
 
         productForm.addEventListener('submit', async (e) => {
@@ -412,6 +445,7 @@
                 stock: parseInt(stockActualInput.value),
                 cantidad_min: parseInt(cantidadMinInput.value),
                 cantidad_max: parseInt(cantidadMaxInput.value),
+                is_gramaje: isGramajeInput.checked // NEW: Include gramaje status
                 // idCategoria ha sido eliminado de la carga útil
             };
 
@@ -499,6 +533,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadProducts();
             resetForm();
+            updateGramajeLabels(false); // Set initial state of labels
         });
         
     </script>
