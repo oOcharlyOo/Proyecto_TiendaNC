@@ -7,225 +7,10 @@
     <title>Sistema de Punto de Venta - VENTA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-image: url(resources/fondo.png);
-            background-size: cover; /* Ensure background covers the entire body */
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed; /* Keep background fixed when scrolling */
-        }
-        
-        /* Make various elements transparent */
-        .main-container {
-            background-color: transparent; /* Remove solid background */
-            height: calc(100vh - 4.5rem);
-            display: flex;
-            padding: 0 1rem 1rem 1rem;
-            gap: 1rem;
-        }
-        .panel-transparent { /* New class for panels */
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-        }
-        .ticket-table thead {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            color: #1f2937;
-        }
-        .importe-green {
-            color: #10b981;
-            font-weight: 600;
-        }
-        #exit-btn {
-            background-color: #ef4444;
-            color: white;
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
-            min-width: 80px;
-        }
-        #exit-btn:hover {
-            background-color: #dc2626;
-        }
-        #codigoProductoInput {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            border: 2px solid #f472b6;
-            box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.2);
-        }
-        .summary-row {
-            @apply flex justify-between items-center py-2 text-gray-700;
-        }
-        .summary-total {
-            @apply flex justify-between items-center py-3 font-bold text-xl border-t-2 border-gray-300;
-        }
-        .qty-btn {
-            @apply px-2 py-0.5 bg-gray-200 rounded hover:bg-gray-300;
-        }
-        #paymentModal {
-            z-index: 100;
-        }
-        .modal-input {
-            @apply mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-rose-500 focus:border-rose-500 sm:text-sm;
-        }
-        .modal-display { /* New class for non-editable display elements in modals */
-            @apply mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm text-gray-900;
-        }
-        /* New Gramaje Calculator Styles */
-        /* body style not included to avoid conflicts */
-
-        .calc-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 800px; /* Inherited from parent div in actual implementation */
-        }
-
-        .grid-table {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 2rem;
-            margin-bottom: 2rem;
-        }
-        @media (max-width: 640px) { /* Tailwind's 'sm' breakpoint for mobile */
-            .grid-table {
-                grid-template-columns: 1fr; /* Stack on mobile */
-                gap: 1rem;
-            }
-        }
-
-        .header-text {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #4b5563;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .big-number {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #1f2937;
-            width: 100%;
-            border: none;
-            outline: none;
-            background: transparent;
-        }
-        @media (max-width: 640px) { /* Reduce font size on mobile */
-            .big-number {
-                font-size: 2rem; /* Smaller font for mobile */
-            }
-        }
-
-        .input-focus:focus {
-            color: #2563eb;
-        }
-
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-        @media (max-width: 640px) { /* Stack on mobile */
-            .controls {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .label {
-            font-size: 0.875rem;
-            color: #6b7280;
-            margin-bottom: 0.5rem;
-            display: block;
-        }
-
-        .config-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            font-size: 1.125rem;
-        }
-
-        .btn-reset {
-            grid-column: span 2;
-            background-color: #ef4444;
-            color: white;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            margin-top: 1rem;
-            transition: background 0.2s;
-        }
-
-        .btn-reset:hover {
-            background-color: #dc2626;
-        }
-        /* Estilos para la búsqueda de productos */
-        #searchResultsContainer { /* Targeting the container for its background */
-             background-color: rgba(255, 255, 255, 0.95); /* Slightly less transparent for readability */
-        }
-        #searchResultsContainer .search-result-item {
-            @apply px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100 flex justify-between items-center;
-        }
-        #searchResultsContainer .search-result-item:last-child {
-            @apply border-b-0;
-        }
-        #tablaEditada {
-            /* No background-image here, it's on the body now */
-            background-color: rgba(255, 255, 255, 0.85);
-            background-color: transparent; /* Ensure it's transparent */
-            background-size: cover; /* Inherit or ensure the image shows through */
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-        /* Estilo para las filas de productos en la tabla */
-        #ticketItems tr {
-            background-color: rgba(255, 255, 255, 0.85); /* Fondo blanco con 85% de opacidad */
-        }
-        /* Modal content should remain mostly opaque */
-        .modal-content {
-            background-color: rgba(255, 255, 255, 0.95); /* Mostly opaque white */
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        .has-products-bg {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-        }
-
-        /* Estilos para la modal de historial de ventas */
-        #historialVentasModal {
-            z-index: 101; /* Asegurar que esté por encima de otras modales */
-        }
-        .historial-modal-content {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            width: 90%;
-            max-width: 800px; /* Ancho mayor para la tabla */
-        }
-        .historial-table {
-            @apply w-full text-left text-sm;
-        }
-        .historial-table thead {
-            @apply bg-gray-100;
-        }
-        .historial-table th, .historial-table td {
-            @apply p-2 border-b;
-        }
-        .btn-cancelar-venta {
-            @apply bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-gray-400;
-        }
-    </style>
+    <link rel="stylesheet" href="resources/style/estilos.css">
 </head>
 
-<body>
+<body class="main-page-body">
     <div id="navbar-placeholder"></div>
 
     <div class="main-container flex-col md:flex-row p-2 md:p-4 gap-2 md:gap-4">
@@ -234,16 +19,16 @@
                 </h2>
                 <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
                     <div class="relative flex-grow">
-                        <label for="codigoProducto" class="block text-sm font-medium text-rose-600 self-center" style="color: rgb(31, 26, 26);">Código o Nombre del Producto:</label>
+                        <label for="codigoProducto" class="block text-sm font-medium text-primary self-center" style="color: rgb(31, 26, 26);">Código o Nombre del Producto:</label>
                         <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
                             disabled>
                         <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
                             <!-- Los resultados de la búsqueda se inyectarán aquí -->
                         </div>  
                     </div>
                     <button id="agregarProductoBtn"
-                        class="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600 transition duration-150 shadow-md self-end"
+                        class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end"
                         disabled>ENTER - Agregar por Código</button>
                 </div>
             </div>
@@ -271,7 +56,7 @@
             <div class="flex-grow">
                 <div class="summary-row"><span>Subtotal:</span><span id="subtotalDisplay">$0.00</span></div>
                 <div class="summary-total mt-4 border-t-2 border-gray-200"><span>TOTAL:</span><span id="totalDisplay"
-                        class="text-rose-600">$0.00</span></div>
+                        class="text-primary">$0.00</span></div>
             </div>
             <div class="mt-4 space-y-3">
                 <button id="cobrarEfectivoBtn"
@@ -279,7 +64,7 @@
                     - Cobrar (Efectivo)
                 </button>
                 <button id="verHistorialBtn"
-                    class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
+                    class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
                     Historial de Ventas
                 </button>
             </div>
@@ -292,29 +77,29 @@
                 <h3 class="text-lg leading-6 font-medium text-gray-900">Cobro en Efectivo</h3>
                 <div class="mt-2 px-7 py-3">
                     <p class="text-sm text-gray-500">Total a Pagar:</p>
-                    <p id="modalTotalAmount" class="text-3xl font-bold text-rose-600">$0.00</p>
+                    <p id="modalTotalAmount" class="text-3xl font-bold text-primary">$0.00</p>
                     <div class="mt-4">
                         <label for="amountPaid" class="block text-sm font-medium text-gray-700">Monto Recibido</label>
                         <input type="number" id="amountPaid"
-                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-rose-500 focus:border-rose-500 sm:text-sm"
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                             placeholder="0.00">
                     </div>
                     <div class="mt-4">
                         <p class="text-sm text-gray-500">Cambio:</p>
-                        <p id="changeAmount" class="text-2xl font-bold text-green-500">$0.00</p>
+                        <p id="changeAmount" class="text-2xl font-bold text-income-color">$0.00</p>
                     </div>
                 </div>
                 <div class="items-center px-4 py-3">
                     <button id="confirmPaymentBtn"
-                        class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+                        class="px-4 py-2 btn-primary text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary">
                         Confirmar Pago
                     </button>
                     <button id="confirmPaymentSpeiBtn"
-                        class="mt-2 px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        class="mt-2 px-4 py-2 btn-primary text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary">
                         Confirmar Pago Transferencia
                     </button>
                     <button id="cancelPaymentBtn"
-                        class="mt-2 px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                        class="mt-2 px-4 py-2 btn-danger text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-danger">
                         Cancelar
                     </button>
                 </div>
@@ -330,11 +115,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
                 <div class="bg-gray-100 p-3 rounded-lg">
                     <p class="text-sm text-gray-600">Cobro Total del Día</p>
-                    <p id="historialCobroTotal" class="text-2xl font-bold text-green-600">$0.00</p>
+                    <p id="historialCobroTotal" class="text-2xl font-bold text-income-color">$0.00</p>
                 </div>
                 <div class="bg-gray-100 p-3 rounded-lg">
                     <p class="text-sm text-gray-600">Ganancia Total del Día</p>
-                    <p id="historialGananciaTotal" class="text-2xl font-bold text-blue-600">$0.00</p>
+                    <p id="historialGananciaTotal" class="text-2xl font-bold text-profit-color">$0.00</p>
                 </div>
             </div>
 
@@ -357,7 +142,7 @@
             </div>
 
             <div class="mt-6 text-right">
-                <button id="cerrarHistorialModalBtn" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">
+                <button id="cerrarHistorialModalBtn" class="btn-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-dark">
                     Cerrar
                 </button>
             </div>
@@ -518,7 +303,7 @@
 
             function alertUser(message, type = 'info') {
                 const alertDiv = document.createElement('div');
-                alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+                alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 ${type === 'success' ? 'bg-primary' : 'bg-danger'}`;
                 alertDiv.textContent = message;
                 document.body.appendChild(alertDiv);
                 setTimeout(() => alertDiv.remove(), 3000);
@@ -549,14 +334,14 @@
                 } else {
                     ticket.forEach((item, index) => {
                         const row = document.createElement('tr');
-                        row.className = 'border-b';
+                        row.className = 'border-b encabezado-zelda-text';
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
                         row.innerHTML = `
                             <td class="p-2">${item.idProducto}</td>
                             <td class="p-2">${item.nombreProducto || 'Cargando...'}</td>
                             <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
                             <td class="p-2 text-center">
-                                <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
+                                <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
                             </td>
                             <td class="p-2 text-center">
                                 <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
@@ -566,7 +351,7 @@
                             <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
                             <td class="p-2 text-center"> <!-- New column -->
                                 <button class="btn-delete-item p-1 rounded-full hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" data-index="${index}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
@@ -744,7 +529,7 @@
                 if (source === 'grams') {
                     if (!isNaN(grams) && !isNaN(pricePerKilo) && grams >= 0) {
                         totalPrice = (grams / 1000) * pricePerKilo;
-                        precioTotal.value = totalPrice.toFixed(2);
+                        precioTotal.value = totalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     } else {
                         precioTotal.value = '';
                     }
@@ -768,6 +553,7 @@
                 precioTotal.value = ''; // Changed from .textContent to .value
                 precioBase.value = calcProductPricePerKilo.value; // Reset to product's original price per kilo
                 gramajeInput.focus();
+                updateCalculatorDisplay('grams');
             }
 
             function calculateChange() {
@@ -829,7 +615,7 @@
                     const item = document.createElement('div');
                     item.className = 'search-result-item';
                     
-                    let pricesHtml = `<p class="font-bold text-rose-500">$${(product.precio_venta || 0).toFixed(2)}</p>`;
+                    let pricesHtml = `<p class="font-bold text-primary">$${(product.precio_venta || 0).toFixed(2)}</p>`;
                     if (product.precio_mayoreo && product.precio_mayoreo > 0) {
                         pricesHtml += `<p class="text-sm text-gray-500">Mayoreo: $${(product.precio_mayoreo || 0).toFixed(2)}</p>`;
                     }
@@ -999,7 +785,7 @@
                                 statusClass = 'bg-blue-200 text-blue-800'; // Using blue for 'Completada'
                             } else if (venta.estatus === 'I') {
                                 statusText = 'Inactiva/Cancelada';
-                                statusClass = 'bg-red-200 text-red-800';
+                                statusClass = 'bg-red-200 text-danger';
                             } else {
                                 statusText = venta.estatus; // Fallback for unknown status
                                 statusClass = 'bg-gray-200 text-gray-800';
@@ -1020,11 +806,11 @@
                                 <td>${new Date(venta.fechaVenta).toLocaleTimeString()}</td>
                                 <td class="text-center">
                                     <button 
-                                        class="btn-cancelar-venta p-1 rounded-full hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                                        class="btn-cancelar-venta p-1 rounded-full hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" 
                                         data-id="${venta.idVenta}" 
                                         title="Cancelar Venta"
                                         ${canBeCancelled ? '' : 'disabled'}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
@@ -1215,57 +1001,55 @@
 
     <!-- Modal para Calculadora de Gramaje -->
     <div id="gramajeCalculatorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center z-50">
-        <div class="relative p-5 border w-11/12 md:max-w-3xl shadow-lg rounded-md bg-white text-center">
-            <div class="calc-container">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Calculadora de Gramaje</h3>
-                <div class="mb-3">
-                    <label for="calcProductName" class="block text-sm font-medium text-gray-700">Producto:</label>
-                    <input type="text" id="calcProductName" class="config-input" readonly>
-                    <input type="hidden" id="calcProductId">
-                    <input type="hidden" id="calcProductPricePerKilo"> <!-- This will be the original price_venta from product, used in calculations -->
-                    <input type="hidden" id="calcProductStock">
-                </div>
-                
-                <div class="grid-table">
-                    <!-- Fila 1: Títulos -->
-                    <div class="header-text">Gramaje a vender (g)</div>
-                    <div class="header-text">Precio Total ($)</div>
-
-                    <!-- Fila 2: Inputs/Valores -->
-                    <div>
-                        <input type="number" id="gramajeInput" class="big-number input-focus" value="" step="10" placeholder="0"> <!-- Initial value will be set by JS -->
-                    </div>
-                    <div>
-                        <input type="number" id="precioTotal" class="big-number text-blue-600" value="0.00" step="0.01" placeholder="0"> <!-- Changed back to input -->
-                    </div>
-                </div>
-
-                <div class="controls">
-                    <div>
-                        <label class="label">Precio por Kilogramo (1000g)</label>
-                        <input type="number" id="precioBase" class="config-input" value="" step="0.5"> <!-- Initial value will be set by JS -->
-                    </div>
-                    <div>
-                        <label class="label">Acciones rápidas</label>
-                        <div class="flex gap-2">
-                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="250">250g</button>
-                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="500">500g</button>
-                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="1000">1kg</button>
+                    <div class="relative p-5 border w-11/12 md:max-w-3xl shadow-lg rounded-md bg-white text-center">
+                        <h3 class="text-lg leading-6 font-medium text-primary mb-4">Calculadora de Gramaje</h3>
+                        <div class="mb-3">
+                            <label for="calcProductName" class="block text-sm font-medium text-gray-700">Producto:</label>
+                            <input type="text" id="calcProductName" class="config-input" readonly>
+                            <input type="hidden" id="calcProductId">
+                            <input type="hidden" id="calcProductPricePerKilo"> <!-- This will be the original price_venta from product, used in calculations -->
+                            <input type="hidden" id="calcProductStock">
                         </div>
-                    </div>
-                    
-                    <button type="button" id="calcResetBtn" class="btn-reset">Limpiar Campos</button>
-                </div>
-                <div class="flex justify-around items-center space-x-2 mt-4">
-                    <button id="calcAddToCartBtn" class="w-full bg-rose-600 text-white font-semibold py-2 rounded-lg hover:bg-rose-700 transition duration-150 shadow-md">
-                        Agregar a Venta
-                    </button>
-                    <button id="calcCancelBtn" class="w-full bg-gray-400 text-white font-semibold py-2 rounded-lg hover:bg-gray-500 transition duration-150 shadow-md">
-                        Cancelar
-                    </button>
-                </div>
-            </div>
-    </div>
+                        
+                        <div class="grid-table">
+                            <!-- Fila 1: Títulos -->
+                            <div class="calc-header-text">Gramaje a vender (g)</div>
+                            <div class="calc-header-text">Precio Total ($)</div>
+        
+                            <!-- Fila 2: Inputs/Valores -->
+                            <div>
+                                <input type="number" id="gramajeInput" class="big-number input-focus" value="" step="10" placeholder="0">
+                            </div>
+                            <div>
+                                <input type="number" id="precioTotal" class="big-number text-profit-color" value="0.00" step="0.01" placeholder="0">
+                            </div>
+                        </div>
+        
+                        <div class="controls">
+                            <div>
+                                <label class="label">Precio por Kilogramo (1000g)</label>
+                                <input type="number" id="precioBase" class="config-input" value="" step="0.5">
+                            </div>
+                            <div>
+                                <label class="label">Acciones rápidas</label>
+                                <div class="flex gap-2">
+                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="250">250g</button>
+                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="500">500g</button>
+                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="1000">1kg</button>
+                                </div>
+                            </div>
+                            
+                            <button type="button" id="calcResetBtn" class="calc-btn-reset">Limpiar Campos</button>
+                        </div>
+                        <div class="flex justify-around items-center space-x-2 mt-4">
+                            <button id="calcAddToCartBtn" class="w-full btn-primary text-white font-semibold py-2 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
+                                Agregar a Venta
+                            </button>
+                            <button id="calcCancelBtn" class="w-full btn-secondary text-white font-semibold py-2 rounded-lg hover:bg-secondary-dark transition duration-150 shadow-md">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>    </div>
 </body>
 
 </html>

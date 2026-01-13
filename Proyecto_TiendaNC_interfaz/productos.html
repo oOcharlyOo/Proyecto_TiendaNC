@@ -7,100 +7,9 @@
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Estilos base del sistema POS */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-image: url(resources/fondo.png);
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed; /* Keep background fixed when scrolling */
-        }
-        .panel-transparent { /* New class for panels */
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-        }
-        
-        /* Estilos de la BARRA SUPERIOR */
-        .header-btn {
-            @apply flex items-center justify-center p-3 rounded-lg text-sm font-semibold transition duration-200;
-            min-width: 110px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .inactive-header-btn {
-            @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
-        }
-        /* Botón ACTIVO (PRODUCTOS, F3) */
-        .active-header-btn {
-            @apply bg-rose-600 text-white shadow-lg shadow-rose-500/50 hover:bg-rose-700;
-        }
-
-        /* Estilos generales del POS */
-        .main-container {
-            background-color: transparent; /* Remove solid background */
-            height: calc(100vh - 4.5rem); 
-            display: flex;
-            padding: 0 1rem 1rem 1rem;
-            gap: 1rem; 
-        }
-
-        /* Estilo para la tabla de productos */
-        .product-table thead {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            color: #1f2937; /* Keep color for contrast */
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-        .product-table tbody tr { /* Apply background to rows directly for transparency */
-            background-color: rgba(255, 255, 255, 0.7); /* Slightly more transparent */
-        }
-        .product-table tbody tr:hover {
-            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
-            cursor: pointer;
-        }
-        .row-selected {
-            background-color: rgba(251, 207, 232, 0.9); /* Pink 200 semi-transparent */
-            border-left: 4px solid #be123c; /* Rose 700 */
-            font-weight: 600;
-        }
-
-        /* Estilos para el formulario */
-        .form-group label {
-            @apply block text-sm font-medium text-gray-700 mb-1;
-        }
-        .form-group input, .form-group select {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            border: 1px solid rgba(209, 213, 219, 0.5); /* Semi-transparent border */
-            border-radius: 0.5rem; /* Match other rounded-lg */
-            padding: 0.75rem 1rem; /* Match other inputs */
-            color: #1f2937; /* Darker text for readability */
-            transition: all 0.15s ease-in-out;
-            /* @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 transition duration-150; */
-        }
-        .form-group input:focus, .form-group select:focus {
-            background-color: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2);
-            border-color: #e11d48;
-        }
-        
-        /* Botón Salir (Rojo) */
-        #exit-btn {
-            background-color: #ef4444; /* Red 500 */
-            color: white;
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
-            min-width: 80px;
-        }
-        #exit-btn:hover {
-            background-color: #dc2626; /* Red 600 */
-        }
-        
-        #productTableContainer {
-            
-        }
-    </style>
+    <link rel="stylesheet" href="resources/style/estilos.css">
 </head>
-<body>
+<body class="main-page-body">
 
     <div id="navbar-placeholder"></div>
 
@@ -143,7 +52,7 @@
         
         <!-- PANEL DERECHO: FORMULARIO DE EDICIÓN/AGREGAR (40%) -->
         <div class="w-full md:w-1/3 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4 md:p-6" style=" max-height: calc(100vh - 6rem); overflow-y: auto;">
-            <h3 id="formTitle" class="text-lg font-bold text-rose-600 mb-4">Agregar Nuevo Producto</h3>
+            <h3 id="formTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
 
             <form id="productForm" class="space-y-4">
                 <input type="hidden" id="productId">
@@ -189,8 +98,8 @@
                     <input type="number" id="cantidadMax" min="0" required>
                 </div>
 
-                <div class="form-group flex items-center space-x-2">
-                    <input type="checkbox" id="isGramaje" class="h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500">
+                <div>
+                    <input type="checkbox" id="isGramaje" class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary">
                     <label for="isGramaje" class="text-sm font-medium text-gray-700">Usa Gramaje (Venta por peso)</label>
                 </div>
                 
@@ -198,11 +107,11 @@
 
                 <div class="flex space-x-4 mt-6">
                     <button type="submit" id="submitBtn" 
-                            class="w-full bg-rose-600 text-white font-semibold py-3 rounded-lg hover:bg-rose-700 transition duration-150 shadow-lg">
+                            class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-lg">
                         Guardar Producto
                     </button>
                     <button type="button" id="deleteBtn" 
-                            class="w-full bg-red-500 text-white font-semibold py-3 rounded-lg hover:bg-red-600 transition duration-150 shadow-lg hidden">
+                            class="w-full btn-danger text-white font-semibold py-3 rounded-lg hover:btn-danger-dark transition duration-150 shadow-lg hidden">
                         Eliminar Producto
                     </button>
                 </div>
@@ -358,7 +267,7 @@
                 row.innerHTML = `
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-medium">${product.nombre}</td>
-                    <td class="p-3 text-right text-rose-600 font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
+                    <td class="p-3 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
                     <td class="p-3 text-right">${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined && product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</td>
                     <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
                     <td class="p-3 text-center">${product.stock}</td>

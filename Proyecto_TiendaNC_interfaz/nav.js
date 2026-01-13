@@ -13,7 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const navbarPlaceholder = document.getElementById('navbar-placeholder');
     if (navbarPlaceholder) {
         fetch('nav.html')
-            .then(response => response.text())
+            .then(response => {
+                return response.text();
+            })
             .then(data => {
                 navbarPlaceholder.innerHTML = data;
 
@@ -32,9 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (activeLink) {
                         activeLink.classList.remove('inactive-header-btn');
                         activeLink.classList.add('active-header-btn');
-                        // Asegurarse de que los enlaces de navegación dentro del menú desplegable tengan el estilo correcto
-                        activeLink.classList.remove('text-gray-700', 'hover:bg-gray-100');
-                        activeLink.classList.add('bg-rose-600', 'text-white', 'shadow-lg', 'shadow-rose-500/50', 'hover:bg-rose-700');
                     }
                 }
 

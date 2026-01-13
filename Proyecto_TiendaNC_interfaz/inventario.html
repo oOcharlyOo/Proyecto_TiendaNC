@@ -7,68 +7,9 @@
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Estilos base del sistema POS */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-image: url(resources/fondo2.png);
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed; /* Keep background fixed when scrolling */
-        }
-        .panel-transparent { /* New class for panels */
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-        }
-        /* Estilos generales del POS */
-        .main-container {
-            background-color: transparent; /* Remove solid background */
-            height: calc(100vh - 4.5rem); 
-            display: flex;
-            padding: 1rem;
-            gap: 1rem; 
-        }
-
-        /* Estilo para la tabla general */
-        .product-table thead {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            color: #1f2937; /* Keep color for contrast */
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-        .product-table tbody tr { /* Apply background to rows directly for transparency */
-            background-color: rgba(255, 255, 255, 0.7); /* Slightly more transparent */
-        }
-        .product-table tbody tr:hover {
-            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
-        }
-
-        /* Estilo para la tabla de bajo inventario */
-        .low-stock-table thead {
-            background-color: rgba(239, 68, 68, 0.85); /* Semi-transparent red (Red 500 with opacity) */
-            color: white;
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-        .low-stock-row { /* This class is applied to the tr element */
-             background-color: rgba(254, 226, 226, 0.85); /* Semi-transparent Red 100 */
-             font-weight: 600;
-             border-left: 4px solid #b91c1c; /* Red 700 */
-        }
-        .low-stock-table tbody tr { /* Apply background to rows directly for transparency */
-            background-color: rgba(255, 255, 255, 0.7); /* Base transparency for rows */
-        }
-        .low-stock-table tbody tr:hover {
-            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
-        }
-        .header-low-stock-transparent { /* New class for low stock panel header */
-            background-color: rgba(239, 68, 68, 0.85); /* Red 500 with 85% opacity */
-        }
-    </style>
+    <link rel="stylesheet" href="resources/style/estilos.css">
 </head>
-<body>
+<body class="main-page-body">
     <div id="navbar-placeholder"></div>
 
     <!-- CONTENIDO PRINCIPAL -->
@@ -77,7 +18,7 @@
         <!-- PANEL IZQUIERDO: PRODUCTOS CON BAJO INVENTARIO (40%) -->
         <div class="w-full md:w-2/5 flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
             
-            <div class="p-3 border-b border-gray-200 header-low-stock-transparent rounded-t-lg">
+            <div class="p-3 border-b border-gray-200 bg-danger-transparent rounded-t-lg">
                 <h2 class="text-lg sm:text-xl font-bold text-white flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -220,7 +161,7 @@
             if (type === 'success') {
                 alertDiv.classList.add('bg-green-500');
             } else if (type === 'error') {
-                alertDiv.classList.add('bg-red-500');
+                alertDiv.classList.add('bg-danger');
             } else {
                 alertDiv.classList.add('bg-blue-500');
             }
@@ -300,7 +241,7 @@
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-medium">${product.nombre}</td>
                     <td class="p-3 text-right text-gray-500">$${product.precio_costo.toFixed(2)}</td>
-                    <td class="p-3 text-right text-rose-600 font-semibold">$${product.precio_venta.toFixed(2)}</td>
+                    <td class="p-3 text-right text-primary font-semibold">$${product.precio_venta.toFixed(2)}</td>
                     <td class="p-3 text-center">${product.cantidad_min}</td>
                     <td class="p-3 text-center">${product.stock}</td>
                 `;
@@ -327,8 +268,8 @@
                 row.innerHTML = `
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-semibold">${product.nombre}</td>
-                    <td class="p-3 text-center text-red-700">${product.cantidad_min}</td>
-                    <td class="p-3 text-center text-red-700 font-extrabold">${product.stock}</td>
+                    <td class="p-3 text-center text-danger">${product.cantidad_min}</td>
+                    <td class="p-3 text-center text-danger font-extrabold">${product.stock}</td>
                 `;
                 
                 lowStockTableBody.appendChild(row);
