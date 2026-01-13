@@ -481,3 +481,9 @@ body {
     max-width: 600px; /* Example fixed max-width, adjust as needed */
     position: relative; /* Maintain relative positioning */
 }
+/* Add new media query for mobile to ensure main-container height behaves as expected */
+@media (max-width: 639px) { /* Target screens smaller than Tailwind's sm breakpoint */
+    .main-container {
+        height: max-content; /* Allow height to be determined by content */
+    }
+}
