@@ -62,7 +62,9 @@ CREATE TABLE tiendadb.productos (
     precio_venta DECIMAL(10, 2) NOT NULL,
     cantidad_min INT NOT NULL,
     cantidad_max INT NOT NULL,
-    stock INT NOT NULL
+    stock INT NOT NULL,
+    precio_mayoreo DECIMAL(10, 2),
+    is_gramaje BOOLEAN DEFAULT FALSE,
 );
 
 -- 4. Tabla Maestra de Ventas (una fila por cada transacción/carrito)
@@ -73,6 +75,7 @@ CREATE TABLE tiendadb.ventas (
     monto_total DECIMAL(12, 2) NOT NULL,
     estatus VARCHAR(1) DEFAULT 'P',
     numero_ticket INT NOT NULL DEFAULT 0,
+    metodo_pago VARCHAR(50) DEFAULT 'EFECTIVO',
 
     CONSTRAINT fk_usuario_venta
         FOREIGN KEY(id_usuario) 
@@ -86,6 +89,7 @@ CREATE TABLE tiendadb.ventas_detalle (
     id_producto INT NOT NULL, -- El producto que se vendió.
     cantidad INT NOT NULL,
     precio_unitario_venta DECIMAL(10, 2) NOT NULL, -- Precio al momento de la venta.
+    tipo_precio_aplicado VARCHAR(50) DEFAULT 'VENTA',
 
     CONSTRAINT fk_venta_detalle
         FOREIGN KEY(id_venta)
