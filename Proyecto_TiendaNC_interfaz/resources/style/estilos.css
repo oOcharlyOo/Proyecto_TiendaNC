@@ -249,19 +249,17 @@ body {
 
 .main-container {
     background-color: transparent;
-    /* min-height: calc(100vh - 4.5rem); */ /* Eliminado */
-    height: max-content;
     flex-grow: 1; /* Añadido para ocupar el espacio restante */
     display: flex;
     flex-direction: column; /* CRUCIAL: Añadido para que el contenido se apile verticalmente */
     padding: 0 1rem 1rem 1rem;
     gap: 1rem;
-    width: 80%; /* Full width on small screens */
+    width: 90%; /* Default to full width for small screens */
     margin: 0; /* Remove default margin */
 }
 @media (min-width: 768px) { /* md breakpoint for Tailwind CSS */
     .main-container {
-        width: 80%;
+        width: 90%;
         margin-left: auto;
         margin-right: auto;
     }
@@ -485,6 +483,6 @@ body {
 /* Add new media query for mobile to ensure main-container height behaves as expected */
 @media (max-width: 639px) { /* Target screens smaller than Tailwind's sm breakpoint */
     .main-container {
-        height: max-content; /* Allow height to be determined by content */
+        height: fit-content; /* Allow height to be determined by content */
     }
 }
