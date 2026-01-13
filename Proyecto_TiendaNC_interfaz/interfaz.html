@@ -871,6 +871,8 @@
                     historialModal.classList.add('hidden');
                 }
             });
+            
+            historialVentasBody.addEventListener('click', handleCancelarVenta);
 
             async function addGramajeProductToSale() {
                 const productId = calcProductId.value;
