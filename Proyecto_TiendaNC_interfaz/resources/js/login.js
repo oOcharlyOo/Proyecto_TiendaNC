@@ -37,6 +37,7 @@
                 const result = await response.json();
 
                 if (response.ok && result.datos !== null) { // Caja activa encontrada
+                    localStorage.setItem('montoInicialCaja', result.datos.monto); // Guardar monto inicial para persistencia
                     sessionStorage.setItem('activeUserShift', JSON.stringify({
                         shiftAmount: result.datos.monto.toFixed(2),
                         shiftId: result.datos.idCaja
@@ -134,6 +135,7 @@
                 });
 
                 if (response.ok) { // response.ok es para estados 2xx
+                    localStorage.setItem('montoInicialCaja', initialAmount); // Guardar para persistencia
                     sessionStorage.setItem('initialCashAmount', initialAmount); // Add this line
                     sessionStorage.setItem('activeUserShift', JSON.stringify({
                         shiftAmount: initialAmount.toFixed(2),
