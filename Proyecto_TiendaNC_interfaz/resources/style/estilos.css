@@ -2,10 +2,14 @@
     --primary-color: #217438;
     --primary-color-dark: #1A5A2B;
     --primary-color-light: rgba(33, 116, 56, 0.7);
+    --primary-color-shadow: rgba(33, 116, 56, 0.3); /* For shadows based on primary */
+
     --danger-color: #ef4444;
     --danger-color-dark: #dc2626;
     --danger-color-transparent: rgba(239, 68, 68, 0.85);
     --danger-border-color: #b91c1c;
+    --danger-shadow: rgba(239, 68, 68, 0.3); /* For shadows based on danger */
+    --danger-background-light: rgba(254, 226, 226, 0.85); /* Tailwind red-100 transparent */
 
     --income-color: #10b981; /* Green */
     --profit-color: #0ea5e9; /* Blue */
@@ -15,7 +19,26 @@
     --secondary-color: #6b7280; /* gray-500 */
     --secondary-color-dark: #4b5563; /* gray-600 */
 
-    --zelda-gold: #f1c40f;
+    --neutral-200: #e5e7eb; /* Tailwind gray-200 */
+    --neutral-300: #d1d5db; /* Tailwind gray-300 */
+    --neutral-700: #374151; /* Tailwind gray-700 */
+    --neutral-800: #1f2937; /* Tailwind gray-800 */
+    --neutral-border-light: rgba(209, 213, 219, 0.5); /* Tailwind gray-300 with transparency */
+
+    --white-transparent-85: rgba(255, 255, 255, 0.85);
+    --white-transparent-70: rgba(255, 255, 255, 0.7);
+    --white-transparent-90: rgba(255, 255, 255, 0.9); /* New variable */
+    --white-transparent-20: rgba(255, 255, 255, 0.2);
+    --primary-color-light-20: rgba(33, 116, 56, 0.2); /* New variable */
+
+    --encabezado-zelda-background: #2d5a2700; /* Transparent green for Zelda headers */
+    --zelda-gold: #f1c40f; /* Original Zelda Gold */
+    --zelda-gold-text: rgb(218, 187, 50); /* Specific hardcoded gold color */
+    --zelda-text-shadow-dark: #1e3d1a;
+    --zelda-text-shadow-light: rgba(0,0,0,0.5);
+
+    --login-card-background: rgba(65, 100, 10, 0.356); /* Specific transparent green for login card */
+    --ticket-header-color: #0357b8; /* Specific blue for ticket header */
 }
 
 /* Registramos la fuente */
@@ -31,13 +54,13 @@
     font-family: 'HyliaSerif', serif;
     font-size: 1.5rem;
     color: var(--zelda-gold); /* Dorado Zelda */
-    background-color: #2d5a2700; /* Verde túnica de Link */
+    background-color: var(--encabezado-zelda-background); /* Verde túnica de Link */
     text-align: center;
     padding: 20px;
     text-transform: uppercase;
     letter-spacing: 3px;
     /* Efecto de relieve sutil */
-    text-shadow: 3px 3px 0px #1e3d1a, 5px 5px 15px rgba(0,0,0,0.5);
+    text-shadow: 3px 3px 0px var(--zelda-text-shadow-dark), 5px 5px 15px var(--zelda-text-shadow-light);
     white-space: normal; /* Ensure text wraps */
     margin: 0 auto;
 }
@@ -66,13 +89,13 @@
     font-family: 'HyliaSerif', serif;
     font-size: 1rem;
     color: var(--zelda-gold); /* Dorado Zelda */
-    background-color: #2d5a2700; /* Verde túnica de Link */
+    background-color: var(--encabezado-zelda-background); /* Verde túnica de Link */
     text-align: center;
     padding: 20px;
     text-transform: uppercase;
     letter-spacing: 3px;
     /* Efecto de relieve sutil */
-    text-shadow: 3px 3px 0px #1e3d1a, 5px 5px 15px rgba(0,0,0,0.5);
+    text-shadow: 3px 3px 0px var(--zelda-text-shadow-dark), 5px 5px 15px var(--zelda-text-shadow-light);
     
     margin: 0 auto;
 }
@@ -99,15 +122,22 @@
 .encabezado-zelda-text {
     font-family: 'HyliaSerif', serif;
     font-size: 1rem;
-    color: rgb(218, 187, 50); /* Dorado Zelda */
-    background-color: #2d5a2700; /* Verde túnica de Link */
+    color: #52ff43f3; 
+    background-color: var(--encabezado-zelda-background); /* Verde túnica de Link */
     text-align: center;
     padding: 20px;
     text-transform: uppercase;
     letter-spacing: 3px;
     /* Efecto de relieve sutil */
-    text-shadow: 3px 3px 0px #1e3d1a, 5px 5px 15px rgba(0,0,0,0.5);
+    text-shadow: 3px 3px 0px var(--zelda-text-shadow-dark), 5px 5px 15px var(--zelda-text-shadow-light);
     margin: 0 auto;
+}
+
+.encabezado-ticket-th {
+    font-size: medium;
+    font-family: 'HyliaSerif', serif;
+    color: rgb(251, 251, 251) !important;
+    text-shadow: 4px 4px 0px var(--zelda-text-shadow-dark), 5px 5px 15px var(--zelda-text-shadow-light);
 }
 
     
@@ -115,7 +145,7 @@
 /* Estilos base */
 body {
     font-family: 'Inter', sans-serif;
-    background-image: linear-gradient(rgba(0, 0, 0, 0.178), rgba(0, 0, 0, 0.26)), url('../fondo2.png');
+    background-image: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.4)), url('../fondo2.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -138,7 +168,7 @@ body {
 }
 
 .login-card {
-    background-color: rgba(65, 100, 10, 0.356); /* More transparency */
+    background-color: var(--login-card-background); /* More transparency */
     padding: 1.5rem;
     border-radius: 1rem;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04);
@@ -155,6 +185,7 @@ body {
 .bg-primary { background-color: var(--primary-color); }
 .bg-primary-dark { background-color: var(--primary-color-dark); }
 .bg-primary-light { background-color: var(--primary-color-light); }
+.bg-profit-color { background-color: var(--profit-color); }
 .text-primary { color: var(--primary-color) !important; }
 .border-primary { border-color: var(--primary-color); }
 .ring-primary { --tw-ring-color: var(--primary-color); }
@@ -230,17 +261,17 @@ body {
 }
 
 .inactive-header-btn {
-    background-color: #e5e7eb;
-    color: #374151;
+    background-color: var(--neutral-200);
+    color: var(--neutral-700);
 }
 .inactive-header-btn:hover {
-    background-color: #d1d5db;
+    background-color: var(--neutral-300);
 }
 
 .active-header-btn {
     background-color: var(--primary-color);
     color: white;
-    box-shadow: 0 4px 6px -1px rgba(33, 116, 56, 0.3), 0 2px 4px -2px rgba(33, 116, 56, 0.3);
+    box-shadow: 0 4px 6px -1px var(--primary-color-shadow), 0 2px 4px -2px var(--primary-color-shadow);
 }
 
 .active-header-btn:hover {
@@ -255,7 +286,7 @@ body {
     padding: 0 1rem 1rem 1rem;
     gap: 1rem;
     width: 90%; /* Default to full width for small screens */
-    margin: 0; /* Remove default margin */
+    margin: 4rem auto 0 auto; /* Add top margin and center horizontally */
 }
 @media (min-width: 768px) { /* md breakpoint for Tailwind CSS */
     .main-container {
@@ -267,27 +298,27 @@ body {
 
 @media (min-width: 1280px) { /* xl breakpoint for Tailwind CSS */
     .main-container {
-        width: 70%; /* Wider for large desktops */
+        width: 90%; /* Wider for large desktops */
         max-width: 1440px; /* Constrain maximum width for readability */
     }
 }
 
 .product-table thead {
-    background-color: rgba(255, 255, 255, 0.85);
-    color: #1f2937;
+    background-color: var(--white-transparent-85);
+    color: var(--neutral-800);
     position: sticky;
     top: 0;
     z-index: 5;
 }
 .product-table tbody tr {
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: var(--white-transparent-70);
 }
 .product-table tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: var(--white-transparent-90);
     cursor: pointer;
 }
 .row-selected {
-    background-color: rgba(33, 116, 56, 0.2) !important;
+    background-color: var(--primary-color-light-20) !important;
     border-left: 4px solid var(--primary-color);
     font-weight: 600;
 }
@@ -301,7 +332,7 @@ body {
 }
 
 .low-stock-row {
-     background-color: rgba(254, 226, 226, 0.85);
+     background-color: var(--danger-background-light);
      font-weight: 600;
      border-left: 4px solid var(--danger-border-color);
 }
@@ -310,21 +341,21 @@ body {
     display: block;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #374151;
+    color: var(--neutral-700);
     margin-bottom: 0.25rem;
 }
 .form-group input, .form-group select {
-    background-color: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(209, 213, 219, 0.5);
+    background-color: var(--white-transparent-85);
+    border: 1px solid var(--neutral-border-light);
     border-radius: 0.5rem;
     padding: 0.75rem 1rem;
-    color: #1f2937;
+    color: var(--neutral-800);
     transition: all 0.15s ease-in-out;
     width: 100%;
 }
 .form-group input:focus, .form-group select:focus {
-    background-color: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 0 0 3px rgba(33, 116, 56, 0.2);
+    background-color: var(--white-transparent-95);
+    box-shadow: 0 0 0 3px var(--primary-color-light-20);
     border-color: var(--primary-color);
 }
 
@@ -387,7 +418,14 @@ body {
     background-color: var(--danger-color-dark);
 }
 
-/* Colores Específicos para tarjetas de resumen */
+.summary-card {
+    padding: 1rem; /* p-4 */
+}
+@media (min-width: 640px) { /* sm breakpoint */
+    .summary-card {
+        padding: 1.5rem; /* sm:p-6 */
+    }
+}
 .income-card { border-color: var(--income-color); }
 .profit-card { border-color: var(--profit-color); }
 .cash-flow-card { border-color: var(--cash-flow-color); }
@@ -420,7 +458,7 @@ body {
 .calc-header-text { /* Make it specific to the calculator modal */
     font-size: 1.25rem;
     font-weight: 600;
-    color: #4b5563; /* This is different from the main header-text in estilos.css */
+    color: var(--secondary-color-dark); /* This is different from the main header-text in estilos.css */
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -451,7 +489,7 @@ body {
 .config-input {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--neutral-300);
     border-radius: 0.5rem;
     font-size: 1.125rem;
 }
@@ -485,4 +523,71 @@ body {
     .main-container {
         height: fit-content; /* Allow height to be determined by content */
     }
+}
+
+.product-catalog-scroll-area {
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    height: max-content;
+}
+
+.product-form-scroll-area { /* New class added here */
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+}
+
+/* Styles for search results dropdown in interfaz.html */
+.search-result-item {
+    background-color: white;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb; /* Tailwind's border-gray-200 */
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background-color: #f3f4f6; /* Tailwind's bg-gray-100 */
+}
+
+/* Toast Notification Styles */
+#toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10000; /* Ensure it's above other elements */
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem; /* Tailwind's rounded-md */
+    color: white;
+    font-size: 0.875rem; /* Tailwind's text-sm */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Specific toast types */
+.toast-success { background-color: #10b981; } /* Tailwind green-500 */
+.toast-error { background-color: #ef4444; } /* Tailwind red-500 */
+.toast-info { background-color: #3b82f6; } /* Tailwind blue-500 */
+.toast-warning { background-color: #f59e0b; } /* Tailwind yellow-500 */
+
+.rotate-180 {
+    transform: rotate(180deg);
 }
