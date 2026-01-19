@@ -6,95 +6,20 @@
     <title>Acceso al Sistema POS</title>
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="resources/style/estilos.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Estilos base */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-image: url('resources/fondo2.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .login-card {
-            background-color: rgba(255, 255, 255, 0.8); /* More transparency */
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04);
-            width: 100%;
-            max-width: 400px;
-            /* Removed the border as requested */
-        }
-        /* Estilo para el botón principal (Rose 700) */
-        .btn-primary {
-            background-color: #be123c; /* Rose 700 */
-        }
-        .btn-primary:hover {
-            background-color: #9f1239; /* Rose 800 */
-        }
-        /* Color de texto primario (Rose 700) */
-        .text-primary {
-            color: #be123c; /* Rose 700 */
-        }
-        /* Estilo para el foco de los inputs (Rose 600) */
-        .input-focus-primary:focus {
-            border-color: #e11d48; /* Rose 600 */
-            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2); /* Rose 600 with opacity */
-        }
-        /* Color para el título h1 (Rose 700) */
-        h1.text-rose-600 { /* Targeting the specific H1 by its existing class */
-            color: #be123c; /* Rose 700 */
-        }
-                                                                                                                                                                                                                                                                                                          
-         .logo-circular {                                                                                                                                                                                                                                                                                   
-            border-radius: 50%; /* Makes the image circular */                                                                                                                                                                                                                                             
-            border: 3px solid black; /* Black border, slightly thicker */                                                                                                                                                                                                                                  
-             padding: 5px; /* Add some padding to make the border stand out from the image */                                                                                                                                                                                                               
-         }   
-               /* Estilos para el modal */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 1.5rem; /* Adjusted for mobile */
-            border-radius: 0.5rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-    </style>
+
 </head>
-<body>
+<body class="login-page-body">
 
     <div class="login-card">
-        <div class="flex justify-center mb-6">
-            <img src="resources/logo_tr.png" alt="Logo Tienda Abarrotera N y C" class="h-24 w-auto logo-circular">
-        </div>
-        <h1 class="text-2xl sm:text-4xl font-extrabold text-gray-900 mb-2 text-center text-rose-600" style="font-family: 'Georgia', serif;">
-            DULCERIA NC
-        </h1>        <p class="text-gray-500 mb-8 text-center text-sm">
-            Ingresa tus credenciales de empleado.
-        </p>
+
+        <img src="resources/Titulo.png" alt="La Leyenda Del Dulce" class="mx-auto mb-2" style="max-width: 300px;">
 
         <form id="loginForm">
             <!-- Campo de Nombre de Usuario (nombre) -->
             <div class="mb-5">
-                <label for="nombre" class="block text-sm font-medium text-gray-700 mb-2">
+                <label for="nombre" class="encabezado-zelda">
                     Nombre de Usuario
                 </label>
                 <input type="text" id="nombre" name="nombre" required
@@ -104,7 +29,7 @@
 
             <!-- Campo de Contraseña (password) -->
             <div class="mb-6">
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                <label for="password" class="block encabezado-zelda">
                     Contraseña
                 </label>
                 <input type="password" id="password" name="password" required
@@ -119,14 +44,14 @@
 
             <!-- Botón de Inicio de Sesión -->
             <button type="submit" id="loginButton"
-                    class="w-full text-white font-semibold py-3 rounded-lg btn-primary focus:outline-none focus:ring-4 focus:ring-rose-500 focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01] shadow-lg hover:shadow-xl">
+                    class="encabezado-zelda w-full text-white font-semibold py-3 rounded-lg btn-primary focus:outline-none focus:ring-4 focus:ring-[var(--danger-color)] focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01] shadow-lg hover:shadow-xl">
                 ACCEDER
             </button>
         </form>
 
         <!-- Enlace de Soporte/Ayuda -->
         <div class="mt-6 text-center">
-            <a href="#" class="text-sm text-primary hover:text-rose-700 font-medium">
+            <a href="#" class="text-sm text-primary hover:text-[var(--danger-color-dark)] font-medium">
                 Soporte de Acceso
             </a>
         </div>
@@ -144,181 +69,7 @@
         </div>
     </div>
 
-    <script>
-        // --- CONFIGURACIÓN DE ENDPOINT ---
-        const API_BASE_URL = 'http://192.168.0.248:8080';
-        const LOGIN_URL = `${API_BASE_URL}/usuarios/login`;
-        const SHIFT_START_URL = 'http://192.168.0.248:8080/caja/apertura'; // Endpoint para apertura de caja
-        const CHECK_ACTIVE_SHIFT_URL = 'http://192.168.0.248:8080/caja/apertura/activa'; // Nuevo Endpoint para verificar caja activa
-
-        // --- REFERENCIAS DEL DOM ---
-        const form = document.getElementById('loginForm');
-        const nombreInput = document.getElementById('nombre');
-        const passwordInput = document.getElementById('password');
-        const statusMessage = document.getElementById('statusMessage');
-        const loginButton = document.getElementById('loginButton');
-
-        // Referencias del DOM para el Modal de Monto Inicial
-        const initialCashModal = document.getElementById('initialCashModal');
-        const initialCashInput = document.getElementById('initialCashInput');
-        const saveInitialCashBtn = document.getElementById('saveInitialCashBtn');
-
-        // --- FUNCIONES DE UTILIDAD ---
-        function displayMessage(message, type = 'error') {
-            statusMessage.textContent = message;
-            statusMessage.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800');
-            statusMessage.classList.add(type === 'success' ? 'bg-green-100' : 'bg-red-100', type === 'success' ? 'text-green-800' : 'text-red-800');
-            statusMessage.classList.remove('hidden');
-        }
-
-        function setLoginButtonState(enabled, text) {
-            loginButton.disabled = !enabled;
-            loginButton.textContent = text;
-            loginButton.classList.toggle('opacity-75', !enabled);
-            loginButton.classList.toggle('cursor-not-allowed', !enabled);
-        }
-
-        function setShiftButtonState(enabled, text) {
-            saveInitialCashBtn.disabled = !enabled;
-            saveInitialCashBtn.textContent = text;
-            saveInitialCashBtn.classList.toggle('opacity-75', !enabled);
-        }
-        
-        // --- LÓGICA PARA VERIFICAR CAJA ACTIVA Y REDIRIGIR ---
-        async function checkAndRedirectIfShiftActive(idUsuario) {
-            try {
-                const response = await fetch(`${CHECK_ACTIVE_SHIFT_URL}?idUsuario=${idUsuario}`);
-                const result = await response.json();
-
-                if (response.ok && result.datos !== null) { // Caja activa encontrada
-                    sessionStorage.setItem('initialCashAmount', result.datos.monto.toFixed(2));
-                    window.location.href = 'interfaz.html'; // Redirigir directamente a ventas
-                } else { // No hay caja activa, mostrar modal de apertura
-                    document.querySelector('.login-card').classList.add('hidden');
-                    initialCashModal.classList.remove('hidden');
-                    initialCashInput.focus();
-                }
-            } catch (error) {
-                console.error("Error al verificar el estado de la caja activa:", error);
-                displayMessage('Error de conexión al verificar el estado de la caja.');
-                setLoginButtonState(true, 'ACCEDER'); // Permitir reintentar login
-            }
-        }
-
-        // --- LÓGICA DE INICIO DE SESIÓN ---
-        async function handleLogin(event) {
-            event.preventDefault();
-            statusMessage.classList.add('hidden');
-
-            const nombre = nombreInput.value.trim();
-            const password_hash = passwordInput.value.trim();
-
-            if (!nombre || !password_hash) {
-                displayMessage('Por favor, ingresa tu nombre de usuario y contraseña.');
-                return;
-            }
-
-            setLoginButtonState(false, 'Verificando...');
-
-            const payload = { nombre, password_hash };
-
-            try {
-                const response = await fetch(LOGIN_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.codigo === 200) {
-                    displayMessage(result.mensaje || 'Login exitoso.', 'success');
-                    sessionStorage.setItem('activeUser', JSON.stringify(result.datos));
-                    // Lógica para verificar caja activa
-                    await checkAndRedirectIfShiftActive(result.datos.idUsuario);
-                } else {
-                    displayMessage(result.mensaje || 'Error de autenticación.');
-                    setLoginButtonState(true, 'ACCEDER');
-                }
-            } catch (error) {
-                console.error("Error en la llamada al API de login:", error);
-                displayMessage('Error de Conexión: No se pudo conectar con el servidor.');
-                setLoginButtonState(true, 'ACCEDER');
-            }
-        }
-
-        // --- LÓGICA DEL MODAL DE MONTO INICIAL DE CAJA ---
-        async function startShift() {
-            const initialAmount = parseFloat(initialCashInput.value);
-            const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
-
-            if (!activeUser?.idUsuario) {
-                alert('Error: No se encontró un usuario activo. Por favor, inicie sesión de nuevo.');
-                window.location.reload();
-                return;
-            }
-
-            if (isNaN(initialAmount) || initialAmount < 0) {
-                alert('Por favor, ingresa un monto inicial válido y positivo.');
-                initialCashInput.focus();
-                return;
-            }
-            
-            setShiftButtonState(false, 'Procesando...');
-
-            const payload = {
-                idUsuario: activeUser.idUsuario,
-                montoInicial: initialAmount
-            };
-
-            try {
-                const response = await fetch(SHIFT_START_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) { // response.ok es para estados 2xx
-                    sessionStorage.setItem('initialCashAmount', initialAmount.toFixed(2));
-                    setShiftButtonState(false, 'Redirigiendo...'); // Informar al usuario
-                    setTimeout(() => {
-                        window.location.href = 'interfaz.html';
-                    }, 1500); // 1.5 segundos de retraso para asegurar que el backend procese la apertura
-                } else {
-                    const errorResult = await response.json().catch(() => ({ mensaje: 'Respuesta no válida del servidor.'}));
-                    alert(`Error al iniciar turno: ${errorResult.mensaje || 'Ocurrió un error.'}`);
-                    setShiftButtonState(true, 'Continuar a Ventas');
-                }
-            } catch (error) {
-                console.error("Error en la llamada al API de inicio de turno:", error);
-                alert('Error de Conexión: No se pudo registrar el inicio de turno.');
-                setShiftButtonState(true, 'Continuar a Ventas');
-            }
-        }
-        
-        // --- EVENT LISTENERS ---
-        saveInitialCashBtn.addEventListener('click', startShift);
-        form.addEventListener('submit', handleLogin);
-        
-        initialCashInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                startShift();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !initialCashModal.classList.contains('hidden')) {
-                // Opcional: Para permitir cerrar el modal con Escape, descomenta las siguientes líneas.
-                // initialCashModal.classList.add('hidden');
-                // document.querySelector('.login-card').classList.remove('hidden');
-                // setLoginButtonState(true, 'ACCEDER');
-            }
-        });
-    </script>
-
+    <script src="nav.js" defer></script>
+    <script src="resources/js/login.js" defer></script>
 </body>
 </html>

@@ -7,105 +7,14 @@
     <!-- Incluir Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Estilos base del sistema POS */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-image: url(resources/fondo.png);
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed; /* Keep background fixed when scrolling */
-        }
-        .panel-transparent { /* New class for panels */
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-        }
-        
-        /* Estilos de la BARRA SUPERIOR */
-        .header-btn {
-            @apply flex items-center justify-center p-3 rounded-lg text-sm font-semibold transition duration-200;
-            min-width: 110px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .inactive-header-btn {
-            @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
-        }
-        /* Botón ACTIVO (PRODUCTOS, F3) */
-        .active-header-btn {
-            @apply bg-rose-600 text-white shadow-lg shadow-rose-500/50 hover:bg-rose-700;
-        }
-
-        /* Estilos generales del POS */
-        .main-container {
-            background-color: transparent; /* Remove solid background */
-            height: calc(100vh - 4.5rem); 
-            display: flex;
-            padding: 0 1rem 1rem 1rem;
-            gap: 1rem; 
-        }
-
-        /* Estilo para la tabla de productos */
-        .product-table thead {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            color: #1f2937; /* Keep color for contrast */
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-        .product-table tbody tr { /* Apply background to rows directly for transparency */
-            background-color: rgba(255, 255, 255, 0.7); /* Slightly more transparent */
-        }
-        .product-table tbody tr:hover {
-            background-color: rgba(255, 255, 255, 0.9); /* Opaque on hover */
-            cursor: pointer;
-        }
-        .row-selected {
-            background-color: rgba(251, 207, 232, 0.9); /* Pink 200 semi-transparent */
-            border-left: 4px solid #be123c; /* Rose 700 */
-            font-weight: 600;
-        }
-
-        /* Estilos para el formulario */
-        .form-group label {
-            @apply block text-sm font-medium text-gray-700 mb-1;
-        }
-        .form-group input, .form-group select {
-            background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-            border: 1px solid rgba(209, 213, 219, 0.5); /* Semi-transparent border */
-            border-radius: 0.5rem; /* Match other rounded-lg */
-            padding: 0.75rem 1rem; /* Match other inputs */
-            color: #1f2937; /* Darker text for readability */
-            transition: all 0.15s ease-in-out;
-            /* @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 transition duration-150; */
-        }
-        .form-group input:focus, .form-group select:focus {
-            background-color: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2);
-            border-color: #e11d48;
-        }
-        
-        /* Botón Salir (Rojo) */
-        #exit-btn {
-            background-color: #ef4444; /* Red 500 */
-            color: white;
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
-            min-width: 80px;
-        }
-        #exit-btn:hover {
-            background-color: #dc2626; /* Red 600 */
-        }
-        
-        #productTableContainer {
-            
-        }
-    </style>
+    <link rel="stylesheet" href="resources/style/estilos.css">
 </head>
-<body>
+<body class="main-page-body">
 
     <div id="navbar-placeholder"></div>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div class="main-container flex-col md:flex-row p-2 md:p-4 gap-2 md:gap-4">
+    <div class="main-container flex-col md:flex-row p-2">
         
         <!-- PANEL IZQUIERDO: LISTA DE PRODUCTOS (60%) -->
         <div class="w-full md:w-2/3 flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
@@ -124,16 +33,17 @@
                     <table class="w-full text-left product-table text-sm">
                         <thead>
                             <tr>
-                                <th class="p-3 w-[10%]">ID</th>
-                                <th class="p-3 w-[45%]">Descripción</th>
+                                <th class="p-3 w-[8%]">ID</th>
+                                <th class="p-3 w-[37%]">Descripción</th>
                                 <th class="p-3 w-[15%] text-right">Precio Venta</th>
-                                <th class="p-3 w-[15%] text-right">Costo</th>
+                                <th class="p-3 w-[15%] text-right">Precio Mayoreo</th>
+                                <th class="p-3 w-[10%] text-right">Costo</th>
                                 <th class="p-3 w-[15%] text-center">Stock</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
                             <!-- Los productos se cargarán aquí -->
-                            <tr><td colspan="5" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
+                            <tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -141,8 +51,8 @@
         </div>
         
         <!-- PANEL DERECHO: FORMULARIO DE EDICIÓN/AGREGAR (40%) -->
-        <div class="w-full md:w-1/3 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4 md:p-6" style=" max-height: calc(100vh - 6rem); overflow-y: auto;">
-            <h3 id="formTitle" class="text-lg font-bold text-rose-600 mb-4">Agregar Nuevo Producto</h3>
+        <div class="w-full md:w-1/3 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4 md:p-6 product-form-scroll-area">
+            <h3 id="formTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
 
             <form id="productForm" class="space-y-4">
                 <input type="hidden" id="productId">
@@ -187,16 +97,21 @@
                     <label for="cantidadMax">Cantidad Máxima</label>
                     <input type="number" id="cantidadMax" min="0" required>
                 </div>
+
+                <div>
+                    <input type="checkbox" id="isGramaje" class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary">
+                    <label for="isGramaje" class="text-sm font-medium text-gray-700">Usa Gramaje (Venta por peso)</label>
+                </div>
                 
                 <!-- El apartado de Categoría ha sido eliminado según solicitud -->
 
                 <div class="flex space-x-4 mt-6">
                     <button type="submit" id="submitBtn" 
-                            class="w-full bg-rose-600 text-white font-semibold py-3 rounded-lg hover:bg-rose-700 transition duration-150 shadow-lg">
+                            class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-lg">
                         Guardar Producto
                     </button>
                     <button type="button" id="deleteBtn" 
-                            class="w-full bg-red-500 text-white font-semibold py-3 rounded-lg hover:bg-red-600 transition duration-150 shadow-lg hidden">
+                            class="w-full btn-danger text-white font-semibold py-3 rounded-lg hover:bg-danger-dark transition duration-150 shadow-lg hidden">
                         Eliminar Producto
                     </button>
                 </div>
@@ -205,304 +120,7 @@
 
     </div>
 
-    <script>
-        // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
-        const API_BASE_URL = 'http://192.168.0.248:8080'; 
-        let products = []; // Array para almacenar la lista local de productos
-
-        // Variables del DOM
-        const productsTableBody = document.getElementById('productsTableBody');
-        const formTitle = document.getElementById('formTitle');
-        const submitBtn = document.getElementById('submitBtn');
-        const deleteBtn = document.getElementById('deleteBtn'); // Nuevo botón
-        const productForm = document.getElementById('productForm');
-        const clearSelectionBtn = document.getElementById('clearSelectionBtn');
-        
-        // Formulario Inputs
-        const productIdInput = document.getElementById('productId');
-        const codigoBarrasInput = document.getElementById('codigoBarras');
-        const nombreProductoInput = document.getElementById('nombreProducto');
-        const precioVentaInput = document.getElementById('precioVenta');
-        const precioMayoreoInput = document.getElementById('precioMayoreoInput'); // NUEVO
-        const precioCostoInput = document.getElementById('precioCosto');
-        const stockActualInput = document.getElementById('stockActual');
-        const cantidadMinInput = document.getElementById('cantidadMin');
-        const cantidadMaxInput = document.getElementById('cantidadMax');
-        // const categoriaInput = document.getElementById('categoria'); // Eliminado
-
-
-        // --- FUNCIONES DE UTILIDAD ---
-
-        /**
-         * Función para realizar llamadas reales a la API de Quarkus.
-         */
-        async function fetchApi(endpoint, method = 'GET', data = null) {
-            const url = `${API_BASE_URL}${endpoint}`;
-            const options = {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-            };
-
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
-
-            try {
-                console.log(`[API Call] ${method} ${url}`);
-                const response = await fetch(url, options);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.mensaje || `Error en la solicitud: ${response.status}`);
-                }
-                // Si la respuesta DELETE no tiene contenido, no intentar parsear JSON
-                if (method === 'DELETE') {
-                    return { mensaje: 'Operación exitosa' }; // Simular una respuesta exitosa
-                }
-                return response.json().then(response => response.datos || response); // La API real devuelve un objeto con la clave "datos" o directamente el objeto
-                
-            } catch (error) {
-                console.error("Error en la llamada a la API:", error.message);
-                throw new Error(`Fallo de conexión o API: ${error.message}`); 
-            }
-        }
-
-        /**
-         * Muestra una notificación temporal.
-         */
-        function alertUser(message, type = 'info') {
-            let existingAlert = document.getElementById('tempAlert');
-            if (existingAlert) existingAlert.remove();
-            
-            const alertDiv = document.createElement('div');
-            alertDiv.id = 'tempAlert';
-            alertDiv.textContent = message;
-            alertDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 transition-all duration-300 transform`;
-
-            if (type === 'success') {
-                alertDiv.classList.add('bg-green-500');
-            } else if (type === 'error') {
-                alertDiv.classList.add('bg-red-500');
-            } else {
-                alertDiv.classList.add('bg-blue-500');
-            }
-
-            document.body.appendChild(alertDiv);
-
-            setTimeout(() => {
-                alertDiv.classList.add('opacity-0', 'translate-y-4');
-                setTimeout(() => alertDiv.remove(), 300);
-            }, 3000);
-        }
-
-        // --- MANEJO DE LA LISTA DE PRODUCTOS ---
-
-        /**
-         * Carga los productos de la API y renderiza la tabla.
-         */
-        async function loadProducts() {
-            try {
-                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan
-                
-                // 1. LLAMADA API REAL: GET /productos/listarProductos
-                products = await fetchApi('/productos/listarProductos', 'GET');
-                
-                renderProductsTable();
-
-            } catch (error) {
-                alertUser(`Error al cargar productos: ${error.message}`, 'error');
-                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`; // Updated colspan
-            }
-        }
-
-        /**
-         * Renderiza el estado local de productos en la tabla.
-         */
-        function renderProductsTable(selectedId = null) {
-            productsTableBody.innerHTML = ''; 
-
-            if (products.length === 0) {
-                 productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`; // Updated colspan
-                 return;
-            }
-
-            products.forEach(product => {
-                const isSelected = (product.idProducto == selectedId);
-                const row = document.createElement('tr');
-                row.className = `border-b ${isSelected ? 'row-selected' : 'bg-white'}`;
-                row.dataset.id = product.idProducto;
-
-                row.innerHTML = `
-                    <td class="p-3">${product.idProducto}</td>
-                    <td class="p-3 font-medium">${product.nombre}</td>
-                    <td class="p-3 text-right text-rose-600 font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
-                    <td class="p-3 text-right">$${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : 0).toFixed(2)}</td> // NEW
-                    <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
-                    <td class="p-3 text-center">${product.stock}</td>
-                `;
-                
-                productsTableBody.appendChild(row);
-            });
-        }
-        
-        // --- MANEJO DE SELECCIÓN Y FORMULARIO ---
-
-        /**
-         * Carga los datos de un producto seleccionado en el formulario.
-         */
-        function loadProductForEditing(product) {
-            productIdInput.value = product.idProducto;
-            codigoBarrasInput.value = product.idProducto;
-            nombreProductoInput.value = product.nombre;
-            precioVentaInput.value = product.precio_venta;
-            precioMayoreoInput.value = product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : ''; // NEW
-            precioCostoInput.value = product.precio_costo;
-            stockActualInput.value = product.stock;
-            cantidadMinInput.value = product.cantidad_min;
-            cantidadMaxInput.value = product.cantidad_max;
-            // La asignación de categoría ha sido eliminada
-            
-            formTitle.textContent = `Modificar Producto #${product.idProducto}`;
-            submitBtn.textContent = 'Guardar Cambios';
-            deleteBtn.classList.remove('hidden'); // Mostrar botón de eliminar
-            renderProductsTable(product.idProducto); // Marcar la fila seleccionada
-        }
-
-        /**
-         * Limpia el formulario para agregar un nuevo producto.
-         */
-        function resetForm() {
-            productForm.reset();
-            productIdInput.value = '';
-            formTitle.textContent = 'Agregar Nuevo Producto';
-            submitBtn.textContent = 'Guardar Producto';
-            deleteBtn.classList.add('hidden'); // Ocultar botón de eliminar
-            renderProductsTable(null); // Deseleccionar filas
-            
-            // Clear new input
-            precioMayoreoInput.value = ''; // NEW
-        }
-
-        // Event listener para seleccionar una fila en la tabla
-        productsTableBody.addEventListener('click', (e) => {
-            let row = e.target.closest('tr');
-            if (row && row.dataset.id) {
-                const id = parseInt(row.dataset.id);
-                const product = products.find(p => p.idProducto === id);
-                if (product) {
-                    loadProductForEditing(product);
-                }
-            }
-        });
-
-        // Event listener para el botón de "Nuevo Producto"
-        clearSelectionBtn.addEventListener('click', resetForm);
-
-        // --- MANEJO DE SUBMIT DEL FORMULARIO ---
-
-        productForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Procesando...';
-
-            const data = {
-                nombre: nombreProductoInput.value,
-                precio_venta: parseFloat(precioVentaInput.value),
-                precio_mayoreo: precioMayoreoInput.value !== '' ? parseFloat(precioMayoreoInput.value) : null, // NEW
-                precio_costo: parseFloat(precioCostoInput.value),
-                stock: parseInt(stockActualInput.value),
-                cantidad_min: parseInt(cantidadMinInput.value),
-                cantidad_max: parseInt(cantidadMaxInput.value),
-                // idCategoria ha sido eliminado de la carga útil
-            };
-
-            const isEditing = !!productIdInput.value; // Checks if a product is being edited
-
-            // El idProducto debe venir siempre de codigoBarrasInput si se considera el ID
-            // Para productos nuevos, este será el ID introducido por el usuario.
-            // Para productos existentes, este será el ID mostrado en el campo de entrada.
-            data.idProducto = parseInt(codigoBarrasInput.value);
-
-            let result;
-
-            try {
-                if (isEditing) {
-                    // MODIFICACIÓN
-                    // Usar productIdInput.value para la URL para identificar el producto a actualizar
-                    // Usar data.idProducto (de codigoBarrasInput) para los datos del payload
-                    result = await fetchApi(`/productos/actualizarProducto/${productIdInput.value}`, 'PUT', data); 
-                    
-                    // Actualizar el estado local
-                    const index = products.findIndex(p => p.idProducto === parseInt(productIdInput.value)); // FIX: Use original ID
-                    if (index !== -1) {
-                        products[index] = result;
-                    }
-                    alertUser(`Producto #${result.idProducto} modificado con éxito.`, 'success');
-                    renderProductsTable(result.idProducto);
-
-                } else {
-                    // AGREGAR NUEVO
-                    // El objeto 'data' ya contiene data.idProducto de codigoBarrasInput
-                    result = await fetchApi('/productos/agregarProducto', 'POST', data); 
-                    
-                    // Actualizar el estado local
-                    products.push(result);
-                    resetForm();
-                    alertUser(`Nuevo producto #${result.idProducto} agregado con éxito.`, 'success');
-                    renderProductsTable(result.idProducto);
-                }
-
-                
-            } catch (error) {
-                alertUser(`Error al guardar: ${error.message}`, 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = isEditing ? 'Guardar Cambios' : 'Guardar Producto';
-            }
-        });
-
-        /**
-         * Maneja la eliminación de un producto.
-         */
-        deleteBtn.addEventListener('click', async () => {
-            const productId = productIdInput.value;
-            if (!productId) {
-                alertUser('No hay ningún producto seleccionado para eliminar.', 'info');
-                return;
-            }
-
-            if (!confirm(`¿Estás seguro de que deseas eliminar el producto #${productId}? Esta acción es irreversible.`)) {
-                return;
-            }
-
-            deleteBtn.disabled = true;
-            deleteBtn.textContent = 'Eliminando...';
-
-            try {
-                await fetchApi(`/productos/eliminarProducto/${productId}`, 'DELETE');
-                alertUser(`Producto #${productId} eliminado con éxito.`, 'success');
-                
-                // Eliminar el producto del estado local
-                products = products.filter(p => p.idProducto !== parseInt(productId));
-                renderProductsTable();
-                resetForm();
-
-            } catch (error) {
-                alertUser(`Error al eliminar el producto: ${error.message}`, 'error');
-            } finally {
-                deleteBtn.disabled = false;
-                deleteBtn.textContent = 'Eliminar Producto';
-            }
-        });
-
-
-        // --- INICIALIZACIÓN ---
-        document.addEventListener('DOMContentLoaded', () => {
-            loadProducts();
-            resetForm();
-        });
-        
-    </script>
-
+    <script src="resources/js/productos.js" defer></script>
     <script src="nav.js" defer></script>
 </body>
 </html>

@@ -9,13 +9,41 @@
     }
 })();
 
+// Global Toast Notification Function
+window.showToast = ({ message = '', type = 'info', duration = 3000 }) => {
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+
+    toastContainer.prepend(toast); // Add to the top of the stack
+
+    setTimeout(() => {
+        toast.classList.add('show'); // Trigger show animation
+    }, 10); // Small delay to allow CSS transition
+
+    setTimeout(() => {
+        toast.classList.remove('show'); // Trigger hide animation
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, duration);
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const navbarPlaceholder = document.getElementById('navbar-placeholder');
     if (navbarPlaceholder) {
         fetch('nav.html')
-            .then(response => response.text())
+            .then(response => {
+                return response.text();
+            })
             .then(data => {
-                navbarPlaceholder.innerHTML = data;
+                navbarPlaceholder.insertAdjacentHTML('beforeend', data);
+
 
                 // Lógica para activar el botón correcto
                 const currentPage = window.location.pathname.split('/').pop().replace('.html', '');
@@ -32,9 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (activeLink) {
                         activeLink.classList.remove('inactive-header-btn');
                         activeLink.classList.add('active-header-btn');
-                        // Asegurarse de que los enlaces de navegación dentro del menú desplegable tengan el estilo correcto
-                        activeLink.classList.remove('text-gray-700', 'hover:bg-gray-100');
-                        activeLink.classList.add('bg-rose-600', 'text-white', 'shadow-lg', 'shadow-rose-500/50', 'hover:bg-rose-700');
                     }
                 }
 
@@ -43,10 +68,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mainNavigation = document.getElementById('main-navigation');
 
                 if (mobileMenuButton && mainNavigation) {
+                    const mobileMenuIcon = document.getElementById('mobile-menu-icon'); // Get reference to the image
+
                     mobileMenuButton.addEventListener('click', () => {
                         mainNavigation.classList.toggle('hidden');
                         mainNavigation.classList.toggle('flex');
                         mainNavigation.classList.toggle('flex-col');
+                        
+                        // Toggle rotation class on the icon
+                        if (mobileMenuIcon) {
+                            mobileMenuIcon.classList.toggle('rotate-180');
+                        }
                     });
                     
                     // Close menu on link click (optional, but good UX)
@@ -55,22 +87,32 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (window.innerWidth < 640) { // Only for mobile view
                                 mainNavigation.classList.add('hidden');
                                 mainNavigation.classList.remove('flex', 'flex-col');
+                                // Ensure icon rotates back when menu closes
+                                if (mobileMenuIcon) {
+                                    mobileMenuIcon.classList.remove('rotate-180');
+                                }
                             }
                         });
                     });
                 }
 
-                // Add event listener for the exit button
+                function handleLogout() {
+                    sessionStorage.clear();
+                    window.location.href = 'Login.html';
+                }
+
+                // Add event listener for the desktop exit button
                 const exitButton = document.getElementById('exit-btn');
                 if (exitButton) {
-                    exitButton.addEventListener('click', () => {
-                        // Correctly clear session storage
-                        sessionStorage.clear();
-                        // Redirect to the login page
-                        window.location.href = 'Login.html';
-                    });
+                    exitButton.addEventListener('click', handleLogout);
                 }
-            })
+
+                // Add event listener for the mobile exit button
+                const mobileExitButton = document.getElementById('mobile-exit-btn');
+                if (mobileExitButton) {
+                    mobileExitButton.addEventListener('click', handleLogout);
+                }
+            }) // Correctly closes the .then(data => { ... }) block
             .catch(error => {
                 console.error('Error al cargar la barra de navegación:', error);
                 navbarPlaceholder.innerHTML = '<p class="text-red-500 text-center">Error al cargar el menú</p>';
