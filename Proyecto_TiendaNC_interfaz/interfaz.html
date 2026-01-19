@@ -271,6 +271,41 @@
                     </div>
     </div>
     
-</body>
+    <!-- MODAL para Detalle de Venta -->
+    <div id="saleDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex justify-center items-center">
+        <div class="relative p-4 sm:p-5 border w-full max-w-xl md:max-w-2xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
+            <h3 id="saleDetailsModalTitle" class="text-xl leading-6 font-bold text-gray-900 mb-4">Detalles de Venta #<span id="detailNumeroTicket"></span></h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4 text-sm">
+                <div><span class="font-semibold">ID Venta:</span> <span id="detailIdVenta"></span></div>
+                <div><span class="font-semibold">Monto Total:</span> <span id="detailMontoTotal"></span></div>
+                <div><span class="font-semibold">Método de Pago:</span> <span id="detailMetodoPago"></span></div>
+                <div><span class="font-semibold">Estatus:</span> <span id="detailEstatus"></span></div>
+                <div><span class="font-semibold">Fecha:</span> <span id="detailFechaVenta"></span></div>
+            </div>
 
-</html>
+            <h4 class="text-lg font-bold text-gray-800 mb-2">Productos en la Venta</h4>
+            <div class="max-h-60 overflow-y-auto">
+                <table class="w-full text-left ticket-table text-sm">
+                    <thead>
+                        <tr>
+                            <th class="p-2 text-center">Código</th>
+                            <th class="p-2 text-center">Descripción</th>
+                            <th class="p-2 text-center">Cantidad</th>
+                            <th class="p-2 text-center">Precio Unitario</th>
+                            <th class="p-2 text-center">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saleDetailsTableBody">
+                        <!-- Detalles de productos se insertarán aquí -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 text-right">
+                <button id="closeSaleDetailsModalBtn" class="btn-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-dark">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>

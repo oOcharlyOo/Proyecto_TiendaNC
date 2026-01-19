@@ -4,11 +4,13 @@
 
         // Variables del DOM
         const productsTableBody = document.getElementById('productsTableBody');
-        const formTitle = document.getElementById('formTitle');
+        const modalTitle = document.getElementById('modalTitle'); // Updated from formTitle
         const submitBtn = document.getElementById('submitBtn');
-        const deleteBtn = document.getElementById('deleteBtn'); // Nuevo botón
+        const deleteBtn = document.getElementById('deleteBtn');
         const productForm = document.getElementById('productForm');
-        const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+        const addOrEditProductBtn = document.getElementById('addOrEditProductBtn'); // Updated from clearSelectionBtn
+        const cancelBtn = document.getElementById('cancelBtn'); // New button
+        const productModal = document.getElementById('productModal'); // New: Reference to the modal container
         
         // Formulario Inputs
         const productIdInput = document.getElementById('productId');
@@ -111,8 +113,7 @@
          */
         async function loadProducts() {
             try {
-                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan
-                
+                                 productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan                
                 // 1. LLAMADA API REAL: GET /productos/listarProductos
                 products = await fetchApi('/productos/listarProductos', 'GET');
                 // Sort products by idProducto
@@ -122,7 +123,7 @@
 
             } catch (error) {
                 alertUser(`Error al cargar productos: ${error.message}`, 'error');
-                productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`; // Updated colspan
+                productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`; // Updated colspan
             }
         }
 
@@ -133,7 +134,7 @@
             productsTableBody.innerHTML = ''; 
 
             if (products.length === 0) {
-                 productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`; // Updated colspan
+                 productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`; // Updated colspan
                  return;
             }
 
@@ -145,11 +146,25 @@
 
                 row.innerHTML = `
                     <td class="p-3">${product.idProducto}</td>
+                    <td class="p-3">${product.codigoBarras || ''}</td>
                     <td class="p-3 font-medium">${product.nombre}</td>
                     <td class="p-3 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
                     <td class="p-3 text-right">${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined && product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</td>
                     <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
+                    <td class="p-3 text-center">${product.cantidad_min}</td>
                     <td class="p-3 text-center">${product.stock}</td>
+                    <td class="p-3 text-center">
+                        <button class="edit-btn p-1 rounded-full hover:bg-blue-100 mr-2" data-id="${product.idProducto}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" />
+                            </svg>
+                        </button>
+                        <button class="delete-btn p-1 rounded-full hover:bg-red-100" data-id="${product.idProducto}" data-nombre="${product.nombre}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </td>
                 `;
                 
                 productsTableBody.appendChild(row);
@@ -157,6 +172,24 @@
         }
         
         // --- MANEJO DE SELECCIÓN Y FORMULARIO ---
+
+        // --- MANEJO DE MODAL ---
+        function openModal(isEditing) {
+            productModal.classList.remove('hidden');
+            if (isEditing) {
+                deleteBtn.classList.remove('hidden'); // Show delete button for editing
+            } else {
+                deleteBtn.classList.add('hidden'); // Hide delete button for new product
+            }
+        }
+
+        function closeModal() {
+            productModal.classList.add('hidden');
+            productForm.reset(); // Clear form on close
+            productIdInput.value = ''; // Ensure hidden ID is cleared
+            updateGramajeLabels(false); // Reset labels
+            loadProducts(); // Reload products to reflect any changes and close modal
+        }
 
         /**
          * Carga los datos de un producto seleccionado en el formulario.
@@ -166,19 +199,17 @@
             codigoBarrasInput.value = product.codigoBarras;
             nombreProductoInput.value = product.nombre;
             precioVentaInput.value = product.precio_venta;
-            precioMayoreoInput.value = product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : ''; // NEW
+            precioMayoreoInput.value = product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : '';
             precioCostoInput.value = product.precio_costo;
             stockActualInput.value = product.stock;
             cantidadMinInput.value = product.cantidad_min;
             cantidadMaxInput.value = product.cantidad_max;
-            isGramajeInput.checked = product.is_gramaje || false; // NEW: Set gramaje checkbox
-            updateGramajeLabels(product.is_gramaje || false); // Update labels based on gramaje status
-            // La asignación de categoría ha sido eliminada
+            isGramajeInput.checked = product.is_gramaje || false;
+            updateGramajeLabels(product.is_gramaje || false);
             
-            formTitle.textContent = `Modificar Producto #${product.idProducto}`;
+            modalTitle.textContent = `Modificar Producto #${product.idProducto}`;
             submitBtn.textContent = 'Guardar Cambios';
-            deleteBtn.classList.remove('hidden'); // Mostrar botón de eliminar
-            renderProductsTable(product.idProducto); // Marcar la fila seleccionada
+            openModal(true); // Open modal for editing
         }
 
         /**
@@ -187,36 +218,64 @@
         function resetForm() {
             productForm.reset();
             productIdInput.value = '';
-            formTitle.textContent = 'Agregar Nuevo Producto';
+            modalTitle.textContent = 'Agregar Nuevo Producto';
             submitBtn.textContent = 'Guardar Producto';
-            deleteBtn.classList.add('hidden'); // Ocultar botón de eliminar
-            renderProductsTable(null); // Deseleccionar filas
-            
-            // Clear new input
-            precioMayoreoInput.value = ''; // NEW
-            isGramajeInput.checked = false; // NEW: Reset gramaje checkbox
+            deleteBtn.classList.add('hidden'); // Ocultar botón de eliminar para nuevo producto
             updateGramajeLabels(false); // Reset labels to default
+            openModal(false); // Open modal for adding
         }
-
-        // Event listener para seleccionar una fila en la tabla
+        
+        // Event listener para los botones de acción en la tabla de productos
         productsTableBody.addEventListener('click', (e) => {
-            let row = e.target.closest('tr');
-            if (row && row.dataset.id) {
-                const id = parseInt(row.dataset.id);
+            if (e.target.closest('.edit-btn')) {
+                const id = parseInt(e.target.closest('.edit-btn').dataset.id);
                 const product = products.find(p => p.idProducto === id);
                 if (product) {
                     loadProductForEditing(product);
                 }
+            } else if (e.target.closest('.delete-btn')) {
+                const id = parseInt(e.target.closest('.delete-btn').dataset.id);
+                const name = e.target.closest('.delete-btn').dataset.nombre;
+                handleDeleteProduct(id, name);
             }
         });
 
-        // Event listener para el botón de "Nuevo Producto"
-        clearSelectionBtn.addEventListener('click', resetForm);
+        // Event listener para el botón de "Nuevo Producto" (addOrEditProductBtn)
+        addOrEditProductBtn.addEventListener('click', resetForm);
+
+        // Event listener para el botón "Cancelar" en el modal
+        cancelBtn.addEventListener('click', closeModal);
 
         // Event listener para el checkbox de gramaje
         isGramajeInput.addEventListener('change', () => {
             updateGramajeLabels(isGramajeInput.checked);
         });
+
+        async function handleDeleteProduct(productId, productName) {
+            if (!productId) {
+                alertUser('No hay ningún producto seleccionado para eliminar.', 'info');
+                return;
+            }
+
+            if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${productName}" (#${productId})? Esta acción es irreversible.`)) {
+                return;
+            }
+
+            try {
+                // Assuming the deleteBtn in the modal is no longer used for this direct deletion
+                // If this is called from the modal's delete button, that button would need to be disabled/enabled
+                
+                await fetchApi(`/productos/eliminarProducto/${productId}`, 'DELETE');
+                alertUser(`Producto "${productName}" eliminado con éxito.`, 'success');
+                
+                // Eliminar el producto del estado local
+                products = products.filter(p => p.idProducto !== parseInt(productId));
+                loadProducts(); // Reload the list to refresh the table
+                // No need to call closeModal here as this is for direct table deletion
+            } catch (error) {
+                alertUser(`Error al eliminar el producto: ${error.message}`, 'error');
+            }
+        }
 
         // --- MANEJO DE SUBMIT DEL FORMULARIO ---
 
@@ -262,8 +321,7 @@
                         products[index] = result;
                     }
                     alertUser(`Producto #${result.idProducto} modificado con éxito.`, 'success');
-                    renderProductsTable(result.idProducto);
-
+                    closeModal(); // Close modal after successful edit
                 } else {
                     // AGREGAR NUEVO
                     // Para agregar, el idProducto no se envía, el backend lo asigna
@@ -274,9 +332,8 @@
                     
                     // En lugar de pushear el resultado (que puede no tener el ID),
                     // recargamos toda la lista para asegurar la consistencia.
-                    resetForm();
                     alertUser('Nuevo producto agregado con éxito.', 'success');
-                    await loadProducts(); // Recargar la lista de productos
+                    closeModal(); // Close modal after successful add
                 }
             } catch (error) {
                 alertUser(`Error al guardar: ${error.message}`, 'error');
@@ -309,12 +366,12 @@
                 
                 // Eliminar el producto del estado local
                 products = products.filter(p => p.idProducto !== parseInt(productId));
-                renderProductsTable();
-                resetForm();
-
+                loadProducts();
+                closeModal(); // Close modal after successful delete
             } catch (error) {
                 alertUser(`Error al eliminar el producto: ${error.message}`, 'error');
-            } finally {
+            }
+            finally {
                 deleteBtn.disabled = false;
                 deleteBtn.textContent = 'Eliminar Producto';
             }
@@ -324,6 +381,6 @@
         // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
             loadProducts();
-            resetForm();
+            // resetForm(); // No longer called here, as the modal opens via button click
             updateGramajeLabels(false); // Set initial state of labels
         });

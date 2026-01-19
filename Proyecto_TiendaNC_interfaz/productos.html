@@ -17,12 +17,12 @@
     <div class="main-container flex-col md:flex-row p-2">
         
         <!-- PANEL IZQUIERDO: LISTA DE PRODUCTOS (60%) -->
-        <div class="w-full md:w-2/3 flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
+        <div class="w-full md:w-full flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
             
             <div class="p-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0">Catálogo de Productos</h2>
-                <button id="clearSelectionBtn" 
-                        class="bg-gray-200 text-gray-700 px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-gray-300 transition duration-150 shadow-md text-sm sm:text-base">
+                <button id="addOrEditProductBtn" 
+                        class="bg-green-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-150 shadow-md text-sm sm:text-base">
                     + Nuevo Producto
                 </button>
             </div>
@@ -33,26 +33,35 @@
                     <table class="w-full text-left product-table text-sm">
                         <thead>
                             <tr>
-                                <th class="p-3 w-[8%]">ID</th>
-                                <th class="p-3 w-[37%]">Descripción</th>
-                                <th class="p-3 w-[15%] text-right">Precio Venta</th>
-                                <th class="p-3 w-[15%] text-right">Precio Mayoreo</th>
+                                <th class="p-3 w-[5%]">ID</th>
+                                <th class="p-3 w-[15%]">Código de Barras</th>
+                                <th class="p-3 w-[25%]">Descripción</th>
+                                <th class="p-3 w-[10%] text-right">Precio Venta</th>
+                                <th class="p-3 w-[10%] text-right">Precio Mayoreo</th>
                                 <th class="p-3 w-[10%] text-right">Costo</th>
-                                <th class="p-3 w-[15%] text-center">Stock</th>
+                                <th class="p-3 w-[5%] text-center">Mín.</th>
+                                <th class="p-3 w-[5%] text-center">Stock</th>
+                                <th class="p-3 w-[15%] text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
                             <!-- Los productos se cargarán aquí -->
-                            <tr><td colspan="6" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
+                            <tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
         
-        <!-- PANEL DERECHO: FORMULARIO DE EDICIÓN/AGREGAR (40%) -->
-        <div class="w-full md:w-1/3 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4 md:p-6 product-form-scroll-area">
-            <h3 id="formTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
+    </div>
+
+    <script src="resources/js/productos.js" defer></script>
+    <script src="nav.js" defer></script>
+
+    <!-- MODAL para Agregar/Modificar Producto -->
+    <div id="productModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex justify-center items-center">
+        <div class="relative p-4 sm:p-5 border w-full max-w-lg md:max-w-xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
+            <h3 id="modalTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
 
             <form id="productForm" class="space-y-4">
                 <input type="hidden" id="productId">
@@ -84,7 +93,6 @@
 
                 <div class="form-group">
                     <label for="stockActual">Stock/Existencia</label>
-                    <!-- Stock se puede editar, pero se debe tener cuidado en apps reales -->
                     <input type="number" id="stockActual" min="0" required>
                 </div>
 
@@ -103,9 +111,7 @@
                     <label for="isGramaje" class="text-sm font-medium text-gray-700">Usa Gramaje (Venta por peso)</label>
                 </div>
                 
-                <!-- El apartado de Categoría ha sido eliminado según solicitud -->
-
-                <div class="flex space-x-4 mt-6">
+                <div class="flex flex-col sm:flex-row space-x-0 sm:space-x-4 space-y-3 sm:space-y-0 mt-6">
                     <button type="submit" id="submitBtn" 
                             class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-lg">
                         Guardar Producto
@@ -114,13 +120,11 @@
                             class="w-full btn-danger text-white font-semibold py-3 rounded-lg hover:bg-danger-dark transition duration-150 shadow-lg hidden">
                         Eliminar Producto
                     </button>
+                    <button type="button" id="cancelBtn" 
+                            class="w-full btn-secondary text-white font-semibold py-3 rounded-lg hover:bg-secondary-dark transition duration-150 shadow-lg">
+                        Cancelar
+                    </button>
                 </div>
             </form>
         </div>
-
     </div>
-
-    <script src="resources/js/productos.js" defer></script>
-    <script src="nav.js" defer></script>
-</body>
-</html>

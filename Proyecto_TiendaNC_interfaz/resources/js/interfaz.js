@@ -17,59 +17,90 @@
             let activeSaleId = null;
             let ticket = [];
 
-            // Gramaje Calculator Modal DOM elements declared here, inside activeUser check
-            let gramajeCalculatorModal;
-            let calcProductName;
-            let calcProductId;
-            let calcProductPricePerKilo; // Original price_venta from product
-            let calcProductStock; // Original stock from product
+            // Utility function to make API requests
+            async function fetchApi(path, method = 'GET', body = null) {
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
 
-            let gramajeInput; // New ID for Grams input
-            let precioTotal; // New ID for Total Price display (div)
-            let precioBase; // New ID for Price per Kilo input
-            let calcResetBtn; // New ID for Reset Button
+                // Assuming activeUser might have a token for authentication
+                // const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
+                // if (activeUser && activeUser.token) {
+                //     headers['Authorization'] = `Bearer ${activeUser.token}`;
+                // }
 
-            let calcAddToCartBtn;
-            let calcCancelBtn;
+                const config = {
+                    method,
+                    headers,
+                };
 
+                if (body) {
+                    config.body = JSON.stringify(body);
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}${path}`, config);
+                    
+                    console.log('API Raw Response Object:', response); // Keep for debugging raw response
+
+                    if (!response.ok) {
+                        let errorMessage = `HTTP error! status: ${response.status}`;
+                        try {
+                            const contentType = response.headers.get("content-type");
+                            if (contentType && contentType.includes("application/json")) {
+                                const errorData = await response.json();
+                                console.error('API Error Data (from !response.ok):', errorData);
+                                errorMessage = errorData.mensaje || errorData.message || errorMessage;
+                            } else {
+                                const textError = await response.text();
+                                console.error('API Error Text (from !response.ok):', textError);
+                                errorMessage = textError || errorMessage;
+                            }
+                        } catch (parseError) {
+                            console.error('Failed to parse error response as JSON/Text:', parseError);
+                        }
+                        throw new Error(errorMessage);
+                    }
+                    
+                    // Handle 204 No Content responses
+                    if (response.status === 204) {
+                        return null;
+                    }
+
+                    const jsonResponse = await response.json(); // Parse the JSON response
+                    console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
+
+                    // Check for the backend's APIResponse structure
+                    if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
+                        if (jsonResponse.codigo === 200) {
+                            return jsonResponse.datos; // Success, return data
+                        } else if (jsonResponse.codigo === 404 && path === '/ventas/buscarVentaPendiente') {
+                            // Specific handling for "no pending sales found" for this endpoint
+                            console.warn("No pending sales found for /ventas/buscarVentaPendiente, backend returned 404. Proceeding to create new sale.");
+                            return null; // Signal to the caller that no pending sale was found, but it's not a critical error
+                        }
+                        else {
+                            // General error from backend
+                            throw new Error(jsonResponse.mensaje || 'API reported an error.');
+                        }
+                    }
+
+                    return jsonResponse; // Fallback if it doesn't follow the APIResponse structure
+                } catch (error) {
+                    console.error('Error in fetchApi:', error);
+                    throw error;
+                }
+            }
 
             // Moved function definitions outside DOMContentLoaded for broader scope if needed
-            function openGramajeCalculator(product) {
-                if (!gramajeCalculatorModal) { // Check if elements are initialized
-                    console.error("Gramaje calculator modal elements not initialized.");
-                    return;
-                }
-                calcProductName.value = product.nombre;
-                calcProductId.value = product.idProducto;
-                calcProductPricePerKilo.value = product.precio_venta; // Hidden input for original product price_venta
-                calcProductStock.value = product.stock; // Hidden input for stock in grams
 
-                // Populate new visible elements
-                precioBase.value = product.precio_venta; // Set initial price per kilo
-                gramajeInput.value = ''; // Clear gramaje input
-                precioTotal.value = ''; // Changed from .textContent to .value
-
-                gramajeCalculatorModal.classList.remove('hidden');
-                gramajeInput.focus(); // Focus on the main gramaje input
-            }
-
-            function closeGramajeCalculator() {
-                if (gramajeCalculatorModal) { // Check if element is initialized
-                    gramajeCalculatorModal.classList.add('hidden');
-                }
-            }
-
-            // Web Audio API for custom beeps
+            // Web Audio API context for sound generation
             let audioContext;
-            function initAudioContext() {
+
+            function playBeep(frequency, duration, type) {
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
-            }
-
-            function playBeep(frequency, duration, type) {
-                initAudioContext();
-                if (!audioContext) return;
 
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
@@ -77,13 +108,11 @@
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
 
-                oscillator.type = type; // 'sine', 'square', 'sawtooth', 'triangle'
                 oscillator.frequency.value = frequency; // in Hz
+                oscillator.type = type; // 'sine', 'square', 'sawtooth', 'triangle'
 
-                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
-                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
-
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Max volume
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration); // Fade out
 
                 oscillator.start(audioContext.currentTime);
                 oscillator.stop(audioContext.currentTime + duration);
@@ -96,6 +125,14 @@
             function playErrorBeep() {
                 playBeep(440, 0.2, 'triangle'); // A lower-pitched, slightly longer beep
             }
+
+            function updateTotals() {
+                const total = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
+                subtotalDisplay.textContent = totalDisplay.textContent = `$${total.toFixed(2)}`;
+            }
+
+            // Moved function definitions outside DOMContentLoaded for broader scope if needed
+
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
@@ -136,69 +173,81 @@
                 calcAddToCartBtn = document.getElementById('calcAddToCartBtn');
                 calcCancelBtn = document.getElementById('calcCancelBtn');
                 calcResetBtn = document.getElementById('calcResetBtn');
-            async function fetchApi(endpoint, method = 'GET', data = null) {
-                let url = `${API_BASE_URL}${endpoint}`;
-                const options = { method, headers: { 'Content-Type': 'application/json' } };
+            
+                // Sale Details Modal DOM elements
+                const saleDetailsModal = document.getElementById('saleDetailsModal');
+                const closeSaleDetailsModalBtn = document.getElementById('closeSaleDetailsModalBtn');
+                const detailNumeroTicket = document.getElementById('detailNumeroTicket');
+                const detailIdVenta = document.getElementById('detailIdVenta');
+                const detailMontoTotal = document.getElementById('detailMontoTotal');
+                const detailMetodoPago = document.getElementById('detailMetodoPago');
+                const detailEstatus = document.getElementById('detailEstatus');
+                const detailFechaVenta = document.getElementById('detailFechaVenta');
+                const saleDetailsTableBody = document.getElementById('saleDetailsTableBody');
 
-                // Para 'completarVenta', todos los datos se convierten en parámetros de consulta en la URL.
-                if (endpoint.includes('/ventas/completarVenta/') && data) {
-                    const params = new URLSearchParams();
-                    for (const key in data) {
-                        if (data[key] !== undefined) {
-                            params.append(key, data[key]);
-                        }
-                    }
-                    if (params.toString()) {
-                        url += `?${params.toString()}`;
-                    }
-                } 
-                // Para todas las demás solicitudes, los datos van en el cuerpo.
-                else if (data) {
-                    options.body = JSON.stringify(data);
+                // --- Sale Details Modal Functions ---
+                function closeSaleDetailsModal() {
+                    saleDetailsModal.classList.add('hidden');
                 }
 
-                try {
-                    const response = await fetch(url, options);
-                    // Si el método es PUT para cancelarVenta, puede que no haya cuerpo en la respuesta
-                    if (method === 'PUT' && endpoint.includes('/ventas/cancelarVenta/')) {
-                        if (!response.ok) {
-                            // Intenta obtener un mensaje de error si lo hay
-                             const errorText = await response.text();
-                             try {
-                                const errorJson = JSON.parse(errorText);
-                                throw new Error(errorJson.mensaje || `Error HTTP: ${response.status}`);
-                             } catch(e) {
-                                throw new Error(errorText || `Error HTTP: ${response.status}`);
-                             }
+                async function openSaleDetailsModal(saleId) {
+                    saleDetailsModal.classList.remove('hidden');
+                    // Clear previous details
+                    detailNumeroTicket.textContent = '';
+                    detailIdVenta.textContent = '';
+                    detailMontoTotal.textContent = '';
+                    detailMetodoPago.textContent = '';
+                    detailEstatus.textContent = '';
+                    detailFechaVenta.textContent = '';
+                    saleDetailsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4">Cargando detalles...</td></tr>';
+
+                    try {
+                        // Use the provided endpoint to get all details at once
+                        const allSaleDetails = await fetchApi(`/ventasDetalle/porVenta/${saleId}`); // Corrected endpoint
+
+                        if (allSaleDetails && allSaleDetails.length > 0) {
+                            const saleDetails = allSaleDetails[0].Venta; // Extract main sale info from the first detail item
+                            
+                            detailNumeroTicket.textContent = saleDetails.numeroTicket;
+                            detailIdVenta.textContent = saleDetails.idVenta;
+                            detailMontoTotal.textContent = `$${saleDetails.montoTotal.toFixed(2)}`;
+                            detailMetodoPago.textContent = saleDetails.metodoPago;
+                            detailEstatus.textContent = saleDetails.estatus;
+                            detailFechaVenta.textContent = new Date(saleDetails.fechaVenta).toLocaleString();
+
+                            // Populate items table
+                            saleDetailsTableBody.innerHTML = '';
+                            allSaleDetails.forEach(item => { // Iterate through all details
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td class="text-center">${item.Producto.codigoBarras || item.Producto.idProducto}</td>
+                                    <td class="text-center">${item.Producto.nombre}</td>
+                                    <td class="text-center">${item.cantidad}</td>
+                                    <td class="text-center">$${item.precioUnitarioVenta.toFixed(2)}</td>
+                                    <td class="text-center">$${(item.cantidad * item.precioUnitarioVenta).toFixed(2)}</td>
+                                `;
+                                saleDetailsTableBody.appendChild(row);
+                            });
+                        } else {
+                            // Handle case where no details are found for the sale
+                            detailNumeroTicket.textContent = 'N/A';
+                            detailIdVenta.textContent = saleId;
+                            detailMontoTotal.textContent = '$0.00';
+                            detailMetodoPago.textContent = 'N/A';
+                            detailEstatus.textContent = 'N/A';
+                            detailFechaVenta.textContent = 'N/A';
+                            saleDetailsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4">No hay productos en esta venta o venta no encontrada.</td></tr>';
                         }
-                        return; // No se espera cuerpo en la respuesta de cancelar
-                    }
 
-
-                    let responseData = {};
-                    const contentType = response.headers.get("content-type");
-                    if (contentType && contentType.includes("application/json")) {
-                        responseData = await response.json();
+                    } catch (error) {
+                        console.error('Error fetching sale details:', error);
+                        saleDetailsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Error al cargar detalles: ${error.message}</td></tr>`;
+                        window.showToast({ message: `Error al cargar detalles de la venta: ${error.message}`, type: 'error' });
                     }
-                    if (!response.ok) {
-                        const errorMessage = (responseData && (responseData.mensaje || responseData.error)) || `Error HTTP: ${response.status}`;
-                        throw new Error(errorMessage);
-                    }
-                    
-                    if (responseData.hasOwnProperty('datos')) {
-                       return responseData.datos;
-                    }
-                    return responseData;
-                } catch (error) {
-                    console.error("Error en la llamada a la API:", error);
-                    throw error;
                 }
-            }
 
-            function updateTotals() {
-                const total = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
-                subtotalDisplay.textContent = totalDisplay.textContent = `$${total.toFixed(2)}`;
-            }
+
+
 
             function renderTicket() {
                 // Update table header for new column
@@ -365,9 +414,22 @@
                 }
             }
 
+            async function removeProductFromTicket(index) {
+                const itemToRemove = ticket[index];
+                try {
+                    await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${itemToRemove.idVentaDetalle}`, 'DELETE');
+                    ticket.splice(index, 1); // Remove from local array
+                    renderTicket(); // Re-render the table
+                    window.showToast({ message: `Producto "${itemToRemove.nombreProducto}" eliminado del ticket.`, type: 'success' });
+                } catch (error) {
+                    window.showToast({ message: `Error al eliminar producto: ${error.message}`, type: 'error' });
+                }
+            }
+
+
             async function createNewSale() {
                 try {
-                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, idCaja: ID_CAJA, montoTotal: 0, estatus: 'P' }; // Add idCaja
+                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, id: ID_CAJA, montoTotal: 0, estatus: 'P' }; // Add idCaja
                     const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
                     if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
                     if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
@@ -476,6 +538,21 @@
                 updateCalculatorDisplay('grams');
             }
 
+            function openGramajeCalculator(productData) {
+                gramajeCalculatorModal.classList.remove('hidden');
+                calcProductName.textContent = productData.nombre;
+                calcProductId.value = productData.idProducto;
+                calcProductPricePerKilo.value = productData.precio_venta; // Assuming precio_venta is price per kilo for gramaje products
+                precioBase.value = productData.precio_venta; // Set the editable base price
+                calcProductStock.value = productData.stock; // Stock in grams
+                resetGramajeCalculator(); // Reset grams and total price
+            }
+
+            function closeGramajeCalculator() {
+                gramajeCalculatorModal.classList.add('hidden');
+                resetGramajeCalculator();
+            }
+
             function calculateChange() {
                 const total = parseFloat(modalTotalAmount.textContent.replace('$', ''));
                 const paid = parseFloat(amountPaid.value) || 0;
@@ -498,12 +575,13 @@
                 if (!activeSaleId || ticket.length === 0) return;
                 try {
                     const montoTotal = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
-                    const payload = {
-                        montoTotal: montoTotal,
+                    const queryParams = new URLSearchParams({
                         metodoPago: 'TRANSFERENCIA',
-                        idCaja: ID_CAJA // Include ID_CAJA
-                    };
-                    await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', payload);
+                        montoTotal: montoTotal,
+                        // If idCaja is needed as a query parameter, add it here:
+                        // idCaja: ID_CAJA
+                    }).toString();
+                    await fetchApi(`/ventas/completarVenta/${activeSaleId}?${queryParams}`, 'PUT');
                     window.showToast({ message: `Venta #${activeSaleId} completada con Transferencia.`, type: 'success' });
                     await initializeSale();
                 } catch (error) {
@@ -518,7 +596,13 @@
                 try {
                     const montoTotal = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
                     // Eliminar tipoVenta del payload, ya que se gestiona por producto individual
-                    await fetchApi(`/ventas/completarVenta/${activeSaleId}`, 'PUT', { montoTotal, idCaja: ID_CAJA }); // Include ID_CAJA
+                    const queryParams = new URLSearchParams({
+                        metodoPago: paymentMethod,
+                        montoTotal: montoTotal,
+                        // If idCaja is needed as a query parameter, add it here:
+                        // idCaja: ID_CAJA
+                    }).toString();
+                    await fetchApi(`/ventas/completarVenta/${activeSaleId}?${queryParams}`, 'PUT');
                     window.showToast({ message: `Venta #${activeSaleId} completada con ${paymentMethod}.`, type: 'success' });
                     await initializeSale();
                 } catch (error) {
@@ -742,6 +826,8 @@
                         historialVentasBody.innerHTML = '';
                         data.ventas.forEach(venta => {
                             const row = document.createElement('tr');
+                            row.className = 'border-b cursor-pointer hover:bg-gray-50'; // Make row clickable
+                            row.dataset.id = venta.idVenta; // Store sale ID for details modal
                             
                             // Determine status text and class based on new definitions
                             let statusText;
@@ -796,52 +882,37 @@
                 }
             }
 
-            async function handleCancelarVenta(event) {
-                const button = event.target.closest('.btn-cancelar-venta');
-                if (button) {
-                    const ventaId = button.dataset.id;
-                    if (confirm(`¿Está seguro de que desea cancelar la venta #${ventaId}? Esta acción no se puede deshacer.`)) {
-                        try {
-                            await fetchApi(`/ventas/cancelarVenta/${ventaId}`, 'PUT');
-                            window.showToast({ message: `Venta #${ventaId} cancelada correctamente.`, type: 'success' });
-                            await cargarHistorialVentas(); // Recargar la lista
-                        } catch (error) {
-                            console.error('Error al cancelar venta:', error);
-                            window.showToast({ message: `Error al cancelar la venta: ${error.message}`, type: 'error' });
-                        }
-                    }
+            // Event listener for clicks within the sales history body (delegation)
+            historialVentasBody.addEventListener('click', (e) => {
+                const clickedElement = e.target;
+                const targetRow = clickedElement.closest('tr[data-id]');
+
+                if (clickedElement.closest('.btn-cancelar-venta')) {
+                    handleCancelarVenta(e); // Let the existing handler manage the button click
+                } else if (targetRow) {
+                    const saleId = targetRow.dataset.id;
+                    openSaleDetailsModal(saleId);
                 }
-            }
-
-            async function removeProductFromTicket(index) {
-                const itemToRemove = ticket[index];
-                try {
-                    await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${itemToRemove.idVentaDetalle}`, 'DELETE');
-                    ticket.splice(index, 1); // Remove from local array
-                    renderTicket(); // Re-render the table
-                    window.showToast({ message: `Producto "${itemToRemove.nombreProducto}" eliminado del ticket.`, type: 'success' });
-                } catch (error) {
-                    window.showToast({ message: `Error al eliminar producto: ${error.message}`, type: 'error' });
-                }
-            }
-
-
-            verHistorialBtn.addEventListener('click', () => {
-                historialModal.classList.remove('hidden');
-                cargarHistorialVentas();
             });
 
-            cerrarHistorialModalBtn.addEventListener('click', () => {
-                historialModal.classList.add('hidden');
-            });
-            
-            historialModal.addEventListener('click', (event) => {
-                if (event.target === historialModal) {
+            closeSaleDetailsModalBtn.addEventListener('click', closeSaleDetailsModal);
+
+            // Add event listener for "Ver Historial" button
+            if (verHistorialBtn) { // Defensive check
+                verHistorialBtn.addEventListener('click', () => {
+                    historialModal.classList.remove('hidden');
+                    cargarHistorialVentas();
+                });
+            }
+
+            if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
+                cerrarHistorialModalBtn.addEventListener('click', () => {
                     historialModal.classList.add('hidden');
-                }
-            });
-            
-            historialVentasBody.addEventListener('click', handleCancelarVenta);
+                });
+            }
+
+            // ... (rest of the code) ...
+
 
             async function addGramajeProductToSale() {
                 const productId = calcProductId.value;
