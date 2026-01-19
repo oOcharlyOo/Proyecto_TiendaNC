@@ -41,7 +41,7 @@
                 try {
                     const response = await fetch(`${API_BASE_URL}${path}`, config);
                     
-                    console.log('API Raw Response Object:', response); // Keep for debugging raw response
+
 
                     if (!response.ok) {
                         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -49,11 +49,11 @@
                             const contentType = response.headers.get("content-type");
                             if (contentType && contentType.includes("application/json")) {
                                 const errorData = await response.json();
-                                console.error('API Error Data (from !response.ok):', errorData);
+    
                                 errorMessage = errorData.mensaje || errorData.message || errorMessage;
                             } else {
                                 const textError = await response.text();
-                                console.error('API Error Text (from !response.ok):', textError);
+    
                                 errorMessage = textError || errorMessage;
                             }
                         } catch (parseError) {
@@ -68,7 +68,7 @@
                     }
 
                     const jsonResponse = await response.json(); // Parse the JSON response
-                    console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
+                    //console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
 
                     // Check for the backend's APIResponse structure
                     if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
@@ -185,15 +185,34 @@
                 const detailFechaVenta = document.getElementById('detailFechaVenta');
                 const saleDetailsTableBody = document.getElementById('saleDetailsTableBody');
 
+                // Alert Modal DOM elements
+                const alertModal = document.getElementById('alertModal');
+                const alertModalTitle = document.getElementById('alertModalTitle');
+                const alertModalMessage = document.getElementById('alertModalMessage');
+                const alertModalCloseBtn = document.getElementById('alertModalCloseBtn');
+
+                // --- Alert Modal Functions ---
+                function showAlertModal(title, message) {
+                    alertModalTitle.textContent = title;
+                    alertModalMessage.textContent = message;
+                    alertModal.classList.remove('hidden');
+                }
+
+                function closeAlertModal() {
+                    alertModal.classList.add('hidden');
+                }
+
+                alertModalCloseBtn.addEventListener('click', closeAlertModal);
+
                 // --- Sale Details Modal Functions ---
                 function closeSaleDetailsModal() {
                     saleDetailsModal.classList.add('hidden');
                 }
 
-                async function openSaleDetailsModal(saleId) {
+                async function openSaleDetailsModal(saleId, enumeratedTicketNumber) {
                     saleDetailsModal.classList.remove('hidden');
                     // Clear previous details
-                    detailNumeroTicket.textContent = '';
+                    detailNumeroTicket.textContent = enumeratedTicketNumber || ''; // Use the enumerated ticket number
                     detailIdVenta.textContent = '';
                     detailMontoTotal.textContent = '';
                     detailMetodoPago.textContent = '';
@@ -208,7 +227,6 @@
                         if (allSaleDetails && allSaleDetails.length > 0) {
                             const saleDetails = allSaleDetails[0].Venta; // Extract main sale info from the first detail item
                             
-                            detailNumeroTicket.textContent = saleDetails.numeroTicket;
                             detailIdVenta.textContent = saleDetails.idVenta;
                             detailMontoTotal.textContent = `$${saleDetails.montoTotal.toFixed(2)}`;
                             detailMetodoPago.textContent = saleDetails.metodoPago;
@@ -222,7 +240,7 @@
                                 row.innerHTML = `
                                     <td class="text-center">${item.Producto.codigoBarras || item.Producto.idProducto}</td>
                                     <td class="text-center">${item.Producto.nombre}</td>
-                                    <td class="text-center">${item.cantidad}</td>
+                                    <td class="text-center">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</td>
                                     <td class="text-center">$${item.precioUnitarioVenta.toFixed(2)}</td>
                                     <td class="text-center">$${(item.cantidad * item.precioUnitarioVenta).toFixed(2)}</td>
                                 `;
@@ -280,7 +298,7 @@
                             </td>
                             <td class="p-2 text-center">
                                 <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
-                                <span class="mx-1 sm:mx-2">${item.cantidad}</span>
+                                <span class="mx-1 sm:mx-2">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
                                 <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
                             </td>
                             <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
@@ -353,13 +371,13 @@
                         // El producto ya está en el ticket
                         const itemInTicket = ticket[existingItemIndex];
                         if (itemInTicket.cantidad + 1 > productData.stock) {
-                            window.showToast({ message: `Stock insuficiente para "${productData.nombre}".`, type: 'error' });
+                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productData.nombre}".`);
                             return;
                         }
                     } else {
                         // El producto es nuevo en el ticket
                         if (!productData.stock || productData.stock <= 0) {
-                            window.showToast({ message: `El producto "${productData.nombre}" no tiene existencias.`, type: 'error' });
+                            showAlertModal('Producto sin Existencias', `El producto "${productData.nombre}" no tiene existencias.`);
                             return;
                         }
                     }
@@ -821,13 +839,25 @@
 
                     if (data.ventas && data.ventas.length > 0) {
                         // Order sales by numeroTicket (assuming it's numeric for sorting)
-                        data.ventas.sort((a, b) => a.numeroTicket - b.numeroTicket);
+                        data.ventas.sort((a, b) => {
+                            const dateA = new Date(a.fechaVenta);
+                            const dateB = new Date(b.fechaVenta);
+
+                            // Primary sort by date (ascending)
+                            if (dateA.getTime() !== dateB.getTime()) {
+                                return dateA.getTime() - dateB.getTime();
+                            }
+
+                            // Secondary sort by numeroTicket (ascending) if dates are the same
+                            return a.numeroTicket - b.numeroTicket;
+                        });
 
                         historialVentasBody.innerHTML = '';
-                        data.ventas.forEach(venta => {
+                        data.ventas.forEach((venta, index) => {
                             const row = document.createElement('tr');
                             row.className = 'border-b cursor-pointer hover:bg-gray-50'; // Make row clickable
                             row.dataset.id = venta.idVenta; // Store sale ID for details modal
+                            row.dataset.enumeratedTicket = index + 1; // Store enumerated ticket number
                             
                             // Determine status text and class based on new definitions
                             let statusText;
@@ -850,7 +880,7 @@
                             const canBeCancelled = venta.estatus === 'F' || venta.estatus === 'C';
                             
                             row.innerHTML = `
-                                <td>${venta.numeroTicket}</td>
+                                <td>${index + 1}</td>
                                 <td>$${venta.montoTotal.toFixed(2)}</td>
                                 <td>${venta.metodoPago}</td>
                                 <td>
@@ -880,8 +910,38 @@
                     historialVentasBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500">Error al cargar el historial: ${error.message}</td></tr>`;
                     window.showToast({ message: `Error al cargar el historial: ${error.message}`, type: 'error' });
                 }
-            }
+            } // Closes cargarHistorialVentas function
 
+            async function handleCancelarVenta(e) {
+                const button = e.target.closest('.btn-cancelar-venta');
+                if (!button) return;
+
+                const saleId = button.dataset.id;
+                const confirmCancel = confirm(`¿Estás seguro de que deseas cancelar la venta con ID ${saleId}?`);
+
+                if (!confirmCancel) return;
+
+                button.disabled = true; // Disable button to prevent multiple clicks
+                button.textContent = 'Cancelando...';
+
+                try {
+                    const payload = {
+                        idUsuario: ID_USUARIO,
+                        saleId: saleId,
+                        newStatus: 'I' // 'I' for Inactiva/Cancelada
+                    };
+                    await fetchApi(`/ventas/cancelarVenta/${saleId}`, 'PUT', payload);
+                    
+                    window.showToast({ message: `Venta ${saleId} cancelada con éxito.`, type: 'success' });
+                    cargarHistorialVentas(); // Refresh the sales history table
+                } catch (error) {
+                    window.showToast({ message: `Error al cancelar la venta ${saleId}: ${error.message}`, type: 'error' });
+                } finally {
+                    button.disabled = false;
+                    button.textContent = ''; // Restore original button content (SVG icon)
+                }
+            }
+            
             // Event listener for clicks within the sales history body (delegation)
             historialVentasBody.addEventListener('click', (e) => {
                 const clickedElement = e.target;
@@ -891,7 +951,8 @@
                     handleCancelarVenta(e); // Let the existing handler manage the button click
                 } else if (targetRow) {
                     const saleId = targetRow.dataset.id;
-                    openSaleDetailsModal(saleId);
+                    const enumeratedTicket = targetRow.dataset.enumeratedTicket; // Get the enumerated ticket
+                    openSaleDetailsModal(saleId, enumeratedTicket);
                 }
             });
 
@@ -934,7 +995,7 @@
                 totalPrice = parseFloat(totalPrice.toFixed(2)); // Ensure consistent precision
 
                 if (grams > stockAvailable) {
-                    window.showToast({ message: `Stock insuficiente para "${productName}". Disponible: ${stockAvailable} gramos.`, type: 'error' });
+                    showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Disponible: ${stockAvailable} gramos.`);
                     return;
                 }
 
@@ -956,7 +1017,7 @@
                         const newTotalGrams = existingItem.cantidad + grams; // Assuming cantidad for gramaje product is in grams
 
                         if (newTotalGrams > stockAvailable) {
-                            window.showToast({ message: `Stock insuficiente para "${productName}". Al intentar agregar ${grams}g, excedería el stock total. Disponible: ${stockAvailable} gramos.`, type: 'error' });
+                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Al intentar agregar ${grams}g, excedería el stock total. Disponible: ${stockAvailable} gramos.`);
                             return;
                         }
 

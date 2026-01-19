@@ -60,7 +60,7 @@
             }
 
             try {
-                console.log(`[API Call] ${method} ${url}`);
+                //console.log(`[API Call] ${method} ${url}`);
                 const response = await fetch(url, options);
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -151,8 +151,8 @@
                     <td class="p-3 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
                     <td class="p-3 text-right">${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined && product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</td>
                     <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
-                    <td class="p-3 text-center">${product.cantidad_min}</td>
-                    <td class="p-3 text-center">${product.stock}</td>
+                    <td class="p-3 text-center">${product.cantidad_min}${product.is_gramaje ? 'g' : ''}</td>
+                    <td class="p-3 text-center">${product.stock}${product.is_gramaje ? 'g' : ''}</td>
                     <td class="p-3 text-center">
                         <button class="edit-btn p-1 rounded-full hover:bg-blue-100 mr-2" data-id="${product.idProducto}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">

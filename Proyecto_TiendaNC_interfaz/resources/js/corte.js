@@ -49,7 +49,7 @@
             try {
                 const response = await fetch(`${API_BASE_URL}${endpoint}`, config); // Changed path to endpoint
                 
-                console.log('API Raw Response Object:', response); // Keep for debugging raw response
+               // console.log('API Raw Response Object:', response); // Keep for debugging raw response
 
                 if (!response.ok) {
                     let errorMessage = `HTTP error! status: ${response.status}`;
@@ -76,7 +76,7 @@
                 }
 
                 const jsonResponse = await response.json(); // Parse the JSON response
-                console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
+                //console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
 
                 // Check for the backend's APIResponse structure
                 if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
@@ -109,8 +109,8 @@
             let labels, dataValues, titleText, totalBruto;
 
             if (isHistoric) { // Reporte Histórico por Día
-                const ventasEfectivo = reportData.ventas.filter(v => v.metodoPago === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
-                const ventasTransferencia = reportData.ventas.filter(v => v.metodoPago === 'TRANSFERENCIA').reduce((sum, v) => sum + v.montoTotal, 0);
+                const ventasEfectivo = reportData.ventas.filter(v => v.metodoPago.toUpperCase() === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
+                const ventasTransferencia = reportData.ventas.filter(v => v.metodoPago.toUpperCase() === 'TRANSFERENCIA').reduce((sum, v) => sum + v.montoTotal, 0);
                 
                 labels = ['Ventas en Efectivo', 'Ventas por Transferencia'];
                 dataValues = [ventasEfectivo, ventasTransferencia];
@@ -255,7 +255,7 @@
                 drawCashFlowChart(emptyReport, true);
             } else {
                 // 3. Calcular ventas por método de pago
-                const ventasEfectivo = data.ventas.filter(v => v.metodoPago === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
+                const ventasEfectivo = data.ventas.filter(v => v.metodoPago === 'EFECTIVO' || v.metodoPago === 'Efectivo').reduce((sum, v) => sum + v.montoTotal, 0);
                 const ventasTransferencia = data.ventas.filter(v => v.metodoPago === 'TRANSFERENCIA').reduce((sum, v) => sum + v.montoTotal, 0);
 
                 // 4. Poblar UI con los datos del reporte histórico
@@ -274,7 +274,7 @@
 
             // 5. Mostrar y ocultar elementos correspondientes
             reporteFechaCorte.textContent = new Date(date + 'T00:00:00').toLocaleString('es-MX', { dateStyle: 'long' });
-            reporteCajero.textContent = 'N/A';
+            reporteCajero.textContent = activeUser.nombre;
             corteReporte.classList.remove('hidden');
             cerrarTurnoBtn.classList.add('hidden');
             generateDailyReportBtn.classList.remove('hidden');
@@ -310,7 +310,7 @@
                 
                 let salesToday = [];
                 try {
-                    const allSalesResponse = await fetchApi('/ventas/obetenerVentas');
+                    const allSalesResponse = await fetchApi('/ventas/obtenerVentas'); // Corrected typo
                     const allSales = Array.isArray(allSalesResponse) ? allSalesResponse : (allSalesResponse.datos || []);
                     
                     const corteDate = new Date(corteResponse.fechaCorte + 'Z'); 
@@ -318,18 +318,20 @@
                     salesToday = allSales.filter(sale => {
                         if (!sale.fechaVenta) return false;
                         const saleDate = new Date(sale.fechaVenta + 'Z'); 
-                        return saleDate.getUTCFullYear() === corteDate.getUTCFullYear() &&
-                               saleDate.getUTCMonth() === corteDate.getUTCMonth() &&
-                               saleDate.getUTCDate() === corteDate.getUTCDate() &&
-                               sale.estatus === 'C';
+                        const isSameDay = saleDate.getUTCFullYear() === corteDate.getUTCFullYear() &&
+                                          saleDate.getUTCMonth() === corteDate.getUTCMonth() &&
+                                          saleDate.getUTCDate() === corteDate.getUTCDate();
+                        
+                        // Include sales that are 'C' (Completed) or 'F' (Finalized)
+                        return isSameDay && (sale.estatus === 'C');
                     });
                 } catch (salesError) {
                     console.error("Error al obtener el total de tickets del día:", salesError);
                 }
 
                 // Calcular ventas por método de pago para el desglose
-                const ventasTransferencia = salesToday.filter(v => v.metodoPago === 'TRANSFERENCIA').reduce((sum, v) => sum + v.montoTotal, 0);
-                const ventasEfectivo = salesToday.filter(v => v.metodoPago === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
+                const ventasTransferencia = salesToday.filter(v => v.metodoPago.toUpperCase() === 'TRANSFERENCIA').reduce((sum, v) => sum + v.montoTotal, 0);
+                const ventasEfectivo = salesToday.filter(v => v.metodoPago.toUpperCase() === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
 
                 renderCorteReport(corteResponse, ventasEfectivo, ventasTransferencia, salesToday.length);
                 window.showToast({ message: 'Corte de caja generado con éxito.', type: 'success' });
@@ -464,7 +466,18 @@ async function generateMonthlyReport() {
             }
             const sale = salesMap.get(saleId);
             sale.totalVenta += detail.cantidad * detail.precioUnitarioVenta;
-            sale.totalCosto += detail.cantidad * (detail.Producto.precio_costo || 0); // Handle missing precio_costo
+
+            let costoPorUnidad = detail.Producto.precio_costo || 0;
+            let cantidadParaCosto = detail.cantidad;
+
+            // Ajuste para productos vendidos por gramaje:
+            // Si el producto es por gramaje (is_gramaje: true), la cantidad está en gramos,
+            // y el precio_costo está por kilogramo. Convertimos gramos a kilogramos.
+            if (detail.Producto.is_gramaje === true) {
+                cantidadParaCosto = detail.cantidad / 1000; // Convertir gramos a kilogramos
+            }
+
+            sale.totalCosto += cantidadParaCosto * costoPorUnidad;
             sale.ganancia = sale.totalVenta - sale.totalCosto;
             sale.productos.push(detail);
         });

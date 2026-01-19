@@ -27,7 +27,7 @@
             }
 
             try {
-                console.log(`[API Call] ${method} ${url}`);
+                //console.log(`[API Call] ${method} ${url}`);
                 const response = await fetch(url, options);
                 
                 if (!response.ok) {
@@ -160,8 +160,8 @@
                     <td class="p-3 font-medium">${product.nombre}</td>
                     <td class="p-3 text-right text-gray-500">$${product.precio_costo.toFixed(2)}</td>
                     <td class="p-3 text-right text-primary font-semibold">$${product.precio_venta.toFixed(2)}</td>
-                    <td class="p-3 text-center">${product.cantidad_min}</td>
-                    <td class="p-3 text-center">${product.stock}</td>
+                    <td class="p-3 text-center">${product.cantidad_min}${product.is_gramaje ? 'g' : ''}</td>
+                    <td class="p-3 text-center">${product.stock}${product.is_gramaje ? 'g' : ''}</td>
                 `;
                 
                 allProductsTableBody.appendChild(row);
@@ -186,8 +186,8 @@
                 row.innerHTML = `
                     <td class="p-3">${product.idProducto}</td>
                     <td class="p-3 font-semibold">${product.nombre}</td>
-                    <td class="p-3 text-center text-danger">${product.cantidad_min}</td>
-                    <td class="p-3 text-center text-danger font-extrabold">${product.stock}</td>
+                    <td class="p-3 text-center text-danger">${product.cantidad_min}${product.is_gramaje ? 'g' : ''}</td>
+                    <td class="p-3 text-center text-danger font-extrabold">${product.stock}${product.is_gramaje ? 'g' : ''}</td>
                 `;
                 
                 lowStockTableBody.appendChild(row);
