@@ -1,4 +1,4 @@
-        const API_BASE_URL = 'http://192.168.0.248:8080';
+        const API_BASE_URL = 'http://localhost:8080';
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
         const activeUserShift = JSON.parse(sessionStorage.getItem('activeUserShift'));
 
@@ -57,6 +57,44 @@
                 if (gramajeCalculatorModal) { // Check if element is initialized
                     gramajeCalculatorModal.classList.add('hidden');
                 }
+            }
+
+            // Web Audio API for custom beeps
+            let audioContext;
+            function initAudioContext() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            function playBeep(frequency, duration, type) {
+                initAudioContext();
+                if (!audioContext) return;
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.type = type; // 'sine', 'square', 'sawtooth', 'triangle'
+                oscillator.frequency.value = frequency; // in Hz
+
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+            }
+
+            function playSuccessBeep() {
+                playBeep(880, 0.1, 'sine'); // A high-pitched, short beep
+            }
+
+            function playErrorBeep() {
+                playBeep(440, 0.2, 'triangle'); // A lower-pitched, slightly longer beep
             }
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
@@ -185,7 +223,7 @@
                         row.className = 'border-b encabezado-zelda-text';
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
                         row.innerHTML = `
-                            <td class="p-2">${item.idProducto}</td>
+                            <td class="p-2">${item.codigoBarras || item.idProducto}</td>
                             <td class="p-2 whitespace-normal break-words">${item.nombreProducto || 'Cargando...'}</td>
                             <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
                             <td class="p-2 text-center">
@@ -235,15 +273,42 @@
                 codigoProductoInput.disabled = true;
                 agregarProductoBtn.textContent = 'Buscando...';
                 try {
-                    const productData = await fetchApi(`/productos/buscarProductoPorId/${String(code).trim()}`);
+                    let productData = null;
+                    let trimmedCode = String(code).trim();
+
+                    // 1. Intentar buscar por ID si es numérico
+                    if (!isNaN(trimmedCode)) {
+                        try {
+                            productData = await fetchApi(`/productos/buscarProductoPorId/${trimmedCode}`);
+                        } catch (e) {
+                            console.warn(`Producto no encontrado por ID: ${trimmedCode}, intentando por Código de Barras.`);
+                        }
+                    }
+
+                    // 2. Si no se encontró por ID o no era numérico, intentar buscar por Código de Barras
+                    // Esto cubre casos donde un barcode es numérico pero no es un ID, o cuando el input no era numérico.
+                    if (!productData) {
+                        try {
+                            productData = await fetchApi(`/productos/buscarPorCodigoBarras/${trimmedCode}`);
+                        } catch (e) {
+                            console.warn(`Producto no encontrado por Código de Barras: ${trimmedCode}`);
+                        }
+                    }
+                    
                     if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
                     
-                    if (ticket.find(item => item.idProducto === productData.idProducto)) {
-                        if ((ticket.find(item => item.idProducto === productData.idProducto).cantidad + 1) > productData.stock) {
-                           window.showToast({ message: `Stock insuficiente para "${productData.nombre}".`, type: 'error' });
-                           return;
+                    const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
+
+                    // Validar stock antes de continuar
+                    if (existingItemIndex !== -1) {
+                        // El producto ya está en el ticket
+                        const itemInTicket = ticket[existingItemIndex];
+                        if (itemInTicket.cantidad + 1 > productData.stock) {
+                            window.showToast({ message: `Stock insuficiente para "${productData.nombre}".`, type: 'error' });
+                            return;
                         }
                     } else {
+                        // El producto es nuevo en el ticket
                         if (!productData.stock || productData.stock <= 0) {
                             window.showToast({ message: `El producto "${productData.nombre}" no tiene existencias.`, type: 'error' });
                             return;
@@ -261,7 +326,7 @@
 
                     if (!activeSaleId) throw new Error("No se pudo crear una nueva venta.");
 
-                    const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
+                    // Si ya existe, actualiza la cantidad. Si no, agrégalo.
                     if (existingItemIndex !== -1) {
                         await updateQuantity(existingItemIndex, 1);
                     } else {
@@ -276,6 +341,7 @@
                         const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
                         ticket.push({
                             idProducto: productData.idProducto,
+                            codigoBarras: productData.codigoBarras,
                             nombreProducto: productData.nombre,
                             cantidad: 1,
                             precioUnitarioVenta: productData.precio_venta, // Default to retail
@@ -286,9 +352,11 @@
                             isMayoreo: false // Add flag
                         });
                         renderTicket();
+                        playSuccessBeep(); // Play success beep
                     }
                 } catch (error) {
                     window.showToast({ message: `Error: ${error.message}`, type: 'error' });
+                    playErrorBeep(); // Play error beep
                 } finally {
                     codigoProductoInput.value = '';
                     codigoProductoInput.disabled = false;
@@ -318,15 +386,19 @@
             async function initializeSale() {
                 ticketIdDisplay.textContent = 'Buscando...';
                 try {
-                    const allSales = await fetchApi('/ventas/obetenerVentas'); // Coincide con el endpoint del backend con typo
-                    const pendingSale = Array.isArray(allSales) ? allSales.find(v => v.estatus === 'P' && v.usuario?.idUsuario === ID_USUARIO && v.idCaja === ID_CAJA) : null; // Filtrado en frontend
-                    if (pendingSale) {
+                    // Usar el nuevo endpoint para buscar directamente la venta pendiente del usuario/caja
+                    const pendingSale = await fetchApi('/ventas/buscarVentaPendiente'); 
+                    
+                    if (pendingSale && pendingSale.idVenta) { // Check if a pending sale object was returned
                         activeSaleId = pendingSale.idVenta;
                         if (!pendingSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
                         ticketIdDisplay.textContent = pendingSale.numeroTicket;
+                        
+                        // Fetch details for the found pending sale
                         const allDetails = await fetchApi('/ventasDetalle/obtenerTodosLosVentasDetalles');
                         ticket = Array.isArray(allDetails) ? allDetails.filter(d => d.Venta.idVenta === activeSaleId).map(detail => ({
                             idProducto: detail.Producto.idProducto,
+                            codigoBarras: detail.Producto.codigoBarras,
                             nombreProducto: detail.Producto.nombre,
                             cantidad: detail.cantidad,
                             precioUnitarioVenta: detail.precioUnitarioVenta,
@@ -338,10 +410,8 @@
                         })) : [];
                         renderTicket();
                     } else {
-                        activeSaleId = null;
-                        ticket = [];
-                        ticketIdDisplay.textContent = 'Pendiente';
-                        renderTicket();
+                        // Si no se encuentra una venta pendiente, crear una nueva inmediatamente
+                        await createNewSale();
                     }
                 } catch (error) {
                     window.showToast({ message: `Error al inicializar: ${error.message}`, type: 'error' });
@@ -481,7 +551,7 @@
                     item.addEventListener('click', () => {
                         searchResultsContainer.classList.add('hidden');
                         codigoProductoInput.value = '';
-                        addProduct(product.idProducto);
+                        addProduct(product.codigoBarras || product.idProducto);
                     });
                     searchResultsContainer.appendChild(item);
                 });
@@ -489,15 +559,60 @@
             }
 
             async function searchProductsByName(query) {
-                if(isNaN(query)){
+                if(query.length < 2) { // Minimal length for search
+                    searchResultsContainer.classList.add('hidden');
+                    return;
+                }
+                try {
+                    let results = [];
+                    let trimmedQuery = query.trim();
+
+                    // 1. Intentar buscar por ID si es numérico
+                    if (!isNaN(trimmedQuery)) {
+                        try {
+                            const productById = await fetchApi(`/productos/buscarProductoPorId/${trimmedQuery}`);
+                            if (productById) {
+                                results.push(productById);
+                            }
+                        } catch (e) {
+                            // Error al buscar por ID (ej. 404), no detener la búsqueda, solo registrar
+                            console.debug(`No se encontró por ID: ${trimmedQuery}`);
+                        }
+                    }
+                    
+                    // 2. Intentar buscar por Código de Barras (funciona para códigos numéricos y alfanuméricos)
                     try {
-                        const results = await fetchApi(`/productos/buscar?nombre=${query}`);
+                        const productByBarcode = await fetchApi(`/productos/buscarPorCodigoBarras/${trimmedQuery}`);
+                        // Solo añadir si no es un duplicado del encontrado por ID
+                        if (productByBarcode && !results.some(p => p.idProducto === productByBarcode.idProducto)) {
+                            results.push(productByBarcode);
+                        }
+                    } catch (e) {
+                        // Error al buscar por Código de Barras, no detener la búsqueda
+                        console.debug(`No se encontró por Código de Barras: ${trimmedQuery}`);
+                    }
+
+                    // 3. Buscar por nombre (para consultas alfanuméricas o para ampliar resultados)
+                    // Esta API de búsqueda por nombre ya debería manejar parciales.
+                    try {
+                        const nameSearchResults = await fetchApi(`/productos/buscar?nombre=${trimmedQuery}`);
+                        nameSearchResults.forEach(p => {
+                            // Evitar duplicados con los ya encontrados por ID o Código de Barras
+                            if (!results.some(existing => existing.idProducto === p.idProducto)) {
+                                results.push(p);
+                            }
+                        });
+                    } catch (e) {
+                        console.debug(`No se encontraron resultados por nombre para: ${trimmedQuery}`);
+                    }
+
+                    if (results.length > 0) {
                         renderSearchResults(results);
-                    } catch (error) {
-                        console.error('Error en búsqueda por nombre:', error);
+                    } else {
                         searchResultsContainer.classList.add('hidden');
                     }
-                } else {
+                } catch (error) {
+                    console.error('Error en búsqueda de productos:', error);
                     searchResultsContainer.classList.add('hidden');
                 }
             }
@@ -621,6 +736,9 @@
                     historialGananciaTotalEl.textContent = `$${(data.gananciaTotal || 0).toFixed(2)}`;
 
                     if (data.ventas && data.ventas.length > 0) {
+                        // Order sales by numeroTicket (assuming it's numeric for sorting)
+                        data.ventas.sort((a, b) => a.numeroTicket - b.numeroTicket);
+
                         historialVentasBody.innerHTML = '';
                         data.ventas.forEach(venta => {
                             const row = document.createElement('tr');
@@ -646,7 +764,7 @@
                             const canBeCancelled = venta.estatus === 'F' || venta.estatus === 'C';
                             
                             row.innerHTML = `
-                                <td>${venta.idVenta}</td>
+                                <td>${venta.numeroTicket}</td>
                                 <td>$${venta.montoTotal.toFixed(2)}</td>
                                 <td>${venta.metodoPago}</td>
                                 <td>
@@ -847,5 +965,81 @@
                 });
             });
             initializeSale(); // Call initializeSale here after everything is set up
+
+            // --- BARCODE SCANNER LOGIC ---
+            const startScannerBtn = document.getElementById('startScannerBtn');
+            const stopScannerBtn = document.getElementById('stopScannerBtn');
+            let isProcessingScan = false;
+
+            function processScannedCode(code) {
+                addProduct(code);
+                
+                const feedback = document.getElementById('scan-feedback');
+                const detectedId = document.getElementById('detected-id');
+                feedback.classList.remove('hidden');
+                detectedId.innerText = `ID: ${code}`;
+    
+                setTimeout(() => feedback.classList.add('hidden'), 3000);
+            }
+
+            function handleDetection(data) {
+                if (isProcessingScan) return;
+
+                const code = data.codeResult.code;
+                if (code) {
+                    isProcessingScan = true;
+                    // document.getElementById('beep-sound').play(); // REMOVED: Replaced by programmatic beeps
+                    stopScanner();
+                    processScannedCode(code);
+                }
+            }
+
+            function stopScanner() {
+                Quagga.stop();
+                document.getElementById('scanner-container').classList.add('hidden');
+                document.getElementById('ticketPanel').classList.remove('hidden');
+                document.querySelector('.w-full.md\\:w-1\\/4').classList.remove('hidden');
+            }
+
+            function startScanner() {
+                isProcessingScan = false; // Reset flag on new scan session
+                document.getElementById('scanner-container').classList.remove('hidden');
+                document.getElementById('ticketPanel').classList.add('hidden');
+                document.querySelector('.w-full.md\\:w-1\\/4').classList.add('hidden');
+    
+    
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: document.querySelector('#interactive'),
+                        constraints: {
+                            facingMode: "environment" // Usar cámara trasera
+                        },
+                    },
+                    decoder: {
+                        readers: [
+                            "code_128_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_39_reader",
+                            "upc_reader"
+                        ]
+                    }
+                }, function(err) {
+                    if (err) {
+                        console.error(err);
+                        alert("Error al iniciar la cámara. Asegúrate de dar permisos.");
+                        stopScanner(); // Asegurarse de limpiar la UI si falla
+                        return;
+                    }
+                    Quagga.start();
+                });
+    
+                Quagga.onDetected(handleDetection);
+            }
+
+            startScannerBtn.addEventListener('click', startScanner);
+            stopScannerBtn.addEventListener('click', stopScanner);
         }); // Correctly closing DOMContentLoaded
     } // Correctly closing if (activeUser)

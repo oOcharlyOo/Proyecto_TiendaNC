@@ -8,51 +8,117 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="resources/style/estilos.css">
+    <!-- QuaggaJS para lectura de códigos de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+    <style>
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            background: #000;
+        }
+        #interactive.viewport video, #interactive.viewport canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .drawingBuffer {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* Línea guía del escáner */
+        .scanner-laser {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: rgba(255, 0, 0, 0.5);
+            box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.7);
+            z-index: 10;
+            transform: translateY(-50%);
+            animation: scan 2s infinite;
+        }
+        @keyframes scan {
+            0%, 100% { top: 30%; }
+            50% { top: 70%; }
+        }
+    </style>
 </head>
 
 <body class="main-page-body">
     <div id="navbar-placeholder"></div>
 
     <div class="main-container flex-col md:flex-row p-2">
-                    <div id="ticketPanel" class="flex-grow flex flex-col rounded-lg shadow-xl overflow-hidden">            <div class="p-4 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800" style="color: var(--ticket-header-color);">VENTA - Ticket <span id="ticketIdDisplay">Cargando...</span>
-                </h2>
-                <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
-                    <div class="relative flex-grow">
-                        <label for="codigoProducto" class="block text-sm font-medium text-primary self-center" style="color: var(--neutral-800);">Código o Nombre del Producto:</label>
-                        <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
-                            disabled>
-                        <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
-                            <!-- Los resultados de la búsqueda se inyectarán aquí -->
-                        </div>  
-                    </div>
-                    <button id="agregarProductoBtn"
-                        class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end"
-                        disabled>ENTER - Agregar por Código</button>
+        <div class="flex-grow flex flex-col">
+            <!-- Sección del Escáner -->
+            <div id="scanner-container" class="bg-white p-2 rounded-2xl shadow-lg mb-6 hidden">
+                <div id="interactive" class="viewport">
+                    <div class="scanner-laser"></div>
+                </div>
+                <button id="stopScannerBtn" class="w-full mt-2 py-2 text-red-600 font-medium text-sm">
+                    Cancelar Escaneo
+                </button>
+            </div>
+
+             <!-- Feedback de Último Escaneo -->
+             <div id="scan-feedback" class="hidden mb-6 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 flex items-center gap-3">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <div>
+                    <p class="font-bold">Código Detectado</p>
+                    <p id="detected-id" class="text-sm opacity-90"></p>
                 </div>
             </div>
-            <div class="flex-grow flex flex-col overflow-hidden">
-                <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">
-                    <div class="overflow-x-auto">
-                        <table id="ticketTable" class="w-full text-left ticket-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th class="p-2 w-[15%]">Código</th>
-                                    <th class="p-2 w-[40%]">Descripción</th>
-                                    <th class="p-2 w-[15%] text-right">Precio</th>
-                                    <th class="p-2 w-[15%] text-center">Cantidad</th>
-                                    <th class="p-2 w-[15%] text-right">Importe</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ticketItems"></tbody>
-                        </table>
+
+            <div id="ticketPanel" class="flex-grow flex flex-col rounded-lg shadow-xl overflow-hidden">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800" style="color: var(--ticket-header-color);">VENTA - Ticket <span id="ticketIdDisplay">Cargando...</span>
+                    </h2>
+                    <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
+                        <div class="relative flex-grow">
+                            <label for="codigoProducto" class="block text-sm font-medium text-primary self-center" style="color: var(--neutral-800);">Código o Nombre del Producto:</label>
+                            <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
+                                disabled>
+                            <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
+                                <!-- Los resultados de la búsqueda se inyectarán aquí -->
+                            </div>  
+                        </div>
+                        <button id="agregarProductoBtn"
+                            class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end"
+                            disabled>ENTER - Agregar por Código</button>
+                        <button id="startScannerBtn" class="flex items-center justify-center gap-3 bg-blue-600 text-white p-2 rounded-lg shadow-md hover:bg-blue-700 transition self-end">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-grow flex flex-col overflow-hidden">
+                    <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">
+                        <div class="overflow-x-auto">
+                            <table id="ticketTable" class="w-full text-left ticket-table text-sm">
+                                <thead>
+                                    <tr>
+                                        <th class="p-2 w-[15%]">Código</th>
+                                        <th class="p-2 w-[40%]">Descripción</th>
+                                        <th class="p-2 w-[15%] text-right">Precio</th>
+                                        <th class="p-2 w-[15%] text-center">Cantidad</th>
+                                        <th class="p-2 w-[15%] text-right">Importe</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ticketItems"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-            <div class="w-full md:w-1/4 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4">            
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Resumen de Venta</h3>
+        <div class="w-full md:w-1/4 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4">            
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Resumen de Venta</h3>
             <div class="flex-grow">
                 <div class="summary-row"><span>Subtotal:</span><span id="subtotalDisplay">$0.00</span></div>
                 <div class="summary-total mt-4 border-t-2 border-gray-200"><span>TOTAL:</span><span id="totalDisplay"
@@ -127,7 +193,7 @@
                 <table class="historial-table">
                     <thead>
                         <tr>
-                            <th>ID Venta</th>
+                            <th>Número de Ticket</th>
                             <th>Monto</th>
                             <th>Método Pago</th>
                             <th>Estatus</th>
@@ -202,7 +268,9 @@
                                 Cancelar
                             </button>
                         </div>
-                    </div>    </div>
+                    </div>
+    </div>
+    
 </body>
 
 </html>

@@ -1,5 +1,5 @@
         // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
-        const API_BASE_URL = 'http://192.168.0.248:8080'; 
+        const API_BASE_URL = 'http://localhost:8080'; 
         let products = []; // Array para almacenar la lista local de productos
 
         // Variables del DOM
@@ -163,7 +163,7 @@
          */
         function loadProductForEditing(product) {
             productIdInput.value = product.idProducto;
-            codigoBarrasInput.value = product.idProducto;
+            codigoBarrasInput.value = product.codigoBarras;
             nombreProductoInput.value = product.nombre;
             precioVentaInput.value = product.precio_venta;
             precioMayoreoInput.value = product.precio_mayoreo !== null && product.precio_mayoreo !== undefined ? product.precio_mayoreo : ''; // NEW
@@ -226,6 +226,7 @@
             submitBtn.textContent = 'Procesando...';
 
             const data = {
+                codigoBarras: codigoBarrasInput.value,
                 nombre: nombreProductoInput.value,
                 precio_venta: parseFloat(precioVentaInput.value),
                 precio_mayoreo: precioMayoreoInput.value !== '' ? parseFloat(precioMayoreoInput.value) : null, // NEW
@@ -239,22 +240,24 @@
 
             const isEditing = !!productIdInput.value; // Checks if a product is being edited
 
-            // El idProducto debe venir siempre de codigoBarrasInput si se considera el ID
-            // Para productos nuevos, este será el ID introducido por el usuario.
-            // Para productos existentes, este será el ID mostrado en el campo de entrada.
-            data.idProducto = parseInt(codigoBarrasInput.value);
+            if (isEditing) {
+                // For editing, include the original product ID in the payload
+                data.idProducto = parseInt(productIdInput.value);
+            }
+
 
             let result;
 
             try {
                 if (isEditing) {
                     // MODIFICACIÓN
-                    // Usar productIdInput.value para la URL para identificar el producto a actualizar
-                    // Usar data.idProducto (de codigoBarrasInput) para los datos del payload
+                    // Para actualizar, el idProducto debe ir en el payload y en la URL
+                    data.idProducto = parseInt(productIdInput.value); // Asegurarse de que el ID del producto esté en el payload
+
                     result = await fetchApi(`/productos/actualizarProducto/${productIdInput.value}`, 'PUT', data); 
                     
                     // Actualizar el estado local
-                    const index = products.findIndex(p => p.idProducto === parseInt(productIdInput.value)); // FIX: Use original ID
+                    const index = products.findIndex(p => p.idProducto === parseInt(productIdInput.value));
                     if (index !== -1) {
                         products[index] = result;
                     }
@@ -263,17 +266,18 @@
 
                 } else {
                     // AGREGAR NUEVO
-                    // El objeto 'data' ya contiene data.idProducto de codigoBarrasInput
-                    result = await fetchApi('/productos/agregarProducto', 'POST', data); 
-                    
-                    // Actualizar el estado local
-                    products.push(result);
-                    resetForm();
-                    alertUser(`Nuevo producto #${result.idProducto} agregado con éxito.`, 'success');
-                    renderProductsTable(result.idProducto);
-                }
+                    // Para agregar, el idProducto no se envía, el backend lo asigna
+                    // Asegurarse de que el objeto 'data' no contenga 'idProducto' si lo tuviera de alguna forma
+                    delete data.idProducto; 
 
-                
+                    await fetchApi('/productos/agregarProducto', 'POST', data); 
+                    
+                    // En lugar de pushear el resultado (que puede no tener el ID),
+                    // recargamos toda la lista para asegurar la consistencia.
+                    resetForm();
+                    alertUser('Nuevo producto agregado con éxito.', 'success');
+                    await loadProducts(); // Recargar la lista de productos
+                }
             } catch (error) {
                 alertUser(`Error al guardar: ${error.message}`, 'error');
             } finally {
