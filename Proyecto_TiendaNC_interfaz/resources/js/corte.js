@@ -32,36 +32,68 @@
         const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 });
         function formatCurrency(amount) { return formatter.format(amount || 0); }
 
-        async function fetchApi(endpoint, method = 'GET', data = null) {
-            let url = `${API_BASE_URL}${endpoint}`;
-            const options = { method, headers: { 'Content-Type': 'application/json' } };
-            if (data) options.body = JSON.stringify(data);
-            console.log(`[API Call] ${method} ${url}`, data);
+        async function fetchApi(endpoint, method = 'GET', data = null) { // Changed path to endpoint, body to data
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            const config = {
+                method,
+                headers,
+            };
+
+            if (data) {
+                config.body = JSON.stringify(data);
+            }
+
             try {
-                const response = await fetch(url, options);
-                let responseText = null;
-                if (response.status !== 204) {
-                    responseText = await response.text();
-                }
-                let responseData;
-                const contentType = response.headers.get("content-type");
-                if (responseText !== null && contentType && contentType.includes("application/json")) {
-                    try { responseData = JSON.parse(responseText); } catch (e) {
-                        responseData = responseText;
-                        console.warn(`API response claimed JSON but failed to parse for ${url}:`, e);
-                    }
-                } else {
-                    responseData = responseText;
-                }
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, config); // Changed path to endpoint
+                
+                console.log('API Raw Response Object:', response); // Keep for debugging raw response
+
                 if (!response.ok) {
-                    const errorDetail = (responseData && (responseData.mensaje || responseData.error || responseData.message))
-                                        ? (typeof responseData === 'object' ? JSON.stringify(responseData) : responseData)
-                                        : `Error HTTP: ${response.status} ${response.statusText}`;
-                    throw new Error(`API Error: ${errorDetail}`);
+                    let errorMessage = `HTTP error! status: ${response.status}`;
+                    try {
+                        const contentType = response.headers.get("content-type");
+                        if (contentType && contentType.includes("application/json")) {
+                            const errorData = await response.json();
+                            console.error('API Error Data (from !response.ok):', errorData);
+                            errorMessage = errorData.mensaje || errorData.message || errorMessage;
+                        } else {
+                            const textError = await response.text();
+                            console.error('API Error Text (from !response.ok):', textError);
+                            errorMessage = textError || errorMessage;
+                        }
+                    } catch (parseError) {
+                        console.error('Failed to parse error response as JSON/Text:', parseError);
+                    }
+                    throw new Error(errorMessage);
                 }
-                return (typeof responseData === 'object' && responseData !== null && responseData.hasOwnProperty('datos') && responseData.datos !== null) ? responseData.datos : responseData;
+                
+                // Handle 204 No Content responses
+                if (response.status === 204) {
+                    return null;
+                }
+
+                const jsonResponse = await response.json(); // Parse the JSON response
+                console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
+
+                // Check for the backend's APIResponse structure
+                if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
+                    if (jsonResponse.codigo === 200) {
+                        // Specific handling for /ventas/buscarVentaPendiente (only for interfaz.js, not needed here but kept general)
+                        // If a specific 404 for this endpoint means "no content" for corte.js, adjust here.
+                        // For corte.js, assume 404 is a real error unless specified.
+                        return jsonResponse.datos; // Success, return data
+                    } else {
+                        // General error from backend
+                        throw new Error(jsonResponse.mensaje || 'API reported an error.');
+                    }
+                }
+
+                return jsonResponse; // Fallback if it doesn't follow the APIResponse structure
             } catch (error) {
-                console.error("Error en la llamada a la API:", error);
+                console.error('Error in fetchApi:', error);
                 throw error;
             }
         }
@@ -358,11 +390,130 @@
             }
         }
 
+// Nuevos elementos para el reporte mensual
+const generateMonthlyReportBtn = document.getElementById('generateMonthlyReportBtn');
+const monthlyReportModal = document.getElementById('monthlyReportModal');
+const reportMonthInput = document.getElementById('reportMonth');
+const generateReportFromMonthlyModalBtn = document.getElementById('generateReportFromMonthlyModalBtn');
+const cancelMonthlyModalBtn = document.getElementById('cancelMonthlyModalBtn');
+const monthlyReportTableBody = document.getElementById('monthlyReportTableBody');
+
+// --- Lógica para el reporte mensual ---
+function openMonthlyReportModal() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    reportMonthInput.value = `${year}-${month}`; // Set current month/year by default
+    monthlyReportModal.classList.remove('hidden');
+}
+
+function closeMonthlyReportModal() {
+    monthlyReportModal.classList.add('hidden');
+}
+
+async function generateMonthlyReport() {
+    const selectedMonthYear = reportMonthInput.value; // Format: YYYY-MM
+    if (!selectedMonthYear) {
+        window.showToast({ message: 'Por favor, selecciona un mes y año.', type: 'error' });
+        return;
+    }
+
+    const [year, month] = selectedMonthYear.split('-');
+    const targetMonth = parseInt(month) - 1; // Months are 0-indexed in JavaScript Date
+    const targetYear = parseInt(year);
+
+    generateReportFromMonthlyModalBtn.disabled = true;
+    generateReportFromMonthlyModalBtn.textContent = 'Generando...';
+
+    try {
+        const allSaleDetails = await fetchApi(`/ventasDetalle/obtenerTodosLosVentasDetalles`, 'GET');
+        
+        // Filter sale details by selected month, year and status 'C' or 'F'
+        const monthlySaleDetails = allSaleDetails.filter(detail => {
+            const saleDate = new Date(detail.Venta.fechaVenta);
+            return saleDate.getMonth() === targetMonth && 
+                   saleDate.getFullYear() === targetYear &&
+                   (detail.Venta.estatus === 'C' || detail.Venta.estatus === 'F'); // Added status check
+        });
+
+        // Aggregate sales by Venta.idVenta to calculate total sales and profit per unique sale
+        const salesMap = new Map(); // Map to store aggregated info for each unique sale
+        monthlySaleDetails.forEach(detail => {
+            const saleId = detail.Venta.idVenta;
+            if (!salesMap.has(saleId)) {
+                salesMap.set(saleId, {
+                    ...detail.Venta, // Copy main Venta properties
+                    totalVenta: 0,
+                    totalCosto: 0,
+                    ganancia: 0,
+                    productos: [] // To store details if needed
+                });
+            }
+            const sale = salesMap.get(saleId);
+            sale.totalVenta += detail.cantidad * detail.precioUnitarioVenta;
+            sale.totalCosto += detail.cantidad * (detail.Producto.precio_costo || 0); // Handle missing precio_costo
+            sale.ganancia = sale.totalVenta - sale.totalCosto;
+            sale.productos.push(detail);
+        });
+
+        const monthlySales = Array.from(salesMap.values()); // Convert map values to array for display
+
+        // Calculate total monthly sales and profit across all filtered details
+        const totalMonthlySalesAmount = monthlySales.reduce((sum, sale) => sum + sale.totalVenta, 0);
+        const totalMonthlyProfit = monthlySales.reduce((sum, sale) => sum + sale.ganancia, 0);
+
+
+        monthlyReportTableBody.innerHTML = ''; // Clear previous report
+        if (monthlySales && monthlySales.length > 0) {
+            // Add a row for total sales and profit at the top
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'bg-primary-light-20 font-bold'; // Changed background here
+            totalRow.innerHTML = `
+                <td class="px-6 py-3 whitespace-normal break-words text-sm text-gray-900 text-center" colspan="3">Total Ventas del Mes:</td>
+                <td class="px-6 py-3 whitespace-normal break-words text-sm text-income-color text-center">${formatCurrency(totalMonthlySalesAmount)}</td>
+                <td class="px-6 py-3 whitespace-normal break-words text-sm text-gray-900 text-center" colspan="3">Ganancia Total del Mes:</td>
+                <td class="px-6 py-3 whitespace-normal break-words text-sm text-profit-color text-center">${formatCurrency(totalMonthlyProfit)}</td>
+            `;
+            monthlyReportTableBody.appendChild(totalRow);
+
+            monthlySales.forEach(sale => { // Iterate through aggregated sales
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.idVenta}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.numeroTicket}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${new Date(sale.fechaVenta).toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${formatCurrency(sale.totalVenta)}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.metodoPago}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.estatus}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.usuario ? sale.usuario.nombre : 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${formatCurrency(sale.ganancia)}</td>
+                `;
+                monthlyReportTableBody.appendChild(row);
+            });
+        } else {
+            monthlyReportTableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 whitespace-normal break-words text-sm text-gray-500 text-center">No se encontraron ventas para ${month}/${year}.</td></tr>`;
+        }
+        window.showToast({ message: `Reporte mensual para ${month}/${year} generado con éxito.`, type: 'success' });
+        // Optionally, close modal after generating report, or leave open to view
+        // closeMonthlyReportModal();
+    } catch (error) {
+        window.showToast({ message: `Error al generar el reporte mensual: ${error.message}`, type: 'error' });
+    } finally {
+        generateReportFromMonthlyModalBtn.disabled = false;
+        generateReportFromMonthlyModalBtn.textContent = 'Generar Reporte';
+    }
+}
+
         generateCorteBtn.addEventListener('click', generateCorteReport);
         generateDailyReportBtn.addEventListener('click', openDailyReportModal);
         cerrarTurnoBtn.addEventListener('click', cerrarTurno);
         
-        // Listeners para la modal
+        // Listeners para la modal de reporte mensual
+        generateMonthlyReportBtn.addEventListener('click', openMonthlyReportModal);
+        cancelMonthlyModalBtn.addEventListener('click', closeMonthlyReportModal);
+        generateReportFromMonthlyModalBtn.addEventListener('click', generateMonthlyReport);
+        
+        // Listeners para la modal de reporte diario
         cancelModalBtn.addEventListener('click', closeDailyReportModal);
         generateReportFromModalBtn.addEventListener('click', generateDailyReportFromModal);
         

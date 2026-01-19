@@ -30,6 +30,9 @@
                 <button id="generateDailyReportBtn" class="btn-primary text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg transition duration-150 shadow-md text-base sm:text-lg hidden">
                     Generar Reporte por Día
                 </button>
+                <button id="generateMonthlyReportBtn" class="btn-primary text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg transition duration-150 shadow-md text-base sm:text-lg">
+                    Generar Reporte Mensual
+                </button>
             </div>
 
             <section id="corteReporte" class="hidden">
@@ -127,6 +130,51 @@
         </div>
     </div>
 
+
+    <!-- Modal para seleccionar mes y año de reporte mensual -->
+    <div id="monthlyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-primary">Generar Reporte Mensual</h3>
+                <div class="mt-4 px-7 py-3">
+                    <label for="reportMonth" class="block text-sm font-medium text-gray-700 text-left">Selecciona un mes:</label>
+                    <input type="month" id="reportMonth" name="reportMonth" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                </div>
+                <div class="items-center px-4 py-3 space-x-4">
+                    <button id="generateReportFromMonthlyModalBtn" class="px-4 py-2 btn-primary text-white text-base font-medium rounded-md shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary">
+                        Generar Reporte
+                    </button>
+                    <button id="cancelMonthlyModalBtn" class="px-4 py-2 btn-secondary text-white text-base font-medium rounded-md shadow-sm hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary">
+                        Cancelar
+                    </button>
+                </div>
+                <!-- Sección para mostrar el reporte mensual -->
+                <div id="monthlyReportDisplay" class="mt-6 text-left">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3">Detalles del Reporte</h4>
+                    <div class="max-h-96 overflow-y-auto overflow-x-auto border rounded-md">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">ID Venta</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Número Ticket</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Fecha Venta</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Monto Total</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Método Pago</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Estatus</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Cajero</th>
+                                    <th class="px-6 py-3 bg-primary text-center text-xs font-medium text-white uppercase tracking-wider encabezado-ticket-th">Ganancia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monthlyReportTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Reporte mensual se insertará aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 
         <script src="nav.js"></script>
         <script src="resources/js/corte.js"></script>
