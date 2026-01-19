@@ -281,18 +281,31 @@
         }
         
         async function generateCorteReport() {
-            const initialCashAmount = parseFloat(sessionStorage.getItem('initialCashAmount'));
-            if (isNaN(initialCashAmount) || initialCashAmount < 0) {
-                window.showToast({ message: 'Monto inicial de caja no encontrado o inválido. Por favor, inicia sesión nuevamente.', type: 'error' });
-                return;
-            }
             generateCorteBtn.disabled = true;
             generateCorteBtn.textContent = 'Calculando...';
             generateDailyReportBtn.classList.add('hidden');
             cerrarTurnoBtn.classList.add('hidden');
             corteReporte.classList.add('hidden');
 
+            let initialCashAmount = 0; // Default to 0
+
             try {
+                // Try to get initial amount from active cash register
+                const activeCaja = await fetchApi(`/caja/apertura/activa?idUsuario=${ID_USUARIO}`, 'GET');
+                if (activeCaja && typeof activeCaja.monto === 'number') {
+                    initialCashAmount = activeCaja.monto;
+                } else {
+                    // Fallback to sessionStorage if no active caja or monto
+                    const sessionAmount = parseFloat(sessionStorage.getItem('initialCashAmount'));
+                    if (!isNaN(sessionAmount) && sessionAmount >= 0) {
+                        initialCashAmount = sessionAmount;
+                    } else {
+                        // If both fail, report an error
+                        window.showToast({ message: 'Monto inicial de caja no encontrado. Por favor, asegúrese de que haya una caja abierta.', type: 'error' });
+                        return;
+                    }
+                }
+
                 const corteResponse = await fetchApi(`/caja/corte?idUsuario=${ID_USUARIO}&montoInicial=${initialCashAmount}`, 'POST');
                 
                 let salesToday = [];
