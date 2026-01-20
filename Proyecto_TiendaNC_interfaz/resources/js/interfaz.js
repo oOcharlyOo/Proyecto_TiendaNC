@@ -560,6 +560,7 @@
                 amountPaid.value = '';
                 changeAmount.textContent = '$0.00';
                 paymentModal.removeAttribute('hidden');
+                paymentModal.classList.remove('hidden');
                 paymentModal.classList.add('modal-active');
                 amountPaid.focus();
             }
@@ -567,6 +568,7 @@
                             function closePaymentModal() {
                                 paymentModal.classList.remove('modal-active');
                                 paymentModal.setAttribute('hidden', '');
+                                paymentModal.classList.add('hidden');
                             }
             // New Gramaje Calculator Functions
             function updateCalculatorDisplay(source) {
