@@ -220,6 +220,7 @@ body {
 .btn-cancelar-venta {
     background-color: var(--danger-color);
     color: white;
+    border-radius: 50% !important; /* Force circular shape */
 }
 .btn-cancelar-venta:hover {
     background-color: var(--danger-color-dark);
@@ -281,12 +282,6 @@ body {
 .main-container {
     background-color: transparent;
     flex-grow: 1; /* Añadido para ocupar el espacio restante */
-    display: flex;
-    flex-direction: column; /* CRUCIAL: Añadido para que el contenido se apile verticalmente */
-    padding: 0 1rem 1rem 1rem;
-    gap: 1rem;
-    width: 90%; /* Default to full width for small screens */
-    margin: 4rem auto 0 auto; /* Add top margin and center horizontally */
 }
 @media (min-width: 768px) { /* md breakpoint for Tailwind CSS */
     .main-container {
@@ -376,10 +371,14 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
+    display: none; /* Hidden by default */
     justify-content: center;
     align-items: center;
     z-index: 1000;
+}
+
+.modal.modal-active {
+    display: flex; /* Show when active */
 }
 .modal-content {
     background-color: white;
@@ -436,6 +435,17 @@ body {
 .text-profit-color { color: var(--profit-color) !important; }
 .text-cash-flow-color { color: var(--cash-flow-color) !important; }
 .text-expense-color { color: var(--expense-color) !important; }
+
+/* Style for SVG icons inside cancel buttons */
+.btn-cancelar-venta svg {
+    color: white !important; /* Force white color for the icon */
+}
+
+/* Style for SVG icons inside edit buttons */
+.edit-btn svg {
+    fill: #3b82f6 !important; /* Force blue color for the fill */
+    stroke: #3b82f6 !important; /* Force blue color for the stroke */
+}
 /* Calculator styles */
 .calc-container {
     background: white;
@@ -515,7 +525,7 @@ body {
     border-radius: 0.5rem;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     width: 90%; /* To match w-11/12 roughly */
-    max-width: 600px; /* Example fixed max-width, adjust as needed */
+    max-width: 800px; /* Example fixed max-width, adjust as needed */
     position: relative; /* Maintain relative positioning */
 }
 /* Add new media query for mobile to ensure main-container height behaves as expected */

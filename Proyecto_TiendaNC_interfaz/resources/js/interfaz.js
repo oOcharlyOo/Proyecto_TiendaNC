@@ -4,6 +4,14 @@
 
         // Only initialize page logic if a user is logged in.
         // The nav.js script handles redirection for unauthenticated users.
+        function getTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
         if (activeUser) {
             const ID_USUARIO = activeUser.idUsuario;
             const ID_CAJA = activeUserShift?.shiftId; // Get shift ID from sessionStorage
@@ -134,8 +142,17 @@
             // Moved function definitions outside DOMContentLoaded for broader scope if needed
 
 
+            function getTodayDate() {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            }
+
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
+                console.log('DOMContentLoaded event fired in interfaz.js');
                 const codigoProductoInput = document.getElementById('codigoProducto');
                 const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
                 const agregarProductoBtn = document.getElementById('agregarProductoBtn');
@@ -185,6 +202,8 @@
                 const detailFechaVenta = document.getElementById('detailFechaVenta');
                 const saleDetailsTableBody = document.getElementById('saleDetailsTableBody');
 
+                let currentlySelectedSaleRow = null; // New variable to track selected row
+
                 // Alert Modal DOM elements
                 const alertModal = document.getElementById('alertModal');
                 const alertModalTitle = document.getElementById('alertModalTitle');
@@ -195,22 +214,28 @@
                 function showAlertModal(title, message) {
                     alertModalTitle.textContent = title;
                     alertModalMessage.textContent = message;
-                    alertModal.classList.remove('hidden');
+                    alertModal.removeAttribute('hidden');
+                    alertModal.classList.add('modal-active');
                 }
 
                 function closeAlertModal() {
-                    alertModal.classList.add('hidden');
+                    alertModal.classList.remove('modal-active');
+                    alertModal.setAttribute('hidden', '');
                 }
 
                 alertModalCloseBtn.addEventListener('click', closeAlertModal);
 
                 // --- Sale Details Modal Functions ---
                 function closeSaleDetailsModal() {
-                    saleDetailsModal.classList.add('hidden');
+                    saleDetailsModal.classList.remove('modal-active');
+                    saleDetailsModal.classList.add('hidden'); // Also add Tailwind's hidden class back
+                    saleDetailsModal.setAttribute('hidden', '');
                 }
 
                 async function openSaleDetailsModal(saleId, enumeratedTicketNumber) {
-                    saleDetailsModal.classList.remove('hidden');
+                    saleDetailsModal.removeAttribute('hidden');
+                    saleDetailsModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
+                    saleDetailsModal.classList.add('modal-active');
                     // Clear previous details
                     detailNumeroTicket.textContent = enumeratedTicketNumber || ''; // Use the enumerated ticket number
                     detailIdVenta.textContent = '';
@@ -470,6 +495,28 @@
                     const pendingSale = await fetchApi('/ventas/buscarVentaPendiente'); 
                     
                     if (pendingSale && pendingSale.idVenta) { // Check if a pending sale object was returned
+                        // New logic starts here
+                        const today = getTodayDate();
+                        const dailySalesData = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
+                        const allSales = dailySalesData.ventas || [];
+
+                        const hasCompletedSales = allSales.some(sale => sale.estatus === 'C');
+                        const hasPendingSale = allSales.some(sale => sale.estatus === 'P');
+                        
+                        // Check if all sales that are not the current pending sale are finalized
+                        const allOthersFinalized = allSales
+                            .filter(sale => sale.idVenta !== pendingSale.idVenta)
+                            .every(sale => sale.estatus === 'F');
+
+                        if (hasPendingSale && !hasCompletedSales && allOthersFinalized) {
+                            // This is a new turn. Reset ticket number.
+                            const updatedSale = { ...pendingSale, numeroTicket: 1 };
+                            await fetchApi(`/ventas/actualizarVenta/${pendingSale.idVenta}`, 'PUT', updatedSale);
+                            pendingSale.numeroTicket = 1; // update in memory
+                            window.showToast({ message: 'Nuevo turno detectado. Ticket reiniciado a 1.', type: 'info' });
+                        }
+                        // New logic ends here
+
                         activeSaleId = pendingSale.idVenta;
                         if (!pendingSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
                         ticketIdDisplay.textContent = pendingSale.numeroTicket;
@@ -512,14 +559,15 @@
                 modalTotalAmount.textContent = `$${total.toFixed(2)}`;
                 amountPaid.value = '';
                 changeAmount.textContent = '$0.00';
-                paymentModal.classList.remove('hidden');
+                paymentModal.removeAttribute('hidden');
+                paymentModal.classList.add('modal-active');
                 amountPaid.focus();
             }
 
-            function closePaymentModal() {
-                paymentModal.classList.add('hidden');
-            }
-
+                            function closePaymentModal() {
+                                paymentModal.classList.remove('modal-active');
+                                paymentModal.setAttribute('hidden', '');
+                            }
             // New Gramaje Calculator Functions
             function updateCalculatorDisplay(source) {
                 let grams = parseFloat(gramajeInput.value) || 0;
@@ -557,7 +605,8 @@
             }
 
             function openGramajeCalculator(productData) {
-                gramajeCalculatorModal.classList.remove('hidden');
+                gramajeCalculatorModal.removeAttribute('hidden');
+                gramajeCalculatorModal.classList.add('modal-active');
                 calcProductName.textContent = productData.nombre;
                 calcProductId.value = productData.idProducto;
                 calcProductPricePerKilo.value = productData.precio_venta; // Assuming precio_venta is price per kilo for gramaje products
@@ -567,7 +616,8 @@
             }
 
             function closeGramajeCalculator() {
-                gramajeCalculatorModal.classList.add('hidden');
+                gramajeCalculatorModal.classList.remove('modal-active');
+                gramajeCalculatorModal.setAttribute('hidden', '');
                 resetGramajeCalculator();
             }
 
@@ -811,11 +861,13 @@
 
 
 
-            // --- Lógica para la Modal de Historial de Ventas ---
-            const historialModal = document.getElementById('historialVentasModal');
-            const verHistorialBtn = document.getElementById('verHistorialBtn');
-            const cerrarHistorialModalBtn = document.getElementById('cerrarHistorialModalBtn');
-            const historialVentasBody = document.getElementById('historialVentasBody');
+                            // --- Lógica para la Modal de Historial de Ventas ---
+                            const historialModal = document.getElementById('historialVentasModal');
+                            console.log('historialModal element:', historialModal);
+                            const verHistorialBtn = document.getElementById('verHistorialBtn');
+                            console.log('verHistorialBtn element:', verHistorialBtn);
+                            const cerrarHistorialModalBtn = document.getElementById('cerrarHistorialModalBtn');
+                            console.log('cerrarHistorialModalBtn element:', cerrarHistorialModalBtn);            const historialVentasBody = document.getElementById('historialVentasBody');
             const historialCobroTotalEl = document.getElementById('historialCobroTotal');
             const historialGananciaTotalEl = document.getElementById('historialGananciaTotal');
 
@@ -828,11 +880,14 @@
             }
 
             async function cargarHistorialVentas() {
+                console.log('cargarHistorialVentas() started.');
                 const today = getTodayDate();
                 historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Cargando...</td></tr>';
+                console.log('Fetching sales data for today:', today);
 
                 try {
                     const data = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
+                    console.log('Sales data fetched:', data);
                     
                     historialCobroTotalEl.textContent = `$${(data.cobroTotal || 0).toFixed(2)}`;
                     historialGananciaTotalEl.textContent = `$${(data.gananciaTotal || 0).toFixed(2)}`;
@@ -855,7 +910,7 @@
                         historialVentasBody.innerHTML = '';
                         data.ventas.forEach((venta, index) => {
                             const row = document.createElement('tr');
-                            row.className = 'border-b cursor-pointer hover:bg-gray-50'; // Make row clickable
+                            row.className = 'border-b cursor-pointer hover:bg-gray-700 hover:text-white hover:scale-[1.01] hover:shadow-lg'; // Make row clickable and darken on hover
                             row.dataset.id = venta.idVenta; // Store sale ID for details modal
                             row.dataset.enumeratedTicket = index + 1; // Store enumerated ticket number
                             
@@ -880,18 +935,19 @@
                             const canBeCancelled = venta.estatus === 'F' || venta.estatus === 'C';
                             
                             row.innerHTML = `
-                                <td>${index + 1}</td>
-                                <td>$${venta.montoTotal.toFixed(2)}</td>
-                                <td>${venta.metodoPago}</td>
-                                <td>
+                                <td class="text-center">${index + 1}</td>
+                                <td class="text-center">$${venta.montoTotal.toFixed(2)}</td>
+                                <td class="text-center">${venta.metodoPago}</td>
+                                <td class="text-center">
                                     <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
                                         ${statusText}
                                     </span>
                                 </td>
-                                <td>${new Date(venta.fechaVenta).toLocaleTimeString()}</td>
+                                <td class="text-center">${new Date(venta.fechaVenta).toLocaleTimeString()}</td>
                                 <td class="text-center">
                                     <button 
-                                        class="btn-cancelar-venta p-1 rounded-full hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" 
+                                        class="btn-cancelar-venta p-1 rounded-full w-8 h-8 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" 
+                                        style="border-radius: 50%;"
                                         data-id="${venta.idVenta}" 
                                         title="Cancelar Venta"
                                         ${canBeCancelled ? '' : 'disabled'}>
@@ -950,25 +1006,48 @@
                 if (clickedElement.closest('.btn-cancelar-venta')) {
                     handleCancelarVenta(e); // Let the existing handler manage the button click
                 } else if (targetRow) {
+                    // Remove 'row-selected' from previously selected row
+                    if (currentlySelectedSaleRow) {
+                        currentlySelectedSaleRow.classList.remove('row-selected');
+                    }
+                    // Add 'row-selected' to the newly clicked row
+                    targetRow.classList.add('row-selected');
+                    currentlySelectedSaleRow = targetRow; // Update currently selected row
+
                     const saleId = targetRow.dataset.id;
                     const enumeratedTicket = targetRow.dataset.enumeratedTicket; // Get the enumerated ticket
                     openSaleDetailsModal(saleId, enumeratedTicket);
                 }
             });
 
-            closeSaleDetailsModalBtn.addEventListener('click', closeSaleDetailsModal);
+            closeSaleDetailsModalBtn.addEventListener('click', () => {
+                closeSaleDetailsModal(); // This already sets the modal to hidden
+                if (currentlySelectedSaleRow) {
+                    currentlySelectedSaleRow.classList.remove('row-selected');
+                    currentlySelectedSaleRow = null; // Clear selection
+                }
+            });
 
             // Add event listener for "Ver Historial" button
             if (verHistorialBtn) { // Defensive check
                 verHistorialBtn.addEventListener('click', () => {
-                    historialModal.classList.remove('hidden');
+                    console.log('verHistorialBtn clicked.');
+                    historialModal.removeAttribute('hidden');
+                    historialModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
+                    historialModal.classList.add('modal-active');
+                    console.log('historialModal after showing: hidden attribute and hidden class removed, modal-active class added. Current classes:', historialModal.classList.value);
                     cargarHistorialVentas();
+                    console.log('cargarHistorialVentas() called.');
                 });
             }
 
             if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
                 cerrarHistorialModalBtn.addEventListener('click', () => {
-                    historialModal.classList.add('hidden');
+                    console.log('cerrarHistorialModalBtn clicked.');
+                    historialModal.classList.remove('modal-active');
+                    historialModal.classList.add('hidden'); // Also add Tailwind's hidden class back
+                    historialModal.setAttribute('hidden', '');
+                    console.log('historialModal after hiding: modal-active class removed, hidden attribute and hidden class added. Current classes:', historialModal.classList.value);
                 });
             }
 

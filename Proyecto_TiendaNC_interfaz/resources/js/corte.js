@@ -346,11 +346,13 @@
         // --- Lógica para el reporte diario ---
         function openDailyReportModal() {
             reportDateInput.valueAsDate = new Date(); // Poner la fecha actual por defecto
-            dailyReportModal.classList.remove('hidden');
+            dailyReportModal.removeAttribute('hidden');
+            dailyReportModal.classList.add('modal-active');
         }
 
         function closeDailyReportModal() {
-            dailyReportModal.classList.add('hidden');
+            dailyReportModal.classList.remove('modal-active');
+            dailyReportModal.setAttribute('hidden', '');
         }
 
         async function generateDailyReportFromModal() {
@@ -419,11 +421,13 @@ function openMonthlyReportModal() {
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     reportMonthInput.value = `${year}-${month}`; // Set current month/year by default
-    monthlyReportModal.classList.remove('hidden');
+    monthlyReportModal.removeAttribute('hidden');
+    monthlyReportModal.classList.add('modal-active');
 }
 
 function closeMonthlyReportModal() {
-    monthlyReportModal.classList.add('hidden');
+    monthlyReportModal.classList.remove('modal-active');
+    monthlyReportModal.setAttribute('hidden', '');
 }
 
 async function generateMonthlyReport() {

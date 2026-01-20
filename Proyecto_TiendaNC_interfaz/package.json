@@ -1,0 +1,18 @@
+{
+  "name": "proyecto_tiendanc_interfaz",
+  "version": "1.0.0",
+  "description": "",
+  "main": "nav.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:css": "tailwindcss -i input.css -o resources/style/output.css",
+    "watch:css": "tailwindcss -i input.css -o resources/style/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "tailwindcss": "^3.0.0"
+  }
+}

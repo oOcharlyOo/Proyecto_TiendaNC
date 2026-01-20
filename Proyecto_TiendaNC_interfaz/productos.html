@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Punto de Venta - PRODUCTOS</title>
-    <!-- Incluir Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resources/style/output.css">
     <link rel="stylesheet" href="resources/style/estilos.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="main-page-body">
 
@@ -59,7 +58,7 @@
     <script src="nav.js" defer></script>
 
     <!-- MODAL para Agregar/Modificar Producto -->
-    <div id="productModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex justify-center items-center">
+    <div id="productModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center hidden" hidden>
         <div class="relative p-4 sm:p-5 border w-full max-w-lg md:max-w-xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
             <h3 id="modalTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
 

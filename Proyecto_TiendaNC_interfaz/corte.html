@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Punto de Venta - CORTE DE CAJA</title>
-    <!-- Incluir Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Incluir Chart.js para la gráfica -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="resources/style/output.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="resources/style/estilos.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body class="main-page-body">
     
@@ -110,7 +107,7 @@
     </div>
 
     <!-- Modal para seleccionar fecha de reporte diario -->
-    <div id="dailyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div id="dailyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" hidden>
         <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
             <div class="mt-3 text-center">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">Generar Reporte por Día</h3>
@@ -132,7 +129,7 @@
 
 
     <!-- Modal para seleccionar mes y año de reporte mensual -->
-    <div id="monthlyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div id="monthlyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" hidden>
         <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
             <div class="mt-3 text-center">
                 <h3 class="text-lg leading-6 font-medium text-primary">Generar Reporte Mensual</h3>

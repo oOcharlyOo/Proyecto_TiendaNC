@@ -45,7 +45,7 @@
                     window.location.href = 'interfaz.html'; // Redirigir directamente a ventas
                 } else { // No hay caja activa, mostrar modal de apertura
                     document.querySelector('.login-card').classList.add('hidden');
-                    initialCashModal.classList.remove('hidden');
+                    initialCashModal.classList.add('modal-active');
                     initialCashInput.focus();
                 }
             } catch (error) {
@@ -169,10 +169,10 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !initialCashModal.classList.contains('hidden')) {
+            if (e.key === 'Escape' && initialCashModal.classList.contains('modal-active')) {
                 // Opcional: Para permitir cerrar el modal con Escape, descomenta las siguientes líneas.
-                // initialCashModal.classList.add('hidden');
-                // document.querySelector('.login-card').classList.remove('hidden');
-                // setLoginButtonState(true, 'ACCEDER');
+                initialCashModal.classList.remove('modal-active');
+                document.querySelector('.login-card').classList.remove('hidden');
+                setLoginButtonState(true, 'ACCEDER');
             }
         });

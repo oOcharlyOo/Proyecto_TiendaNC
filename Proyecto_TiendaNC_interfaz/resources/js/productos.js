@@ -11,6 +11,9 @@
         const addOrEditProductBtn = document.getElementById('addOrEditProductBtn'); // Updated from clearSelectionBtn
         const cancelBtn = document.getElementById('cancelBtn'); // New button
         const productModal = document.getElementById('productModal'); // New: Reference to the modal container
+        console.log('productModal element:', productModal);
+        console.log('productModal initial classes:', productModal ? productModal.classList.value : 'N/A');
+        console.log('productModal initial hidden attribute:', productModal ? productModal.hasAttribute('hidden') : 'N/A');
         
         // Formulario Inputs
         const productIdInput = document.getElementById('productId');
@@ -154,8 +157,8 @@
                     <td class="p-3 text-center">${product.cantidad_min}${product.is_gramaje ? 'g' : ''}</td>
                     <td class="p-3 text-center">${product.stock}${product.is_gramaje ? 'g' : ''}</td>
                     <td class="p-3 text-center">
-                        <button class="edit-btn p-1 rounded-full hover:bg-blue-100 mr-2" data-id="${product.idProducto}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                        <button class="edit-btn p-1 rounded-full w-7 h-7 hover:bg-blue-100 mr-2" data-id="${product.idProducto}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-blue-500 stroke-blue-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" />
                             </svg>
                         </button>
@@ -175,7 +178,11 @@
 
         // --- MANEJO DE MODAL ---
         function openModal(isEditing) {
-            productModal.classList.remove('hidden');
+            console.log('openModal() called. isEditing:', isEditing);
+            productModal.removeAttribute('hidden');
+            productModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
+            productModal.classList.add('modal-active');
+            console.log('productModal after openModal: classes:', productModal.classList.value, 'hidden attribute:', productModal.hasAttribute('hidden'));
             if (isEditing) {
                 deleteBtn.classList.remove('hidden'); // Show delete button for editing
             } else {
@@ -184,7 +191,9 @@
         }
 
         function closeModal() {
-            productModal.classList.add('hidden');
+            productModal.classList.remove('modal-active');
+            productModal.classList.add('hidden'); // Also add Tailwind's hidden class back
+            productModal.setAttribute('hidden', '');
             productForm.reset(); // Clear form on close
             productIdInput.value = ''; // Ensure hidden ID is cleared
             updateGramajeLabels(false); // Reset labels
@@ -380,6 +389,7 @@
 
         // --- INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded event fired in productos.js');
             loadProducts();
             // resetForm(); // No longer called here, as the modal opens via button click
             updateGramajeLabels(false); // Set initial state of labels
