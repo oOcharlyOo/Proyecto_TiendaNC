@@ -45,7 +45,11 @@
                     window.location.href = 'interfaz.html'; // Redirigir directamente a ventas
                 } else { // No hay caja activa, mostrar modal de apertura
                     document.querySelector('.login-card').classList.add('hidden');
+                    initialCashModal.removeAttribute('hidden')
+                    initialCashModal.classList.remove('hidden');
+                    initialCashModal.style.setProperty('display', 'flex', 'important');
                     initialCashModal.classList.add('modal-active');
+
                     initialCashInput.focus();
                 }
             } catch (error) {
@@ -112,6 +116,7 @@
 
             if (isNaN(initialAmount) || initialAmount < 0) {
                 window.showToast({ message: 'Por favor, ingresa un monto inicial válido y positivo.', type: 'error' });
+                initialCashModal.classList.remove('hidden');
                 initialCashInput.focus();
                 setShiftButtonState(true, 'Continuar a Ventas'); // Re-enable button
                 return;
