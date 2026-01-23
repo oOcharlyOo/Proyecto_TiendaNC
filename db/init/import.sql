@@ -64,7 +64,8 @@ CREATE TABLE tiendadb.productos (
     cantidad_max INT NOT NULL,
     stock INT NOT NULL,
     precio_mayoreo DECIMAL(10, 2),
-    is_gramaje BOOLEAN DEFAULT FALSE
+    is_gramaje BOOLEAN DEFAULT FALSE,
+    codigo_barras VARCHAR(255) UNIQUE
 );
 
 -- 4. Tabla Maestra de Ventas (una fila por cada transacción/carrito)
