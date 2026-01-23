@@ -391,9 +391,7 @@
                 const payload = {
                     idUsuario: ID_USUARIO,
                     startDate: startOfDay.toISOString(), 
-                    endDate: endOfDay.toISOString(),
-                    oldStatus: 'C',
-                    newStatus: 'F'  
+                    endDate: endOfDay.toISOString()
                 };
                 await fetchApi('/caja/ventas/status', 'PUT', payload);
                 window.showToast({ message: 'Turno cerrado con éxito. Cerrando sesión...', type: 'success' });
