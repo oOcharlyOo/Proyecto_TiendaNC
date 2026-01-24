@@ -26,6 +26,7 @@
         const reporteTotalVentas = document.getElementById('reporteTotalVentas');
         const reporteOtrosIngresos = document.getElementById('reporteOtrosIngresos');
         const reporteTotalEgresos = document.getElementById('reporteTotalEgresos');
+        const reporteOtrasEntradas = document.getElementById('reporteOtrasEntradas');
         const reporteSaldoFinalCalculado = document.getElementById('reporteSaldoFinalCalculado');
         const reporteGananciaTotal = document.getElementById('reporteGananciaTotal');
 
@@ -210,7 +211,8 @@
             reporteVentasEfectivo.textContent = formatCurrency(ventasEfectivo); // Nuevo campo
             reporteTotalVentas.textContent = formatCurrency(corteDTO.totalVentas); // Usar total del backend
             reporteOtrosIngresos.textContent = formatCurrency(ventasTransferencia); // Ventas por Transferencia
-            reporteTotalEgresos.textContent = formatCurrency(corteDTO.totalEgresos);
+            reporteTotalEgresos.textContent = "- " + formatCurrency(corteDTO.totalEgresos);
+            reporteOtrasEntradas.textContent = formatCurrency(corteDTO.otrosIngresos);
             reporteSaldoFinalCalculado.textContent = formatCurrency(corteDTO.saldoFinalCalculado); // Usar saldo del backend
             reporteGananciaTotal.textContent = formatCurrency(corteDTO.gananciaTotal); // Usar ganancia del backend
             
@@ -251,7 +253,7 @@
                 reporteGananciaTotal.textContent = formatCurrency(0);
                 reporteSaldoFinalCalculado.textContent = formatCurrency(0);
                 document.getElementById('reporteTotalTicketsDia').textContent = 0;
-                reporteTotalEgresos.textContent = formatCurrency(0);
+                reporteTotalEgresos.textContent = "- " + formatCurrency(0);
                 drawCashFlowChart(emptyReport, true);
             } else {
                 // 3. Calcular ventas por método de pago
@@ -405,130 +407,260 @@
             }
         }
 
-// Nuevos elementos para el reporte mensual
+// Nuevos elementos para el reporte mensual (Nuevo Diseño)
 const generateMonthlyReportBtn = document.getElementById('generateMonthlyReportBtn');
 const monthlyReportModal = document.getElementById('monthlyReportModal');
 const reportMonthInput = document.getElementById('reportMonth');
 const generateReportFromMonthlyModalBtn = document.getElementById('generateReportFromMonthlyModalBtn');
 const cancelMonthlyModalBtn = document.getElementById('cancelMonthlyModalBtn');
-const monthlyReportTableBody = document.getElementById('monthlyReportTableBody');
+
+const monthlyReportSelectedMonth = document.getElementById('monthlyReport-selectedMonth').querySelector('span');
+const statsVentasValue = document.getElementById('monthlyReport-stats-ventas-value');
+const statsVentasChange = document.getElementById('monthlyReport-stats-ventas-change');
+const statsTransferenciaValue = document.getElementById('monthlyReport-stats-transferencia-value');
+const statsTransferenciaChange = document.getElementById('monthlyReport-stats-transferencia-change');
+const statsGananciasValue = document.getElementById('monthlyReport-stats-ganancias-value');
+const statsGananciasChange = document.getElementById('monthlyReport-stats-ganancias-change');
+const monthlyReportChartContainer = document.getElementById('monthly-report-chart-container');
+const recentTransactionsList = document.getElementById('monthlyReport-recent-transactions-list');
+const monthlyReportFooterTip = document.getElementById('monthlyReport-footer-tip');
+const monthlyReportFooterTipText = document.getElementById('monthlyReport-footer-tip-text');
+
+let monthlyReportChartInstance = null;
+
 
 // --- Lógica para el reporte mensual ---
+
+function createMonthlyReportChart(weeklyData) {
+    const canvas = document.getElementById('monthlyReportChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (monthlyReportChartInstance) {
+        monthlyReportChartInstance.destroy();
+    }
+
+    const labels = weeklyData.map(d => `S${d.week}`);
+    const salesData = weeklyData.map(d => d.sales);
+    const profitData = weeklyData.map(d => d.profit);
+
+    monthlyReportChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ventas',
+                    data: salesData,
+                    backgroundColor: '#4f46e5', // indigo-600
+                    borderRadius: 2,
+                    barPercentage: 0.6,
+                },
+                {
+                    label: 'Ganancia',
+                    data: profitData,
+                    backgroundColor: '#c084fc', // purple-400
+                    borderRadius: 2,
+                    barPercentage: 0.6,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: { size: 8 },
+                        callback: function(value) {
+                            return '$' + (value / 1000) + 'k';
+                        }
+                    },
+                    grid: {
+                        drawTicks: false,
+                        color: '#f1f5f9' // slate-100
+                    },
+                    border: {
+                        dash: [2, 4],
+                        display: false
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 10, weight: 'bold' }
+                    },
+                    grid: {
+                        display: false,
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: true,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+
 function openMonthlyReportModal() {
     const today = new Date();
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     reportMonthInput.value = `${year}-${month}`; // Set current month/year by default
     monthlyReportModal.removeAttribute('hidden');
+    monthlyReportModal.classList.remove('hidden'); // Use Tailwind class to un-hide
     monthlyReportModal.classList.add('modal-active');
+    
+    // Reset UI to initial state
+    monthlyReportSelectedMonth.textContent = 'Seleccione un mes';
+    statsVentasValue.textContent = '$0.00';
+    statsTransferenciaValue.textContent = '$0.00';
+    statsGananciasValue.textContent = '$0.00';
+    statsVentasChange.textContent = '--%';
+    statsTransferenciaChange.textContent = '--%';
+    statsGananciasChange.textContent = '--%';
+    recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">Genere un reporte para ver datos.</div>`;
+    if (monthlyReportChartInstance) {
+        monthlyReportChartInstance.destroy();
+        monthlyReportChartInstance = null;
+    }
+    monthlyReportFooterTip.classList.add('hidden');
 }
 
 function closeMonthlyReportModal() {
     monthlyReportModal.classList.remove('modal-active');
+    monthlyReportModal.classList.add('hidden');
     monthlyReportModal.setAttribute('hidden', '');
 }
 
 async function generateMonthlyReport() {
-    const selectedMonthYear = reportMonthInput.value; // Format: YYYY-MM
+    const selectedMonthYear = reportMonthInput.value;
     if (!selectedMonthYear) {
         window.showToast({ message: 'Por favor, selecciona un mes y año.', type: 'error' });
         return;
     }
 
-    const [year, month] = selectedMonthYear.split('-');
-    const targetMonth = parseInt(month) - 1; // Months are 0-indexed in JavaScript Date
-    const targetYear = parseInt(year);
-
+    const originalButtonContent = generateReportFromMonthlyModalBtn.innerHTML;
     generateReportFromMonthlyModalBtn.disabled = true;
-    generateReportFromMonthlyModalBtn.textContent = 'Generando...';
+    generateReportFromMonthlyModalBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
     try {
+        const [year, month] = selectedMonthYear.split('-');
+        const targetMonth = parseInt(month) - 1;
+        const targetYear = parseInt(year);
+
+        const date = new Date(targetYear, targetMonth, 1);
+        const monthName = date.toLocaleString('es-MX', { month: 'long' });
+        monthlyReportSelectedMonth.textContent = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+
         const allSaleDetails = await fetchApi(`/ventasDetalle/obtenerTodosLosVentasDetalles`, 'GET');
         
-        // Filter sale details by selected month, year and status 'C' or 'F'
         const monthlySaleDetails = allSaleDetails.filter(detail => {
             const saleDate = new Date(detail.Venta.fechaVenta);
             return saleDate.getMonth() === targetMonth && 
                    saleDate.getFullYear() === targetYear &&
-                   (detail.Venta.estatus === 'C' || detail.Venta.estatus === 'F'); // Added status check
+                   (detail.Venta.estatus === 'C' || detail.Venta.estatus === 'F');
         });
 
-        // Aggregate sales by Venta.idVenta to calculate total sales and profit per unique sale
-        const salesMap = new Map(); // Map to store aggregated info for each unique sale
+        const salesMap = new Map();
         monthlySaleDetails.forEach(detail => {
             const saleId = detail.Venta.idVenta;
             if (!salesMap.has(saleId)) {
-                salesMap.set(saleId, {
-                    ...detail.Venta, // Copy main Venta properties
-                    totalVenta: 0,
-                    totalCosto: 0,
-                    ganancia: 0,
-                    productos: [] // To store details if needed
-                });
+                salesMap.set(saleId, { ...detail.Venta, totalVenta: 0, totalCosto: 0, ganancia: 0 });
             }
             const sale = salesMap.get(saleId);
-            sale.totalVenta += detail.cantidad * detail.precioUnitarioVenta;
+            const itemVenta = detail.cantidad * detail.precioUnitarioVenta;
+            sale.totalVenta += itemVenta;
 
             let costoPorUnidad = detail.Producto.precio_costo || 0;
             let cantidadParaCosto = detail.cantidad;
-
-            // Ajuste para productos vendidos por gramaje:
-            // Si el producto es por gramaje (is_gramaje: true), la cantidad está en gramos,
-            // y el precio_costo está por kilogramo. Convertimos gramos a kilogramos.
             if (detail.Producto.is_gramaje === true) {
-                cantidadParaCosto = detail.cantidad / 1000; // Convertir gramos a kilogramos
+                cantidadParaCosto = detail.cantidad / 1000;
             }
-
             sale.totalCosto += cantidadParaCosto * costoPorUnidad;
-            sale.ganancia = sale.totalVenta - sale.totalCosto;
-            sale.productos.push(detail);
         });
 
-        const monthlySales = Array.from(salesMap.values()); // Convert map values to array for display
+        const monthlySales = Array.from(salesMap.values()).map(sale => ({...sale, ganancia: sale.totalVenta - sale.totalCosto}));
+        monthlySales.sort((a, b) => new Date(b.fechaVenta) - new Date(a.fechaVenta)); // Sort recent first
 
-        // Calculate total monthly sales and profit across all filtered details
-        const totalMonthlySalesAmount = monthlySales.reduce((sum, sale) => sum + sale.totalVenta, 0);
-        const totalMonthlyProfit = monthlySales.reduce((sum, sale) => sum + sale.ganancia, 0);
+        // --- STATS CALCULATION ---
+        // Assuming the endpoint returns these values directly
+        statsVentasValue.textContent = formatCurrency(reportData.totalVentas);
+        statsTransferenciaValue.textContent = formatCurrency(reportData.totalTransferencia);
+        statsGananciasValue.textContent = formatCurrency(reportData.totalGanancias);
+        
+        // Handling stats changes (assuming the API provides this, otherwise default to '--%')
+        statsVentasChange.textContent = reportData.ventasChange ? `${reportData.ventasChange.toFixed(2)}%` : '--%';
+        statsTransferenciaChange.textContent = reportData.transferenciaChange ? `${reportData.transferenciaChange.toFixed(2)}%` : '--%';
+        statsGananciasChange.textContent = reportData.gananciasChange ? `${reportData.gananciasChange.toFixed(2)}%` : '--%';
+
+        // --- WEEKLY CHART CALCULATION ---
+        // Assuming the endpoint returns 'weeklyData' in the format: [{ week: 1, sales: X, profit: Y }, ...]
+        if (reportData.weeklyData && reportData.weeklyData.length > 0) {
+            createMonthlyReportChart(reportData.weeklyData);
+        } else {
+             // If no weekly data, create an empty chart
+            createMonthlyReportChart([{ week: 1, sales: 0, profit: 0 }, { week: 2, sales: 0, profit: 0 }, { week: 3, sales: 0, profit: 0 }, { week: 4, sales: 0, profit: 0 }]);
+        }
 
 
-        monthlyReportTableBody.innerHTML = ''; // Clear previous report
-        if (monthlySales && monthlySales.length > 0) {
-            // Add a row for total sales and profit at the top
-            const totalRow = document.createElement('tr');
-            totalRow.className = 'bg-primary-light-20 font-bold'; // Changed background here
-            totalRow.innerHTML = `
-                <td class="px-6 py-3 whitespace-normal break-words text-sm text-gray-900 text-center" colspan="3">Total Ventas del Mes:</td>
-                <td class="px-6 py-3 whitespace-normal break-words text-sm text-income-color text-center">${formatCurrency(totalMonthlySalesAmount)}</td>
-                <td class="px-6 py-3 whitespace-normal break-words text-sm text-gray-900 text-center" colspan="3">Ganancia Total del Mes:</td>
-                <td class="px-6 py-3 whitespace-normal break-words text-sm text-profit-color text-center">${formatCurrency(totalMonthlyProfit)}</td>
-            `;
-            monthlyReportTableBody.appendChild(totalRow);
-
-            monthlySales.forEach(sale => { // Iterate through aggregated sales
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.idVenta}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.numeroTicket}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${new Date(sale.fechaVenta).toLocaleString()}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${formatCurrency(sale.totalVenta)}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.metodoPago}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.estatus}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${sale.usuario ? sale.usuario.nombre : 'N/A'}</td>
-                    <td class="px-6 py-4 whitespace-normal break-words text-sm text-gray-900 text-center">${formatCurrency(sale.ganancia)}</td>
+        // --- RECENT TRANSACTIONS ---
+        // Assuming the endpoint returns 'recentTransactions' in the format: [{ numeroTicket: X, fechaVenta: '...', metodoPago: '...', totalVenta: Y }, ...]
+        recentTransactionsList.innerHTML = '';
+        if (reportData.recentTransactions && reportData.recentTransactions.length > 0) {
+            reportData.recentTransactions.slice(0, 5).forEach(trx => {
+                const trxDiv = document.createElement('div');
+                trxDiv.className = "px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer";
+                trxDiv.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="text-xs font-bold text-slate-800">Venta #${trx.numeroTicket}</span>
+                        <span class="text-[10px] text-slate-400">${new Date(trx.fechaVenta).toLocaleDateString()} • ${trx.metodoPago}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold text-slate-800">${formatCurrency(trx.totalVenta)}</div>
+                        <div class="text-[9px] text-emerald-600 font-bold uppercase">Éxito</div>
+                    </div>
                 `;
-                monthlyReportTableBody.appendChild(row);
+                recentTransactionsList.appendChild(trxDiv);
             });
         } else {
-            monthlyReportTableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 whitespace-normal break-words text-sm text-gray-500 text-center">No se encontraron ventas para ${month}/${year}.</td></tr>`;
+            recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">No hay transacciones este mes.</div>`;
         }
-        window.showToast({ message: `Reporte mensual para ${month}/${year} generado con éxito.`, type: 'success' });
-        // Optionally, close modal after generating report, or leave open to view
-        // closeMonthlyReportModal();
+        
+        window.showToast({ message: `Reporte mensual para ${formattedMonthName} ${year} generado.`, type: 'success' });
+
     } catch (error) {
         window.showToast({ message: `Error al generar el reporte mensual: ${error.message}`, type: 'error' });
+         // Reset UI on error to avoid showing stale data
+        statsVentasValue.textContent = '$0.00';
+        statsTransferenciaValue.textContent = '$0.00'; // Updated to transferencia
+        statsGananciasValue.textContent = '$0.00';
+        recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">Error al cargar datos.</div>`;
+        if (monthlyReportChartInstance) {
+            monthlyReportChartInstance.destroy();
+            monthlyReportChartInstance = null;
+        }
+
     } finally {
         generateReportFromMonthlyModalBtn.disabled = false;
-        generateReportFromMonthlyModalBtn.textContent = 'Generar Reporte';
+        generateReportFromMonthlyModalBtn.innerHTML = originalButtonContent;
     }
 }
 

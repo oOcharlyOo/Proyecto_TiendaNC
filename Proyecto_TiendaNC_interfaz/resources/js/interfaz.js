@@ -225,6 +225,145 @@
 
                 alertModalCloseBtn.addEventListener('click', closeAlertModal);
 
+                // --- Cash In/Out Modals DOM Elements ---
+                const abrirModalEntradaBtn = document.getElementById('abrirModalEntradaBtn');
+                const abrirModalSalidaBtn = document.getElementById('abrirModalSalidaBtn');
+                const cashInModal = document.getElementById('cashInModal');
+                const cancelCashInBtn = document.getElementById('cancelCashInBtn');
+                const cashInForm = document.getElementById('cashInForm');
+                const cashInAmount = document.getElementById('cashInAmount');
+                const cashInDescription = document.getElementById('cashInDescription');
+                const cashInUserId = document.getElementById('cashInUserId'); // Hidden input for user ID
+
+                const cashOutModal = document.getElementById('cashOutModal');
+                const cancelCashOutBtn = document.getElementById('cancelCashOutBtn');
+                const cashOutForm = document.getElementById('cashOutForm');
+                const cashOutAmount = document.getElementById('cashOutAmount');
+                const cashOutDescription = document.getElementById('cashOutDescription');
+                const cashOutUserId = document.getElementById('cashOutUserId'); // Hidden input for user ID
+
+                // --- Cash In/Out Modals Functions ---
+                function openCashInModal() {
+                    cashInModal.removeAttribute('hidden');
+                    cashInModal.classList.remove('hidden');
+                    cashInModal.classList.add('modal-active');
+                    cashInModal.style.setProperty('display', 'flex', 'important'); // As hinted by user
+                    cashInAmount.focus();
+                }
+
+                function closeCashInModal() {
+                    cashInModal.classList.remove('modal-active');
+                    cashInModal.classList.add('hidden');
+                    cashInModal.setAttribute('hidden', '');
+                    cashInModal.style.display = ''; // Reset display style
+                    cashInForm.reset(); // Clear form fields
+                }
+
+                function openCashOutModal() {
+                    cashOutModal.removeAttribute('hidden');
+                    cashOutModal.classList.remove('hidden');
+                    cashOutModal.classList.add('modal-active');
+                    cashOutModal.style.setProperty('display', 'flex', 'important'); // As hinted by user
+                    cashOutAmount.focus();
+                }
+
+                function closeCashOutModal() {
+                    cashOutModal.classList.remove('modal-active');
+                    cashOutModal.classList.add('hidden');
+                    cashOutModal.setAttribute('hidden', '');
+                    cashOutModal.style.display = ''; // Reset display style
+                    cashOutForm.reset(); // Clear form fields
+                }
+
+                // --- Event Listeners for Cash In/Out Modals ---
+                abrirModalEntradaBtn.addEventListener('click', openCashInModal);
+                cancelCashInBtn.addEventListener('click', closeCashInModal);
+
+                abrirModalSalidaBtn.addEventListener('click', openCashOutModal);
+                cancelCashOutBtn.addEventListener('click', closeCashOutModal);
+
+                // --- Form Submission Handlers ---
+                cashInForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const montoEoS = parseFloat(cashInAmount.value);
+                    const descripcion = cashInDescription.value;
+                    const idUsuario = parseInt(cashInUserId.value); // Get from hidden input
+
+                    if (isNaN(montoEoS) || montoEoS <= 0) {
+                        showAlertModal('Error', 'Por favor, ingrese un monto válido para la entrada de efectivo.');
+                        return;
+                    }
+
+                    // Placeholder for montoInicial. This should ideally be fetched dynamically.
+                    // For now, using 0 as a placeholder as per user's prompt example (montoInicial: 500)
+                    // The API example uses montoInicial as a value, but it's unclear if it's the current balance or a starting point.
+                    // Assuming the backend will handle current balance. If not, this needs to be fetched.
+                    const montoInicial = 0; 
+
+                    try {
+                        const payload = {
+                            montoInicial: montoInicial,
+                            montoEoS: montoEoS,
+                            descripcion: descripcion,
+                            usuario: { // Construct user object as per API example
+                                idUsuario: ID_USUARIO, // Use ID_USUARIO from the existing context
+                                nombre: activeUser.nombre,
+                                apellido_p: activeUser.apellido_p,
+                                apellido_m: activeUser.apellido_m,
+                                password_hash: activeUser.password_hash, // May not be needed, but including for consistency with example
+                                id_tipo_usuario: activeUser.id_tipo_usuario
+                            }
+                        };
+                        const response = await fetchApi('/caja/entrada', 'POST', payload);
+                        if (response) {
+                            window.showToast({ message: 'Entrada de efectivo registrada con éxito.', type: 'success' });
+                            closeCashInModal();
+                            // Optionally, refresh any cash balance display if available
+                        }
+                    } catch (error) {
+                        showAlertModal('Error al Registrar Entrada', error.message);
+                    }
+                });
+
+                cashOutForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const montoEoS = parseFloat(cashOutAmount.value);
+                    const descripcion = cashOutDescription.value;
+                    const idUsuario = parseInt(cashOutUserId.value); // Get from hidden input
+
+                    if (isNaN(montoEoS) || montoEoS <= 0) {
+                        showAlertModal('Error', 'Por favor, ingrese un monto válido para la salida de efectivo.');
+                        return;
+                    }
+
+                    // Placeholder for montoInicial. This should ideally be fetched dynamically.
+                    const montoInicial = 0;
+
+                    try {
+                        const payload = {
+                            montoInicial: montoInicial,
+                            montoEoS: montoEoS,
+                            descripcion: descripcion,
+                            usuario: { // Construct user object as per API example
+                                idUsuario: ID_USUARIO, // Use ID_USUARIO from the existing context
+                                nombre: activeUser.nombre,
+                                apellido_p: activeUser.apellido_p,
+                                apellido_m: activeUser.apellido_m,
+                                password_hash: activeUser.password_hash,
+                                id_tipo_usuario: activeUser.id_tipo_usuario
+                            }
+                        };
+                        const response = await fetchApi('/caja/salida', 'POST', payload);
+                        if (response) {
+                            window.showToast({ message: 'Salida de efectivo registrada con éxito.', type: 'success' });
+                            closeCashOutModal();
+                            // Optionally, refresh any cash balance display if available
+                        }
+                    } catch (error) {
+                        showAlertModal('Error al Registrar Salida', error.message);
+                    }
+                });
+
                 // --- Sale Details Modal Functions ---
                 function closeSaleDetailsModal() {
                     saleDetailsModal.classList.remove('modal-active');
