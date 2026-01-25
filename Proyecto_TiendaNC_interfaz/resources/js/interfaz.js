@@ -76,7 +76,6 @@
                     }
 
                     const jsonResponse = await response.json(); // Parse the JSON response
-                    //console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
 
                     // Check for the backend's APIResponse structure
                     if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
@@ -152,7 +151,6 @@
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
-                console.log('DOMContentLoaded event fired in interfaz.js');
                 const codigoProductoInput = document.getElementById('codigoProducto');
                 const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
                 const agregarProductoBtn = document.getElementById('agregarProductoBtn');
@@ -432,49 +430,75 @@
 
 
             function renderTicket() {
-                // Update table header for new column
-                const tableHeader = document.querySelector('#ticketTable thead tr');
-                tableHeader.innerHTML = `
-                    <th class="p-2 w-[8%] encabezado-ticket-th">Código</th>
-                    <th class="p-2 w-[35%] whitespace-normal break-words encabezado-ticket-th">Descripción</th>
-                    <th class="p-2 w-[10%] text-right encabezado-ticket-th">Precio</th>
-                    <th class="p-2 w-[8%] text-center encabezado-ticket-th">Mayoreo</th>
-                    <th class="p-2 w-[12%] text-center encabezado-ticket-th">Cantidad</th>
-                    <th class="p-2 w-[15%] text-right encabezado-ticket-th">Importe</th>
-                    <th class="p-2 w-[12%] text-center encabezado-ticket-th">Eliminar</th> <!-- New column -->
-                `;
+                const ticketItemsContainer = document.getElementById('ticketItems');
+                ticketItemsContainer.innerHTML = ''; // Clear previous items
 
-                ticketItemsTableBody.innerHTML = '';
                 if (ticket.length === 0) {
-                    ticketItemsTableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-gray-500">No hay productos</td></tr>`;
+                    ticketItemsContainer.innerHTML = `<div class="text-center p-8 text-gray-500">No hay productos en el ticket</div>`;
                     ticketPanel.classList.remove('has-products-bg');
                 } else {
                     ticket.forEach((item, index) => {
-                        const row = document.createElement('tr');
-                        row.className = 'border-b encabezado-zelda-text';
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'ticket-item block p-3 md:grid md:grid-cols-12 md:gap-x-4 md:items-center';
+                        itemElement.dataset.id = item.idProducto;
+
+                        const importe = (item.precioUnitarioVenta || 0) * item.cantidad;
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
-                        row.innerHTML = `
-                            <td class="p-2">${item.codigoBarras || item.idProducto}</td>
-                            <td class="p-2 whitespace-normal break-words">${item.nombreProducto || 'Cargando...'}</td>
-                            <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
-                            <td class="p-2 text-center">
-                                <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
-                            </td>
-                            <td class="p-2 text-center">
-                                <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
-                                <span class="mx-1 sm:mx-2">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
-                                <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
-                            </td>
-                            <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
-                            <td class="p-2 text-center"> <!-- New column -->
-                                <button class="btn-delete-item p-1 rounded-full hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" data-index="${index}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </td>
+
+                        itemElement.innerHTML = `
+                            <!-- Mobile View -->
+                            <div class="md:hidden">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="ticket-product-name-zelda text-base break-words">${item.nombreProducto}</p>
+                                        <p class="text-sm text-gray-600">Cód: <span class="ticket-barcode-zelda">${item.codigoBarras || item.idProducto}</span></p>
+                                    </div>
+                                    <p class="ticket-product-name-zelda-price text-lg font-semibold ml-2">$${importe.toFixed(2)}</p>
+                                </div>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <div class="flex items-center">
+                                        <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
+                                        <span class="px-3 font-bold text-xl ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                        <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        <div class="flex items-center ${hasValidMayoreo ? '' : 'hidden'}">
+                                            <input type="checkbox" id="mayoreo-check-mob-${index}" class="mayoreo-checkbox round-checkbox" data-index="${index}" ${item.isMayoreo ? 'checked' : ''}>
+                                            <label for="mayoreo-check-mob-${index}" class="ml-2 text-sm font-medium zelda-label-text">Mayoreo</label>
+                                        </div>
+                                        <button class="btn-delete-item p-2 rounded-full hover:bg-red-100" data-index="${index}" title="Eliminar Producto">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Desktop View -->
+                            <div class="hidden md:contents">
+                                <div class="col-span-2 text-sm truncate ticket-barcode-zelda">${item.codigoBarras || item.idProducto}</div>
+                                <div class="col-span-3 ticket-product-name-zelda text-sm truncate">${item.nombreProducto}</div>
+                                <div class="col-span-2 text-right text-sm ticket-product-name-zelda-price">$${(item.precioUnitarioVenta || 0).toFixed(2)}</div>
+                                <div class="col-span-1 text-center">
+                                    <input type="checkbox" class="mayoreo-checkbox round-checkbox mx-auto" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
+                                </div>
+                                <div class="col-span-2 text-center flex items-center justify-center">
+                                    <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
+                                    <span class="px-3 font-bold text-base ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                    <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
+                                </div>
+                                <div class="col-span-1 text-right font-semibold ticket-product-name-zelda-price">$${importe.toFixed(2)}</div>
+                                <div class="col-span-1 text-center">
+                                    <button class="btn-delete-item p-1 rounded-full hover:bg-red-100" data-index="${index}" title="Eliminar Producto">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
                         `;
-                        ticketItemsTableBody.appendChild(row);
+                        ticketItemsContainer.appendChild(itemElement);
                     });
                     ticketPanel.classList.add('has-products-bg');
                 }
@@ -986,13 +1010,16 @@
             confirmPaymentBtn.addEventListener('click', handlePayment);
             confirmPaymentSpeiBtn.addEventListener('click', handleTransferPayment);
             amountPaid.addEventListener('input', calculateChange);
-            ticketItemsTableBody.addEventListener('click', async e => {
+            ticketItems.addEventListener('click', async e => {
                 const target = e.target;
-                if (target.classList.contains('btn-qty-plus')) await updateQuantity(target.dataset.index, 1);
-                else if (target.classList.contains('btn-qty-minus')) await updateQuantity(target.dataset.index, -1);
-                else if (target.classList.contains('mayoreo-checkbox')) handleMayoreoToggle(e);
-                else if (target.closest('.btn-delete-item')) { // New condition for delete button
-                    const index = target.closest('.btn-delete-item').dataset.index;
+                const index = target.closest('[data-index]')?.dataset.index;
+
+                if (index === undefined) return;
+
+                if (target.closest('.btn-qty-plus')) await updateQuantity(index, 1);
+                else if (target.closest('.btn-qty-minus')) await updateQuantity(index, -1);
+                else if (target.closest('.mayoreo-checkbox')) handleMayoreoToggle(e);
+                else if (target.closest('.btn-delete-item')) {
                     await removeProductFromTicket(index);
                 }
             });
@@ -1004,11 +1031,9 @@
 
                             // --- Lógica para la Modal de Historial de Ventas ---
                             const historialModal = document.getElementById('historialVentasModal');
-                            console.log('historialModal element:', historialModal);
                             const verHistorialBtn = document.getElementById('verHistorialBtn');
-                            console.log('verHistorialBtn element:', verHistorialBtn);
                             const cerrarHistorialModalBtn = document.getElementById('cerrarHistorialModalBtn');
-                            console.log('cerrarHistorialModalBtn element:', cerrarHistorialModalBtn);            const historialVentasBody = document.getElementById('historialVentasBody');
+                            const historialVentasBody = document.getElementById('historialVentasBody');
             const historialCobroTotalEl = document.getElementById('historialCobroTotal');
             const historialGananciaTotalEl = document.getElementById('historialGananciaTotal');
 
@@ -1021,14 +1046,11 @@
             }
 
             async function cargarHistorialVentas() {
-                console.log('cargarHistorialVentas() started.');
                 const today = getTodayDate();
                 historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Cargando...</td></tr>';
-                console.log('Fetching sales data for today:', today);
 
                 try {
                     const data = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
-                    console.log('Sales data fetched:', data);
                     
                     historialCobroTotalEl.textContent = `$${(data.cobroTotal || 0).toFixed(2)}`;
                     historialGananciaTotalEl.textContent = `$${(data.gananciaTotal || 0).toFixed(2)}`;
@@ -1172,23 +1194,18 @@
             // Add event listener for "Ver Historial" button
             if (verHistorialBtn) { // Defensive check
                 verHistorialBtn.addEventListener('click', () => {
-                    console.log('verHistorialBtn clicked.');
                     historialModal.removeAttribute('hidden');
                     historialModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
                     historialModal.classList.add('modal-active');
-                    console.log('historialModal after showing: hidden attribute and hidden class removed, modal-active class added. Current classes:', historialModal.classList.value);
                     cargarHistorialVentas();
-                    console.log('cargarHistorialVentas() called.');
                 });
             }
 
             if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
                 cerrarHistorialModalBtn.addEventListener('click', () => {
-                    console.log('cerrarHistorialModalBtn clicked.');
                     historialModal.classList.remove('modal-active');
                     historialModal.classList.add('hidden'); // Also add Tailwind's hidden class back
                     historialModal.setAttribute('hidden', '');
-                    console.log('historialModal after hiding: modal-active class removed, hidden attribute and hidden class added. Current classes:', historialModal.classList.value);
                 });
             }
 

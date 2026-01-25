@@ -5,13 +5,15 @@
 CREATE SCHEMA IF NOT EXISTS tiendaDB;
 
 -- Borra las tablas en orden inverso a su creación para evitar problemas con las claves foráneas.
--- CASCADE se encarga de eliminar automáticamente las restricciones dependientes.
 DROP TABLE IF EXISTS tiendaDB.ventas_detalle;
 DROP TABLE IF EXISTS tiendaDB.ventas;
-DROP TABLE IF EXISTS tiendaDB.productos;
+DROP TABLE IF EXISTS tiendaDB.productos CASCADE; -- CASCADE asegura borrar triggers asociados
 DROP TABLE IF EXISTS tiendaDB.usuarios;
 DROP TABLE IF EXISTS tiendaDB.tipos_usuario;
 DROP TABLE IF EXISTS tiendaDB.caja;
+
+-- Borrar la función del trigger si ya existe
+DROP FUNCTION IF EXISTS tiendadb.fn_limpiar_codigo_barras();
 
 -- 1. Tabla de Tipos de Usuario (Roles)
 CREATE TABLE tiendadb.tipos_usuario (
@@ -26,7 +28,7 @@ CREATE TABLE tiendadb.usuarios (
     nombre VARCHAR(255) NOT NULL,
     apellido_p VARCHAR(255) NOT NULL,
     apellido_m VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- Columna para el HASH de la contraseña
+    password_hash VARCHAR(255) NOT NULL,
     id_tipo_usuario INTEGER NOT NULL,
 
     CONSTRAINT fk_tipo_usuario
@@ -40,7 +42,7 @@ CREATE TABLE tiendadb.usuarios (
 CREATE TABLE tiendadb.caja (
     id_caja SERIAL PRIMARY KEY,
     fecha_movimiento TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    tipo_movimiento VARCHAR(50) NOT NULL, -- 'apertura', 'cierre', 'ingreso', 'egreso'
+    tipo_movimiento VARCHAR(50) NOT NULL,
     monto DECIMAL(12, 2) NOT NULL,
     descripcion TEXT,
     saldo_resultante DECIMAL(12, 2) NOT NULL,
@@ -58,6 +60,7 @@ CREATE TABLE tiendadb.caja (
 CREATE TABLE tiendadb.productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
+    codigo_barras VARCHAR(255), -- Se agrega sin UNIQUE para permitir nulos/vacíos
     precio_costo DECIMAL(10, 2) NOT NULL,
     precio_venta DECIMAL(10, 2) NOT NULL,
     cantidad_min INT NOT NULL,
@@ -67,7 +70,24 @@ CREATE TABLE tiendadb.productos (
     is_gramaje BOOLEAN DEFAULT FALSE
 );
 
--- 4. Tabla Maestra de Ventas (una fila por cada transacción/carrito)
+-- FUNCIÓN Y TRIGGER PARA PRODUCTOS
+-- Convierte strings vacíos '' en NULL para evitar conflictos
+CREATE OR REPLACE FUNCTION tiendadb.fn_limpiar_codigo_barras()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.codigo_barras = '' THEN
+        NEW.codigo_barras := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tr_productos_limpiar_codigo
+BEFORE INSERT OR UPDATE ON tiendadb.productos
+FOR EACH ROW
+EXECUTE FUNCTION tiendadb.fn_limpiar_codigo_barras();
+
+-- 4. Tabla Maestra de Ventas
 CREATE TABLE tiendadb.ventas (
     id_venta SERIAL PRIMARY KEY,
     id_usuario INT NOT NULL,
@@ -82,25 +102,26 @@ CREATE TABLE tiendadb.ventas (
         REFERENCES tiendadb.usuarios(id_usuario)
 );
 
--- 5. Tabla de Detalles de Venta (una fila por cada producto en el carrito)
+-- 5. Tabla de Detalles de Venta
 CREATE TABLE tiendadb.ventas_detalle (
     id_venta_detalle SERIAL PRIMARY KEY,
-    id_venta INT NOT NULL, -- Vincula este detalle con la venta maestra.
-    id_producto INT NOT NULL, -- El producto que se vendió.
+    id_venta INT NOT NULL,
+    id_producto INT NOT NULL,
     cantidad INT NOT NULL,
-    precio_unitario_venta DECIMAL(10, 2) NOT NULL, -- Precio al momento de la venta.
+    precio_unitario_venta DECIMAL(10, 2) NOT NULL,
     tipo_precio_aplicado VARCHAR(50) DEFAULT 'VENTA',
 
     CONSTRAINT fk_venta_detalle
         FOREIGN KEY(id_venta)
         REFERENCES tiendadb.ventas(id_venta)
-        ON DELETE CASCADE, -- Si se borra la venta, se borran sus detalles.
+        ON DELETE CASCADE,
 
     CONSTRAINT fk_producto_detalle
         FOREIGN KEY(id_producto)
         REFERENCES tiendadb.productos(id_producto)
 );
--- Reiniciar las secuencias para futuras inserciones automáticas
-Insert into tiendaDB.tipos_usuario (nombre, descripcion) values 
+
+-- Reiniciar las secuencias e inserciones iniciales
+INSERT INTO tiendaDB.tipos_usuario (nombre, descripcion) VALUES 
 ('Administrador', 'Usuario con todos los privilegios'),
 ('Cajero', 'Usuario encargado de las ventas y manejo de caja');
