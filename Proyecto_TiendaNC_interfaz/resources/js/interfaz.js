@@ -1299,13 +1299,18 @@
                             stock: stockAvailable,
                             is_gramaje: true
                         };
-                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
                         const detailPayload = {
-                            cantidad: grams, // Quantity is in grams
-                            precioUnitarioVenta: totalPrice / grams, // Price per gram
-                            Venta: ventaData,
+                            cantidad: grams,
+                            precioUnitarioVenta: totalPrice / grams,
+                            Venta: {
+                                idVenta: activeSaleId,
+                                usuario: { // Nested user object as expected by backend DTO
+                                    idUsuario: ID_USUARIO
+                                }
+                            },
                             Producto: productData,
-                            tipoPrecioAplicado: "VENTA_GRAMAJE" // New type for gramaje sales
+                            tipoPrecioAplicado: "VENTA_GRAMAJE",
+                            usuario: { idUsuario: ID_USUARIO } // Add user info for backend DTO
                         };
                         const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
                         ticket.push({
@@ -1315,7 +1320,7 @@
                             precioUnitarioVenta: totalPrice / grams,
                             existence: stockAvailable,
                             idVentaDetalle: newDetail.idVentaDetalle,
-                            Venta: ventaData,
+                            Venta: { idVenta: activeSaleId }, // Use a minimal Venta object for the local ticket array
                             Producto: productData,
                             isMayoreo: false // Gramaje products typically don't have mayoreo in the same way
                         });
