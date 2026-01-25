@@ -203,22 +203,20 @@
                 </div>
             </div>
 
-            <div class="max-h-96 overflow-y-auto overflow-x-auto w-full">
-                <table class="historial-table w-full"> <!-- This is the table we need to modify -->
-                    <thead>
-                        <tr>
-                            <th class="text-center">Número de Ticket</th>
-                            <th class="text-center">Monto</th>
-                            <th class="text-center">Método Pago</th>
-                            <th class="text-center">Estatus</th>
-                            <th class="text-center">Fecha</th>
-                            <th class="text-center">Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historialVentasBody">
-                        <!-- Las filas de ventas se insertarán aquí -->
-                    </tbody>
-                </table>
+            <div class="max-h-96 overflow-y-auto w-full">
+                <!-- Encabezado de la tabla para escritorio -->
+                <div class="hidden md:grid grid-cols-6 gap-x-4 p-3 bg-gray-100 font-semibold text-sm text-gray-700 sticky top-0 z-10">
+                    <div class="col-span-1 text-center">Ticket #</div>
+                    <div class="col-span-1 text-center">Monto</div>
+                    <div class="col-span-1 text-center">Método Pago</div>
+                    <div class="col-span-1 text-center">Estatus</div>
+                    <div class="col-span-1 text-center">Fecha</div>
+                    <div class="col-span-1 text-center">Acción</div>
+                </div>
+                <!-- Cuerpo de la lista de historial de ventas -->
+                <div id="historialVentasBody" class="divide-y divide-gray-200">
+                    <!-- Las ventas se cargarán aquí -->
+                </div>
             </div>
 
             <div class="mt-6 text-right">

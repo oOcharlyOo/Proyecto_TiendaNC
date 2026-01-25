@@ -481,7 +481,7 @@
                                 <div class="col-span-3 ticket-product-name-zelda text-sm truncate">${item.nombreProducto}</div>
                                 <div class="col-span-2 text-right text-sm ticket-product-name-zelda-price">$${(item.precioUnitarioVenta || 0).toFixed(2)}</div>
                                 <div class="col-span-1 text-center">
-                                    <input type="checkbox" class="mayoreo-checkbox round-checkbox mx-auto" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
+                                    <input type="checkbox" id="mayoreo-check-desk-${index}" class="mayoreo-checkbox round-checkbox mx-auto" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
                                 </div>
                                 <div class="col-span-2 text-center flex items-center justify-center">
                                     <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
@@ -1047,7 +1047,7 @@
 
             async function cargarHistorialVentas() {
                 const today = getTodayDate();
-                historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Cargando...</td></tr>';
+                historialVentasBody.innerHTML = '<div class="text-center p-4">Cargando...</div>';
 
                 try {
                     const data = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
@@ -1072,10 +1072,10 @@
 
                         historialVentasBody.innerHTML = '';
                         data.ventas.forEach((venta, index) => {
-                            const row = document.createElement('tr');
-                            row.className = 'border-b cursor-pointer hover:bg-gray-700 hover:text-white hover:scale-[1.01] hover:shadow-lg'; // Make row clickable and darken on hover
-                            row.dataset.id = venta.idVenta; // Store sale ID for details modal
-                            row.dataset.enumeratedTicket = index + 1; // Store enumerated ticket number
+                            const saleItem = document.createElement('div');
+                            saleItem.className = 'sale-history-item block p-4 md:grid md:grid-cols-6 md:gap-x-4 md:items-center hover:bg-gray-700 hover:text-white transition-colors duration-150 cursor-pointer';
+                            saleItem.dataset.id = venta.idVenta;
+                            saleItem.dataset.enumeratedTicket = index + 1;
                             
                             // Determine status text and class based on new definitions
                             let statusText;
@@ -1085,7 +1085,7 @@
                                 statusClass = 'bg-green-200 text-green-800';
                             } else if (venta.estatus === 'C') {
                                 statusText = 'Completada';
-                                statusClass = 'bg-blue-200 text-blue-800'; // Using blue for 'Completada'
+                                statusClass = 'bg-blue-200 text-blue-800';
                             } else if (venta.estatus === 'I') {
                                 statusText = 'Inactiva/Cancelada';
                                 statusClass = 'bg-red-200 text-danger';
@@ -1097,36 +1097,54 @@
                             // Only Finalizada or Completada sales can be cancelled
                             const canBeCancelled = venta.estatus === 'F' || venta.estatus === 'C';
                             
-                            row.innerHTML = `
-                                <td class="text-center">${index + 1}</td>
-                                <td class="text-center">$${venta.montoTotal.toFixed(2)}</td>
-                                <td class="text-center">${venta.metodoPago}</td>
-                                <td class="text-center">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
-                                        ${statusText}
-                                    </span>
-                                </td>
-                                <td class="text-center">${new Date(venta.fechaVenta).toLocaleTimeString()}</td>
-                                <td class="text-center">
-                                    <button 
-                                        class="btn-cancelar-venta p-1 rounded-full w-8 h-8 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" 
-                                        style="border-radius: 50%;"
-                                        data-id="${venta.idVenta}" 
-                                        title="Cancelar Venta"
-                                        ${canBeCancelled ? '' : 'disabled'}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </td>
+                            saleItem.innerHTML = `
+                                <!-- Mobile View -->
+                                <div class="md:hidden">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <p class="font-bold text-lg">Ticket #${index + 1}</p>
+                                            <p class="text-sm text-gray-400">${new Date(venta.fechaVenta).toLocaleTimeString()}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-lg font-semibold ticket-barcode-zelda">$${venta.montoTotal.toFixed(2)}</p>
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 flex justify-between items-center">
+                                        <p class="text-sm text-gray-400">Pagado con: <span class="font-semibold">${venta.metodoPago}</span></p>
+                                        <button class="btn-cancelar-venta p-2 rounded-full w-10 h-10 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" style="border-radius: 50%;" data-id="${venta.idVenta}" title="Cancelar Venta" ${canBeCancelled ? '' : 'disabled'}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Desktop View -->
+                                <div class="hidden md:contents">
+                                    <div class="col-span-1 text-center font-semibold ticket-product-name-zelda">${index + 1}</div>
+                                    <div class="col-span-1 text-center font-bold ticket-product-name-zelda-price">$${venta.montoTotal.toFixed(2)}</div>
+                                    <div class="col-span-1 text-center zelda-label-text">${venta.metodoPago}</div>
+                                    <div class="col-span-1 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                                    </div>
+                                    <div class="col-span-1 text-center zelda-label-text">${new Date(venta.fechaVenta).toLocaleTimeString()}</div>
+                                    <div class="col-span-1 text-center">
+                                        <button class="btn-cancelar-venta p-1 rounded-full w-8 h-8 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" style="border-radius: 50%;" data-id="${venta.idVenta}" title="Cancelar Venta" ${canBeCancelled ? '' : 'disabled'}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             `;
-                            historialVentasBody.appendChild(row);
+                            historialVentasBody.appendChild(saleItem);
                         });
                     } else {
-                        historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">No se encontraron ventas para hoy.</td></tr>';
+                        historialVentasBody.innerHTML = '<div class="text-center p-4">No se encontraron ventas para hoy.</div>';
                     }
                 } catch (error) {
-                    historialVentasBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500">Error al cargar el historial: ${error.message}</td></tr>`;
+                    historialVentasBody.innerHTML = `<div class="text-center p-4 text-red-500">Error al cargar el historial: ${error.message}</div>`;
                     window.showToast({ message: `Error al cargar el historial: ${error.message}`, type: 'error' });
                 }
             } // Closes cargarHistorialVentas function
@@ -1164,7 +1182,7 @@
             // Event listener for clicks within the sales history body (delegation)
             historialVentasBody.addEventListener('click', (e) => {
                 const clickedElement = e.target;
-                const targetRow = clickedElement.closest('tr[data-id]');
+                const targetRow = clickedElement.closest('.sale-history-item');
 
                 if (clickedElement.closest('.btn-cancelar-venta')) {
                     handleCancelarVenta(e); // Let the existing handler manage the button click
