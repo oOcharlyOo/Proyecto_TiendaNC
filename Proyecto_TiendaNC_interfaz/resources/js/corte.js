@@ -559,7 +559,7 @@ async function generateMonthlyReport() {
 
     const originalButtonContent = generateReportFromMonthlyModalBtn.innerHTML;
     generateReportFromMonthlyModalBtn.disabled = true;
-    generateReportFromMonthlyModalBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+    generateReportFromMonthlyModalBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generando...`;
 
     try {
         const [year, month] = selectedMonthYear.split('-');
@@ -568,10 +568,13 @@ async function generateMonthlyReport() {
 
         const date = new Date(targetYear, targetMonth, 1);
         const monthName = date.toLocaleString('es-MX', { month: 'long' });
-        monthlyReportSelectedMonth.textContent = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+        const formattedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        monthlyReportSelectedMonth.textContent = `${formattedMonthName} ${year}`;
 
+        // 1. Obtener todos los detalles de ventas
         const allSaleDetails = await fetchApi(`/ventasDetalle/obtenerTodosLosVentasDetalles`, 'GET');
         
+        // 2. Filtrar detalles de ventas por el mes y año seleccionados
         const monthlySaleDetails = allSaleDetails.filter(detail => {
             const saleDate = new Date(detail.Venta.fechaVenta);
             return saleDate.getMonth() === targetMonth && 
@@ -579,63 +582,96 @@ async function generateMonthlyReport() {
                    (detail.Venta.estatus === 'C' || detail.Venta.estatus === 'F');
         });
 
+        // 3. Procesar y agrupar los detalles en ventas únicas con sus totales
         const salesMap = new Map();
         monthlySaleDetails.forEach(detail => {
             const saleId = detail.Venta.idVenta;
             if (!salesMap.has(saleId)) {
-                salesMap.set(saleId, { ...detail.Venta, totalVenta: 0, totalCosto: 0, ganancia: 0 });
+                salesMap.set(saleId, { 
+                    ...detail.Venta, 
+                    totalVenta: 0, 
+                    totalCosto: 0,
+                });
             }
             const sale = salesMap.get(saleId);
             const itemVenta = detail.cantidad * detail.precioUnitarioVenta;
             sale.totalVenta += itemVenta;
 
-            let costoPorUnidad = detail.Producto.precio_costo || 0;
-            let cantidadParaCosto = detail.cantidad;
-            if (detail.Producto.is_gramaje === true) {
-                cantidadParaCosto = detail.cantidad / 1000;
-            }
+            const costoPorUnidad = detail.Producto.precio_costo || 0;
+            const cantidadParaCosto = detail.Producto.esGramaje ? (detail.cantidad / 1000) : detail.cantidad;
             sale.totalCosto += cantidadParaCosto * costoPorUnidad;
         });
 
-        const monthlySales = Array.from(salesMap.values()).map(sale => ({...sale, ganancia: sale.totalVenta - sale.totalCosto}));
-        monthlySales.sort((a, b) => new Date(b.fechaVenta) - new Date(a.fechaVenta)); // Sort recent first
+        const monthlySales = Array.from(salesMap.values()).map(sale => ({
+            ...sale, 
+            ganancia: sale.totalVenta - sale.totalCosto
+        }));
+        monthlySales.sort((a, b) => new Date(b.fechaVenta) - new Date(a.fechaVenta));
 
-        // --- STATS CALCULATION ---
-        // Assuming the endpoint returns these values directly
+        // 4. Construir el objeto reportData a partir de los datos procesados
+        const totalVentas = monthlySales.reduce((sum, sale) => sum + sale.totalVenta, 0);
+        const totalGanancias = monthlySales.reduce((sum, sale) => sum + sale.ganancia, 0);
+        const totalTransferencia = monthlySales
+            .filter(s => s.metodoPago.toUpperCase() === 'TRANSFERENCIA')
+            .reduce((sum, sale) => sum + sale.totalVenta, 0);
+
+        const getWeekOfMonth = (date) => {
+            const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+            const dayOfMonth = date.getDate();
+            const dayOfWeek = startOfMonth.getDay();
+            return Math.ceil((dayOfMonth + dayOfWeek) / 7);
+        };
+
+        const weeklyData = Array.from({ length: 5 }, (_, i) => ({ week: i + 1, sales: 0, profit: 0 }));
+        monthlySales.forEach(sale => {
+            const saleDate = new Date(sale.fechaVenta);
+            const week = getWeekOfMonth(saleDate);
+            if (week >= 1 && week <= 5) {
+                weeklyData[week - 1].sales += sale.totalVenta;
+                weeklyData[week - 1].profit += sale.ganancia;
+            }
+        });
+
+        const reportData = {
+            totalVentas,
+            totalGanancias,
+            totalTransferencia,
+            ventasChange: undefined, // No se calcula por ahora
+            transferenciaChange: undefined,
+            gananciasChange: undefined,
+            weeklyData,
+            recentTransactions: monthlySales, // Ya están ordenadas por fecha
+        };
+
+        // 5. Utilizar reportData para popular la UI
         statsVentasValue.textContent = formatCurrency(reportData.totalVentas);
         statsTransferenciaValue.textContent = formatCurrency(reportData.totalTransferencia);
         statsGananciasValue.textContent = formatCurrency(reportData.totalGanancias);
         
-        // Handling stats changes (assuming the API provides this, otherwise default to '--%')
-        statsVentasChange.textContent = reportData.ventasChange ? `${reportData.ventasChange.toFixed(2)}%` : '--%';
-        statsTransferenciaChange.textContent = reportData.transferenciaChange ? `${reportData.transferenciaChange.toFixed(2)}%` : '--%';
-        statsGananciasChange.textContent = reportData.gananciasChange ? `${reportData.gananciasChange.toFixed(2)}%` : '--%';
+        // Los porcentajes de cambio se dejan como estaban
+        statsVentasChange.textContent = '--%';
+        statsTransferenciaChange.textContent = '--%';
+        statsGananciasChange.textContent = '--%';
 
-        // --- WEEKLY CHART CALCULATION ---
-        // Assuming the endpoint returns 'weeklyData' in the format: [{ week: 1, sales: X, profit: Y }, ...]
         if (reportData.weeklyData && reportData.weeklyData.length > 0) {
             createMonthlyReportChart(reportData.weeklyData);
         } else {
-             // If no weekly data, create an empty chart
-            createMonthlyReportChart([{ week: 1, sales: 0, profit: 0 }, { week: 2, sales: 0, profit: 0 }, { week: 3, sales: 0, profit: 0 }, { week: 4, sales: 0, profit: 0 }]);
+            createMonthlyReportChart([]);
         }
 
-
-        // --- RECENT TRANSACTIONS ---
-        // Assuming the endpoint returns 'recentTransactions' in the format: [{ numeroTicket: X, fechaVenta: '...', metodoPago: '...', totalVenta: Y }, ...]
         recentTransactionsList.innerHTML = '';
         if (reportData.recentTransactions && reportData.recentTransactions.length > 0) {
             reportData.recentTransactions.slice(0, 5).forEach(trx => {
                 const trxDiv = document.createElement('div');
-                trxDiv.className = "px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer";
+                trxDiv.className = "px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer rounded-md";
                 trxDiv.innerHTML = `
                     <div class="flex flex-col">
                         <span class="text-xs font-bold text-slate-800">Venta #${trx.numeroTicket}</span>
-                        <span class="text-[10px] text-slate-400">${new Date(trx.fechaVenta).toLocaleDateString()} • ${trx.metodoPago}</span>
+                        <span class="text-[10px] text-slate-400">${new Date(trx.fechaVenta).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'})} • ${trx.metodoPago}</span>
                     </div>
                     <div class="text-right">
                         <div class="text-xs font-bold text-slate-800">${formatCurrency(trx.totalVenta)}</div>
-                        <div class="text-[9px] text-emerald-600 font-bold uppercase">Éxito</div>
+                        <div class="text-[9px] text-emerald-600 font-semibold uppercase">Finalizada</div>
                     </div>
                 `;
                 recentTransactionsList.appendChild(trxDiv);
@@ -644,13 +680,12 @@ async function generateMonthlyReport() {
             recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">No hay transacciones este mes.</div>`;
         }
         
-        window.showToast({ message: `Reporte mensual para ${formattedMonthName} ${year} generado.`, type: 'success' });
+        window.showToast({ message: `Reporte para ${formattedMonthName} ${year} generado.`, type: 'success' });
 
     } catch (error) {
         window.showToast({ message: `Error al generar el reporte mensual: ${error.message}`, type: 'error' });
-         // Reset UI on error to avoid showing stale data
         statsVentasValue.textContent = '$0.00';
-        statsTransferenciaValue.textContent = '$0.00'; // Updated to transferencia
+        statsTransferenciaValue.textContent = '$0.00';
         statsGananciasValue.textContent = '$0.00';
         recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">Error al cargar datos.</div>`;
         if (monthlyReportChartInstance) {
