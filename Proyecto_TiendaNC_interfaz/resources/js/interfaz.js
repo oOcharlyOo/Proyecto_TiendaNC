@@ -771,6 +771,7 @@
 
             function openGramajeCalculator(productData) {
                 gramajeCalculatorModal.removeAttribute('hidden');
+                gramajeCalculatorModal.classList.remove('hidden'); // Ensure Tailwind's hidden class is removed
                 gramajeCalculatorModal.classList.add('modal-active');
                 calcProductName.textContent = productData.nombre;
                 calcProductId.value = productData.idProducto;
@@ -783,6 +784,7 @@
             function closeGramajeCalculator() {
                 gramajeCalculatorModal.classList.remove('modal-active');
                 gramajeCalculatorModal.setAttribute('hidden', '');
+                gramajeCalculatorModal.classList.add('hidden'); // Ensure Tailwind's hidden class is added back
                 resetGramajeCalculator();
             }
 
