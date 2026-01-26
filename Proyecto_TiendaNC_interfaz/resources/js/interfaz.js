@@ -213,12 +213,14 @@
                     alertModalTitle.textContent = title;
                     alertModalMessage.textContent = message;
                     alertModal.removeAttribute('hidden');
+                    alertModal.classList.remove('hidden');
                     alertModal.classList.add('modal-active');
                 }
 
                 function closeAlertModal() {
                     alertModal.classList.remove('modal-active');
                     alertModal.setAttribute('hidden', '');
+                    alertModal.classList.add('hidden');
                 }
 
                 alertModalCloseBtn.addEventListener('click', closeAlertModal);
@@ -551,28 +553,30 @@
                     }
                     
                     if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
+
+                    // Si el producto es por gramaje, abrir la calculadora especializada y no continuar.
+                    // La lógica de stock para gramaje se maneja en 'addGramajeProductToSale'.
+                    if (productData.is_gramaje) {
+                        openGramajeCalculator(productData);
+                        return;
+                    }
                     
                     const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
 
-                    // Validar stock antes de continuar
+                    // Validar stock antes de continuar (SOLO PARA PRODUCTOS NO-GRAMAJE)
                     if (existingItemIndex !== -1) {
                         // El producto ya está en el ticket
                         const itemInTicket = ticket[existingItemIndex];
                         if (itemInTicket.cantidad + 1 > productData.stock) {
-                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productData.nombre}".`);
+                            showAlertModal('Inventario Insuficiente', `No se puede agregar más del stock disponible (${productData.stock}) para "${productData.nombre}".`);
                             return;
                         }
                     } else {
                         // El producto es nuevo en el ticket
                         if (!productData.stock || productData.stock <= 0) {
-                            showAlertModal('Producto sin Existencias', `El producto "${productData.nombre}" no tiene existencias.`);
+                            showAlertModal('Producto Agotado', `El producto "${productData.nombre}" no tiene existencias en el inventario.`);
                             return;
                         }
-                    }
-
-                    if (productData.is_gramaje) {
-                        openGramajeCalculator(productData);
-                        return;
                     }
 
                     if (!activeSaleId) {
@@ -742,7 +746,7 @@
                 if (source === 'grams') {
                     if (!isNaN(grams) && !isNaN(pricePerKilo) && grams >= 0) {
                         totalPrice = (grams / 1000) * pricePerKilo;
-                        precioTotal.value = totalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        precioTotal.value = totalPrice.toFixed(2);
                     } else {
                         precioTotal.value = '';
                     }
@@ -1252,7 +1256,7 @@
                 totalPrice = parseFloat(totalPrice.toFixed(2)); // Ensure consistent precision
 
                 if (grams > stockAvailable) {
-                    showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Disponible: ${stockAvailable} gramos.`);
+                    showAlertModal('Inventario Insuficiente', `No se pueden agregar ${grams}g de "${productName}". Solo hay ${stockAvailable}g disponibles.`);
                     return;
                 }
 
@@ -1274,7 +1278,7 @@
                         const newTotalGrams = existingItem.cantidad + grams; // Assuming cantidad for gramaje product is in grams
 
                         if (newTotalGrams > stockAvailable) {
-                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Al intentar agregar ${grams}g, excedería el stock total. Disponible: ${stockAvailable} gramos.`);
+                            showAlertModal('Inventario Insuficiente', `No se puede exceder el stock disponible (${stockAvailable}g) para "${productName}".`);
                             return;
                         }
 
