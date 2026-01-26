@@ -382,7 +382,7 @@ body {
 }
 
 .modal.modal-active {
-    display: flex; /* Show when active */
+    display: flex !important; /* Show when active */
 }
 .modal-content {
     background-color: white;
