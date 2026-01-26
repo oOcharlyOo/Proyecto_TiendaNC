@@ -520,6 +520,8 @@ function createMonthlyReportChart(weeklyData) {
 
 
 function openMonthlyReportModal() {
+    console.log('Opening monthly report modal. Modal element:', monthlyReportModal); // DEBUG LOG
+    console.log('Monthly Report Modal classList before changes:', monthlyReportModal ? monthlyReportModal.classList : 'Modal not found'); // DEBUG LOG
     const today = new Date();
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -527,6 +529,7 @@ function openMonthlyReportModal() {
     monthlyReportModal.removeAttribute('hidden');
     monthlyReportModal.classList.remove('hidden'); // Use Tailwind class to un-hide
     monthlyReportModal.classList.add('modal-active');
+    console.log('Monthly Report Modal classList after changes:', monthlyReportModal ? monthlyReportModal.classList : 'Modal not found'); // DEBUG LOG
     
     // Reset UI to initial state
     monthlyReportSelectedMonth.textContent = 'Seleccione un mes';
