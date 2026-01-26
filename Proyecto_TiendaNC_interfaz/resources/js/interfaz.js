@@ -773,7 +773,7 @@
                 gramajeCalculatorModal.removeAttribute('hidden');
                 gramajeCalculatorModal.classList.remove('hidden'); // Ensure Tailwind's hidden class is removed
                 gramajeCalculatorModal.classList.add('modal-active');
-                calcProductName.textContent = productData.nombre;
+                calcProductName.value = productData.nombre;
                 calcProductId.value = productData.idProducto;
                 calcProductPricePerKilo.value = productData.precio_venta; // Assuming precio_venta is price per kilo for gramaje products
                 precioBase.value = productData.precio_venta; // Set the editable base price
@@ -1233,7 +1233,7 @@
 
 
             async function addGramajeProductToSale() {
-                const productId = calcProductId.value;
+                const productId = parseInt(calcProductId.value);
                 const productName = calcProductName.value;
                 let grams = parseFloat(gramajeInput.value); // New ID
                 let totalPrice = parseFloat(precioTotal.value); // Read from .value now
@@ -1285,13 +1285,11 @@
                             // Use the currentPricePerKilo from the modal for calculation, not the average
                             precioUnitarioVenta: totalPrice / grams, // This is price per gram based on current modal calculation
                         };
-                        await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', {
-                            cantidad: updatedItem.cantidad,
-                            precioUnitarioVenta: updatedItem.precioUnitarioVenta,
-                        });
+                        await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', updatedItem);
                         ticket[existingItemIndex] = updatedItem;
                     } else {
                         // Add as new item
+                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
                         const productData = {
                             idProducto: productId,
                             nombre: productName,
@@ -1302,15 +1300,9 @@
                         const detailPayload = {
                             cantidad: grams,
                             precioUnitarioVenta: totalPrice / grams,
-                            Venta: {
-                                idVenta: activeSaleId,
-                                usuario: { // Nested user object as expected by backend DTO
-                                    idUsuario: ID_USUARIO
-                                }
-                            },
+                            Venta: ventaData,
                             Producto: productData,
-                            tipoPrecioAplicado: "VENTA_GRAMAJE",
-                            usuario: { idUsuario: ID_USUARIO } // Add user info for backend DTO
+                            tipoPrecioAplicado: "VENTA_GRAMAJE"
                         };
                         const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
                         ticket.push({
@@ -1320,7 +1312,7 @@
                             precioUnitarioVenta: totalPrice / grams,
                             existence: stockAvailable,
                             idVentaDetalle: newDetail.idVentaDetalle,
-                            Venta: { idVenta: activeSaleId }, // Use a minimal Venta object for the local ticket array
+                            Venta: ventaData, // Use a minimal Venta object for the local ticket array
                             Producto: productData,
                             isMayoreo: false // Gramaje products typically don't have mayoreo in the same way
                         });
