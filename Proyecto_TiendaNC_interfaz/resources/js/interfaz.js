@@ -151,9 +151,12 @@
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
+                console.log('DOMContentLoaded fired!'); // DEBUG LOG
                 const codigoProductoInput = document.getElementById('codigoProducto');
+                console.log('codigoProductoInput:', codigoProductoInput); // DEBUG LOG
                 const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
                 const agregarProductoBtn = document.getElementById('agregarProductoBtn');
+                console.log('agregarProductoBtn:', agregarProductoBtn); // DEBUG LOG
                 const ticketItemsTableBody = document.getElementById('ticketItems');
                 const ticketIdDisplay = document.getElementById('ticketIdDisplay');
                 const subtotalDisplay = document.getElementById('subtotalDisplay');
