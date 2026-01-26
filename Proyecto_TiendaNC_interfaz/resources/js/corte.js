@@ -1,5 +1,5 @@
 // --- CONFIGURACIÓN Y UTILIDADES ---
-        const API_BASE_URL = 'http://localhost:8080';
+        const API_BASE_URL = '__API_BASE_URL__';
         
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser')) || { idUsuario: 1, nombre: 'Usuario Desconocido' };
         const ID_USUARIO = activeUser.idUsuario;
