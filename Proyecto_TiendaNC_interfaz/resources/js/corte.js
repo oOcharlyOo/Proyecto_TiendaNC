@@ -285,7 +285,6 @@
         async function generateCorteReport() {
             generateCorteBtn.disabled = true;
             generateCorteBtn.textContent = 'Calculando...';
-            generateDailyReportBtn.classList.add('hidden');
             cerrarTurnoBtn.classList.add('hidden');
             corteReporte.classList.add('hidden');
 
