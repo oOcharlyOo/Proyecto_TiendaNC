@@ -422,7 +422,6 @@ const statsTransferenciaChange = document.getElementById('monthlyReport-stats-tr
 const statsGananciasValue = document.getElementById('monthlyReport-stats-ganancias-value');
 const statsGananciasChange = document.getElementById('monthlyReport-stats-ganancias-change');
 const monthlyReportChartContainer = document.getElementById('monthly-report-chart-container');
-const recentTransactionsList = document.getElementById('monthlyReport-recent-transactions-list');
 const monthlyReportFooterTip = document.getElementById('monthlyReport-footer-tip');
 const monthlyReportFooterTipText = document.getElementById('monthlyReport-footer-tip-text');
 
@@ -539,7 +538,6 @@ function openMonthlyReportModal() {
     statsVentasChange.textContent = '--%';
     statsTransferenciaChange.textContent = '--%';
     statsGananciasChange.textContent = '--%';
-    recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">Genere un reporte para ver datos.</div>`;
     if (monthlyReportChartInstance) {
         monthlyReportChartInstance.destroy();
         monthlyReportChartInstance = null;
@@ -574,6 +572,8 @@ async function generateMonthlyReport() {
         const formattedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
         monthlyReportSelectedMonth.textContent = `${formattedMonthName} ${year}`;
 
+
+
         // 1. Obtener todos los detalles de ventas
         const allSaleDetails = await fetchApi(`/ventasDetalle/obtenerTodosLosVentasDetalles`, 'GET');
         
@@ -601,7 +601,9 @@ async function generateMonthlyReport() {
             sale.totalVenta += itemVenta;
 
             const costoPorUnidad = detail.Producto.precio_costo || 0;
-            const cantidadParaCosto = detail.Producto.esGramaje ? (detail.cantidad / 1000) : detail.cantidad;
+            // Use tipoPrecioAplicado from the sale detail to determine if grammage conversion is needed
+            const isGramajeSale = detail.tipoPrecioAplicado === "VENTA_GRAMAJE";
+            const cantidadParaCosto = isGramajeSale ? (detail.cantidad / 1000) : detail.cantidad;
             sale.totalCosto += cantidadParaCosto * costoPorUnidad;
         });
 
@@ -662,26 +664,7 @@ async function generateMonthlyReport() {
             createMonthlyReportChart([]);
         }
 
-        recentTransactionsList.innerHTML = '';
-        if (reportData.recentTransactions && reportData.recentTransactions.length > 0) {
-            reportData.recentTransactions.slice(0, 5).forEach(trx => {
-                const trxDiv = document.createElement('div');
-                trxDiv.className = "px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer rounded-md";
-                trxDiv.innerHTML = `
-                    <div class="flex flex-col">
-                        <span class="text-xs font-bold text-slate-800">Venta #${trx.numeroTicket}</span>
-                        <span class="text-[10px] text-slate-400">${new Date(trx.fechaVenta).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'})} • ${trx.metodoPago}</span>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xs font-bold text-slate-800">${formatCurrency(trx.totalVenta)}</div>
-                        <div class="text-[9px] text-emerald-600 font-semibold uppercase">Finalizada</div>
-                    </div>
-                `;
-                recentTransactionsList.appendChild(trxDiv);
-            });
-        } else {
-            recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">No hay transacciones este mes.</div>`;
-        }
+        // ... (remaining code in generateMonthlyReport function) ...
         
         window.showToast({ message: `Reporte para ${formattedMonthName} ${year} generado.`, type: 'success' });
 
@@ -690,7 +673,6 @@ async function generateMonthlyReport() {
         statsVentasValue.textContent = '$0.00';
         statsTransferenciaValue.textContent = '$0.00';
         statsGananciasValue.textContent = '$0.00';
-        recentTransactionsList.innerHTML = `<div class="px-3 py-4 text-center text-sm text-slate-400">Error al cargar datos.</div>`;
         if (monthlyReportChartInstance) {
             monthlyReportChartInstance.destroy();
             monthlyReportChartInstance = null;
