@@ -526,6 +526,7 @@
             }
 
             async function addProduct(code) {
+                console.log('addProduct called with code:', code); // DEBUG LOG
                 if (!code) return;
                 codigoProductoInput.disabled = true;
                 agregarProductoBtn.textContent = 'Buscando...';
