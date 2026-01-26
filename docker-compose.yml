@@ -16,7 +16,8 @@ services:
     build:
       context: ./Proyecto_TiendaNC_interfaz
       dockerfile: Dockerfile
-      args: API_URL: https://dulceria.homemartinez.uk
+      args: 
+        API_URL: http://localhost:8080
     ports:
       - "8081:80"
     container_name: html-frontend

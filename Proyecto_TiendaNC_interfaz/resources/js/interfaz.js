@@ -1,4 +1,4 @@
-        const API_BASE_URL = '__API_BASE_URL__';
+        const API_BASE_URL = 'http://localhost:8080';
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
         const activeUserShift = JSON.parse(sessionStorage.getItem('activeUserShift'));
 
