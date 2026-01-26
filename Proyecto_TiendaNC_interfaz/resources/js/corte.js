@@ -450,14 +450,14 @@ function createMonthlyReportChart(weeklyData) {
                 {
                     label: 'Ventas',
                     data: salesData,
-                    backgroundColor: '#4f46e5', // indigo-600
+                    backgroundColor: '#48d308', // Zelda Green
                     borderRadius: 2,
                     barPercentage: 0.6,
                 },
                 {
                     label: 'Ganancia',
                     data: profitData,
-                    backgroundColor: '#c084fc', // purple-400
+                    backgroundColor: '#f1c40f', // Zelda Gold
                     borderRadius: 2,
                     barPercentage: 0.6,
                 }
