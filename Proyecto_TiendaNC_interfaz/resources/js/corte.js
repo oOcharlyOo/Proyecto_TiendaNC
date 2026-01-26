@@ -131,7 +131,7 @@
                 totalBruto = montoInicial + ventasEfectivo + ventasTransferencia + otrosIngresos;
 
                 titleText = `Total Entradas: ${formatCurrency(totalBruto)}`;
-                chartTitle.textContent = 'Composici├│n del Flujo de Caja';
+                chartTitle.textContent = 'Composición del Flujo de Caja';
             }
 
             const chartData = {
@@ -236,7 +236,7 @@
 
         function renderHistoricReport(data, date) {
             // 1. Cambiar din├ímicamente los t├¡tulos para el reporte hist├│rico
-            reportTitle.textContent = `Reporte del D├¡a: ${date}`;
+            reportTitle.textContent = `Reporte del Día: ${date}`;
             reporteMontoInicial.parentElement.querySelector('.summary-title').textContent = 'Monto Inicial'; // Mantener el t├¡tulo original
             reporteVentasEfectivo.parentElement.querySelector('.summary-title').textContent = 'Ventas en Efectivo'; // Nuevo t├¡tulo
             reporteOtrosIngresos.parentElement.querySelector('.summary-title').textContent = 'Ventas por Transferencia'; // Cambiado
@@ -430,7 +430,7 @@ let monthlyReportChartInstance = null;
 
 // --- L├│gica para el reporte mensual ---
 
-function createMonthlyReportChart(weeklyData) {
+function createMonthlyReportChart(weeklyData, monthYearString) {
     const canvas = document.getElementById('monthlyReportChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -438,7 +438,37 @@ function createMonthlyReportChart(weeklyData) {
         monthlyReportChartInstance.destroy();
     }
 
-    const labels = weeklyData.map(d => `S${d.week}`);
+    // Helper function to get week range label
+    const getWeekRangeLabel = (weekNumber, monthYearString) => {
+        const [year, month] = monthYearString.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate(); // Get last day of previous month, which is days in current month
+
+        let startDate, endDate;
+
+        if (weekNumber === 1) {
+            startDate = 1;
+            endDate = 7;
+        } else if (weekNumber === 2) {
+            startDate = 8;
+            endDate = 14;
+        } else if (weekNumber === 3) {
+            startDate = 15;
+            endDate = 21;
+        } else if (weekNumber === 4) {
+            startDate = 22;
+            endDate = daysInMonth; // Last day of the month
+        } else {
+            return `S${weekNumber}`; // Fallback, though we expect only 1-4
+        }
+
+        const start = new Date(year, month - 1, startDate).getDate();
+        const end = new Date(year, month - 1, endDate).getDate();
+
+        // Format the label to show only day of month
+        return `S${weekNumber}\n(${start}-${end})`;
+    };
+
+    const labels = weeklyData.map(d => getWeekRangeLabel(d.week, monthYearString)); // Modified labels generation
     const salesData = weeklyData.map(d => d.sales);
     const profitData = weeklyData.map(d => d.profit);
 
@@ -450,14 +480,14 @@ function createMonthlyReportChart(weeklyData) {
                 {
                     label: 'Ventas',
                     data: salesData,
-                    backgroundColor: '#48d308', // Zelda Green
+                    backgroundColor: '#48d308', // Zelda Green - Keep original color
                     borderRadius: 2,
                     barPercentage: 0.6,
                 },
                 {
                     label: 'Ganancia',
                     data: profitData,
-                    backgroundColor: '#f1c40f', // Zelda Gold
+                    backgroundColor: '#f1c40f', // Zelda Gold - Keep original color
                     borderRadius: 2,
                     barPercentage: 0.6,
                 }
@@ -592,13 +622,13 @@ async function generateMonthlyReport() {
             if (!salesMap.has(saleId)) {
                 salesMap.set(saleId, {
                     ...detail.Venta,
-                    totalVenta: 0,
+                    totalVenta: detail.Venta.montoTotal, // Usar el montoTotal del backend
                     totalCosto: 0,
                 });
             }
             const sale = salesMap.get(saleId);
-            const itemVenta = detail.cantidad * detail.precioUnitarioVenta;
-            sale.totalVenta += itemVenta;
+            // No sumar itemVenta aqu├¡, ya que totalVenta viene del backend
+
 
             const costoPorUnidad = detail.Producto.precio_costo || 0;
             // Use tipoPrecioAplicado from the sale detail to determine if grammage conversion is needed
@@ -620,18 +650,26 @@ async function generateMonthlyReport() {
             .filter(s => s.metodoPago.toUpperCase() === 'TRANSFERENCIA')
             .reduce((sum, sale) => sum + sale.montoTotal, 0);
 
-        const getWeekOfMonth = (date) => {
-            const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+
+
+        const getFixedWeekNumber = (date) => {
             const dayOfMonth = date.getDate();
-            const dayOfWeek = startOfMonth.getDay();
-            return Math.ceil((dayOfMonth + dayOfWeek) / 7);
+            if (dayOfMonth >= 1 && dayOfMonth <= 7) {
+                return 1;
+            } else if (dayOfMonth >= 8 && dayOfMonth <= 14) {
+                return 2;
+            } else if (dayOfMonth >= 15 && dayOfMonth <= 21) {
+                return 3;
+            } else { // dayOfMonth >= 22 and up to daysInMonth
+                return 4;
+            }
         };
 
-        const weeklyData = Array.from({ length: 5 }, (_, i) => ({ week: i + 1, sales: 0, profit: 0 }));
+        const weeklyData = Array.from({ length: 4 }, (_, i) => ({ week: i + 1, sales: 0, profit: 0 }));
         monthlySales.forEach(sale => {
             const saleDate = new Date(sale.fechaVenta);
-            const week = getWeekOfMonth(saleDate);
-            if (week >= 1 && week <= 5) {
+            const week = getFixedWeekNumber(saleDate);
+            if (week >= 1 && week <= 4) {
                 weeklyData[week - 1].sales += sale.totalVenta;
                 weeklyData[week - 1].profit += sale.ganancia;
             }
@@ -659,8 +697,7 @@ async function generateMonthlyReport() {
         statsGananciasChange.textContent = '--%';
 
         if (reportData.weeklyData && reportData.weeklyData.length > 0) {
-            createMonthlyReportChart(reportData.weeklyData);
-        } else {
+                            createMonthlyReportChart(reportData.weeklyData, selectedMonthYear);        } else {
             createMonthlyReportChart([]);
         }
 
@@ -688,7 +725,6 @@ async function generateMonthlyReport() {
         document.addEventListener('DOMContentLoaded', () => {
              if (reporteCajero) reporteCajero.textContent = activeUser.nombre;
              if (corteReporte) corteReporte.classList.add('hidden');
-             if (generateDailyReportBtn) generateDailyReportBtn.classList.add('hidden');
              if (cerrarTurnoBtn) cerrarTurnoBtn.classList.add('hidden');
 
             generateCorteBtn.addEventListener('click', generateCorteReport);

@@ -804,7 +804,10 @@ video {
 }
 
 .max-w-md {
-  max-width: 28rem;
+  max-width: 23rem;
+}
+.max-w-md-custom {
+  max-width: 70rem;
 }
 
 .max-w-sm {
