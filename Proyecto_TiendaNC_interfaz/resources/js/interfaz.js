@@ -557,6 +557,7 @@
                     // Si el producto es por gramaje, abrir la calculadora especializada y no continuar.
                     // La lógica de stock para gramaje se maneja en 'addGramajeProductToSale'.
                     if (productData.is_gramaje) {
+                        console.log('Product is grammage. Calling openGramajeCalculator with:', productData); // DEBUG LOG
                         openGramajeCalculator(productData);
                         return;
                     }
@@ -774,9 +775,12 @@
             }
 
             function openGramajeCalculator(productData) {
+                console.log('Opening gramaje calculator. Modal element:', gramajeCalculatorModal); // DEBUG LOG
+                console.log('Modal classList before changes:', gramajeCalculatorModal ? gramajeCalculatorModal.classList : 'Modal not found'); // DEBUG LOG
                 gramajeCalculatorModal.removeAttribute('hidden');
                 gramajeCalculatorModal.classList.remove('hidden'); // Ensure Tailwind's hidden class is removed
                 gramajeCalculatorModal.classList.add('modal-active');
+                console.log('Modal classList after changes:', gramajeCalculatorModal ? gramajeCalculatorModal.classList : 'Modal not found'); // DEBUG LOG
                 calcProductName.value = productData.nombre;
                 calcProductId.value = productData.idProducto;
                 calcProductPricePerKilo.value = productData.precio_venta; // Assuming precio_venta is price per kilo for gramaje products
