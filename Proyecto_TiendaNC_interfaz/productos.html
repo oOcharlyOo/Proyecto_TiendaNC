@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="resources/style/output.css">
     <link rel="stylesheet" href="resources/style/estilos.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- QuaggaJS para lectura de códigos de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+
 </head>
 <body class="main-page-body">
 
@@ -68,9 +71,16 @@
             <form id="productForm" class="space-y-4">
                 <input type="hidden" id="productId">
 
-                <div class="form-group">
-                    <label for="codigoBarras">Código de Barras/PIN</label>
-                    <input type="text" id="codigoBarras">
+                <div class="form-group flex items-center space-x-2">
+                    <div class="flex-grow">
+                        <label for="codigoBarras">Código de Barras/PIN</label>
+                        <input type="text" id="codigoBarras">
+                    </div>
+                    <button type="button" id="startScannerProductoBtn" class="bg-blue-600 text-white p-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-150 shadow-md text-sm flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                    </button>
                 </div>
 
                 <div class="form-group">
@@ -130,3 +140,27 @@
             </form>
         </div>
     </div>
+
+    <!-- MODAL para Escáner de Productos -->
+    <div id="productScannerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center hidden" hidden>
+        <div class="relative p-4 sm:p-5 border w-full max-w-lg shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
+            <h3 class="text-lg font-bold text-primary mb-4">Escanear Código de Barras</h3>
+            <div id="interactive-product-scanner" class="viewport">
+                <div class="scanner-laser"></div>
+            </div>
+            <button id="stopProductScannerBtn" class="scanner-cancel-btn">
+                Cancelar Escaneo
+            </button>
+        </div>
+    </div>
+    
+    <!-- Feedback de Último Escaneo (para productos.js) -->
+    <div id="scanFeedbackProducto" class="fixed bottom-4 right-4 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 flex items-center gap-3 shadow-xl z-50 hidden">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+        <div>
+            <p class="font-bold">Código Detectado</p>
+            <p id="detectedIdProducto" class="text-sm opacity-90"></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -176,6 +176,80 @@
 
                 const ticketPanel = document.getElementById('ticketPanel'); // Nuevo: Referencia al panel principal del ticket
 
+                // NLP DOM elements
+                const nlpTextInput = document.getElementById('nlpTextInput');
+                const processNlpBtn = document.getElementById('processNlpBtn');
+                const startVoiceCommandBtn = document.getElementById('startVoiceCommandBtn'); // NEW
+
+                // --- SPEECH-TO-TEXT (VOICE COMMAND) LOGIC ---
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                let recognition;
+                let isRecognizing = false;
+
+                if (SpeechRecognition) {
+                    recognition = new SpeechRecognition();
+                    recognition.continuous = false; // Stop after a single, continuous utterance
+                    recognition.interimResults = false; // Only return final results
+                    recognition.lang = 'es-ES'; // Set language to Spanish
+
+                    recognition.onstart = () => {
+                        isRecognizing = true;
+                        startVoiceCommandBtn.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        `; // Pulsing mic icon
+                        startVoiceCommandBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                        startVoiceCommandBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+                        window.showToast({ message: 'Escuchando tu pedido...', type: 'info' });
+                    };
+
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        nlpTextInput.value = transcript;
+                        window.showToast({ message: `Comando por voz detectado: "${transcript}"`, type: 'info' });
+                        // Automatically process the NLP command after recognition
+                        processNlpOrder();
+                    };
+
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        window.showToast({ message: `Error en el reconocimiento de voz: ${event.error}`, type: 'error' });
+                        isRecognizing = false;
+                        resetVoiceCommandBtn();
+                    };
+
+                    recognition.onend = () => {
+                        isRecognizing = false;
+                        resetVoiceCommandBtn();
+                    };
+
+                    startVoiceCommandBtn.addEventListener('click', () => {
+                        if (isRecognizing) {
+                            recognition.stop();
+                        } else {
+                            // Clear previous input before starting new recognition
+                            nlpTextInput.value = ''; 
+                            recognition.start();
+                        }
+                    });
+
+                    function resetVoiceCommandBtn() {
+                        startVoiceCommandBtn.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        `; // Original mic icon
+                        startVoiceCommandBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                        startVoiceCommandBtn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                    }
+
+                } else {
+                    startVoiceCommandBtn.disabled = true;
+                    startVoiceCommandBtn.title = 'Reconocimiento de voz no soportado por este navegador.';
+                    window.showToast({ message: 'Tu navegador no soporta el reconocimiento de voz.', type: 'error' });
+                }
+
                 // Initialize Gramaje Calculator Modal DOM elements inside DOMContentLoaded
                 gramajeCalculatorModal = document.getElementById('gramajeCalculatorModal');
                 calcProductName = document.getElementById('calcProductName');
@@ -528,137 +602,454 @@
                 renderTicket();
             }
 
-            async function addProduct(code) {
-                console.log('addProduct called with code:', code); // DEBUG LOG
-                if (!code) return;
-                codigoProductoInput.disabled = true;
-                agregarProductoBtn.textContent = 'Buscando...';
-                try {
-                    let productData = null;
-                    let trimmedCode = String(code).trim();
+            async function addItemToTicketFromNlp(productData, commandData) {
+                console.log('Adding item from NLP:', productData, commandData);
 
-                    // 1. Intentar buscar por ID si es numérico
-                    if (!isNaN(trimmedCode)) {
-                        try {
-                            productData = await fetchApi(`/productos/buscarProductoPorId/${trimmedCode}`);
-                        } catch (e) {
-                            console.warn(`Producto no encontrado por ID: ${trimmedCode}, intentando por Código de Barras.`);
+                const productId = productData.idProducto;
+                const productName = productData.nombre;
+                const productStock = productData.stock;
+                const isGramajeProduct = productData.is_gramaje;
+
+                let quantityToAdd = 0;
+                let pricePerUnit = productData.precio_venta; // Default to retail price
+                let tipoPrecioAplicado = "VENTA";
+
+                if (commandData.tipo === "UNIDAD") {
+                    quantityToAdd = commandData.valor;
+                } else if (commandData.tipo === "PESO") {
+                    // For PESO, commandData.valor is the weight in grams
+                    if (!isGramajeProduct) {
+                        window.showToast({ message: `"${productName}" no es un producto por gramaje, pero se solicitó por peso. Añadiendo 1 unidad por defecto.`, type: 'warning' });
+                        quantityToAdd = 1; // Fallback to 1 unit if not grammage
+                    } else {
+                        quantityToAdd = commandData.valor; // quantity is in grams
+                        // Calculate price based on weight
+                        pricePerUnit = (productData.precio_venta / 1000); // Price per gram
+                        tipoPrecioAplicado = "VENTA_GRAMAJE";
+                    }
+                } else if (commandData.tipo === "PRECIO") {
+                    // For PRECIO, commandData.valor is the total price the user wants to spend
+                    if (!isGramajeProduct) {
+                        // If not grammage, try to add units based on price, fallback to 1 unit if difficult
+                        // This might be tricky without a clear "how many units for X price" logic
+                        window.showToast({ message: `"${productName}" no es un producto por gramaje y se solicitó por precio. Añadiendo 1 unidad por defecto.`, type: 'warning' });
+                        quantityToAdd = 1; // Fallback for non-grammage by price
+                    } else {
+                        // For grammage products, if user specifies total price, calculate grams
+                        const pricePerKilo = productData.precio_venta; // Assuming this is price per kilo
+                        if (pricePerKilo > 0) {
+                            quantityToAdd = (commandData.valor / pricePerKilo) * 1000; // Grams to add
+                            pricePerUnit = (productData.precio_venta / 1000); // Price per gram
+                            tipoPrecioAplicado = "VENTA_GRAMAJE";
+                        } else {
+                            window.showToast({ message: `No se pudo calcular gramaje para "${productName}" ya que su precio por kilo es 0. Añadiendo 1 unidad por defecto.`, type: 'warning' });
+                            quantityToAdd = 1;
                         }
                     }
+                }
 
-                    // 2. Si no se encontró por ID o no era numérico, intentar buscar por Código de Barras
-                    // Esto cubre casos donde un barcode es numérico pero no es un ID, o cuando el input no era numérico.
-                    if (!productData) {
-                        try {
-                            productData = await fetchApi(`/productos/buscarPorCodigoBarras/${trimmedCode}`);
-                        } catch (e) {
-                            console.warn(`Producto no encontrado por Código de Barras: ${trimmedCode}`);
-                        }
-                    }
-                    
-                    if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
+                if (quantityToAdd <= 0) {
+                    window.showToast({ message: `Cantidad inválida para "${productName}". No se añadió al ticket.`, type: 'error' });
+                    return;
+                }
+                
+                // Round grams to nearest whole number if it's a grammage product
+                if (isGramajeProduct) {
+                    quantityToAdd = Math.round(quantityToAdd);
+                }
 
-                    // Si el producto es por gramaje, abrir la calculadora especializada y no continuar.
-                    // La lógica de stock para gramaje se maneja en 'addGramajeProductToSale'.
-                    if (productData.is_gramaje) {
-                        console.log('Product is grammage. Calling openGramajeCalculator with:', productData); // DEBUG LOG
-                        openGramajeCalculator(productData);
+                // Check stock availability
+                if (isGramajeProduct && quantityToAdd > productStock) {
+                    showAlertModal('Inventario Insuficiente', `No se pueden agregar ${quantityToAdd}g de "${productName}". Solo hay ${productStock}g disponibles.`);
+                    return;
+                } else if (!isGramajeProduct && quantityToAdd > productStock) {
+                    showAlertModal('Inventario Insuficiente', `No se pueden agregar ${quantityToAdd} unidades de "${productName}". Solo hay ${productStock} disponibles.`);
+                    return;
+                }
+
+
+                if (!activeSaleId) {
+                    await createNewSale();
+                }
+
+                if (!activeSaleId) {
+                    window.showToast({ message: "No se pudo crear una nueva venta para añadir el producto.", type: 'error' });
+                    return;
+                }
+
+                const existingItemIndex = ticket.findIndex(item => item.idProducto === productId);
+
+                if (existingItemIndex !== -1) {
+                    // Product already in ticket, update quantity
+                    const existingItem = ticket[existingItemIndex];
+                    const newTotalQuantity = existingItem.cantidad + quantityToAdd;
+
+                    // Re-check stock with accumulated quantity
+                    if (isGramajeProduct && newTotalQuantity > productStock) {
+                        showAlertModal('Inventario Insuficiente', `No se pueden agregar ${newTotalQuantity}g de "${productName}". Solo hay ${productStock}g disponibles.`);
+                        return;
+                    } else if (!isGramajeProduct && newTotalQuantity > productStock) {
+                        showAlertModal('Inventario Insuficiente', `No se pueden agregar ${newTotalQuantity} unidades de "${productName}". Solo hay ${productStock} disponibles.`);
                         return;
                     }
-                    
-                    const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
 
-                    // Validar stock antes de continuar (SOLO PARA PRODUCTOS NO-GRAMAJE)
-                    if (existingItemIndex !== -1) {
-                        // El producto ya está en el ticket
-                        const itemInTicket = ticket[existingItemIndex];
-                        if (itemInTicket.cantidad + 1 > productData.stock) {
-                            showAlertModal('Inventario Insuficiente', `No se puede agregar más del stock disponible (${productData.stock}) para "${productData.nombre}".`);
-                            return;
+                    const updatedItem = {
+                        ...existingItem,
+                        cantidad: newTotalQuantity,
+                        // Ensure price is consistent if it's a grammage item and price was calculated
+                        precioUnitarioVenta: isGramajeProduct ? (productData.precio_venta / 1000) : existingItem.precioUnitarioVenta,
+                        tipoPrecioAplicado: tipoPrecioAplicado
+                    };
+                    await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', updatedItem);
+                    ticket[existingItemIndex] = updatedItem;
+                } else {
+                    // Add new item to ticket
+                    const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
+                    const detailPayload = {
+                        cantidad: quantityToAdd,
+                        precioUnitarioVenta: pricePerUnit,
+                        Venta: ventaData,
+                        Producto: productData,
+                        tipoPrecioAplicado: tipoPrecioAplicado
+                    };
+                    const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
+                    ticket.push({
+                        idProducto: productId,
+                        codigoBarras: productData.codigoBarras,
+                        nombreProducto: productName,
+                        cantidad: quantityToAdd,
+                        precioUnitarioVenta: pricePerUnit,
+                        existence: productStock,
+                        idVentaDetalle: newDetail.idVentaDetalle,
+                        Venta: ventaData,
+                        Producto: productData,
+                        isMayoreo: false // Default to false for NLP additions
+                    });
+                }
+                renderTicket();
+            }
+
+            async function addProduct(code) {
+
+                console.log('addProduct called with code:', code); // DEBUG LOG
+
+                if (!code) return;
+
+                codigoProductoInput.disabled = true;
+
+                            agregarProductoBtn.textContent = 'Buscando...';
+
+                            try {
+
+                                let productData = null;
+
+                                let trimmedCode = String(code).trim();
+
+            
+
+                                // 1. Intentar buscar por ID si es numérico
+
+                                if (!isNaN(trimmedCode)) {
+
+                                    try {
+
+                                        productData = await fetchApi(`/productos/buscarProductoPorId/${trimmedCode}`);
+
+                                    } catch (e) {
+
+                                        console.warn(`Producto no encontrado por ID: ${trimmedCode}, intentando por Código de Barras.`);
+
+                                    }
+
+                                }
+
+            
+
+                                // 2. Si no se encontró por ID o no era numérico, intentar buscar por Código de Barras
+
+                                // Esto cubre casos donde un barcode es numérico pero no es un ID, o cuando el input no era numérico.
+
+                                if (!productData) {
+
+                                    try {
+
+                                        productData = await fetchApi(`/productos/buscarPorCodigoBarras/${trimmedCode}`);
+
+                                    } catch (e) {
+
+                                        console.warn(`Producto no encontrado por Código de Barras: ${trimmedCode}`);
+
+                                    }
+
+                                }
+
+                                
+
+                                if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
+
+            
+
+                                // Si el producto es por gramaje, abrir la calculadora especializada y no continuar.
+
+                                // La lógica de stock para gramaje se maneja en 'addGramajeProductToSale'.
+
+                                if (productData.is_gramaje) {
+
+                                    console.log('Product is grammage. Calling openGramajeCalculator with:', productData); // DEBUG LOG
+
+                                    openGramajeCalculator(productData);
+
+                                    return;
+
+                                }
+
+                                
+
+                                const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
+
+            
+
+                                // Validar stock antes de continuar (SOLO PARA PRODUCTOS NO-GRAMAJE)
+
+                                if (existingItemIndex !== -1) {
+
+                                    // El producto ya está en el ticket
+
+                                    const itemInTicket = ticket[existingItemIndex];
+
+                                    if (itemInTicket.cantidad + 1 > productData.stock) {
+
+                                        showAlertModal('Inventario Insuficiente', `No se puede agregar más del stock disponible (${productData.stock}) para "${productData.nombre}".`);
+
+                                        return;
+
+                                    }
+
+                                } else {
+
+                                    // El producto es nuevo en el ticket
+
+                                    if (!productData.stock || productData.stock <= 0) {
+
+                                        showAlertModal('Producto Agotado', `El producto "${productData.nombre}" no tiene existencias en el inventario.`);
+
+                                        return;
+
+                                    }
+
+                                }
+
+            
+
+                                if (!activeSaleId) {
+
+                                    await createNewSale();
+
+                                }
+
+            
+
+                                if (!activeSaleId) throw new Error("No se pudo crear una nueva venta.");
+
+            
+
+                                // Si ya existe, actualiza la cantidad. Si no, agrégalo.
+
+                                if (existingItemIndex !== -1) {
+
+                                    await updateQuantity(existingItemIndex, 1);
+
+                                } else {
+
+                                    const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
+
+                                    const detailPayload = {
+
+                                        cantidad: 1,
+
+                                        precioUnitarioVenta: productData.precio_venta, // Default to retail
+
+                                        Venta: ventaData,
+
+                                        Producto: productData,
+
+                                        tipoPrecioAplicado: "VENTA" // Default to VENTA
+
+                                    };
+
+                                    const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
+
+                                    ticket.push({
+
+                                        idProducto: productData.idProducto,
+
+                                        codigoBarras: productData.codigoBarras,
+
+                                        nombreProducto: productData.nombre,
+
+                                        cantidad: 1,
+
+                                        precioUnitarioVenta: productData.precio_venta, // Default to retail
+
+                                        existence: productData.stock,
+
+                                        idVentaDetalle: newDetail.idVentaDetalle,
+
+                                        Venta: ventaData,
+
+                                        Producto: productData,
+
+                                        isMayoreo: false // Add flag
+
+                                    });
+
+                                    renderTicket();
+
+                                    playSuccessBeep(); // Play success beep
+
+                                }
+
+                            } catch (error) {
+
+                                window.showToast({ message: `Error: ${error.message}`, type: 'error' });
+
+                                playErrorBeep(); // Play error beep
+
+                            } finally {
+
+                                codigoProductoInput.value = '';
+
+                                codigoProductoInput.disabled = false;
+
+                                agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
+
+                                codigoProductoInput.focus();
+
+                            }
+
                         }
-                    } else {
-                        // El producto es nuevo en el ticket
-                        if (!productData.stock || productData.stock <= 0) {
-                            showAlertModal('Producto Agotado', `El producto "${productData.nombre}" no tiene existencias en el inventario.`);
-                            return;
+
+            
+
+            // Function to process natural language order using the new NLP endpoint
+            async function processNlpOrder() {
+                const naturalLanguageText = nlpTextInput.value.trim();
+
+                if (!naturalLanguageText) {
+                    window.showToast({ message: 'Por favor, introduce tu pedido en lenguaje natural o por voz.', type: 'info' });
+                    return;
+                }
+
+                processNlpBtn.disabled = true;
+                processNlpBtn.textContent = 'Procesando...';
+                window.showToast({ message: 'Enviando comando de voz al servidor...', type: 'info' });
+
+                try {
+                    const payload = {
+                        comando: naturalLanguageText
+                    };
+                    // Use the new API endpoint for NLP processing
+                    const responseData = await fetchApi('/ventas/comando-texto', 'POST', payload);
+
+                    if (responseData && responseData.length > 0) {
+                        let productsAddedCount = 0;
+                        for (const item of responseData) {
+                            // Ensure both product and command details are present
+                            if (item.producto && item.comando) {
+                                await addItemToTicketFromNlp(item.producto, item.comando);
+                                productsAddedCount++;
+                            } else {
+                                console.warn("Item skipped due to missing 'producto' or 'comando' data:", item);
+                            }
                         }
-                    }
+                        if (productsAddedCount > 0) {
+                            window.showToast({ message: `Se añadieron ${productsAddedCount} productos al ticket.`, type: 'success' });
+                            nlpTextInput.value = ''; // Clear input after successful processing
+                            playSuccessBeep();
+                        } else {
+                            window.showToast({ message: 'El comando fue procesado, pero no se pudieron añadir productos válidos.', type: 'error' });
+                            playErrorBeep();
+                        }
 
-                    if (!activeSaleId) {
-                        await createNewSale();
-                    }
-
-                    if (!activeSaleId) throw new Error("No se pudo crear una nueva venta.");
-
-                    // Si ya existe, actualiza la cantidad. Si no, agrégalo.
-                    if (existingItemIndex !== -1) {
-                        await updateQuantity(existingItemIndex, 1);
                     } else {
-                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
-                        const detailPayload = {
-                            cantidad: 1,
-                            precioUnitarioVenta: productData.precio_venta, // Default to retail
-                            Venta: ventaData,
-                            Producto: productData,
-                            tipoPrecioAplicado: "VENTA" // Default to VENTA
-                        };
-                        const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
-                        ticket.push({
-                            idProducto: productData.idProducto,
-                            codigoBarras: productData.codigoBarras,
-                            nombreProducto: productData.nombre,
-                            cantidad: 1,
-                            precioUnitarioVenta: productData.precio_venta, // Default to retail
-                            existence: productData.stock,
-                            idVentaDetalle: newDetail.idVentaDetalle,
-                            Venta: ventaData,
-                            Producto: productData,
-                            isMayoreo: false // Add flag
-                        });
-                        renderTicket();
-                        playSuccessBeep(); // Play success beep
+                        window.showToast({ message: 'No se pudieron interpretar productos del comando: "' + naturalLanguageText + '".', type: 'error' });
+                        playErrorBeep();
                     }
+
                 } catch (error) {
-                    window.showToast({ message: `Error: ${error.message}`, type: 'error' });
-                    playErrorBeep(); // Play error beep
+                    window.showToast({ message: `Error al procesar el comando: ${error.message}`, type: 'error' });
+                    playErrorBeep();
                 } finally {
-                    codigoProductoInput.value = '';
-                    codigoProductoInput.disabled = false;
-                    agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
-                    codigoProductoInput.focus();
+                    processNlpBtn.disabled = false;
+                    processNlpBtn.textContent = 'Procesar Pedido (IA)';
                 }
             }
 
-            async function removeProductFromTicket(index) {
-                const itemToRemove = ticket[index];
-                try {
-                    await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${itemToRemove.idVentaDetalle}`, 'DELETE');
-                    ticket.splice(index, 1); // Remove from local array
-                    renderTicket(); // Re-render the table
-                    window.showToast({ message: `Producto "${itemToRemove.nombreProducto}" eliminado del ticket.`, type: 'success' });
-                } catch (error) {
-                    window.showToast({ message: `Error al eliminar producto: ${error.message}`, type: 'error' });
-                }
-            }
+            
 
+            
 
-            async function createNewSale() {
-                try {
-                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, id: ID_CAJA, montoTotal: 0, estatus: 'P' }; // Add idCaja
-                    const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
-                    if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
-                    if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
-                    activeSaleId = createdSale.idVenta;
-                    ticket = [];
-                    ticketIdDisplay.textContent = createdSale.numeroTicket;
-                    renderTicket();
-                    window.showToast({ message: `Nueva venta #${createdSale.numeroTicket} iniciada.`, type: 'success' });
-                } catch (error) {
-                    ticketIdDisplay.textContent = 'ERROR';
-                    window.showToast({ message: `Error al crear nueva venta: ${error.message}`, type: 'error' });
-                    throw error;
-                }
-            }
+                        async function removeProductFromTicket(index) {
+
+                            const itemToRemove = ticket[index];
+
+                            try {
+
+                                await fetchApi(`/ventasDetalle/eliminarVentaDetalle/${itemToRemove.idVentaDetalle}`, 'DELETE');
+
+                                ticket.splice(index, 1); // Remove from local array
+
+                                renderTicket(); // Re-render the table
+
+                                window.showToast({ message: `Producto "${itemToRemove.nombreProducto}" eliminado del ticket.`, type: 'success' });
+
+                            } catch (error) {
+
+                                window.showToast({ message: `Error al eliminar producto: ${error.message}`, type: 'error' });
+
+                            }
+
+                        }
+
+            
+
+            
+
+                        async function createNewSale() {
+
+                            try {
+
+                                const newSaleData = { usuario: { idUsuario: ID_USUARIO }, id: ID_CAJA, montoTotal: 0, estatus: 'P' }; // Add idCaja
+
+                                const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
+
+                                if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
+
+                                if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
+
+                                activeSaleId = createdSale.idVenta;
+
+                                ticket = [];
+
+                                ticketIdDisplay.textContent = createdSale.numeroTicket;
+
+                                renderTicket();
+
+                                window.showToast({ message: `Nueva venta #${createdSale.numeroTicket} iniciada.`, type: 'success' });
+
+                            } catch (error) {
+
+                                ticketIdDisplay.textContent = 'ERROR';
+
+                                window.showToast({ message: `Error al crear nueva venta: ${error.message}`, type: 'error' });
+
+                                throw error;
+
+                            }
+
+                        }
+
+            
 
             async function initializeSale() {
                 ticketIdDisplay.textContent = 'Buscando...';
@@ -1363,6 +1754,9 @@
                 });
             });
             initializeSale(); // Call initializeSale here after everything is set up
+
+            // Event listener for NLP button
+            processNlpBtn.addEventListener('click', processNlpOrder);
 
             // --- BARCODE SCANNER LOGIC ---
             const startScannerBtn = document.getElementById('startScannerBtn');

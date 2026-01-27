@@ -96,6 +96,26 @@
                             </svg>
                         </button>
                     </div>
+                    <!-- NEW NLP Input Section -->
+                    <div class="flex flex-col sm:flex-row mt-4 space-y-2 sm:space-y-0 sm:space-x-2 items-end">
+                        <div class="relative flex-grow">
+                            <label for="nlpTextInput" class="block text-sm font-medium text-primary self-center" style="color: var(--neutral-800);">Pedido en Lenguaje Natural:</label>
+                            <textarea id="nlpTextInput" placeholder="Ej: 2 cafés, 1 croissant y 3 manzanas"
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
+                                rows="2"></textarea>
+                        </div>
+                        <button id="processNlpBtn"
+                            class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end">
+                            Procesar Pedido (IA)
+                        </button>
+                        <button id="startVoiceCommandBtn"
+                            class="bg-purple-600 text-white p-2 rounded-lg shadow-md hover:bg-purple-700 transition self-end"
+                            title="Comando por Voz">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="flex-grow flex flex-col overflow-hidden">
                     <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">

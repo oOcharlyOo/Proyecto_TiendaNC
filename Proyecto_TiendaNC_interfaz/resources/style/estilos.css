@@ -664,3 +664,45 @@ body {
 .rotate-180 {
     transform: rotate(180deg);
 }
+#interactive-product-scanner.viewport {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            background: #000;
+        }
+        #interactive-product-scanner.viewport video, #interactive-product-scanner.viewport canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .drawingBuffer {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* Línea guía del escáner */
+        .scanner-laser {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: rgba(255, 0, 0, 0.5);
+            box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.7);
+            z-index: 10;
+            transform: translateY(-50%);
+            animation: scan 2s infinite;
+        }
+        @keyframes scan {
+            0%, 100% { top: 30%; }
+            50% { top: 70%; }
+        }
+        .scanner-cancel-btn {
+            color: var(--zelda-red-text);
+            font-size: 1rem !important; /* text-base */
+            display: block !important;
+            margin: 1rem auto 0 auto;
+            padding: 0.5rem 1rem;
+        }

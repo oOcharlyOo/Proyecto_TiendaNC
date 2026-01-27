@@ -26,6 +26,14 @@
         const cantidadMinInput = document.getElementById('cantidadMin');
         const cantidadMaxInput = document.getElementById('cantidadMax');
         const isGramajeInput = document.getElementById('isGramaje'); // NEW: Gramaje checkbox
+
+        // Scanner DOM elements
+        const startScannerProductoBtn = document.getElementById('startScannerProductoBtn');
+        const productScannerModal = document.getElementById('productScannerModal');
+        const interactiveProductScanner = document.getElementById('interactive-product-scanner');
+        const stopProductScannerBtn = document.getElementById('stopProductScannerBtn');
+        const scanFeedbackProducto = document.getElementById('scanFeedbackProducto');
+        const detectedIdProducto = document.getElementById('detectedIdProducto');
         
         // Search Inputs
         const productSearchInput = document.getElementById('productSearchInput');
@@ -238,12 +246,16 @@
             productModal.removeAttribute('hidden');
             productModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
             productModal.classList.add('modal-active');
-            console.log('productModal after openModal: classes:', productModal.classList.value, 'hidden attribute:', productModal.hasAttribute('hidden'));
+            console.log('productModal initial hidden attribute:', productModal ? productModal.hasAttribute('hidden') : 'N/A');
             if (isEditing) {
                 deleteBtn.classList.remove('hidden'); // Show delete button for editing
             } else {
                 deleteBtn.classList.add('hidden'); // Hide delete button for new product
             }
+            // Pequeño retardo para asegurar que el modal es visible antes de intentar enfocar
+            setTimeout(() => {
+                codigoBarrasInput.focus();
+            }, 100);
         }
 
         function closeModal() {
@@ -458,10 +470,37 @@
                     // resetForm(); // No longer called here, as the modal opens via button click
 
 
-                    updateGramajeLabels(false); // Set initial state of labels
+                                updateGramajeLabels(false); // Set initial state of labels
 
 
-                });
+                            });
+
+
+                    
+
+
+                            // Event listener para prevenir el envío del formulario al presionar Enter en el campo de código de barras
+
+
+                            codigoBarrasInput.addEventListener('keydown', (e) => {
+
+
+                                if (e.key === 'Enter') {
+
+
+                                    e.preventDefault();
+
+
+                                    // Opcional: mover el foco al siguiente campo o realizar alguna otra acción
+
+
+                                    nombreProductoInput.focus(); 
+
+
+                                }
+
+
+                            });
 
 
         
@@ -495,6 +534,113 @@
 
 
                 });
+
+            // --- BARCODE SCANNER LOGIC FOR PRODUCTOS ---
+            let isProcessingScanProducto = false;
+
+            function processScannedCodeProducto(code) {
+                codigoBarrasInput.value = code; // Populate the product barcode input
+                
+                scanFeedbackProducto.classList.remove('hidden');
+                detectedIdProducto.innerText = `ID: ${code}`;
+    
+                setTimeout(() => scanFeedbackProducto.classList.add('hidden'), 3000);
+
+                stopScannerProducto(); // Stop scanner after successful scan
+                openModal(true); // Re-open the product form modal if it was hidden
+            }
+
+            function handleDetectionProducto(data) {
+                if (isProcessingScanProducto) return;
+
+                const code = data.codeResult.code;
+                if (code) {
+                    isProcessingScanProducto = true;
+                    // Play a sound if desired, similar to interfaz.js but adapted for this context
+                    // playSuccessBeep(); // If playSuccessBeep is available and desired here
+                    processScannedCodeProducto(code);
+                }
+            }
+
+            function stopScannerProducto() {
+                if (typeof Quagga !== 'undefined' && Quagga.initialized) { // Check if Quagga was initialized
+                    Quagga.stop();
+                    Quagga.initialized = false; // Reset flag
+                }
+                productScannerModal.classList.remove('modal-active');
+                productScannerModal.classList.add('hidden');
+                productScannerModal.setAttribute('hidden', '');
+                productScannerModal.style.display = ''; // Reset display style
+                isProcessingScanProducto = false;
+                // Re-show the product form modal
+                productModal.removeAttribute('hidden');
+                productModal.classList.remove('hidden');
+                productModal.classList.add('modal-active');
+            }
+
+            function startScannerProducto() {
+                isProcessingScanProducto = false; // Reset flag on new scan session
+                
+                // Show the scanner modal
+                productScannerModal.removeAttribute('hidden');
+                productScannerModal.classList.remove('hidden');
+                productScannerModal.classList.add('modal-active');
+                productScannerModal.style.display = 'flex'; // Explicitly set display to flex
+
+
+                // Hide the product form modal while scanner is active
+                productModal.classList.remove('modal-active');
+                productModal.classList.add('hidden');
+                productModal.setAttribute('hidden', '');
+    
+                if (typeof Quagga === 'undefined') {
+                    alert("La librería QuaggaJS no está cargada. Asegúrate de que el CDN está incluido.");
+                    stopScannerProducto();
+                    return;
+                }
+
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: interactiveProductScanner, // Target the specific scanner container for products
+                        constraints: {
+                            facingMode: "environment" // Use back camera
+                        },
+                    },
+                    decoder: {
+                        readers: [
+                            "code_128_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_39_reader",
+                            "upc_reader"
+                        ]
+                    }
+                }, function(err) {
+                    if (err) {
+                        console.error(err);
+                        alert("Error al iniciar la cámara. Asegúrate de dar permisos y que no esté en uso por otra aplicación.");
+                        stopScannerProducto(); // Ensure UI is cleaned up if it fails
+                        return;
+                    }
+                    Quagga.start();
+                    // Mark Quagga as initialized to prevent stopping an uninitialized scanner
+                    Quagga.initialized = true; 
+                });
+    
+                Quagga.onDetected(handleDetectionProducto);
+            }
+
+            // Event Listeners for the scanner buttons
+            startScannerProductoBtn.addEventListener('click', () => {
+                // Before starting scanner, ensure product modal is hidden
+                productModal.classList.remove('modal-active');
+                productModal.classList.add('hidden');
+                productModal.setAttribute('hidden', '');
+                startScannerProducto();
+            });
+            stopProductScannerBtn.addEventListener('click', stopScannerProducto);
 
 
         
