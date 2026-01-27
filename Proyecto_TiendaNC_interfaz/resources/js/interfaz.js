@@ -76,7 +76,6 @@
                     }
 
                     const jsonResponse = await response.json(); // Parse the JSON response
-                    //console.log('API Parsed JSON:', jsonResponse); // Log the parsed JSON
 
                     // Check for the backend's APIResponse structure
                     if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
@@ -152,10 +151,12 @@
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
-                console.log('DOMContentLoaded event fired in interfaz.js');
+                console.log('DOMContentLoaded fired!'); // DEBUG LOG
                 const codigoProductoInput = document.getElementById('codigoProducto');
+                console.log('codigoProductoInput:', codigoProductoInput); // DEBUG LOG
                 const ventaMayoreoCheckbox = document.getElementById('ventaMayoreoCheckbox'); // NEW
                 const agregarProductoBtn = document.getElementById('agregarProductoBtn');
+                console.log('agregarProductoBtn:', agregarProductoBtn); // DEBUG LOG
                 const ticketItemsTableBody = document.getElementById('ticketItems');
                 const ticketIdDisplay = document.getElementById('ticketIdDisplay');
                 const subtotalDisplay = document.getElementById('subtotalDisplay');
@@ -215,15 +216,156 @@
                     alertModalTitle.textContent = title;
                     alertModalMessage.textContent = message;
                     alertModal.removeAttribute('hidden');
+                    alertModal.classList.remove('hidden');
                     alertModal.classList.add('modal-active');
                 }
 
                 function closeAlertModal() {
                     alertModal.classList.remove('modal-active');
                     alertModal.setAttribute('hidden', '');
+                    alertModal.classList.add('hidden');
                 }
 
                 alertModalCloseBtn.addEventListener('click', closeAlertModal);
+
+                // --- Cash In/Out Modals DOM Elements ---
+                const abrirModalEntradaBtn = document.getElementById('abrirModalEntradaBtn');
+                const abrirModalSalidaBtn = document.getElementById('abrirModalSalidaBtn');
+                const cashInModal = document.getElementById('cashInModal');
+                const cancelCashInBtn = document.getElementById('cancelCashInBtn');
+                const cashInForm = document.getElementById('cashInForm');
+                const cashInAmount = document.getElementById('cashInAmount');
+                const cashInDescription = document.getElementById('cashInDescription');
+                const cashInUserId = document.getElementById('cashInUserId'); // Hidden input for user ID
+
+                const cashOutModal = document.getElementById('cashOutModal');
+                const cancelCashOutBtn = document.getElementById('cancelCashOutBtn');
+                const cashOutForm = document.getElementById('cashOutForm');
+                const cashOutAmount = document.getElementById('cashOutAmount');
+                const cashOutDescription = document.getElementById('cashOutDescription');
+                const cashOutUserId = document.getElementById('cashOutUserId'); // Hidden input for user ID
+
+                // --- Cash In/Out Modals Functions ---
+                function openCashInModal() {
+                    cashInModal.removeAttribute('hidden');
+                    cashInModal.classList.remove('hidden');
+                    cashInModal.classList.add('modal-active');
+                    cashInModal.style.setProperty('display', 'flex', 'important'); // As hinted by user
+                    cashInAmount.focus();
+                }
+
+                function closeCashInModal() {
+                    cashInModal.classList.remove('modal-active');
+                    cashInModal.classList.add('hidden');
+                    cashInModal.setAttribute('hidden', '');
+                    cashInModal.style.display = ''; // Reset display style
+                    cashInForm.reset(); // Clear form fields
+                }
+
+                function openCashOutModal() {
+                    cashOutModal.removeAttribute('hidden');
+                    cashOutModal.classList.remove('hidden');
+                    cashOutModal.classList.add('modal-active');
+                    cashOutModal.style.setProperty('display', 'flex', 'important'); // As hinted by user
+                    cashOutAmount.focus();
+                }
+
+                function closeCashOutModal() {
+                    cashOutModal.classList.remove('modal-active');
+                    cashOutModal.classList.add('hidden');
+                    cashOutModal.setAttribute('hidden', '');
+                    cashOutModal.style.display = ''; // Reset display style
+                    cashOutForm.reset(); // Clear form fields
+                }
+
+                // --- Event Listeners for Cash In/Out Modals ---
+                abrirModalEntradaBtn.addEventListener('click', openCashInModal);
+                cancelCashInBtn.addEventListener('click', closeCashInModal);
+
+                abrirModalSalidaBtn.addEventListener('click', openCashOutModal);
+                cancelCashOutBtn.addEventListener('click', closeCashOutModal);
+
+                // --- Form Submission Handlers ---
+                cashInForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const montoEoS = parseFloat(cashInAmount.value);
+                    const descripcion = cashInDescription.value;
+                    const idUsuario = parseInt(cashInUserId.value); // Get from hidden input
+
+                    if (isNaN(montoEoS) || montoEoS <= 0) {
+                        showAlertModal('Error', 'Por favor, ingrese un monto válido para la entrada de efectivo.');
+                        return;
+                    }
+
+                    // Placeholder for montoInicial. This should ideally be fetched dynamically.
+                    // For now, using 0 as a placeholder as per user's prompt example (montoInicial: 500)
+                    // The API example uses montoInicial as a value, but it's unclear if it's the current balance or a starting point.
+                    // Assuming the backend will handle current balance. If not, this needs to be fetched.
+                    const montoInicial = 0; 
+
+                    try {
+                        const payload = {
+                            montoInicial: montoInicial,
+                            montoEoS: montoEoS,
+                            descripcion: descripcion,
+                            usuario: { // Construct user object as per API example
+                                idUsuario: ID_USUARIO, // Use ID_USUARIO from the existing context
+                                nombre: activeUser.nombre,
+                                apellido_p: activeUser.apellido_p,
+                                apellido_m: activeUser.apellido_m,
+                                password_hash: activeUser.password_hash, // May not be needed, but including for consistency with example
+                                id_tipo_usuario: activeUser.id_tipo_usuario
+                            }
+                        };
+                        const response = await fetchApi('/caja/entrada', 'POST', payload);
+                        if (response) {
+                            window.showToast({ message: 'Entrada de efectivo registrada con éxito.', type: 'success' });
+                            closeCashInModal();
+                            // Optionally, refresh any cash balance display if available
+                        }
+                    } catch (error) {
+                        showAlertModal('Error al Registrar Entrada', error.message);
+                    }
+                });
+
+                cashOutForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const montoEoS = parseFloat(cashOutAmount.value);
+                    const descripcion = cashOutDescription.value;
+                    const idUsuario = parseInt(cashOutUserId.value); // Get from hidden input
+
+                    if (isNaN(montoEoS) || montoEoS <= 0) {
+                        showAlertModal('Error', 'Por favor, ingrese un monto válido para la salida de efectivo.');
+                        return;
+                    }
+
+                    // Placeholder for montoInicial. This should ideally be fetched dynamically.
+                    const montoInicial = 0;
+
+                    try {
+                        const payload = {
+                            montoInicial: montoInicial,
+                            montoEoS: montoEoS,
+                            descripcion: descripcion,
+                            usuario: { // Construct user object as per API example
+                                idUsuario: ID_USUARIO, // Use ID_USUARIO from the existing context
+                                nombre: activeUser.nombre,
+                                apellido_p: activeUser.apellido_p,
+                                apellido_m: activeUser.apellido_m,
+                                password_hash: activeUser.password_hash,
+                                id_tipo_usuario: activeUser.id_tipo_usuario
+                            }
+                        };
+                        const response = await fetchApi('/caja/salida', 'POST', payload);
+                        if (response) {
+                            window.showToast({ message: 'Salida de efectivo registrada con éxito.', type: 'success' });
+                            closeCashOutModal();
+                            // Optionally, refresh any cash balance display if available
+                        }
+                    } catch (error) {
+                        showAlertModal('Error al Registrar Salida', error.message);
+                    }
+                });
 
                 // --- Sale Details Modal Functions ---
                 function closeSaleDetailsModal() {
@@ -293,49 +435,75 @@
 
 
             function renderTicket() {
-                // Update table header for new column
-                const tableHeader = document.querySelector('#ticketTable thead tr');
-                tableHeader.innerHTML = `
-                    <th class="p-2 w-[8%] encabezado-ticket-th">Código</th>
-                    <th class="p-2 w-[35%] whitespace-normal break-words encabezado-ticket-th">Descripción</th>
-                    <th class="p-2 w-[10%] text-right encabezado-ticket-th">Precio</th>
-                    <th class="p-2 w-[8%] text-center encabezado-ticket-th">Mayoreo</th>
-                    <th class="p-2 w-[12%] text-center encabezado-ticket-th">Cantidad</th>
-                    <th class="p-2 w-[15%] text-right encabezado-ticket-th">Importe</th>
-                    <th class="p-2 w-[12%] text-center encabezado-ticket-th">Eliminar</th> <!-- New column -->
-                `;
+                const ticketItemsContainer = document.getElementById('ticketItems');
+                ticketItemsContainer.innerHTML = ''; // Clear previous items
 
-                ticketItemsTableBody.innerHTML = '';
                 if (ticket.length === 0) {
-                    ticketItemsTableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-gray-500">No hay productos</td></tr>`;
+                    ticketItemsContainer.innerHTML = `<div class="text-center p-8 text-gray-500">No hay productos en el ticket</div>`;
                     ticketPanel.classList.remove('has-products-bg');
                 } else {
                     ticket.forEach((item, index) => {
-                        const row = document.createElement('tr');
-                        row.className = 'border-b encabezado-zelda-text';
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'ticket-item block p-3 md:grid md:grid-cols-12 md:gap-x-4 md:items-center';
+                        itemElement.dataset.id = item.idProducto;
+
+                        const importe = (item.precioUnitarioVenta || 0) * item.cantidad;
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
-                        row.innerHTML = `
-                            <td class="p-2">${item.codigoBarras || item.idProducto}</td>
-                            <td class="p-2 whitespace-normal break-words">${item.nombreProducto || 'Cargando...'}</td>
-                            <td class="p-2 text-right">$${(item.precioUnitarioVenta || 0).toFixed(2)}</td>
-                            <td class="p-2 text-center">
-                                <input type="checkbox" class="mayoreo-checkbox h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
-                            </td>
-                            <td class="p-2 text-center">
-                                <button class="qty-btn btn-qty-minus" data-index="${index}">-</button>
-                                <span class="mx-1 sm:mx-2">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
-                                <button class="qty-btn btn-qty-plus" data-index="${index}">+</button>
-                            </td>
-                            <td class="p-2 text-right importe-green">$${((item.precioUnitarioVenta || 0) * item.cantidad).toFixed(2)}</td>
-                            <td class="p-2 text-center"> <!-- New column -->
-                                <button class="btn-delete-item p-1 rounded-full hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" data-index="${index}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </td>
+
+                        itemElement.innerHTML = `
+                            <!-- Mobile View -->
+                            <div class="md:hidden">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="ticket-product-name-zelda text-base break-words">${item.nombreProducto}</p>
+                                        <p class="text-sm text-gray-600">Cód: <span class="ticket-barcode-zelda">${item.codigoBarras || item.idProducto}</span></p>
+                                    </div>
+                                    <p class="ticket-product-name-zelda-price text-lg font-semibold ml-2">$${importe.toFixed(2)}</p>
+                                </div>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <div class="flex items-center">
+                                        <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
+                                        <span class="px-3 font-bold text-xl ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                        <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        <div class="flex items-center ${hasValidMayoreo ? '' : 'hidden'}">
+                                            <input type="checkbox" id="mayoreo-check-mob-${index}" class="mayoreo-checkbox round-checkbox" data-index="${index}" ${item.isMayoreo ? 'checked' : ''}>
+                                            <label for="mayoreo-check-mob-${index}" class="ml-2 text-sm font-medium zelda-label-text">Mayoreo</label>
+                                        </div>
+                                        <button class="btn-delete-item p-2 rounded-full hover:bg-red-100" data-index="${index}" title="Eliminar Producto">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Desktop View -->
+                            <div class="hidden md:contents">
+                                <div class="col-span-2 text-sm truncate ticket-barcode-zelda">${item.codigoBarras || item.idProducto}</div>
+                                <div class="col-span-3 ticket-product-name-zelda text-sm truncate">${item.nombreProducto}</div>
+                                <div class="col-span-2 text-right text-sm ticket-product-name-zelda-price">$${(item.precioUnitarioVenta || 0).toFixed(2)}</div>
+                                <div class="col-span-1 text-center">
+                                    <input type="checkbox" id="mayoreo-check-desk-${index}" class="mayoreo-checkbox round-checkbox mx-auto" data-index="${index}" ${item.isMayoreo ? 'checked' : ''} ${hasValidMayoreo ? '' : 'disabled'}>
+                                </div>
+                                <div class="col-span-2 text-center flex items-center justify-center">
+                                    <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
+                                    <span class="px-3 font-bold text-base ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                    <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
+                                </div>
+                                <div class="col-span-1 text-right font-semibold ticket-product-name-zelda-price">$${importe.toFixed(2)}</div>
+                                <div class="col-span-1 text-center">
+                                    <button class="btn-delete-item p-1 rounded-full hover:bg-red-100" data-index="${index}" title="Eliminar Producto">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
                         `;
-                        ticketItemsTableBody.appendChild(row);
+                        ticketItemsContainer.appendChild(itemElement);
                     });
                     ticketPanel.classList.add('has-products-bg');
                 }
@@ -361,6 +529,7 @@
             }
 
             async function addProduct(code) {
+                console.log('addProduct called with code:', code); // DEBUG LOG
                 if (!code) return;
                 codigoProductoInput.disabled = true;
                 agregarProductoBtn.textContent = 'Buscando...';
@@ -388,28 +557,31 @@
                     }
                     
                     if (!productData || !productData.idProducto) throw new Error("Producto no encontrado.");
+
+                    // Si el producto es por gramaje, abrir la calculadora especializada y no continuar.
+                    // La lógica de stock para gramaje se maneja en 'addGramajeProductToSale'.
+                    if (productData.is_gramaje) {
+                        console.log('Product is grammage. Calling openGramajeCalculator with:', productData); // DEBUG LOG
+                        openGramajeCalculator(productData);
+                        return;
+                    }
                     
                     const existingItemIndex = ticket.findIndex(item => item.idProducto === productData.idProducto);
 
-                    // Validar stock antes de continuar
+                    // Validar stock antes de continuar (SOLO PARA PRODUCTOS NO-GRAMAJE)
                     if (existingItemIndex !== -1) {
                         // El producto ya está en el ticket
                         const itemInTicket = ticket[existingItemIndex];
                         if (itemInTicket.cantidad + 1 > productData.stock) {
-                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productData.nombre}".`);
+                            showAlertModal('Inventario Insuficiente', `No se puede agregar más del stock disponible (${productData.stock}) para "${productData.nombre}".`);
                             return;
                         }
                     } else {
                         // El producto es nuevo en el ticket
                         if (!productData.stock || productData.stock <= 0) {
-                            showAlertModal('Producto sin Existencias', `El producto "${productData.nombre}" no tiene existencias.`);
+                            showAlertModal('Producto Agotado', `El producto "${productData.nombre}" no tiene existencias en el inventario.`);
                             return;
                         }
-                    }
-
-                    if (productData.is_gramaje) {
-                        openGramajeCalculator(productData);
-                        return;
                     }
 
                     if (!activeSaleId) {
@@ -579,7 +751,7 @@
                 if (source === 'grams') {
                     if (!isNaN(grams) && !isNaN(pricePerKilo) && grams >= 0) {
                         totalPrice = (grams / 1000) * pricePerKilo;
-                        precioTotal.value = totalPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        precioTotal.value = totalPrice.toFixed(2);
                     } else {
                         precioTotal.value = '';
                     }
@@ -607,9 +779,13 @@
             }
 
             function openGramajeCalculator(productData) {
+                console.log('Opening gramaje calculator. Modal element:', gramajeCalculatorModal); // DEBUG LOG
+                console.log('Modal classList before changes:', gramajeCalculatorModal ? gramajeCalculatorModal.classList : 'Modal not found'); // DEBUG LOG
                 gramajeCalculatorModal.removeAttribute('hidden');
+                gramajeCalculatorModal.classList.remove('hidden'); // Ensure Tailwind's hidden class is removed
                 gramajeCalculatorModal.classList.add('modal-active');
-                calcProductName.textContent = productData.nombre;
+                console.log('Modal classList after changes:', gramajeCalculatorModal ? gramajeCalculatorModal.classList : 'Modal not found'); // DEBUG LOG
+                calcProductName.value = productData.nombre;
                 calcProductId.value = productData.idProducto;
                 calcProductPricePerKilo.value = productData.precio_venta; // Assuming precio_venta is price per kilo for gramaje products
                 precioBase.value = productData.precio_venta; // Set the editable base price
@@ -620,6 +796,7 @@
             function closeGramajeCalculator() {
                 gramajeCalculatorModal.classList.remove('modal-active');
                 gramajeCalculatorModal.setAttribute('hidden', '');
+                gramajeCalculatorModal.classList.add('hidden'); // Ensure Tailwind's hidden class is added back
                 resetGramajeCalculator();
             }
 
@@ -847,13 +1024,16 @@
             confirmPaymentBtn.addEventListener('click', handlePayment);
             confirmPaymentSpeiBtn.addEventListener('click', handleTransferPayment);
             amountPaid.addEventListener('input', calculateChange);
-            ticketItemsTableBody.addEventListener('click', async e => {
+            ticketItems.addEventListener('click', async e => {
                 const target = e.target;
-                if (target.classList.contains('btn-qty-plus')) await updateQuantity(target.dataset.index, 1);
-                else if (target.classList.contains('btn-qty-minus')) await updateQuantity(target.dataset.index, -1);
-                else if (target.classList.contains('mayoreo-checkbox')) handleMayoreoToggle(e);
-                else if (target.closest('.btn-delete-item')) { // New condition for delete button
-                    const index = target.closest('.btn-delete-item').dataset.index;
+                const index = target.closest('[data-index]')?.dataset.index;
+
+                if (index === undefined) return;
+
+                if (target.closest('.btn-qty-plus')) await updateQuantity(index, 1);
+                else if (target.closest('.btn-qty-minus')) await updateQuantity(index, -1);
+                else if (target.closest('.mayoreo-checkbox')) handleMayoreoToggle(e);
+                else if (target.closest('.btn-delete-item')) {
                     await removeProductFromTicket(index);
                 }
             });
@@ -865,11 +1045,9 @@
 
                             // --- Lógica para la Modal de Historial de Ventas ---
                             const historialModal = document.getElementById('historialVentasModal');
-                            console.log('historialModal element:', historialModal);
                             const verHistorialBtn = document.getElementById('verHistorialBtn');
-                            console.log('verHistorialBtn element:', verHistorialBtn);
                             const cerrarHistorialModalBtn = document.getElementById('cerrarHistorialModalBtn');
-                            console.log('cerrarHistorialModalBtn element:', cerrarHistorialModalBtn);            const historialVentasBody = document.getElementById('historialVentasBody');
+                            const historialVentasBody = document.getElementById('historialVentasBody');
             const historialCobroTotalEl = document.getElementById('historialCobroTotal');
             const historialGananciaTotalEl = document.getElementById('historialGananciaTotal');
 
@@ -882,14 +1060,11 @@
             }
 
             async function cargarHistorialVentas() {
-                console.log('cargarHistorialVentas() started.');
                 const today = getTodayDate();
-                historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Cargando...</td></tr>';
-                console.log('Fetching sales data for today:', today);
+                historialVentasBody.innerHTML = '<div class="text-center p-4">Cargando...</div>';
 
                 try {
                     const data = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
-                    console.log('Sales data fetched:', data);
                     
                     historialCobroTotalEl.textContent = `$${(data.cobroTotal || 0).toFixed(2)}`;
                     historialGananciaTotalEl.textContent = `$${(data.gananciaTotal || 0).toFixed(2)}`;
@@ -911,10 +1086,10 @@
 
                         historialVentasBody.innerHTML = '';
                         data.ventas.forEach((venta, index) => {
-                            const row = document.createElement('tr');
-                            row.className = 'border-b cursor-pointer hover:bg-gray-700 hover:text-white hover:scale-[1.01] hover:shadow-lg'; // Make row clickable and darken on hover
-                            row.dataset.id = venta.idVenta; // Store sale ID for details modal
-                            row.dataset.enumeratedTicket = index + 1; // Store enumerated ticket number
+                            const saleItem = document.createElement('div');
+                            saleItem.className = 'sale-history-item block p-4 md:grid md:grid-cols-6 md:gap-x-4 md:items-center hover:bg-gray-700 hover:text-white transition-colors duration-150 cursor-pointer';
+                            saleItem.dataset.id = venta.idVenta;
+                            saleItem.dataset.enumeratedTicket = index + 1;
                             
                             // Determine status text and class based on new definitions
                             let statusText;
@@ -924,7 +1099,7 @@
                                 statusClass = 'bg-green-200 text-green-800';
                             } else if (venta.estatus === 'C') {
                                 statusText = 'Completada';
-                                statusClass = 'bg-blue-200 text-blue-800'; // Using blue for 'Completada'
+                                statusClass = 'bg-blue-200 text-blue-800';
                             } else if (venta.estatus === 'I') {
                                 statusText = 'Inactiva/Cancelada';
                                 statusClass = 'bg-red-200 text-danger';
@@ -936,36 +1111,54 @@
                             // Only Finalizada or Completada sales can be cancelled
                             const canBeCancelled = venta.estatus === 'F' || venta.estatus === 'C';
                             
-                            row.innerHTML = `
-                                <td class="text-center">${index + 1}</td>
-                                <td class="text-center">$${venta.montoTotal.toFixed(2)}</td>
-                                <td class="text-center">${venta.metodoPago}</td>
-                                <td class="text-center">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
-                                        ${statusText}
-                                    </span>
-                                </td>
-                                <td class="text-center">${new Date(venta.fechaVenta).toLocaleTimeString()}</td>
-                                <td class="text-center">
-                                    <button 
-                                        class="btn-cancelar-venta p-1 rounded-full w-8 h-8 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" 
-                                        style="border-radius: 50%;"
-                                        data-id="${venta.idVenta}" 
-                                        title="Cancelar Venta"
-                                        ${canBeCancelled ? '' : 'disabled'}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </td>
+                            saleItem.innerHTML = `
+                                <!-- Mobile View -->
+                                <div class="md:hidden">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <p class="font-bold text-lg">Ticket #${index + 1}</p>
+                                            <p class="text-sm text-gray-400">${new Date(venta.fechaVenta).toLocaleTimeString()}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-lg font-semibold ticket-barcode-zelda">$${venta.montoTotal.toFixed(2)}</p>
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 flex justify-between items-center">
+                                        <p class="text-sm text-gray-400">Pagado con: <span class="font-semibold">${venta.metodoPago}</span></p>
+                                        <button class="btn-cancelar-venta p-2 rounded-full w-10 h-10 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" style="border-radius: 50%;" data-id="${venta.idVenta}" title="Cancelar Venta" ${canBeCancelled ? '' : 'disabled'}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Desktop View -->
+                                <div class="hidden md:contents">
+                                    <div class="col-span-1 text-center font-semibold ticket-product-name-zelda">${index + 1}</div>
+                                    <div class="col-span-1 text-center font-bold ticket-product-name-zelda-price">$${venta.montoTotal.toFixed(2)}</div>
+                                    <div class="col-span-1 text-center zelda-label-text">${venta.metodoPago}</div>
+                                    <div class="col-span-1 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                                    </div>
+                                    <div class="col-span-1 text-center zelda-label-text">${new Date(venta.fechaVenta).toLocaleTimeString()}</div>
+                                    <div class="col-span-1 text-center">
+                                        <button class="btn-cancelar-venta p-1 rounded-full w-8 h-8 shadow-md hover:bg-danger-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger disabled:opacity-50 disabled:cursor-not-allowed" style="border-radius: 50%;" data-id="${venta.idVenta}" title="Cancelar Venta" ${canBeCancelled ? '' : 'disabled'}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             `;
-                            historialVentasBody.appendChild(row);
+                            historialVentasBody.appendChild(saleItem);
                         });
                     } else {
-                        historialVentasBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">No se encontraron ventas para hoy.</td></tr>';
+                        historialVentasBody.innerHTML = '<div class="text-center p-4">No se encontraron ventas para hoy.</div>';
                     }
                 } catch (error) {
-                    historialVentasBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500">Error al cargar el historial: ${error.message}</td></tr>`;
+                    historialVentasBody.innerHTML = `<div class="text-center p-4 text-red-500">Error al cargar el historial: ${error.message}</div>`;
                     window.showToast({ message: `Error al cargar el historial: ${error.message}`, type: 'error' });
                 }
             } // Closes cargarHistorialVentas function
@@ -1003,7 +1196,7 @@
             // Event listener for clicks within the sales history body (delegation)
             historialVentasBody.addEventListener('click', (e) => {
                 const clickedElement = e.target;
-                const targetRow = clickedElement.closest('tr[data-id]');
+                const targetRow = clickedElement.closest('.sale-history-item');
 
                 if (clickedElement.closest('.btn-cancelar-venta')) {
                     handleCancelarVenta(e); // Let the existing handler manage the button click
@@ -1033,23 +1226,18 @@
             // Add event listener for "Ver Historial" button
             if (verHistorialBtn) { // Defensive check
                 verHistorialBtn.addEventListener('click', () => {
-                    console.log('verHistorialBtn clicked.');
                     historialModal.removeAttribute('hidden');
                     historialModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
                     historialModal.classList.add('modal-active');
-                    console.log('historialModal after showing: hidden attribute and hidden class removed, modal-active class added. Current classes:', historialModal.classList.value);
                     cargarHistorialVentas();
-                    console.log('cargarHistorialVentas() called.');
                 });
             }
 
             if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
                 cerrarHistorialModalBtn.addEventListener('click', () => {
-                    console.log('cerrarHistorialModalBtn clicked.');
                     historialModal.classList.remove('modal-active');
                     historialModal.classList.add('hidden'); // Also add Tailwind's hidden class back
                     historialModal.setAttribute('hidden', '');
-                    console.log('historialModal after hiding: modal-active class removed, hidden attribute and hidden class added. Current classes:', historialModal.classList.value);
                 });
             }
 
@@ -1057,7 +1245,7 @@
 
 
             async function addGramajeProductToSale() {
-                const productId = calcProductId.value;
+                const productId = parseInt(calcProductId.value);
                 const productName = calcProductName.value;
                 let grams = parseFloat(gramajeInput.value); // New ID
                 let totalPrice = parseFloat(precioTotal.value); // Read from .value now
@@ -1076,7 +1264,7 @@
                 totalPrice = parseFloat(totalPrice.toFixed(2)); // Ensure consistent precision
 
                 if (grams > stockAvailable) {
-                    showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Disponible: ${stockAvailable} gramos.`);
+                    showAlertModal('Inventario Insuficiente', `No se pueden agregar ${grams}g de "${productName}". Solo hay ${stockAvailable}g disponibles.`);
                     return;
                 }
 
@@ -1098,7 +1286,7 @@
                         const newTotalGrams = existingItem.cantidad + grams; // Assuming cantidad for gramaje product is in grams
 
                         if (newTotalGrams > stockAvailable) {
-                            showAlertModal('Stock Insuficiente', `Stock insuficiente para "${productName}". Al intentar agregar ${grams}g, excedería el stock total. Disponible: ${stockAvailable} gramos.`);
+                            showAlertModal('Inventario Insuficiente', `No se puede exceder el stock disponible (${stockAvailable}g) para "${productName}".`);
                             return;
                         }
 
@@ -1109,13 +1297,11 @@
                             // Use the currentPricePerKilo from the modal for calculation, not the average
                             precioUnitarioVenta: totalPrice / grams, // This is price per gram based on current modal calculation
                         };
-                        await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', {
-                            cantidad: updatedItem.cantidad,
-                            precioUnitarioVenta: updatedItem.precioUnitarioVenta,
-                        });
+                        await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', updatedItem);
                         ticket[existingItemIndex] = updatedItem;
                     } else {
                         // Add as new item
+                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
                         const productData = {
                             idProducto: productId,
                             nombre: productName,
@@ -1123,13 +1309,12 @@
                             stock: stockAvailable,
                             is_gramaje: true
                         };
-                        const ventaData = await fetchApi(`/ventas/obtenerVentaPorId/${activeSaleId}`);
                         const detailPayload = {
-                            cantidad: grams, // Quantity is in grams
-                            precioUnitarioVenta: totalPrice / grams, // Price per gram
+                            cantidad: grams,
+                            precioUnitarioVenta: totalPrice / grams,
                             Venta: ventaData,
                             Producto: productData,
-                            tipoPrecioAplicado: "VENTA_GRAMAJE" // New type for gramaje sales
+                            tipoPrecioAplicado: "VENTA_GRAMAJE"
                         };
                         const newDetail = await fetchApi('/ventasDetalle/agregarVentaDetalle', 'POST', detailPayload);
                         ticket.push({
@@ -1139,7 +1324,7 @@
                             precioUnitarioVenta: totalPrice / grams,
                             existence: stockAvailable,
                             idVentaDetalle: newDetail.idVentaDetalle,
-                            Venta: ventaData,
+                            Venta: ventaData, // Use a minimal Venta object for the local ticket array
                             Producto: productData,
                             isMayoreo: false // Gramaje products typically don't have mayoreo in the same way
                         });

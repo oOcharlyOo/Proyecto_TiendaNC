@@ -20,34 +20,37 @@
             
             <div class="p-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0">Catálogo de Productos</h2>
-                <button id="addOrEditProductBtn" 
-                        class="bg-green-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-150 shadow-md text-sm sm:text-base">
-                    + Nuevo Producto
-                </button>
+                <div class="flex flex-col sm:flex-row items-center sm:space-x-2 space-y-2 sm:space-y-0 mt-2 sm:mt-0 w-full sm:w-auto">
+                    <div class="flex w-full sm:w-auto space-x-2">
+                        <input type="text" id="productSearchInput" placeholder="Buscar producto..." class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-grow sm:w-48">
+                        <button id="searchProductBtn" class="bg-blue-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-150 shadow-md text-sm sm:text-base">
+                            Buscar
+                        </button>
+                    </div>
+                    <button id="addOrEditProductBtn" 
+                            class="bg-green-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-150 shadow-md text-sm sm:text-base w-full sm:w-auto">
+                        + Nuevo Producto
+                    </button>
+                </div>
             </div>
 
-            <!-- Contenedor de la Tabla -->
+            <!-- Contenedor de la lista de productos -->
             <div id="productTableContainer" class="flex-grow overflow-y-auto">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left product-table text-sm">
-                        <thead>
-                            <tr>
-                                <th class="p-3 w-[5%]">ID</th>
-                                <th class="p-3 w-[15%]">Código de Barras</th>
-                                <th class="p-3 w-[25%]">Descripción</th>
-                                <th class="p-3 w-[10%] text-right">Precio Venta</th>
-                                <th class="p-3 w-[10%] text-right">Precio Mayoreo</th>
-                                <th class="p-3 w-[10%] text-right">Costo</th>
-                                <th class="p-3 w-[5%] text-center">Mín.</th>
-                                <th class="p-3 w-[5%] text-center">Stock</th>
-                                <th class="p-3 w-[15%] text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="productsTableBody">
-                            <!-- Los productos se cargarán aquí -->
-                            <tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos...</td></tr>
-                        </tbody>
-                    </table>
+                <!-- Encabezado de la tabla para escritorio -->
+                <div class="hidden md:grid grid-cols-12 gap-x-4 p-3 border-b bg-gray-100 font-semibold text-sm text-gray-700 sticky top-0 z-10">
+                    <div class="col-span-1">ID</div>
+                    <div class="col-span-2">Código de Barras</div>
+                    <div class="col-span-3">Descripción</div>
+                    <div class="col-span-1 text-right">P. Venta</div>
+                    <div class="col-span-1 text-right">P. Mayoreo</div>
+                    <div class="col-span-1 text-center">Stock</div>
+                    <div class="col-span-3 text-center">Acciones</div>
+                </div>
+                
+                <!-- Cuerpo de la lista de productos (se llenará con JS) -->
+                <div id="productsTableBody" class="divide-y divide-gray-200">
+                    <!-- Los productos (tarjetas/filas) se cargarán aquí -->
+                    <div class="text-center p-8 text-gray-500">Cargando productos...</div>
                 </div>
             </div>
         </div>

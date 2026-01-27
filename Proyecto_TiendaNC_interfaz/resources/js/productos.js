@@ -27,6 +27,10 @@
         const cantidadMaxInput = document.getElementById('cantidadMax');
         const isGramajeInput = document.getElementById('isGramaje'); // NEW: Gramaje checkbox
         
+        // Search Inputs
+        const productSearchInput = document.getElementById('productSearchInput');
+        const searchProductBtn = document.getElementById('searchProductBtn');
+        
         // Labels for dynamic text
         const precioVentaLabel = document.querySelector('label[for="precioVenta"]');
         const precioCostoLabel = document.querySelector('label[for="precioCosto"]');
@@ -116,13 +120,13 @@
          */
         async function loadProducts() {
             try {
-                                 productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan                
+                productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan
                 // 1. LLAMADA API REAL: GET /productos/listarProductos
                 products = await fetchApi('/productos/listarProductos', 'GET');
                 // Sort products by idProducto
                 products.sort((a, b) => a.idProducto - b.idProducto);
                 
-                renderProductsTable();
+                renderProductsTable(products); // Render all products initially
 
             } catch (error) {
                 alertUser(`Error al cargar productos: ${error.message}`, 'error');
@@ -132,46 +136,98 @@
 
         /**
          * Renderiza el estado local de productos en la tabla.
+         * @param {Array} productsToDisplay - Array de productos a mostrar. Si es null o undefined, usa el array 'products' global.
          */
-        function renderProductsTable(selectedId = null) {
+        function renderProductsTable(productsToDisplay = products, selectedId = null) {
             productsTableBody.innerHTML = ''; 
 
-            if (products.length === 0) {
-                 productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">No hay productos en el catálogo.</td></tr>`; // Updated colspan
+            const listToRender = productsToDisplay;
+
+            if (listToRender.length === 0) {
+                 productsTableBody.innerHTML = `<div class="text-center p-8 text-gray-500">No hay productos que coincidan con la búsqueda.</div>`;
                  return;
             }
 
-            products.forEach(product => {
-                const isSelected = (product.idProducto == selectedId);
-                const row = document.createElement('tr');
-                row.className = `border-b ${isSelected ? 'row-selected' : 'bg-white'}`;
-                row.dataset.id = product.idProducto;
+            listToRender.forEach(product => {
+                const productElement = document.createElement('div');
+                productElement.className = `product-item block p-4 border-b border-gray-200 md:grid md:grid-cols-12 md:gap-x-4 md:items-center hover:bg-gray-50 transition-colors duration-150`;
+                productElement.dataset.id = product.idProducto;
+                
+                const isLowStock = product.stock <= product.cantidad_min;
 
-                row.innerHTML = `
-                    <td class="p-3">${product.idProducto}</td>
-                    <td class="p-3">${product.codigoBarras || ''}</td>
-                    <td class="p-3 font-medium">${product.nombre}</td>
-                    <td class="p-3 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</td>
-                    <td class="p-3 text-right">${(product.precio_mayoreo !== null && product.precio_mayoreo !== undefined && product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</td>
-                    <td class="p-3 text-right text-gray-500">$${(product.precio_costo || 0).toFixed(2)}</td>
-                    <td class="p-3 text-center">${product.cantidad_min}${product.is_gramaje ? 'g' : ''}</td>
-                    <td class="p-3 text-center">${product.stock}${product.is_gramaje ? 'g' : ''}</td>
-                    <td class="p-3 text-center">
-                        <button class="edit-btn p-1 rounded-full w-7 h-7 hover:bg-blue-100 mr-2" data-id="${product.idProducto}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-blue-500 stroke-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" />
-                            </svg>
-                        </button>
-                        <button class="delete-btn p-1 rounded-full hover:bg-red-100" data-id="${product.idProducto}" data-nombre="${product.nombre}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </td>
+                productElement.innerHTML = `
+                    <!-- Mobile View -->
+                    <div class="md:hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold text-lg text-gray-800">${product.nombre}</p>
+                                <p class="text-sm text-gray-600">ID: ${product.idProducto} | Cód: ${product.codigoBarras || 'N/A'}</p>
+                            </div>
+                            <div class="text-right flex-shrink-0 ml-4">
+                                <p class="text-lg font-semibold text-primary">$${(product.precio_venta || 0).toFixed(2)}</p>
+                                <p class="text-sm font-medium ${isLowStock ? 'text-red-500' : 'text-gray-500'}">
+                                    Stock: ${product.stock}${product.is_gramaje ? 'g' : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end space-x-3">
+                            <button class="edit-btn btn-primary text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" /></svg>
+                                Modificar
+                            </button>
+                            <button class="delete-btn btn-danger text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}" data-nombre="${product.nombre}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" /></svg>
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Desktop View -->
+                    <div class="hidden md:contents">
+                        <div class="col-span-1 text-sm text-gray-700">${product.idProducto}</div>
+                        <div class="col-span-2 text-sm text-gray-700 truncate" title="${product.codigoBarras || ''}">${product.codigoBarras || ''}</div>
+                        <div class="col-span-3 font-medium text-gray-800 truncate" title="${product.nombre}">${product.nombre}</div>
+                        <div class="col-span-1 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</div>
+                        <div class="col-span-1 text-right text-sm text-gray-600">${(product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</div>
+                        <div class="col-span-1 text-center text-sm font-medium ${isLowStock ? 'text-red-500' : 'text-gray-800'}">
+                            ${product.stock}${product.is_gramaje ? 'g' : ''}
+                        </div>
+                        <div class="col-span-3 text-center flex justify-center items-center space-x-2">
+                            <button class="edit-btn p-1 rounded-full w-8 h-8 hover:bg-blue-100 transition-colors duration-150" data-id="${product.idProducto}" title="Modificar">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" />
+                                </svg>
+                            </button>
+                            <button class="delete-btn p-1 rounded-full w-8 h-8 hover:bg-red-100 transition-colors duration-150" data-id="${product.idProducto}" data-nombre="${product.nombre}" title="Eliminar">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 `;
                 
-                productsTableBody.appendChild(row);
+                productsTableBody.appendChild(productElement);
             });
+        }
+
+        /**
+         * Filtra los productos basados en el término de búsqueda y renderiza la tabla.
+         */
+        function filterAndRenderProducts() {
+            const searchTerm = productSearchInput.value.toLowerCase().trim();
+            let filteredProducts = [];
+
+            if (searchTerm === '') {
+                filteredProducts = products; // Show all products if search is empty
+            } else {
+                filteredProducts = products.filter(product => {
+                    const matchesName = product.nombre.toLowerCase().includes(searchTerm);
+                    const matchesBarcode = product.codigoBarras ? product.codigoBarras.toLowerCase().includes(searchTerm) : false;
+                    return matchesName || matchesBarcode;
+                });
+            }
+            renderProductsTable(filteredProducts);
         }
         
         // --- MANEJO DE SELECCIÓN Y FORMULARIO ---
@@ -387,10 +443,58 @@
         });
 
 
-        // --- INICIALIZACIÓN ---
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded event fired in productos.js');
-            loadProducts();
-            // resetForm(); // No longer called here, as the modal opens via button click
-            updateGramajeLabels(false); // Set initial state of labels
-        });
+                // --- INICIALIZACIÓN ---
+
+
+                document.addEventListener('DOMContentLoaded', () => {
+
+
+                    console.log('DOMContentLoaded event fired in productos.js');
+
+
+                    loadProducts();
+
+
+                    // resetForm(); // No longer called here, as the modal opens via button click
+
+
+                    updateGramajeLabels(false); // Set initial state of labels
+
+
+                });
+
+
+        
+
+
+                // Event listeners para el buscador
+
+
+                productSearchInput.addEventListener('keyup', filterAndRenderProducts);
+
+
+                searchProductBtn.addEventListener('click', filterAndRenderProducts);
+
+
+        
+
+
+                // Event listener para limpiar la búsqueda y mostrar todos los productos
+
+
+                productSearchInput.addEventListener('change', (e) => {
+
+
+                    if (e.target.value === '') {
+
+
+                        renderProductsTable(products);
+
+
+                    }
+
+
+                });
+
+
+        

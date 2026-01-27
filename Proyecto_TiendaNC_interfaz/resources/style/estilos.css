@@ -34,6 +34,10 @@
     --encabezado-zelda-background: #2d5a2700; /* Transparent green for Zelda headers */
     --zelda-gold: #f1c40f; /* Original Zelda Gold */
     --zelda-gold-text: rgb(218, 187, 50); /* Specific hardcoded gold color */
+    --zelda-green-text: rgb(72, 211, 8); /* Specific hardcoded green color */
+    --zelda-red-text: rgb(255, 0, 0);
+    --zelda-white-text: rgb(255, 255, 255);
+    --zelda-blue-text: rgb(99, 114, 248);
     --zelda-text-shadow-dark: #1e3d1a;
     --zelda-text-shadow-light: rgba(0,0,0,0.5);
 
@@ -378,7 +382,7 @@ body {
 }
 
 .modal.modal-active {
-    display: flex; /* Show when active */
+    display: flex !important; /* Show when active */
 }
 .modal-content {
     background-color: white;
@@ -441,10 +445,69 @@ body {
     color: white !important; /* Force white color for the icon */
 }
 
-/* Style for SVG icons inside edit buttons */
-.edit-btn svg {
-    fill: #3b82f6 !important; /* Force blue color for the fill */
-    stroke: #3b82f6 !important; /* Force blue color for the stroke */
+.ticket-product-name-zelda {
+    font-family: 'HyliaSerif', serif;
+    color: var(--zelda-green-text); /* Green for product name */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 0px var(--zelda-text-shadow-dark), 2px 2px 5px var(--zelda-text-shadow-light);
+}
+.ticket-product-name-zelda-price {
+    font-family: 'HyliaSerif', serif;
+    color: var(--zelda-green-text); /* Green for price */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 0px var(--zelda-text-shadow-dark), 1px 1px 3px var(--zelda-text-shadow-light);
+}
+
+.ticket-quantity-zelda {
+    font-family: 'HyliaSerif', serif;
+    color: var(--zelda-green-text); /* Green for quantity */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 0px var(--zelda-text-shadow-dark), 2px 2px 5px var(--zelda-text-shadow-light);
+}
+
+.ticket-barcode-zelda {
+    font-family: 'HyliaSerif', serif;
+    color: var(--zelda-gold); /* Gold for barcode */
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 0px var(--zelda-text-shadow-dark);
+}
+
+.round-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--zelda-gold); /* Primary green border */
+    position: relative;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.2s;
+}
+
+.round-checkbox:checked {
+    background-color: var(--primary-color);
+    border: 2px solid var(--primary-color-dark);
+}
+
+.round-checkbox:checked::after {
+    content: '✔';
+    color: white;
+    font-size: 12px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.zelda-label-text {
+    font-family: 'HyliaSerif', serif;
+    color: var(--zelda-white-text); /* Gold for label text */
+    letter-spacing: 0.5px;
 }
 /* Calculator styles */
 .calc-container {
