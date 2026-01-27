@@ -134,7 +134,12 @@
             }
 
             function updateTotals() {
-                const total = ticket.reduce((sum, item) => sum + (item.precioUnitarioVenta * item.cantidad), 0);
+                const total = ticket.reduce((sum, item) => {
+                    const itemTotal = item._nlpTargetTotalPrice !== null && item._nlpTargetTotalPrice !== undefined
+                                      ? item._nlpTargetTotalPrice
+                                      : (item.precioUnitarioVenta || 0) * item.cantidad;
+                    return sum + itemTotal;
+                }, 0);
                 subtotalDisplay.textContent = totalDisplay.textContent = `$${total.toFixed(2)}`;
             }
 
@@ -521,7 +526,9 @@
                         itemElement.className = 'ticket-item block p-3 md:grid md:grid-cols-12 md:gap-x-4 md:items-center';
                         itemElement.dataset.id = item.idProducto;
 
-                        const importe = (item.precioUnitarioVenta || 0) * item.cantidad;
+                        const importe = item._nlpTargetTotalPrice !== null && item._nlpTargetTotalPrice !== undefined
+                                        ? item._nlpTargetTotalPrice
+                                        : (item.precioUnitarioVenta || 0) * item.cantidad;
                         const hasValidMayoreo = item.Producto.precio_mayoreo && item.Producto.precio_mayoreo > 0;
 
                         itemElement.innerHTML = `
@@ -537,7 +544,7 @@
                                 <div class="mt-2 flex justify-between items-center">
                                     <div class="flex items-center">
                                         <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
-                                        <span class="px-3 font-bold text-xl ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                        <span class="px-3 font-bold text-xl ticket-quantity-zelda">${item.Producto.is_gramaje ? item.cantidad.toFixed(2) : item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
                                         <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
                                     </div>
                                     <div class="flex items-center space-x-3">
@@ -564,7 +571,7 @@
                                 </div>
                                 <div class="col-span-2 text-center flex items-center justify-center">
                                     <button class="qty-btn btn-qty-minus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">-</button>
-                                    <span class="px-3 font-bold text-base ticket-quantity-zelda">${item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
+                                    <span class="px-3 font-bold text-base ticket-quantity-zelda">${item.Producto.is_gramaje ? item.cantidad.toFixed(2) : item.cantidad}${item.Producto.is_gramaje ? 'g' : ''}</span>
                                     <button class="qty-btn btn-qty-plus bg-gray-100 text-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold shadow-sm hover:bg-primary hover:text-white transition-colors duration-150" data-index="${index}">+</button>
                                 </div>
                                 <div class="col-span-1 text-right font-semibold ticket-product-name-zelda-price">$${importe.toFixed(2)}</div>
@@ -653,8 +660,9 @@
                     return;
                 }
                 
-                // Round grams to nearest whole number if it's a grammage product
-                if (isGramajeProduct) {
+                // Only round grammage quantity if it's not a 'PRECIO' type command,
+                // because for 'PRECIO' type, the quantity should precisely yield the desired total.
+                if (isGramajeProduct && commandData.tipo !== "PRECIO") {
                     quantityToAdd = Math.round(quantityToAdd);
                 }
 
@@ -698,7 +706,11 @@
                         cantidad: newTotalQuantity,
                         // Ensure price is consistent if it's a grammage item and price was calculated
                         precioUnitarioVenta: isGramajeProduct ? (productData.precio_venta / 1000) : existingItem.precioUnitarioVenta,
-                        tipoPrecioAplicado: tipoPrecioAplicado
+                        tipoPrecioAplicado: tipoPrecioAplicado,
+                        // If existing item was from an NLP PRECIO command, update its target total
+                        _nlpTargetTotalPrice: (commandData.tipo === "PRECIO" && isGramajeProduct && existingItem._nlpTargetTotalPrice !== undefined && existingItem._nlpTargetTotalPrice !== null)
+                                            ? (existingItem._nlpTargetTotalPrice + commandData.valor)
+                                            : (existingItem._nlpTargetTotalPrice || null)
                     };
                     await fetchApi(`/ventasDetalle/actualizarVentaDetalle/${existingItem.idVentaDetalle}`, 'PUT', updatedItem);
                     ticket[existingItemIndex] = updatedItem;
@@ -723,7 +735,8 @@
                         idVentaDetalle: newDetail.idVentaDetalle,
                         Venta: ventaData,
                         Producto: productData,
-                        isMayoreo: false // Default to false for NLP additions
+                        isMayoreo: false,
+                        _nlpTargetTotalPrice: commandData.tipo === "PRECIO" && isGramajeProduct ? commandData.valor : null
                     });
                 }
                 renderTicket();
@@ -1015,93 +1028,61 @@
 
             
 
-                        async function createNewSale() {
-
-                            try {
-
-                                const newSaleData = { usuario: { idUsuario: ID_USUARIO }, id: ID_CAJA, montoTotal: 0, estatus: 'P' }; // Add idCaja
-
-                                const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
-
-                                if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
-
-                                if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
-
-                                activeSaleId = createdSale.idVenta;
-
-                                ticket = [];
-
-                                ticketIdDisplay.textContent = createdSale.numeroTicket;
-
-                                renderTicket();
-
-                                window.showToast({ message: `Nueva venta #${createdSale.numeroTicket} iniciada.`, type: 'success' });
-
-                            } catch (error) {
-
-                                ticketIdDisplay.textContent = 'ERROR';
-
-                                window.showToast({ message: `Error al crear nueva venta: ${error.message}`, type: 'error' });
-
-                                throw error;
-
-                            }
-
-                        }
+            async function createNewSale() {
+                try {
+                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, idCaja: ID_CAJA, montoTotal: 0, estatus: 'P',  }; // Add idCaja
+                    const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
+                    if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
+                    if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
+                    activeSaleId = createdSale.idVenta;
+                    ticket = [];
+                    ticketIdDisplay.textContent = createdSale.numeroTicket;
+                    renderTicket();
+                    window.showToast({ message: `Nueva venta #${createdSale.numeroTicket} iniciada.`, type: 'success' });
+                } catch (error) {
+                    ticketIdDisplay.textContent = 'ERROR';
+                    window.showToast({ message: `Error al crear nueva venta: ${error.message}`, type: 'error' });
+                    throw error;
+                }
+            }
 
             
 
             async function initializeSale() {
                 ticketIdDisplay.textContent = 'Buscando...';
                 try {
-                    // Usar el nuevo endpoint para buscar directamente la venta pendiente del usuario/caja
                     const pendingSale = await fetchApi('/ventas/buscarVentaPendiente'); 
                     
                     if (pendingSale && pendingSale.idVenta) { // Check if a pending sale object was returned
-                        // New logic starts here
-                        const today = getTodayDate();
-                        const dailySalesData = await fetchApi(`/ventas/obtenerVentaPorDia/${today}`);
-                        const allSales = dailySalesData.ventas || [];
-
-                        const hasCompletedSales = allSales.some(sale => sale.estatus === 'C');
-                        const hasPendingSale = allSales.some(sale => sale.estatus === 'P');
-                        
-                        // Check if all sales that are not the current pending sale are finalized
-                        const allOthersFinalized = allSales
-                            .filter(sale => sale.idVenta !== pendingSale.idVenta)
-                            .every(sale => sale.estatus === 'F');
-
-                        if (hasPendingSale && !hasCompletedSales && allOthersFinalized) {
-                            // This is a new turn. Reset ticket number.
-                            const updatedSale = { ...pendingSale, numeroTicket: 1 };
-                            await fetchApi(`/ventas/actualizarVenta/${pendingSale.idVenta}`, 'PUT', updatedSale);
-                            pendingSale.numeroTicket = 1; // update in memory
-                            window.showToast({ message: 'Nuevo turno detectado. Ticket reiniciado a 1.', type: 'info' });
+                        if (pendingSale.estatus === "C") { // If the found "pending" sale is actually completed
+                            window.showToast({ message: `Venta anterior completada #${pendingSale.numeroTicket}. Iniciando nueva venta.`, type: 'info' });
+                            await createNewSale(); // Create a new pending sale, let backend determine ticket number
+                        } else if (pendingSale.estatus === "P") { // If genuinely pending
+                            activeSaleId = pendingSale.idVenta;
+                            if (!pendingSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
+                            ticketIdDisplay.textContent = pendingSale.numeroTicket;
+                            
+                            // Fetch details for the found pending sale
+                            const allDetails = await fetchApi('/ventasDetalle/obtenerTodosLosVentasDetalles');
+                            ticket = Array.isArray(allDetails) ? allDetails.filter(d => d.Venta.idVenta === activeSaleId).map(detail => ({
+                                idProducto: detail.Producto.idProducto,
+                                codigoBarras: detail.Producto.codigoBarras,
+                                nombreProducto: detail.Producto.nombre,
+                                cantidad: detail.cantidad,
+                                precioUnitarioVenta: detail.precioUnitarioVenta,
+                                existence: detail.Producto.stock,
+                                idVentaDetalle: detail.idVentaDetalle,
+                                Venta: detail.Venta,
+                                Producto: detail.Producto,
+                                isMayoreo: (detail.Producto.precio_mayoreo && detail.precioUnitarioVenta === detail.Producto.precio_mayoreo)
+                            })) : [];
+                            renderTicket();
+                        } else {
+                            window.showToast({ message: `Venta pendiente #${pendingSale.numeroTicket} con estatus desconocido: ${pendingSale.estatus}. Iniciando nueva venta.`, type: 'warning' });
+                            await createNewSale(); // Fallback to creating a new sale
                         }
-                        // New logic ends here
-
-                        activeSaleId = pendingSale.idVenta;
-                        if (!pendingSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
-                        ticketIdDisplay.textContent = pendingSale.numeroTicket;
-                        
-                        // Fetch details for the found pending sale
-                        const allDetails = await fetchApi('/ventasDetalle/obtenerTodosLosVentasDetalles');
-                        ticket = Array.isArray(allDetails) ? allDetails.filter(d => d.Venta.idVenta === activeSaleId).map(detail => ({
-                            idProducto: detail.Producto.idProducto,
-                            codigoBarras: detail.Producto.codigoBarras,
-                            nombreProducto: detail.Producto.nombre,
-                            cantidad: detail.cantidad,
-                            precioUnitarioVenta: detail.precioUnitarioVenta,
-                            existence: detail.Producto.stock,
-                            idVentaDetalle: detail.idVentaDetalle,
-                            Venta: detail.Venta,
-                            Producto: detail.Producto,
-                            isMayoreo: (detail.Producto.precio_mayoreo && detail.precioUnitarioVenta === detail.Producto.precio_mayoreo)
-                        })) : [];
-                        renderTicket();
                     } else {
-                        // Si no se encuentra una venta pendiente, crear una nueva inmediatamente
-                        await createNewSale();
+                        await createNewSale(); // No pending sale found, create a new one, let backend determine ticket number
                     }
                 } catch (error) {
                     window.showToast({ message: `Error al inicializar: ${error.message}`, type: 'error' });
@@ -1241,8 +1222,10 @@
                         // idCaja: ID_CAJA
                     }).toString();
                     await fetchApi(`/ventas/completarVenta/${activeSaleId}?${queryParams}`, 'PUT');
-                    window.showToast({ message: `Venta #${activeSaleId} completada con ${paymentMethod}.`, type: 'success' });
-                    await initializeSale();
+                    window.showToast({ message: `Venta #${ticketIdDisplay.textContent} completada con ${paymentMethod}.`, type: 'success' });
+
+                    // After completing a sale, create a new pending sale, letting backend determine ticket number
+                    await createNewSale(); 
                 } catch (error) {
                     window.showToast({ message: `Error al completar la venta: ${error.message}`, type: 'error' });
                 }
