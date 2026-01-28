@@ -270,7 +270,7 @@
                 document.getElementById('reporteTotalTicketsDia').textContent = data.ventas.length;
                 reporteTotalEgresos.textContent = formatCurrency(0);
 
-                window.showToast({ message: `Reporte para el d├¡a ${date} generado con ├®xito.`, type: 'success' });
+                window.showToast({ message: `Reporte para el día ${date} generado con éxito.`, type: 'success' });
                 drawCashFlowChart(data, true);
             }
 
@@ -335,7 +335,7 @@
                 const ventasEfectivo = salesToday.filter(v => v.metodoPago.toUpperCase() === 'EFECTIVO').reduce((sum, v) => sum + v.montoTotal, 0);
 
                 renderCorteReport(corteResponse, ventasEfectivo, ventasTransferencia, salesToday.length);
-                window.showToast({ message: 'Corte de caja generado con ├®xito.', type: 'success' });
+                window.showToast({ message: 'Corte de caja generado con éxito.', type: 'success' });
             } catch (error) {
                 window.showToast({ message: `Error al generar el corte: ${error.message}`, type: 'error' });
             } finally {
@@ -395,7 +395,7 @@
                     endDate: endOfDay.toISOString()
                 };
                 await fetchApi('/caja/ventas/status', 'PUT', payload);
-                window.showToast({ message: 'Turno cerrado con ├®xito. Cerrando sesi├│n...', type: 'success' });
+                window.showToast({ message: 'Turno cerrado con éxito. Cerrando sesión...', type: 'success' });
                 sessionStorage.clear();
                 setTimeout(() => { window.location.href = 'Login.html'; }, 1500);
             } catch (error) {

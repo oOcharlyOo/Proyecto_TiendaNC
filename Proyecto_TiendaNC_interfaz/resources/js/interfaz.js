@@ -80,7 +80,11 @@
                     // Check for the backend's APIResponse structure
                     if (jsonResponse.hasOwnProperty('codigo') && jsonResponse.hasOwnProperty('mensaje')) {
                         if (jsonResponse.codigo === 200) {
-                            return jsonResponse.datos; // Success, return data
+                            // For buscarVentaPendiente, we need the full response to check the message
+                            if (path === '/ventas/buscarVentaPendiente') {
+                                return jsonResponse;
+                            }
+                            return jsonResponse.datos; // Success, return data for other endpoints
                         } else if (jsonResponse.codigo === 404 && path === '/ventas/buscarVentaPendiente') {
                             // Specific handling for "no pending sales found" for this endpoint
                             console.warn("No pending sales found for /ventas/buscarVentaPendiente, backend returned 404. Proceeding to create new sale.");
@@ -1028,12 +1032,15 @@
 
             
 
-            async function createNewSale() {
+            async function createNewSale(nextTicketNumber = null) {
                 try {
-                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, idCaja: ID_CAJA, montoTotal: 0, estatus: 'P',  }; // Add idCaja
+                    const newSaleData = { usuario: { idUsuario: ID_USUARIO }, idCaja: ID_CAJA, montoTotal: 0, estatus: 'P' };
+                    if (nextTicketNumber) {
+                        newSaleData.numeroTicket = nextTicketNumber;
+                    }
                     const createdSale = await fetchApi('/ventas/agregarVenta', 'POST', newSaleData);
                     if (!createdSale || !createdSale.idVenta) throw new Error("La API no devolvió un ID de venta válido.");
-                    if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta."); // Nuevo
+                    if (!createdSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la nueva venta.");
                     activeSaleId = createdSale.idVenta;
                     ticket = [];
                     ticketIdDisplay.textContent = createdSale.numeroTicket;
@@ -1051,17 +1058,24 @@
             async function initializeSale() {
                 ticketIdDisplay.textContent = 'Buscando...';
                 try {
-                    const pendingSale = await fetchApi('/ventas/buscarVentaPendiente'); 
-                    
-                    if (pendingSale && pendingSale.idVenta) { // Check if a pending sale object was returned
-                        if (pendingSale.estatus === "C") { // If the found "pending" sale is actually completed
-                            window.showToast({ message: `Venta anterior completada #${pendingSale.numeroTicket}. Iniciando nueva venta.`, type: 'info' });
-                            await createNewSale(); // Create a new pending sale, let backend determine ticket number
-                        } else if (pendingSale.estatus === "P") { // If genuinely pending
-                            activeSaleId = pendingSale.idVenta;
-                            if (!pendingSale.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
-                            ticketIdDisplay.textContent = pendingSale.numeroTicket;
-                            
+                    const response = await fetchApi('/ventas/buscarVentaPendiente');
+
+                    // Case 1: A sale (pending or completed) was found.
+                    if (response && response.datos && response.datos.idVenta) {
+                        const saleData = response.datos;
+
+                        // Scenario 1: Last sale was completed. Create a new one with the next ticket number.
+                        if (response.mensaje === "Se encontro la ultima venta ya completada") {
+                            const nextTicketNumber = saleData.numeroTicket + 1;
+                            window.showToast({ message: `Última venta #${saleData.numeroTicket} completada. Iniciando nueva venta #${nextTicketNumber}.`, type: 'info' });
+                            await createNewSale(nextTicketNumber);
+
+                        // Scenario 2: A pending sale exists. Continue with it.
+                        } else if (response.mensaje === "Se encontró una venta pendiente.") {
+                            activeSaleId = saleData.idVenta;
+                            if (!saleData.numeroTicket) throw new Error("La API no devolvió el número de ticket para la venta pendiente.");
+                            ticketIdDisplay.textContent = saleData.numeroTicket;
+
                             // Fetch details for the found pending sale
                             const allDetails = await fetchApi('/ventasDetalle/obtenerTodosLosVentasDetalles');
                             ticket = Array.isArray(allDetails) ? allDetails.filter(d => d.Venta.idVenta === activeSaleId).map(detail => ({
@@ -1077,12 +1091,17 @@
                                 isMayoreo: (detail.Producto.precio_mayoreo && detail.precioUnitarioVenta === detail.Producto.precio_mayoreo)
                             })) : [];
                             renderTicket();
+                            window.showToast({ message: `Continuando con venta pendiente #${saleData.numeroTicket}.`, type: 'info' });
+
+                        // Fallback for unexpected messages or statuses
                         } else {
-                            window.showToast({ message: `Venta pendiente #${pendingSale.numeroTicket} con estatus desconocido: ${pendingSale.estatus}. Iniciando nueva venta.`, type: 'warning' });
-                            await createNewSale(); // Fallback to creating a new sale
+                            window.showToast({ message: `Respuesta inesperada del servidor. Iniciando nueva venta.`, type: 'warning' });
+                            await createNewSale();
                         }
+
+                    // Case 2: No sale found (e.g., API returned null or 404), create a brand new one.
                     } else {
-                        await createNewSale(); // No pending sale found, create a new one, let backend determine ticket number
+                        await createNewSale();
                     }
                 } catch (error) {
                     window.showToast({ message: `Error al inicializar: ${error.message}`, type: 'error' });
