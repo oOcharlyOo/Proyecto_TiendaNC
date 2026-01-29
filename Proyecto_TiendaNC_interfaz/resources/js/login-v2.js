@@ -1,8 +1,8 @@
 // --- CONFIGURACIÓN DE ENDPOINT ---
-        const API_BASE_URL = 'http://localhost:8080';
+        const API_BASE_URL = 'https://api.laleyendadeldulce.com';
         const LOGIN_URL = `${API_BASE_URL}/usuarios/login`;
-        const SHIFT_START_URL = 'http://localhost:8080/caja/apertura'; // Endpoint para apertura de caja
-        const CHECK_ACTIVE_SHIFT_URL = 'http://localhost:8080/caja/apertura/activa'; // Nuevo Endpoint para verificar caja activa
+        const SHIFT_START_URL = 'https://api.laleyendadeldulce.com/caja/apertura'; // Endpoint para apertura de caja
+        const CHECK_ACTIVE_SHIFT_URL = 'https://api.laleyendadeldulce.com/caja/apertura/activa'; // Nuevo Endpoint para verificar caja activa
 
         // --- REFERENCIAS DEL DOM ---
         const form = document.getElementById('loginForm');

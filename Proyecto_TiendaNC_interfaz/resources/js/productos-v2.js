@@ -1,5 +1,5 @@
         // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
-        const API_BASE_URL = 'http://localhost:8080'; 
+        const API_BASE_URL = 'https://api.laleyendadeldulce.com'; 
         let products = []; // Array para almacenar la lista local de productos
 
         // Variables del DOM

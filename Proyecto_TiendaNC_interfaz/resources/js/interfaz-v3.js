@@ -1,4 +1,4 @@
-        const API_BASE_URL = 'http://localhost:8080';
+        const API_BASE_URL = 'https://api.laleyendadeldulce.com';
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
         const activeUserShift = JSON.parse(sessionStorage.getItem('activeUserShift'));
 
