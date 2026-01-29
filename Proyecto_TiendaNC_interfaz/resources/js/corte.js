@@ -243,7 +243,7 @@
 
             // 2. Si no hay datos o la lista de ventas est├í vac├¡a, muestra un reporte en ceros.
             if (!data || !data.ventas || data.ventas.length === 0) {
-                window.showToast({ message: `No se encontraron datos de ventas para el d├¡a ${date}.`, type: 'info' });
+                window.showToast({ message: `No se encontraron datos de ventas para el día ${date}.`, type: 'info' });
                 const emptyReport = { cobroTotal: 0, gananciaTotal: 0, ventas: [] };
 
                 reporteMontoInicial.textContent = formatCurrency(0); // Monto Inicial = 0 para reporte hist├│rico

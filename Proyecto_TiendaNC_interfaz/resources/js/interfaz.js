@@ -1240,11 +1240,21 @@
                         // If idCaja is needed as a query parameter, add it here:
                         // idCaja: ID_CAJA
                     }).toString();
-                    await fetchApi(`/ventas/completarVenta/${activeSaleId}?${queryParams}`, 'PUT');
-                    window.showToast({ message: `Venta #${ticketIdDisplay.textContent} completada con ${paymentMethod}.`, type: 'success' });
+                    
+                    const lastTicketNumber = parseInt(ticketIdDisplay.textContent, 10);
 
-                    // After completing a sale, create a new pending sale, letting backend determine ticket number
-                    await createNewSale(); 
+                    await fetchApi(`/ventas/completarVenta/${activeSaleId}?${queryParams}`, 'PUT');
+                    window.showToast({ message: `Venta #${lastTicketNumber} completada con ${paymentMethod}.`, type: 'success' });
+
+                    // Ahora, creamos una nueva venta pasándole el siguiente número de ticket.
+                    // También guardamos el último número de ticket por si se refresca la página.
+                    if (!isNaN(lastTicketNumber)) {
+                        localStorage.setItem('ultimoTicket', lastTicketNumber);
+                        await createNewSale(lastTicketNumber + 1);
+                    } else {
+                        // Fallback si no pudimos leer el número de ticket, dejamos que el backend decida.
+                        await createNewSale();
+                    }
                 } catch (error) {
                     window.showToast({ message: `Error al completar la venta: ${error.message}`, type: 'error' });
                 }
@@ -1417,6 +1427,12 @@
             confirmPaymentBtn.addEventListener('click', handlePayment);
             confirmPaymentSpeiBtn.addEventListener('click', handleTransferPayment);
             amountPaid.addEventListener('input', calculateChange);
+            amountPaid.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handlePayment();
+                }
+            });
             ticketItems.addEventListener('click', async e => {
                 const target = e.target;
                 const index = target.closest('[data-index]')?.dataset.index;

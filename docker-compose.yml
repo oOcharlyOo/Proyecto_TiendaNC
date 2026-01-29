@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -7,22 +5,24 @@ services:
       dockerfile: src/main/docker/Dockerfile.legacy-jar
     ports:
       - "8080:8080"
-    container_name: quarkus-backend
+    container_name: backend
     restart: on-failure
     depends_on:
       - database 
+    networks:
+      - tienda-red
 
   frontend:
     build:
       context: ./Proyecto_TiendaNC_interfaz
       dockerfile: Dockerfile
-      args: 
-        API_URL: http://localhost:8080
     ports:
       - "8081:80"
-    container_name: html-frontend
+    container_name: frontend
     depends_on:
       - backend
+    networks:
+      - tienda-red
 
   database: 
     image: postgres:13
@@ -33,17 +33,25 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
-    container_name: postgres-db
+    container_name: Dulceria-DB
     ports:
       - "5432:5432" 
+    networks:
+      - tienda-red
 
-  adminer:
-    image: adminer
-    ports:
-      - "8082:8080"
-    container_name: adminer-db-manager
+  tunnel:
+    container_name: cloudflared-tunnel
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --no-autoupdate run --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiNWYzNGQwNjYtZDE4NC00NzhhLTk4ZDItYjliMzJkY2M3ZDljIiwicyI6Ik1tWmpOV0kwWXpZdFpHRXpNeTAwTkRBeExXSTNaVFl0WVRCbU9ETTNZbVk1TXpWaSJ9
+    networks:
+      - tienda-red
     depends_on:
-      - database
+      - frontend
+
+networks:
+  tienda-red:
+    driver: bridge
 
 volumes:
   db-data:
