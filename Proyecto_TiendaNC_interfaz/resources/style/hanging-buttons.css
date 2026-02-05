@@ -1,0 +1,127 @@
+:root {
+    --oak-light: #dcb386;
+    --oak-medium: #b5835a;
+    --oak-dark: #8b5a2b;
+    --oak-deep: #5d4037;
+    --rope: #8d6e63;
+}
+
+/* Estructura de soporte superior (Viga) */
+.hanging-structure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+}
+
+.main-beam {
+    width: 350px;
+    height: 30px;
+    background: linear-gradient(to bottom, var(--oak-dark), #3a2720); /* Stronger, darker gradient */
+    border-radius: 4px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+    z-index: 5;
+    position: relative;
+}
+
+/* Contenedor de los carteles con cuerdas */
+.signs-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -5px;
+}
+
+.hanging-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: sway 4s ease-in-out infinite alternate;
+    transform-origin: top center;
+    margin-bottom: -15px; /* Overlap signs slightly */
+}
+
+/* Balanceo suave de carteles colgantes */
+@keyframes sway {
+    from { transform: rotate(-1.5deg); }
+    to { transform: rotate(1.5deg); }
+}
+
+/* Estilo de las cuerdas */
+.rope {
+    width: 4px;
+    height: 30px;
+    background: var(--rope);
+    background-image: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.2) 50%);
+    background-size: 100% 4px;
+    box-shadow: 1px 0 3px rgba(0,0,0,0.5);
+}
+
+.rope-pair {
+    display: flex;
+    justify-content: space-between;
+    width: 180px;
+}
+
+.wood-sign {
+    position: relative;
+    padding: 15px 40px;
+    font-family: 'HyliaSerif', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2c1e14;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    background-color: var(--oak-medium);
+    background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+    
+    clip-path: var(--shape);
+    
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 260px;
+    justify-content: center;
+    
+    text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.2);
+}
+
+.wood-sign::before, .wood-sign::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    width: 8px;
+    height: 8px;
+    background: #1a120b;
+    border-radius: 50%;
+    box-shadow: inset 1px 1px 2px rgba(255,255,255,0.1);
+}
+.wood-sign::before { left: 40px; }
+.wood-sign::after { right: 40px; }
+
+.wood-sign:hover {
+    filter: brightness(1.15);
+    transform: scale(1.02);
+    color: #4e342e;
+}
+
+.wood-sign:active {
+    transform: translateY(2px);
+}
+
+/* Variaciones de forma para cada cartel */
+.sign-1 { --shape: polygon(1% 2%, 99% 0%, 100% 90%, 96% 100%, 4% 98%, 0% 85%); }
+.sign-2 { --shape: polygon(0% 5%, 98% 2%, 100% 95%, 95% 100%, 2% 96%, 1% 70%); }
+.sign-3 { --shape: polygon(2% 0%, 100% 8%, 98% 98%, 5% 95%, 0% 90%, 1% 15%); }
+
+.triforce-engraved {
+    font-size: 1.2rem;
+    color: rgba(61, 43, 31, 0.6);
+}

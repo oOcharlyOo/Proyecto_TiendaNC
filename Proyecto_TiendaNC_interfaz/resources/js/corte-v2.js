@@ -1,5 +1,5 @@
 // --- CONFIGURACIÓN Y UTILIDADES ---
-        const API_BASE_URL = 'https://api.laleyendadeldulce.com';
+        const API_BASE_URL = 'http://localhost:8080';
 
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser')) || { idUsuario: 1, nombre: 'Usuario Desconocido' };
         const ID_USUARIO = activeUser.idUsuario;
@@ -117,7 +117,7 @@
                 dataValues = [ventasEfectivo, ventasTransferencia];
                 totalBruto = reportData.cobroTotal;
                 titleText = `Ingresos Totales: ${formatCurrency(totalBruto)}`;
-                chartTitle.textContent = 'Composici├│n del Flujo de Efectivo Bruto (Entradas)';
+                chartTitle.textContent = 'Composición del Flujo de Efectivo Bruto (Entradas)';
 
             } else { // L├│gica para el corte de caja en vivo
                 labels = ['Monto Inicial', 'Ventas en Efectivo', 'Ventas por Transferencia', 'Otros Ingresos'];
