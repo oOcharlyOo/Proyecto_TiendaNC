@@ -1,4 +1,4 @@
-        // --- CONFIGURACIÓN Y ESTADO GLOBAL ---
+// --- CONFIGURACIÓN Y ESTADO GLOBAL ---
         const API_BASE_URL = 'http://localhost:8080'; 
         let products = []; // Array para almacenar la lista local de productos
 
@@ -127,18 +127,19 @@
          * Carga los productos de la API y renderiza la tabla.
          */
         async function loadProducts() {
+            console.log('loadProducts() called.'); // Log start of function
             try {
-                productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-gray-500">Cargando productos del servidor...</td></tr>`; // Updated colspan
-                // 1. LLAMADA API REAL: GET /productos/listarProductos
+                productsTableBody.innerHTML = `<div class="text-center p-8 text-dark-ink hylian-font">Cargando productos del servidor...</div>`;
+                console.log('Fetching products from API...'); // Log before fetch
                 products = await fetchApi('/productos/listarProductos', 'GET');
-                // Sort products by idProducto
+                console.log('Products fetched successfully:', products); // Log success
                 products.sort((a, b) => a.idProducto - b.idProducto);
-                
-                renderProductsTable(products); // Render all products initially
-
+                renderProductsTable(products);
+                console.log('Products rendered.'); // Log after rendering
             } catch (error) {
-                alertUser(`Error al cargar productos: ${error.message}`, 'error');
-                productsTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-red-500">Error de conexión. No se pudo cargar el catálogo.</td></tr>`; // Updated colspan
+                console.error('Error in loadProducts:', error); // Explicitly log the error object
+                alertUser(`Error al cargar productos: ${error.message}`, 'error'); // Ensure alert is shown
+                productsTableBody.innerHTML = `<div class="text-center p-8 text-zelda-red hylian-font">Error de conexión. No se pudo cargar el catálogo.</div>`; // Thematic error message
             }
         }
 
@@ -152,13 +153,13 @@
             const listToRender = productsToDisplay;
 
             if (listToRender.length === 0) {
-                 productsTableBody.innerHTML = `<div class="text-center p-8 text-gray-500">No hay productos que coincidan con la búsqueda.</div>`;
+                 productsTableBody.innerHTML = `<div class="text-center p-8 text-dark-ink hylian-font">No hay productos que coincidan con la búsqueda.</div>`;
                  return;
             }
 
             listToRender.forEach(product => {
                 const productElement = document.createElement('div');
-                productElement.className = `product-item block p-4 border-b border-gray-200 md:grid md:grid-cols-12 md:gap-x-4 md:items-center hover:bg-gray-50 transition-colors duration-150`;
+                productElement.className = `product-item block p-4 border-b border-yellow-800/10 md:grid md:grid-cols-12 md:gap-x-4 md:items-center hover:bg-yellow-800/5 transition-colors duration-150`;
                 productElement.dataset.id = product.idProducto;
                 
                 const isLowStock = product.stock <= product.cantidad_min;
@@ -168,23 +169,23 @@
                     <div class="md:hidden">
                         <div class="flex justify-between items-start">
                             <div>
-                                <p class="font-bold text-lg text-gray-800">${product.nombre}</p>
-                                <p class="text-sm text-gray-600">ID: ${product.idProducto} | Cód: ${product.codigoBarras || 'N/A'}</p>
+                                <p class="font-bold text-lg hylian-font" style="color: rgb(72, 211, 8);">${product.nombre}</p>
+                                <p class="text-sm text-gray-500">ID: ${product.idProducto} | Cód: ${product.codigoBarras || 'N/A'}</p>
                             </div>
                             <div class="text-right flex-shrink-0 ml-4">
-                                <p class="text-lg font-semibold text-primary">$${(product.precio_venta || 0).toFixed(2)}</p>
-                                <p class="text-sm font-medium ${isLowStock ? 'text-red-500' : 'text-gray-500'}">
+                                <p class="text-lg font-semibold hylian-font" style="color: rgb(22, 101, 52);">$${(product.precio_venta || 0).toFixed(2)}</p>
+                                <p class="text-sm font-medium hylian-font ${isLowStock ? '' : 'text-gray-500'}" ${isLowStock ? 'style="color: rgb(255, 0, 0);"' : ''}>
                                     Stock: ${product.stock}${product.is_gramaje ? 'g' : ''}
                                 </p>
                             </div>
                         </div>
                         <div class="mt-4 flex justify-end space-x-3">
-                            <button class="edit-btn btn-primary text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" /></svg>
+                            <button class="edit-btn btn-wood-aesthetic text-neutral-800 font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-neutral-800" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" /></svg>
                                 Modificar
                             </button>
-                            <button class="delete-btn btn-danger text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}" data-nombre="${product.nombre}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" /></svg>
+                            <button class="delete-btn btn-wood-aesthetic is-danger text-neutral-800 font-semibold py-2 px-4 rounded-lg text-sm flex items-center gap-2" data-id="${product.idProducto}" data-nombre="${product.nombre}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-neutral-800" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" /></svg>
                                 Eliminar
                             </button>
                         </div>
@@ -192,24 +193,22 @@
                     
                     <!-- Desktop View -->
                     <div class="hidden md:contents">
-                        <div class="col-span-1 text-sm text-gray-700">${product.idProducto}</div>
-                        <div class="col-span-2 text-sm text-gray-700 truncate" title="${product.codigoBarras || ''}">${product.codigoBarras || ''}</div>
-                        <div class="col-span-3 font-medium text-gray-800 truncate" title="${product.nombre}">${product.nombre}</div>
-                        <div class="col-span-1 text-right text-primary font-semibold">$${(product.precio_venta || 0).toFixed(2)}</div>
-                        <div class="col-span-1 text-right text-sm text-gray-600">${(product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</div>
-                        <div class="col-span-1 text-center text-sm font-medium ${isLowStock ? 'text-red-500' : 'text-gray-800'}">
+                        <div class="col-span-1 text-sm text-gray-500">${product.idProducto}</div>
+                        <div class="col-span-2 text-sm text-gray-500 truncate" title="${product.codigoBarras || ''}">${product.codigoBarras || ''}</div>
+                        <div class="col-span-3 font-medium hylian-font truncate" title="${product.nombre}" style="color: rgb(72, 211, 8);">${product.nombre}</div>
+                        <div class="col-span-1 text-right font-semibold hylian-font" style="color: rgb(22, 101, 52);">$${(product.precio_venta || 0).toFixed(2)}</div>
+                        <div class="col-span-1 text-right text-sm hylian-font" style="color: rgb(22, 101, 52);">${(product.precio_mayoreo > 0) ? '$' + product.precio_mayoreo.toFixed(2) : ''}</div>
+                        <div class="col-span-1 text-center text-sm font-medium hylian-font ${isLowStock ? '' : 'text-gray-500'}" ${isLowStock ? 'style="color: rgb(255, 0, 0);"' : ''}>
                             ${product.stock}${product.is_gramaje ? 'g' : ''}
                         </div>
                         <div class="col-span-3 text-center flex justify-center items-center space-x-2">
-                            <button class="edit-btn p-1 rounded-full w-8 h-8 hover:bg-blue-100 transition-colors duration-150" data-id="${product.idProducto}" title="Modificar">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" />
-                                </svg>
+                            <button class="edit-btn btn-wood-aesthetic p-1 rounded-full w-8 h-8 transition-colors duration-150" data-id="${product.idProducto}" title="Modificar">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-neutral-800" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.828-2.829z" /></svg>
                             </button>
-                            <button class="delete-btn p-1 rounded-full w-8 h-8 hover:bg-red-100 transition-colors duration-150" data-id="${product.idProducto}" data-nombre="${product.nombre}" title="Eliminar">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-red-600" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" />
-                                </svg>
+                            <button class="delete-btn btn-wood-aesthetic is-danger p-1 rounded-full w-8 h-8 transition-colors duration-150" data-id="${product.idProducto}" data-nombre="${product.nombre}" title="Eliminar">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto text-neutral-800" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm6 10a1 1 0 100-2v-6a1 1 0 100-2h-2a1 1 0 100 2v6a1 1 0 100 2h2z" clip-rule="evenodd" /></svg>
                             </button>
                         </div>
                     </div>
@@ -243,9 +242,8 @@
         // --- MANEJO DE MODAL ---
         function openModal(isEditing) {
             console.log('openModal() called. isEditing:', isEditing);
-            productModal.removeAttribute('hidden');
-            productModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
-            productModal.classList.add('modal-active');
+            productModal.style.display = 'flex'; // Explicitly set display to flex
+            productModal.classList.add('modal-active'); // Keep for transition effect
             console.log('productModal initial hidden attribute:', productModal ? productModal.hasAttribute('hidden') : 'N/A');
             if (isEditing) {
                 deleteBtn.classList.remove('hidden'); // Show delete button for editing
@@ -260,8 +258,7 @@
 
         function closeModal() {
             productModal.classList.remove('modal-active');
-            productModal.classList.add('hidden'); // Also add Tailwind's hidden class back
-            productModal.setAttribute('hidden', '');
+            productModal.style.display = 'none'; // Explicitly set display to none
             productForm.reset(); // Clear form on close
             productIdInput.value = ''; // Ensure hidden ID is cleared
             updateGramajeLabels(false); // Reset labels
@@ -338,10 +335,10 @@
                 return;
             }
 
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = 'Eliminando...';
+
             try {
-                // Assuming the deleteBtn in the modal is no longer used for this direct deletion
-                // If this is called from the modal's delete button, that button would need to be disabled/enabled
-                
                 await fetchApi(`/productos/eliminarProducto/${productId}`, 'DELETE');
                 alertUser(`Producto "${productName}" eliminado con éxito.`, 'success');
                 
@@ -352,107 +349,11 @@
             } catch (error) {
                 alertUser(`Error al eliminar el producto: ${error.message}`, 'error');
             }
-        }
-
-        // --- MANEJO DE SUBMIT DEL FORMULARIO ---
-
-        productForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Procesando...';
-
-            const data = {
-                codigoBarras: codigoBarrasInput.value,
-                nombre: nombreProductoInput.value,
-                precio_venta: parseFloat(precioVentaInput.value),
-                precio_mayoreo: precioMayoreoInput.value !== '' ? parseFloat(precioMayoreoInput.value) : null, // NEW
-                precio_costo: parseFloat(precioCostoInput.value),
-                stock: parseInt(stockActualInput.value),
-                cantidad_min: parseInt(cantidadMinInput.value),
-                cantidad_max: parseInt(cantidadMaxInput.value),
-                is_gramaje: isGramajeInput.checked // NEW: Include gramaje status
-                // idCategoria ha sido eliminado de la carga útil
-            };
-
-            const isEditing = !!productIdInput.value; // Checks if a product is being edited
-
-            if (isEditing) {
-                // For editing, include the original product ID in the payload
-                data.idProducto = parseInt(productIdInput.value);
-            }
-
-
-            let result;
-
-            try {
-                if (isEditing) {
-                    // MODIFICACIÓN
-                    // Para actualizar, el idProducto debe ir en el payload y en la URL
-                    data.idProducto = parseInt(productIdInput.value); // Asegurarse de que el ID del producto esté en el payload
-
-                    result = await fetchApi(`/productos/actualizarProducto/${productIdInput.value}`, 'PUT', data); 
-                    
-                    // Actualizar el estado local
-                    const index = products.findIndex(p => p.idProducto === parseInt(productIdInput.value));
-                    if (index !== -1) {
-                        products[index] = result;
-                    }
-                    alertUser(`Producto #${result.idProducto} modificado con éxito.`, 'success');
-                    closeModal(); // Close modal after successful edit
-                } else {
-                    // AGREGAR NUEVO
-                    // Para agregar, el idProducto no se envía, el backend lo asigna
-                    // Asegurarse de que el objeto 'data' no contenga 'idProducto' si lo tuviera de alguna forma
-                    delete data.idProducto; 
-
-                    await fetchApi('/productos/agregarProducto', 'POST', data); 
-                    
-                    // En lugar de pushear el resultado (que puede no tener el ID),
-                    // recargamos toda la lista para asegurar la consistencia.
-                    alertUser('Nuevo producto agregado con éxito.', 'success');
-                    closeModal(); // Close modal after successful add
-                }
-            } catch (error) {
-                alertUser(`Error al guardar: ${error.message}`, 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = isEditing ? 'Guardar Cambios' : 'Guardar Producto';
-            }
-        });
-
-        /**
-         * Maneja la eliminación de un producto.
-         */
-        deleteBtn.addEventListener('click', async () => {
-            const productId = productIdInput.value;
-            if (!productId) {
-                alertUser('No hay ningún producto seleccionado para eliminar.', 'info');
-                return;
-            }
-
-            if (!confirm(`¿Estás seguro de que deseas eliminar el producto #${productId}? Esta acción es irreversible.`)) {
-                return;
-            }
-
-            deleteBtn.disabled = true;
-            deleteBtn.textContent = 'Eliminando...';
-
-            try {
-                await fetchApi(`/productos/eliminarProducto/${productId}`, 'DELETE');
-                alertUser(`Producto #${productId} eliminado con éxito.`, 'success');
-                
-                // Eliminar el producto del estado local
-                products = products.filter(p => p.idProducto !== parseInt(productId));
-                loadProducts();
-                closeModal(); // Close modal after successful delete
-            } catch (error) {
-                alertUser(`Error al eliminar el producto: ${error.message}`, 'error');
-            }
             finally {
                 deleteBtn.disabled = false;
                 deleteBtn.textContent = 'Eliminar Producto';
             }
-        });
+        };
 
 
                 // --- INICIALIZACIÓN ---
@@ -568,13 +469,10 @@
                     Quagga.initialized = false; // Reset flag
                 }
                 productScannerModal.classList.remove('modal-active');
-                productScannerModal.classList.add('hidden');
-                productScannerModal.setAttribute('hidden', '');
-                productScannerModal.style.display = ''; // Reset display style
+                productScannerModal.style.display = 'none'; // Explicitly set display to none
                 isProcessingScanProducto = false;
                 // Re-show the product form modal
-                productModal.removeAttribute('hidden');
-                productModal.classList.remove('hidden');
+                productModal.style.display = 'flex';
                 productModal.classList.add('modal-active');
             }
 
@@ -590,8 +488,7 @@
 
                 // Hide the product form modal while scanner is active
                 productModal.classList.remove('modal-active');
-                productModal.classList.add('hidden');
-                productModal.setAttribute('hidden', '');
+                productModal.style.display = 'none'; // Correct way to hide
     
                 if (typeof Quagga === 'undefined') {
                     alert("La librería QuaggaJS no está cargada. Asegúrate de que el CDN está incluido.");
@@ -636,11 +533,7 @@
             startScannerProductoBtn.addEventListener('click', () => {
                 // Before starting scanner, ensure product modal is hidden
                 productModal.classList.remove('modal-active');
-                productModal.classList.add('hidden');
-                productModal.setAttribute('hidden', '');
+                productModal.style.display = 'none'; // Use style.display for consistency
                 startScannerProducto();
             });
             stopProductScannerBtn.addEventListener('click', stopScannerProducto);
-
-
-        

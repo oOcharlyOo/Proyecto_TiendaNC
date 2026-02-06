@@ -207,42 +207,53 @@
         </div>
     </div>
 
-    <!-- Modal para Historial de Ventas -->
-    <div id="historialVentasModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden" hidden>
-        <div class="historial-modal-content relative">
-            <h3 class="text-xl leading-6 font-bold text-gray-900 mb-4">Historial de Ventas del Día</h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
-                <div class="bg-gray-100 p-3 rounded-lg">
-                    <p class="text-sm text-gray-600">Cobro Total del Día</p>
-                    <p id="historialCobroTotal" class="text-2xl font-bold text-income-color">$0.00</p>
-                </div>
-                <div class="bg-gray-100 p-3 rounded-lg">
-                    <p class="text-sm text-gray-600">Ganancia Total del Día</p>
-                    <p id="historialGananciaTotal" class="text-2xl font-bold text-profit-color">$0.00</p>
-                </div>
-            </div>
+    <!-- HISTORY MODAL -->
+    <div id="historialVentasModal" class="fixed inset-0 z-[100] history-overlay hidden flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl wood-texture p-3 rounded-lg animate-pop">
+            <div class="wood-inner p-4 md:p-8 rounded relative">
+                <div class="nail top-3 left-3"></div>
+                <div class="nail top-3 right-3"></div>
+                <div class="nail bottom-3 left-3"></div>
+                <div class="nail bottom-3 right-3"></div>
 
-            <div class="max-h-96 overflow-y-auto w-full">
-                <!-- Encabezado de la tabla para escritorio -->
-                <div class="hidden md:grid grid-cols-6 gap-x-4 p-3 bg-gray-100 font-semibold text-sm text-gray-700 sticky top-0 z-10">
-                    <div class="col-span-1 text-center">Ticket #</div>
-                    <div class="col-span-1 text-center">Monto</div>
-                    <div class="col-span-1 text-center">Método Pago</div>
-                    <div class="col-span-1 text-center">Estatus</div>
-                    <div class="col-span-1 text-center">Fecha</div>
-                    <div class="col-span-1 text-center">Acción</div>
-                </div>
-                <!-- Cuerpo de la lista de historial de ventas -->
-                <div id="historialVentasBody" class="divide-y divide-gray-200">
-                    <!-- Las ventas se cargarán aquí -->
-                </div>
-            </div>
+                <header class="mb-8 border-b-2 border-[#3e2723]/30 pb-4">
+                    <h2 class="text-3xl font-black text-[#3e2723] uppercase italic">📜 Historial de Ventas del Día</h2>
+                </header>
 
-            <div class="mt-6 text-right">
-                <button id="cerrarHistorialModalBtn" class="btn-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-dark">
-                    Cerrar
-                </button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="embedded-item p-6 rounded-lg text-center">
+                        <p class="text-[#3e2723]/60 font-black text-sm uppercase tracking-widest mb-1">Cobro Total del Día</p>
+                        <p id="historialCobroTotal" class="text-4xl font-black text-[#10b981]">$0.00</p>
+                    </div>
+                    <div class="embedded-item p-6 rounded-lg text-center">
+                        <p class="text-[#3e2723]/60 font-black text-sm uppercase tracking-widest mb-1">Ganancia Total del Día</p>
+                        <p id="historialGananciaTotal" class="text-4xl font-black text-[#3b82f6]">$0.00</p>
+                    </div>
+                </div>
+
+                <div class="embedded-item p-4 rounded-lg overflow-x-auto min-h-[300px]">
+                    <table class="w-full text-left text-[#3e2723] font-bold">
+                        <thead>
+                            <tr class="border-b-2 border-[#3e2723]/20 text-xs uppercase opacity-60">
+                                <th class="py-3 px-4">Ticket #</th>
+                                <th class="py-3 px-4">Monto</th>
+                                <th class="py-3 px-4">Método Pago</th>
+                                <th class="py-3 px-4">Estatus</th>
+                                <th class="py-3 px-4">Fecha</th>
+                                <th class="py-3 px-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historialVentasBody">
+                            <!-- Rows will be injected here by interfaz-v3.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-8 flex justify-end">
+                    <button id="cerrarHistorialModalBtn" class="btn-zelda bg-[#3e2723]/60 hover:bg-[#3e2723] text-white px-8 py-3 rounded-lg font-black uppercase tracking-widest border-b-4 border-black shadow-lg">
+                        Cerrar Registro
+                    </button>
+                </div>
             </div>
         </div>
     </div>

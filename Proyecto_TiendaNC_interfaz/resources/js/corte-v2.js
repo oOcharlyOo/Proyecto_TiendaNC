@@ -347,13 +347,11 @@
         // --- L├│gica para el reporte diario ---
         function openDailyReportModal() {
             reportDateInput.valueAsDate = new Date(); // Poner la fecha actual por defecto
-            dailyReportModal.removeAttribute('hidden');
-            dailyReportModal.classList.add('modal-active');
+            dailyReportModal.style.display = 'flex';
         }
 
         function closeDailyReportModal() {
-            dailyReportModal.classList.remove('modal-active');
-            dailyReportModal.setAttribute('hidden', '');
+            dailyReportModal.style.display = 'none';
         }
 
         async function generateDailyReportFromModal() {
@@ -548,16 +546,11 @@ function createMonthlyReportChart(weeklyData, monthYearString) {
 
 
 function openMonthlyReportModal() {
-    // console.log('Opening monthly report modal. Modal element:', monthlyReportModal); // DEBUG LOG
-    // console.log('Monthly Report Modal classList before changes:', monthlyReportModal ? monthlyReportModal.classList : 'Modal not found'); // DEBUG LOG
     const today = new Date();
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
-    reportMonthInput.value = `${year}-${month}`; // Set current month/year by default
-    monthlyReportModal.removeAttribute('hidden');
-    monthlyReportModal.classList.remove('hidden'); // Use Tailwind class to un-hide
-    monthlyReportModal.classList.add('modal-active');
-    // console.log('Monthly Report Modal classList after changes:', monthlyReportModal ? monthlyReportModal.classList : 'Modal not found'); // DEBUG LOG
+    reportMonthInput.value = `${year}-${month}`;
+    monthlyReportModal.style.display = 'flex';
 
     // Reset UI to initial state
     monthlyReportSelectedMonth.textContent = 'Seleccione un mes';
@@ -575,9 +568,7 @@ function openMonthlyReportModal() {
 }
 
 function closeMonthlyReportModal() {
-    monthlyReportModal.classList.remove('modal-active');
-    monthlyReportModal.classList.add('hidden');
-    monthlyReportModal.setAttribute('hidden', '');
+    monthlyReportModal.style.display = 'none';
 }
 
 async function generateMonthlyReport() {

@@ -9,40 +9,44 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- QuaggaJS para lectura de códigos de barras -->
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-
+    <!-- Enlace a cartel.css para el estilo de madera -->
+    <link rel="stylesheet" href="resources/style/cartel.css">
 </head>
 <body class="main-page-body">
 
     <div id="navbar-placeholder"></div>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <div class="main-container flex-col md:flex-row p-2">
+    <!-- CONTENIDO PRINCIPAL - Envuelto en estilo de letrero de madera -->
+    <div class="wood-interface" style="height: 90vh; max-width: 1200px; margin: 5vh auto;">
+        <div class="nail n-tl"></div>
+        <div class="nail n-tr"></div>
+        <div class="nail n-bl"></div>
+        <div class="nail n-br"></div>
         
-        <!-- PANEL IZQUIERDO: LISTA DE PRODUCTOS (60%) -->
-        <div class="w-full md:w-full flex flex-col panel-transparent rounded-lg shadow-xl overflow-hidden">
-            
-            <div class="p-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0">Catálogo de Productos</h2>
+        <div class="parchment-scroll flex flex-col">
+            <!-- Panel de Contenido -->
+            <div class="p-3 border-b-2 border-yellow-800/10 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <h2 class="text-lg sm:text-xl font-bold hylian-font mb-2 sm:mb-0">Catálogo de Productos</h2>
                 <div class="flex flex-col sm:flex-row items-center sm:space-x-2 space-y-2 sm:space-y-0 mt-2 sm:mt-0 w-full sm:w-auto">
                     <div class="flex w-full sm:w-auto space-x-2">
-                        <input type="text" id="productSearchInput" placeholder="Buscar producto..." class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-grow sm:w-48">
-                        <button id="searchProductBtn" class="bg-blue-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-150 shadow-md text-sm sm:text-base">
+                        <input type="text" id="productSearchInput" placeholder="Buscar producto..." class="hylian-select text-sm flex-grow sm:w-48">
+                        <button id="searchProductBtn" class="btn-wood-aesthetic px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base">
                             Buscar
                         </button>
                     </div>
                     <button id="addOrEditProductBtn" 
-                            class="bg-green-600 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-150 shadow-md text-sm sm:text-base w-full sm:w-auto">
+                            class="btn-wood-aesthetic px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base w-full sm:w-auto">
                         + Nuevo Producto
                     </button>
                 </div>
             </div>
 
-            <!-- Contenedor de la lista de productos -->
-            <div id="productTableContainer" class="flex-grow overflow-y-auto">
+            <!-- Contenedor de la lista de productos con scroll -->
+            <div id="productTableContainer" class="flex-grow overflow-y-auto sales-list">
                 <!-- Encabezado de la tabla para escritorio -->
-                <div class="hidden md:grid grid-cols-12 gap-x-4 p-3 border-b bg-gray-100 font-semibold text-sm text-gray-700 sticky top-0 z-10">
+                <div class="hidden md:grid grid-cols-12 gap-x-4 p-3 border-b-2 border-yellow-800/10 bg-yellow-800/10 font-bold hylian-font text-neutral-800 sticky top-0 z-10 text-sm">
                     <div class="col-span-1">ID</div>
-                    <div class="col-span-2">Código de Barras</div>
+                    <div class="col-span-2">Código</div>
                     <div class="col-span-3">Descripción</div>
                     <div class="col-span-1 text-right">P. Venta</div>
                     <div class="col-span-1 text-right">P. Mayoreo</div>
@@ -51,111 +55,129 @@
                 </div>
                 
                 <!-- Cuerpo de la lista de productos (se llenará con JS) -->
-                <div id="productsTableBody" class="divide-y divide-gray-200">
+                <div id="productsTableBody" class="divide-y divide-yellow-800/10 hylian-font text-neutral-800">
                     <!-- Los productos (tarjetas/filas) se cargarán aquí -->
-                    <div class="text-center p-8 text-gray-500">Cargando productos...</div>
+                    <div class="text-center p-8 text-yellow-900/80">Cargando productos...</div>
                 </div>
             </div>
         </div>
-        
     </div>
 
     <script src="resources/js/productos-v2.js" defer></script>
     <script src="nav-v2.js" defer></script>
 
-    <!-- MODAL para Agregar/Modificar Producto -->
-    <div id="productModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center hidden" hidden>
-        <div class="relative p-4 sm:p-5 border w-full max-w-lg md:max-w-xl shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
-            <h3 id="modalTitle" class="text-lg font-bold text-primary mb-4">Agregar Nuevo Producto</h3>
+    <!-- MODAL para Agregar/Modificar Producto - Estilo de Madera -->
+    <div id="productModal" class="modal-overlay">
+        <div class="wood-interface" style="max-width: 90vw; width: 600px; max-height: 85vh; margin: auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; overflow-y: auto;">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 id="modalTitle" class="hylian-font text-xl text-zelda-gold font-bold">Agregar Nuevo Producto</h3>
+                </header>
 
-            <form id="productForm" class="space-y-4">
-                <input type="hidden" id="productId">
+                <form id="productForm" class="space-y-4 p-6 flex flex-col flex-grow">
+                    <input type="hidden" id="productId">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 flex-grow">
+                        <div class="form-group flex items-center space-x-2">
+                            <div class="flex-grow">
+                                <label for="codigoBarras" class="zelda-label-text hylian-font">Código de Barras/PIN</label>
+                                <input type="text" id="codigoBarras" class="hylian-select w-full text-base">
+                            </div>
+                            <button type="button" id="startScannerProductoBtn" class="btn-wood-aesthetic p-2 flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                            </button>
+                        </div>
 
-                <div class="form-group flex items-center space-x-2">
-                    <div class="flex-grow">
-                        <label for="codigoBarras">Código de Barras/PIN</label>
-                        <input type="text" id="codigoBarras">
+                        <div class="form-group">
+                            <label for="nombreProducto" class="zelda-label-text hylian-font">Nombre del Producto</label>
+                            <input type="text" id="nombreProducto" required class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="precioVenta" class="zelda-label-text hylian-font">Precio de Venta ($)</label>
+                            <input type="number" id="precioVenta" step="0.01" min="0" required class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="precioMayoreoInput" class="zelda-label-text hylian-font">Precio de Mayoreo ($)</label>
+                            <input type="number" id="precioMayoreoInput" step="0.01" min="0" class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="precioCosto" class="zelda-label-text hylian-font">Precio de Costo ($)</label>
+                            <input type="number" id="precioCosto" step="0.01" min="0" required class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="stockActual" class="zelda-label-text hylian-font">Stock/Existencia</label>
+                            <input type="number" id="stockActual" min="0" required class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cantidadMin" class="zelda-label-text hylian-font">Cantidad Mínima</label>
+                            <input type="number" id="cantidadMin" min="0" required class="hylian-select w-full text-base">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cantidadMax" class="zelda-label-text hylian-font">Cantidad Máxima</label>
+                            <input type="number" id="cantidadMax" min="0" required class="hylian-select w-full text-base">
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 col-span-full"> <!-- isGramaje checkbox across two columns -->
+                            <input type="checkbox" id="isGramaje" class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary">
+                            <label for="isGramaje" class="text-sm font-medium text-neutral-800 hylian-font">Usa Gramaje (Venta por peso)</label>
+                        </div>
                     </div>
-                    <button type="button" id="startScannerProductoBtn" class="bg-blue-600 text-white p-2 rounded-lg font-semibold hover:bg-blue-700 transition duration-150 shadow-md text-sm flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="form-group">
-                    <label for="nombreProducto">Nombre del Producto</label>
-                    <input type="text" id="nombreProducto" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="precioVenta">Precio de Venta ($)</label>
-                    <input type="number" id="precioVenta" step="0.01" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="precioMayoreoInput">Precio de Mayoreo ($)</label>
-                    <input type="number" id="precioMayoreoInput" step="0.01" min="0">
-                </div>
-
-                <div class="form-group">
-                    <label for="precioCosto">Precio de Costo ($)</label>
-                    <input type="number" id="precioCosto" step="0.01" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="stockActual">Stock/Existencia</label>
-                    <input type="number" id="stockActual" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="cantidadMin">Cantidad Mínima</label>
-                    <input type="number" id="cantidadMin" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="cantidadMax">Cantidad Máxima</label>
-                    <input type="number" id="cantidadMax" min="0" required>
-                </div>
-
-                <div>
-                    <input type="checkbox" id="isGramaje" class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary">
-                    <label for="isGramaje" class="text-sm font-medium text-gray-700">Usa Gramaje (Venta por peso)</label>
-                </div>
-                
-                <div class="flex flex-col sm:flex-row space-x-0 sm:space-x-4 space-y-3 sm:space-y-0 mt-6">
-                    <button type="submit" id="submitBtn" 
-                            class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-lg">
-                        Guardar Producto
-                    </button>
-                    <button type="button" id="deleteBtn" 
-                            class="w-full btn-danger text-white font-semibold py-3 rounded-lg hover:bg-danger-dark transition duration-150 shadow-lg hidden">
-                        Eliminar Producto
-                    </button>
-                    <button type="button" id="cancelBtn" 
-                            class="w-full btn-secondary text-white font-semibold py-3 rounded-lg hover:bg-secondary-dark transition duration-150 shadow-lg">
-                        Cancelar
-                    </button>
-                </div>
-            </form>
+                    
+                    <div class="flex flex-col sm:flex-row space-x-0 sm:space-x-4 space-y-3 sm:space-y-0 mt-6 px-6 pt-4 border-t border-yellow-800/10">
+                        <button type="submit" id="submitBtn" 
+                                class="w-full btn-wood-aesthetic font-semibold py-3">
+                            Guardar Producto
+                        </button>
+                        <button type="button" id="deleteBtn" 
+                                class="w-full btn-wood-aesthetic font-semibold py-3 hidden" style="background-color: #a35a44;">
+                            Eliminar Producto
+                        </button>
+                        <button type="button" id="cancelBtn" 
+                                class="w-full btn-wood-aesthetic font-semibold py-3" style="background-color: var(--ink-color);">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL para Escáner de Productos -->
-    <div id="productScannerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center hidden" hidden>
-        <div class="relative p-4 sm:p-5 border w-full max-w-lg shadow-lg rounded-md bg-white max-h-full overflow-y-auto">
-            <h3 class="text-lg font-bold text-primary mb-4">Escanear Código de Barras</h3>
-            <div id="interactive-product-scanner" class="viewport">
-                <div class="scanner-laser"></div>
+    <!-- MODAL para Escáner de Productos - Estilo de Madera -->
+    <div id="productScannerModal" class="modal-overlay">
+        <div class="wood-interface" style="width: 500px; height: auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; min-height: auto;">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 class="hylian-font text-xl text-zelda-gold font-bold">Escanear Código de Barras</h3>
+                </header>
+                <div class="p-6">
+                    <div id="interactive-product-scanner" class="viewport bg-gray-200 border-2 border-gray-300 rounded-lg overflow-hidden flex justify-center items-center">
+                        <div class="scanner-laser"></div>
+                    </div>
+                    <button id="stopProductScannerBtn" class="btn-wood-aesthetic mt-6 w-full" style="background-color: #a35a44;">
+                        Cancelar Escaneo
+                    </button>
+                </div>
             </div>
-            <button id="stopProductScannerBtn" class="scanner-cancel-btn">
-                Cancelar Escaneo
-            </button>
         </div>
     </div>
     
     <!-- Feedback de Último Escaneo (para productos.js) -->
-    <div id="scanFeedbackProducto" class="fixed bottom-4 right-4 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 flex items-center gap-3 shadow-xl z-50 hidden">
+    <div id="scanFeedbackProducto" class="fixed bottom-4 right-4 p-4 rounded-xl flex items-center gap-3 shadow-xl z-50 hidden toast-feedback">
         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
         <div>
             <p class="font-bold">Código Detectado</p>

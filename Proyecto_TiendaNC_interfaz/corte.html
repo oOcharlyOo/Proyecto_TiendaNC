@@ -154,20 +154,27 @@
         </div>
     </div>
 
-    <!-- Modal para seleccionar fecha de reporte diario -->
-    <div id="dailyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" hidden>
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Generar Reporte por Día</h3>
-                <div class="mt-4 px-7 py-3">
-                    <label for="reportDate" class="block text-sm font-medium text-gray-700 text-left">Selecciona una fecha:</label>
-                    <input type="date" id="reportDate" name="reportDate" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+    <!-- Modal para seleccionar fecha de reporte diario con estilo de madera -->
+    <div id="dailyReportModal" class="modal-overlay">
+        <div class="wood-interface" style="width: 500px; height: auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; min-height: auto;">
+                <header class="text-center p-6 border-b-2 border-yellow-800/10">
+                    <h1 class="hylian-font text-2xl text-yellow-950 font-bold">Reporte por Día</h1>
+                    <p class="text-sm text-yellow-900/70 mt-1">Selecciona una fecha para ver el registro.</p>
+                </header>
+                <div class="p-8 text-center">
+                    <label for="reportDate" class="filter-label text-left block">Sol (Día)</label>
+                    <input type="date" id="reportDate" name="reportDate" class="hylian-select w-full text-center text-lg p-2">
                 </div>
-                <div class="items-center px-4 py-3 space-x-4">
-                    <button id="generateReportFromModalBtn" class="px-4 py-2 btn-primary text-white text-base font-medium rounded-md shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary">
-                        Generar Reporte
+                <div class="flex justify-center gap-4 pb-6">
+                    <button id="generateReportFromModalBtn" class="btn-wood-aesthetic py-2 px-6">
+                        Generar
                     </button>
-                    <button id="cancelModalBtn" class="px-4 py-2 btn-secondary text-white text-base font-medium rounded-md shadow-sm hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary">
+                    <button id="cancelModalBtn" class="btn-wood-aesthetic py-2 px-6" style="background-color: #a35a44;">
                         Cancelar
                     </button>
                 </div>
@@ -175,79 +182,86 @@
         </div>
     </div>
 
-    <!-- Modal para reporte mensual (Nuevo Diseño) -->
-    <div id="monthlyReportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="relative w-full max-w-md-custom md:w-full xl:w-3/4 xl:max-w-7xl bg-slate-100 rounded-lg shadow-2xl flex flex-col max-h-full overflow-hidden" style="height: 80%;">
-            <div class="p-4 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-bold text-slate-800">Reporte Mensual de Ventas</h3>
-                    <p class="text-sm text-slate-500">Analiza el rendimiento de tus ventas mes a mes.</p>
-                </div>
-                <button id="cancelMonthlyModalBtn" class="p-2 rounded-full hover:bg-slate-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
-            <div class="flex-grow p-4 grid grid-cols-12 gap-6 overflow-y-auto">
-                <div class="col-span-12 lg:col-span-4 bg-white rounded-lg p-4 space-y-6">
+    <!-- Modal para reporte mensual (Nuevo Diseño con Estilo de Madera) -->
+    <div id="monthlyReportModal" class="modal-overlay">
+        <div class="wood-interface" style="width: 90vw; max-width: 1200px; height: 90vh;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; display: flex; flex-direction: column;">
+                <header class="p-4 border-b-2 border-yellow-800/10 flex items-center justify-between">
                     <div>
-                        <label for="reportMonth" class="block text-sm font-semibold text-slate-700 mb-1">Seleccionar Mes:</label>
-                        <input type="month" id="reportMonth" name="reportMonth" class="w-full text-sm p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        <button id="modalGenerateMonthlyReportBtn" class="w-full mt-3 btn-primary text-white font-bold text-sm py-2 px-4 rounded-md transition-all flex items-center justify-center">
-                            Generar Reporte
-                        </button>
+                        <h3 class="hylian-font text-xl font-bold text-yellow-950">Reporte Mensual de Ventas</h3>
+                        <p class="text-sm text-yellow-900/70">Analiza el rendimiento de tus ventas mes a mes.</p>
                     </div>
-                    <div class="space-y-4">
-                        <h4 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Estadísticas del Mes</h4>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-indigo-100 rounded-md"><svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
-                                <span class="font-bold text-sm text-slate-600">Ventas Totales</span>
+                    <button id="cancelMonthlyModalBtn" class="p-2 rounded-full hover:bg-yellow-800/10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-950" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </header>
+                <div class="flex-grow p-4 grid grid-cols-12 gap-6 overflow-y-auto">
+                    <div class="col-span-12 lg:col-span-4 bg-white/30 rounded-lg p-4 space-y-6">
+                        <div>
+                            <label for="reportMonth" class="filter-label">Seleccionar Luna (Mes):</label>
+                            <input type="month" id="reportMonth" name="reportMonth" class="hylian-select w-full text-base">
+                            <button id="modalGenerateMonthlyReportBtn" class="w-full mt-3 btn-wood-aesthetic py-2 px-4">
+                                Generar Reporte
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="text-sm font-bold text-yellow-900/60 uppercase tracking-wider">Estadísticas del Mes</h4>
+                            <!-- Contenido de estadísticas sin cambios -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-indigo-100 rounded-md"><svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ventas Totales</span>
+                                </div>
+                                <div class="text-right">
+                                    <p id="monthlyReport-stats-ventas-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-ventas-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <p id="monthlyReport-stats-ventas-value" class="font-bold text-slate-800 text-sm">$0.00</p>
-                                <p id="monthlyReport-stats-ventas-change" class="text-xs font-mono text-slate-500">--%</p>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-purple-100 rounded-md"><svg class="h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.356-2A8.001 8.001 0 0119.418 15m0 0H15"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ventas por Transferencia</span>
+                                </div>
+                                 <div class="text-right">
+                                    <p id="monthlyReport-stats-transferencia-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-transferencia-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-amber-100 rounded-md"><svg class="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ganancias</span>
+                                </div>
+                                <div class="text-right">
+                                    <p id="monthlyReport-stats-ganancias-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-ganancias-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-purple-100 rounded-md"><svg class="h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.356-2A8.001 8.001 0 0119.418 15m0 0H15"/></svg></div>
-                                <span class="font-bold text-sm text-slate-600">Ventas por Transferencia</span>
-                            </div>
-                             <div class="text-right">
-                                <p id="monthlyReport-stats-transferencia-value" class="font-bold text-slate-800 text-sm">$0.00</p>
-                                <p id="monthlyReport-stats-transferencia-change" class="text-xs font-mono text-slate-500">--%</p>
-                            </div>
+                    </div>
+                    <div class="col-span-12 lg:col-span-8 bg-white/30 rounded-lg p-4 flex flex-col">
+                        <div id="monthlyReport-selectedMonth" class="mb-4">
+                            <span class="hylian-font text-lg font-bold text-yellow-950">Seleccione un mes</span>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <div class="p-2 bg-amber-100 rounded-md"><svg class="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg></div>
-                                <span class="font-bold text-sm text-slate-600">Ganancias</span>
-                            </div>
-                            <div class="text-right">
-                                <p id="monthlyReport-stats-ganancias-value" class="font-bold text-slate-800 text-sm">$0.00</p>
-                                <p id="monthlyReport-stats-ganancias-change" class="text-xs font-mono text-slate-500">--%</p>
-                            </div>
+                        <div id="monthly-report-chart-container" class="flex-grow mb-4">
+                            <canvas id="monthlyReportChart"></canvas>
                         </div>
                     </div>
                 </div>
-                <div class="col-span-12 lg:col-span-8 bg-white rounded-lg p-4 flex flex-col">
-                    <div id="monthlyReport-selectedMonth" class="mb-4">
-                        <span class="text-lg font-bold text-slate-800">Seleccione un mes</span>
-                    </div>
-                    <div id="monthly-report-chart-container" class="flex-grow mb-4">
-                        <canvas id="monthlyReportChart"></canvas>
-                    </div>
+                <div id="monthlyReport-footer-tip" class="p-3 bg-yellow-800/10 border-t border-yellow-800/20 rounded-b-lg text-center hidden">
+                     <p id="monthlyReport-footer-tip-text" class="hylian-font text-xs text-yellow-900/80">Tip: Compara la ganancia semanal para identificar tendencias.</p>
                 </div>
-            </div>
-            <div id="monthlyReport-footer-tip" class="p-3 bg-slate-200 border-t border-slate-300 rounded-b-lg text-center hidden">
-                 <p id="monthlyReport-footer-tip-text" class="text-xs text-slate-600">Tip: Compara la ganancia semanal para identificar tendencias.</p>
             </div>
         </div>
     </div>
 
     <!-- Modal de Historial Completo -->
     <div id="historyModal" class="modal-overlay">
-        <div class="wood-interface">
+        <div class="wood-interface" style="width: 90vw; height: 90vh; max-width: 1200px; margin: 5vh auto;">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
@@ -293,7 +307,7 @@
     <div class="modal-overlay" id="modal-overlay-details">
         <div class="modal-content">
             <div class="close-btn" onclick="closeModalDetails()">×</div>
-            <div class="stamp">REGISTRO<br>VÁLIDO</div>
+            <div class="stamp">APROBADO<br>POR<br>HYRULE</div>
             <div class="border-b border-gray-300 pb-3 mb-6">
                 <h2 class="hylian-font text-2xl text-yellow-950" id="modal-item-name">Nombre</h2>
                 <p class="text-xs uppercase tracking-widest text-gray-500 font-bold" id="modal-category">Categoría</p>

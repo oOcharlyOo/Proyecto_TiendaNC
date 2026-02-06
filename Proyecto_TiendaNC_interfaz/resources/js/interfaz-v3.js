@@ -185,10 +185,14 @@
 
                 const ticketPanel = document.getElementById('ticketPanel'); // Nuevo: Referencia al panel principal del ticket
 
+                // --- DOM elements ---
+                // Initial declarations already exist at the top of DOMContentLoaded
+                // const codigoProductoInput = document.getElementById('codigoProducto'); // Already declared above
+                // const startVoiceCommandBtn = document.getElementById('startVoiceCommandBtn'); // Already declared above
+
                 // NLP DOM elements
                 const nlpTextInput = document.getElementById('nlpTextInput');
                 const processNlpBtn = document.getElementById('processNlpBtn');
-                const startVoiceCommandBtn = document.getElementById('startVoiceCommandBtn'); // NEW
 
                 // --- SPEECH-TO-TEXT (VOICE COMMAND) LOGIC ---
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -204,21 +208,19 @@
                     recognition.onstart = () => {
                         isRecognizing = true;
                         startVoiceCommandBtn.innerHTML = `
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
+                            <span class="text-xl animate-pulse">🎙️</span>
                         `; // Pulsing mic icon
                         startVoiceCommandBtn.classList.add('bg-red-500', 'hover:bg-red-600');
-                        startVoiceCommandBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+                        startVoiceCommandBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700'); // Assuming blue was original
                         window.showToast({ message: 'Escuchando tu pedido...', type: 'info' });
                     };
 
                     recognition.onresult = (event) => {
                         const transcript = event.results[0][0].transcript;
-                        nlpTextInput.value = transcript;
+                        nlpTextInput.value = transcript; // Writes to nlpTextInput again
                         window.showToast({ message: `Comando por voz detectado: "${transcript}"`, type: 'info' });
                         // Automatically process the NLP command after recognition
-                        processNlpOrder();
+                        processNlpOrder(); // Calls processNlpOrder() again
                     };
 
                     recognition.onerror = (event) => {
@@ -234,23 +236,24 @@
                     };
 
                     startVoiceCommandBtn.addEventListener('click', () => {
+                        console.log('startVoiceCommandBtn click event triggered'); // DEBUG
                         if (isRecognizing) {
                             recognition.stop();
                         } else {
-                            // Clear previous input before starting new recognition
-                            nlpTextInput.value = ''; 
+                            // Clear previous NLP input before starting new recognition
+                            nlpTextInput.value = ''; // Clears nlpTextInput again
                             recognition.start();
                         }
                     });
 
+                    console.log('Event listener attached to startVoiceCommandBtn for click'); // DEBUG
+
                     function resetVoiceCommandBtn() {
                         startVoiceCommandBtn.innerHTML = `
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
+                            <span class="text-xl">🎙️</span>
                         `; // Original mic icon
                         startVoiceCommandBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-                        startVoiceCommandBtn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                        startVoiceCommandBtn.classList.add('bg-blue-600', 'hover:bg-blue-700'); // Assuming blue was original
                     }
 
                 } else {
@@ -517,7 +520,7 @@
 
 
 
-            function renderTicket() {
+            function renderTicket(newlyAddedItemId = null) {
                 const ticketItemsContainer = document.getElementById('ticketItems');
                 ticketItemsContainer.innerHTML = ''; // Clear previous items
 
@@ -529,6 +532,19 @@
                         const itemElement = document.createElement('div');
                         itemElement.className = 'ticket-item block p-3 md:grid md:grid-cols-12 md:gap-x-4 md:items-center';
                         itemElement.dataset.id = item.idProducto;
+
+                        // Generate subtle random inset box-shadow for varied carved effect
+                        const blur = Math.floor(Math.random() * 5) + 5; // 5-9px blur
+                        const spread = Math.floor(Math.random() * 3) + 1; // 1-3px spread
+                        const opacity = (Math.random() * 0.1) + 0.1; // 0.1-0.2 opacity
+                        itemElement.style.boxShadow = `inset 0 2px ${blur}px ${spread}px rgba(0,0,0,${opacity})`;
+
+                        if (item.idProducto === newlyAddedItemId) {
+                            itemElement.classList.add('new-ticket-item-effect');
+                            setTimeout(() => {
+                                itemElement.classList.remove('new-ticket-item-effect');
+                            }, 300);
+                        }
 
                         const importe = item._nlpTargetTotalPrice !== null && item._nlpTargetTotalPrice !== undefined
                                         ? item._nlpTargetTotalPrice
@@ -743,11 +759,11 @@
                         _nlpTargetTotalPrice: commandData.tipo === "PRECIO" && isGramajeProduct ? commandData.valor : null
                     });
                 }
-                renderTicket();
+                renderTicket(productId);
             }
 
             async function addProduct(code) {
-
+                console.log('--- addProduct function started ---'); // NEW DEBUG
                 console.log('addProduct called with code:', code); // DEBUG LOG
 
                 if (!code) return;
@@ -920,7 +936,7 @@
 
                                     });
 
-                                    renderTicket();
+                                    renderTicket(productData.idProducto);
 
                                     playSuccessBeep(); // Play success beep
 
@@ -1414,13 +1430,19 @@
             });
 
             codigoProductoInput.addEventListener('keydown', e => {
+                console.log('codigoProductoInput keydown event triggered'); // DEBUG
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     addProduct(e.target.value);
                     searchResultsContainer.classList.add('hidden');
                 }
             });
-            agregarProductoBtn.addEventListener('click', () => addProduct(codigoProductoInput.value));
+            console.log('Event listener attached to codigoProductoInput for keydown'); // DEBUG
+            agregarProductoBtn.addEventListener('click', () => {
+                console.log('agregarProductoBtn click event triggered'); // DEBUG
+                addProduct(codigoProductoInput.value);
+            });
+            console.log('Event listener attached to agregarProductoBtn for click'); // DEBUG
             
             cobrarEfectivoBtn.addEventListener('click', openPaymentModal);
             cancelPaymentBtn.addEventListener('click', closePaymentModal);
@@ -1635,18 +1657,14 @@
             // Add event listener for "Ver Historial" button
             if (verHistorialBtn) { // Defensive check
                 verHistorialBtn.addEventListener('click', () => {
-                    historialModal.removeAttribute('hidden');
-                    historialModal.classList.remove('hidden'); // Also remove Tailwind's hidden class
-                    historialModal.classList.add('modal-active');
+                    historialModal.classList.remove('hidden'); // New modal structure only needs hidden class toggled
                     cargarHistorialVentas();
                 });
             }
 
             if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
                 cerrarHistorialModalBtn.addEventListener('click', () => {
-                    historialModal.classList.remove('modal-active');
-                    historialModal.classList.add('hidden'); // Also add Tailwind's hidden class back
-                    historialModal.setAttribute('hidden', '');
+                    historialModal.classList.add('hidden'); // New modal structure only needs hidden class toggled
                 });
             }
 
@@ -1739,7 +1757,7 @@
                         });
                     }
 
-                    renderTicket();
+                    renderTicket(productId);
                     closeGramajeCalculator();
                     window.showToast({ message: `Producto por gramaje "${productName}" agregado a la venta.`, type: 'success' });
 
@@ -1808,14 +1826,14 @@
                 Quagga.stop();
                 document.getElementById('scanner-container').classList.add('hidden');
                 document.getElementById('ticketPanel').classList.remove('hidden');
-                document.querySelector('.w-full.md\\:w-1\\/4').classList.remove('hidden');
+                document.querySelector('.w-full.lg\\:w-1\\/3').classList.remove('hidden');
             }
 
             function startScanner() {
                 isProcessingScan = false; // Reset flag on new scan session
                 document.getElementById('scanner-container').classList.remove('hidden');
                 document.getElementById('ticketPanel').classList.add('hidden');
-                document.querySelector('.w-full.md\\:w-1\\/4').classList.add('hidden');
+                document.querySelector('.w-full.lg\\:w-1\\/3').classList.add('hidden');
     
     
                 Quagga.init({
