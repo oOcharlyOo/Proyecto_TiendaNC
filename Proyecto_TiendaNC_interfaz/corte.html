@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Punto de Venta - CORTE DE CAJA</title>
     <link rel="stylesheet" href="resources/style/output.css">
+    <link rel="stylesheet" href="resources/style/estilos.css">
+    <link rel="stylesheet" href="resources/style/cartel.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Quicksand:wght@300;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="resources/style/cartel.css">
     <link rel="stylesheet" href="resources/style/sign-button.css">
     <link rel="stylesheet" href="resources/style/hanging-buttons.css">
 </head>
@@ -18,7 +18,7 @@
     <!-- BARRA SUPERIOR DE NAVEGACIÓN -->
     <div id="navbar-placeholder"></div>
 
-    <div class="main-container">
+    <div class="main-container wood-texture"> <!-- Added wood-texture class -->
         <div class="nail n-tl"></div>
         <div class="nail n-tr"></div>
         <div class="nail n-bl"></div>
@@ -156,7 +156,7 @@
 
     <!-- Modal para seleccionar fecha de reporte diario con estilo de madera -->
     <div id="dailyReportModal" class="modal-overlay">
-        <div class="wood-interface" style="width: 500px; height: auto;">
+        <div class="wood-texture" style="width: 500px; height: auto;">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
@@ -184,7 +184,7 @@
 
     <!-- Modal para reporte mensual (Nuevo Diseño con Estilo de Madera) -->
     <div id="monthlyReportModal" class="modal-overlay">
-        <div class="wood-interface" style="width: 90vw; max-width: 1200px; height: 90vh;">
+        <div class="wood-texture" style="width: 90vw; max-width: 1200px; height: 90vh;">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
@@ -261,7 +261,7 @@
 
     <!-- Modal de Historial Completo -->
     <div id="historyModal" class="modal-overlay">
-        <div class="wood-interface" style="width: 90vw; height: 90vh; max-width: 1200px; margin: 5vh auto;">
+        <div class="wood-texture" style="width: 90vw; height: 90vh; max-width: 1200px; margin: 5vh auto;">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
@@ -332,7 +332,7 @@
         </div>
     </div>
 
-    <script src="nav-v2.js"></script>
+    <script src="resources/js/main.js"></script>
     <script src="resources/js/corte-v2.js"></script>
 <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -388,7 +388,7 @@
 
                 } catch (error) {
                     console.error("Error fetching sales history:", error);
-                    document.getElementById('sales-container').innerHTML = `<div class="text-center py-20 opacity-30 italic hylian-font">Error al cargar los registros.</div>`;
+                    document.getElementById('sales-container').innerHTML = `<div class="text-center py-20 opacity-30 italic hylian-font">Ningún registro hallado...</div>`;
                 }
             }
 
@@ -448,7 +448,7 @@
                                 <div class="w-10 h-10 bg-yellow-900/5 rounded-full flex items-center justify-center text-xl opacity-50 font-bold">${displayTicketNumber}</div>
                                 <div>
                                     <h3 class="hylian-font font-bold text-base text-yellow-950">Venta #${displayTicketNumber}</h3>
-                                    <span class="text-[9px] opacity-50 uppercase font-bold tracking-wider">${formattedDate}</span>
+                                    <span class="text-[9px] opacity-50 uppercase tracking-wider">${formattedDate}</span>
                                 </div>
                             </div>
                             <div class="text-right">

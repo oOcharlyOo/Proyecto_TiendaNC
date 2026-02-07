@@ -7,20 +7,21 @@
     <link rel="stylesheet" href="resources/style/output.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="resources/style/cartel.css">
+    <link rel="stylesheet" href="resources/style/estilos.css"> <!-- Added estilos.css for global styles -->
 </head>
 <body class="main-page-body">
     <div id="navbar-placeholder"></div>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div class="flex flex-col md:flex-row p-4 gap-4">
+    <div class="main-container flex flex-col md:flex-row p-4 gap-4 flex-grow">
         
         <!-- Contenedor de Cartel de Madera Izquierdo -->
-        <div class="wood-interface is-danger md:w-2/5" style="height: 85vh; margin: 0;">
+        <div class="wood-texture is-danger md:w-2/5 flex flex-col flex-grow">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
             <div class="nail n-br"></div>
-            <div class="parchment-scroll">
+            <div class="wood-inner parchment-scroll flex-grow flex flex-col min-h-0">
                 <!-- PANEL IZQUIERDO: PRODUCTOS CON BAJO INVENTARIO -->
                 <div class="p-3 border-b-2 border-yellow-800/10 rounded-t-lg">
                     <h2 class="text-lg sm:text-xl font-bold flex items-center hylian-font" style="color: var(--zelda-red-text);">
@@ -32,8 +33,8 @@
                 </div>
 
                 <!-- Contenedor de la Tabla de Bajo Stock -->
-                <div class="flex-grow overflow-y-auto sales-list">
-                    <div class="overflow-x-auto">
+                <div class="flex-grow overflow-y-auto sales-list min-h-0">
+                    <div class="overflow-x-auto" style="height: 500px;">
                         <table class="w-full text-left low-stock-table text-sm">
                             <thead class="hylian-font text-yellow-900/80">
                                 <tr>
@@ -54,12 +55,12 @@
         </div>
         
         <!-- Contenedor de Cartel de Madera Derecho -->
-        <div class="wood-interface md:w-3/5" style="height: 85vh; margin: 0;">
+        <div class="wood-texture md:w-3/5 flex flex-col flex-grow">
             <div class="nail n-tl"></div>
             <div class="nail n-tr"></div>
             <div class="nail n-bl"></div>
             <div class="nail n-br"></div>
-            <div class="parchment-scroll">
+            <div class="wood-inner parchment-scroll flex-grow flex flex-col min-h-0">
                 <!-- PANEL DERECHO: CATÁLOGO COMPLETO -->
                 <div class="p-3 border-b-2 border-yellow-800/10 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <h2 class="text-lg sm:text-xl font-bold text-yellow-950 mb-2 sm:mb-0 hylian-font">Catálogo de Inventario (<span id="totalProductCount">0</span>)</h2>
@@ -67,8 +68,8 @@
                 </div>
 
                 <!-- Contenedor de la Tabla Completa -->
-                <div class="flex-grow overflow-y-auto sales-list">
-                    <div class="overflow-x-auto">
+                <div class="flex-grow overflow-y-auto sales-list min-h-0">
+                    <div class="overflow-x-auto" style="height: 500px;">
                         <table class="w-full text-left product-table text-sm">
                             <thead class="hylian-font text-yellow-900/80">
                                 <tr>
@@ -92,8 +93,8 @@
 
     </div>
 
-    <script src="resources/js/inventario-v2.js" defer></script>
-    <script src="nav-v2.js" defer></script>  
+    <script src="resources/js/main.js" defer></script>
+    <script src="resources/js/inventario-v2.js" defer></script>  
 
 </body>
 </html>

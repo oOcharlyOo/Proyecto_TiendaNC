@@ -6,6 +6,7 @@
     <title>Acceso al Sistema POS</title>
     <link rel="stylesheet" href="/resources/style/output.css">
     <link rel="stylesheet" href="/resources/style/estilos.css">
+    <link rel="stylesheet" href="/resources/style/cartel.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
 </head>
@@ -57,18 +58,24 @@
     </div>
 
     <!-- MODAL PARA MONTO INICIAL DE CAJA -->
-    <div id="initialCashModal" class="modal">
-        <div class="modal-content">
-            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Monto Inicial de Caja</h2>
-            <p class="text-gray-600 mb-6">Por favor, ingresa el monto inicial con el que abres la caja hoy.</p>
-            <input type="number" id="initialCashInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none input-focus-primary transition duration-150 ease-in-out mb-6 text-center text-xl" placeholder="0.00" step="0.01" min="0" value="0.00">
-            <button id="saveInitialCashBtn" class="w-full text-white font-semibold py-3 rounded-lg btn-primary focus:outline-none focus:ring-4 focus:ring-rose-500 focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01] shadow-lg hover:shadow-xl">
-                Continuar a Ventas
-            </button>
+    <div id="initialCashModal" class="modal-overlay">
+        <div class="wood-texture" style="max-width: 90vw; width: 600px; max-height: 85vh; margin: auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; overflow-y: auto;">
+                <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Monto Inicial de Caja</h2>
+                <p class="text-gray-600 mb-6">Por favor, ingresa el monto inicial con el que abres la caja hoy.</p>
+                <input type="number" id="initialCashInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none input-focus-primary transition duration-150 ease-in-out mb-6 text-center text-xl" placeholder="0.00" step="0.01" min="0" value="0.00">
+                <button id="saveInitialCashBtn" class="w-full text-white font-semibold py-3 rounded-lg btn-primary focus:outline-none focus:ring-4 focus:ring-rose-500 focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01] shadow-lg hover:shadow-xl">
+                    Continuar a Ventas
+                </button>
+            </div>
         </div>
     </div>
 
-    <script src="/nav-v2.js" defer></script>
+    <script src="/resources/js/main.js" defer></script>
     <script src="/resources/js/login-v2.js" defer></script>
 </body>
 </html>

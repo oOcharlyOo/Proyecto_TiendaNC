@@ -1,4 +1,4 @@
-        const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost:8080';
         const activeUser = JSON.parse(sessionStorage.getItem('activeUser'));
         const activeUserShift = JSON.parse(sessionStorage.getItem('activeUserShift'));
 
@@ -147,16 +147,6 @@
                 subtotalDisplay.textContent = totalDisplay.textContent = `$${total.toFixed(2)}`;
             }
 
-            // Moved function definitions outside DOMContentLoaded for broader scope if needed
-
-
-            function getTodayDate() {
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
 
             // All other DOM-related variables and event listeners should be inside DOMContentLoaded
             document.addEventListener('DOMContentLoaded', () => { 
@@ -207,11 +197,8 @@
 
                     recognition.onstart = () => {
                         isRecognizing = true;
-                        startVoiceCommandBtn.innerHTML = `
-                            <span class="text-xl animate-pulse">🎙️</span>
-                        `; // Pulsing mic icon
-                        startVoiceCommandBtn.classList.add('bg-red-500', 'hover:bg-red-600');
-                        startVoiceCommandBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700'); // Assuming blue was original
+                        // The original button for voice command is not present in the new HTML.
+                        // So, we will not update its innerHTML or classList here.
                         window.showToast({ message: 'Escuchando tu pedido...', type: 'info' });
                     };
 
@@ -221,6 +208,30 @@
                         window.showToast({ message: `Comando por voz detectado: "${transcript}"`, type: 'info' });
                         // Automatically process the NLP command after recognition
                         processNlpOrder(); // Calls processNlpOrder() again
+                    };
+
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        window.showToast({ message: `Error en el reconocimiento de voz: ${event.error}`, type: 'error' });
+                        isRecognizing = false;
+                        // resetVoiceCommandBtn(); // No button to reset in new HTML.
+                    };
+
+                    recognition.onend = () => {
+                        isRecognizing = false;
+                        // resetVoiceCommandBtn(); // No button to reset in new HTML.
+                    };
+
+                    const startVoiceCommandBtn = document.getElementById('startVoiceCommandBtn');
+
+                    recognition.onstart = () => {
+                        isRecognizing = true;
+                        startVoiceCommandBtn.innerHTML = `
+                            <span class="text-xl animate-pulse">🎙️</span>
+                        `; // Pulsing mic icon
+                        startVoiceCommandBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                        startVoiceCommandBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600'); // Assuming blue was original
+                        window.showToast({ message: 'Escuchando tu pedido...', type: 'info' });
                     };
 
                     recognition.onerror = (event) => {
@@ -253,7 +264,7 @@
                             <span class="text-xl">🎙️</span>
                         `; // Original mic icon
                         startVoiceCommandBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-                        startVoiceCommandBtn.classList.add('bg-blue-600', 'hover:bg-blue-700'); // Assuming blue was original
+                        startVoiceCommandBtn.classList.add('bg-gray-500', 'hover:bg-gray-600'); // Assuming blue was original
                     }
 
                 } else {
@@ -478,13 +489,13 @@
                         const allSaleDetails = await fetchApi(`/ventasDetalle/porVenta/${saleId}`); // Corrected endpoint
 
                         if (allSaleDetails && allSaleDetails.length > 0) {
-                            const saleDetails = allSaleDetails[0].Venta; // Extract main sale info from the first detail item
+                            const saleData = allSaleDetails[0].Venta; // Extract main sale info from the first detail item
                             
-                            detailIdVenta.textContent = saleDetails.idVenta;
-                            detailMontoTotal.textContent = `$${saleDetails.montoTotal.toFixed(2)}`;
-                            detailMetodoPago.textContent = saleDetails.metodoPago;
-                            detailEstatus.textContent = saleDetails.estatus;
-                            detailFechaVenta.textContent = new Date(saleDetails.fechaVenta).toLocaleString();
+                            detailIdVenta.textContent = saleData.idVenta;
+                            detailMontoTotal.textContent = `$${saleData.montoTotal.toFixed(2)}`;
+                            detailMetodoPago.textContent = saleData.metodoPago;
+                            detailEstatus.textContent = saleData.estatus;
+                            detailFechaVenta.textContent = new Date(saleData.fechaVenta).toLocaleString();
 
                             // Populate items table
                             saleDetailsTableBody.innerHTML = '';
@@ -954,7 +965,7 @@
 
                                 codigoProductoInput.disabled = false;
 
-                                agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
+                                agregarProductoBtn.textContent = 'Añadir';
 
                                 codigoProductoInput.focus();
 
@@ -1333,7 +1344,7 @@
                     // 2. Intentar buscar por Código de Barras (funciona para códigos numéricos y alfanuméricos)
                     try {
                         const productByBarcode = await fetchApi(`/productos/buscarPorCodigoBarras/${trimmedQuery}`);
-                        // Solo añadir si no es un duplicado del encontrado por ID
+                        // Solo añadir si no es un duplicado del encontrado por ID o Código de Barras
                         if (productByBarcode && !results.some(p => p.idProducto === productByBarcode.idProducto)) {
                             results.push(productByBarcode);
                         }
@@ -1455,7 +1466,7 @@
                     handlePayment();
                 }
             });
-            ticketItems.addEventListener('click', async e => {
+            ticketItemsTableBody.addEventListener('click', async e => {
                 const target = e.target;
                 const index = target.closest('[data-index]')?.dataset.index;
 
@@ -1482,13 +1493,8 @@
             const historialCobroTotalEl = document.getElementById('historialCobroTotal');
             const historialGananciaTotalEl = document.getElementById('historialGananciaTotal');
 
-            function getTodayDate() {
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
+            // --- Note: getTodayDate() is also defined in main.js, this might be a duplicate or intended for this specific scope.
+            // Keeping it here for now as it was in the original snippet, but it's good to be aware.
 
             async function cargarHistorialVentas() {
                 const today = getTodayDate();
@@ -1766,7 +1772,7 @@
                 } finally {
                     codigoProductoInput.value = '';
                     codigoProductoInput.disabled = false;
-                    agregarProductoBtn.textContent = 'ENTER - Agregar por Código';
+                    agregarProductoBtn.textContent = 'Añadir';
                     codigoProductoInput.focus();
                 }
             }
@@ -1826,15 +1832,18 @@
                 Quagga.stop();
                 document.getElementById('scanner-container').classList.add('hidden');
                 document.getElementById('ticketPanel').classList.remove('hidden');
-                document.querySelector('.w-full.lg\\:w-1\\/3').classList.remove('hidden');
+                // The new HTML structure does not have a ".w-full.lg\:w-1\/3" div to hide/show.
+                // Assuming this refers to the summary panel, its ID is "summaryPanel" in the new structure.
+                document.getElementById('summaryPanel').classList.remove('hidden');
             }
 
             function startScanner() {
                 isProcessingScan = false; // Reset flag on new scan session
                 document.getElementById('scanner-container').classList.remove('hidden');
                 document.getElementById('ticketPanel').classList.add('hidden');
-                document.querySelector('.w-full.lg\\:w-1\\/3').classList.add('hidden');
-    
+                // The new HTML structure does not have a ".w-full.lg\:w-1\/3" div to hide/show.
+                // Assuming this refers to the summary panel, its ID is "summaryPanel" in the new structure.
+                document.getElementById('summaryPanel').classList.add('hidden');
     
                 Quagga.init({
                     inputStream: {
