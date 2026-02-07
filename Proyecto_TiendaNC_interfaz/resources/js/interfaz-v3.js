@@ -1152,6 +1152,7 @@ const API_BASE_URL = 'http://localhost:8080';
                 paymentModal.removeAttribute('hidden');
                 paymentModal.classList.remove('hidden');
                 paymentModal.classList.add('modal-active');
+                paymentModal.style.setProperty('display', 'flex', 'important'); // ADDED for explicit display
                 amountPaid.focus();
             }
 
@@ -1159,6 +1160,7 @@ const API_BASE_URL = 'http://localhost:8080';
                                 paymentModal.classList.remove('modal-active');
                                 paymentModal.setAttribute('hidden', '');
                                 paymentModal.classList.add('hidden');
+                                paymentModal.style.display = ''; // Reset display style
                             }
             // New Gramaje Calculator Functions
             function updateCalculatorDisplay(source) {
@@ -1202,6 +1204,7 @@ const API_BASE_URL = 'http://localhost:8080';
                 gramajeCalculatorModal.removeAttribute('hidden');
                 gramajeCalculatorModal.classList.remove('hidden'); // Ensure Tailwind's hidden class is removed
                 gramajeCalculatorModal.classList.add('modal-active');
+                gramajeCalculatorModal.style.setProperty('display', 'flex', 'important'); // ADDED for explicit display
                 console.log('Modal classList after changes:', gramajeCalculatorModal ? gramajeCalculatorModal.classList : 'Modal not found'); // DEBUG LOG
                 calcProductName.value = productData.nombre;
                 calcProductId.value = productData.idProducto;
@@ -1215,6 +1218,7 @@ const API_BASE_URL = 'http://localhost:8080';
                 gramajeCalculatorModal.classList.remove('modal-active');
                 gramajeCalculatorModal.setAttribute('hidden', '');
                 gramajeCalculatorModal.classList.add('hidden'); // Ensure Tailwind's hidden class is added back
+                gramajeCalculatorModal.style.display = ''; // Reset display style
                 resetGramajeCalculator();
             }
 
@@ -1664,13 +1668,17 @@ const API_BASE_URL = 'http://localhost:8080';
             if (verHistorialBtn) { // Defensive check
                 verHistorialBtn.addEventListener('click', () => {
                     historialModal.classList.remove('hidden'); // New modal structure only needs hidden class toggled
+                    historialModal.classList.add('modal-active'); // ADDED
+                    historialModal.style.setProperty('display', 'flex', 'important'); // ADDED
                     cargarHistorialVentas();
                 });
             }
 
             if (cerrarHistorialModalBtn) { // Assuming there's a close button for historialModal
                 cerrarHistorialModalBtn.addEventListener('click', () => {
+                    historialModal.classList.remove('modal-active'); // ADDED
                     historialModal.classList.add('hidden'); // New modal structure only needs hidden class toggled
+                    historialModal.style.display = ''; // ADDED: Reset display style
                 });
             }
 

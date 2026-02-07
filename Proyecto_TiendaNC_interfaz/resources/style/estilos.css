@@ -50,13 +50,7 @@
     --zelda-wood-dark: #3e2723;
 }
 
-/* Registramos la fuente */
-@font-face {
-    font-family: 'HyliaSerif';
-    src: url('../fonts/HyliaSerifBeta-Regular.otf') format('opentype');
-    font-weight: normal;
-    font-style: normal;
-}
+
 
 /* Estilo para el encabezado de tu dulcería */
 .encabezado-zelda {

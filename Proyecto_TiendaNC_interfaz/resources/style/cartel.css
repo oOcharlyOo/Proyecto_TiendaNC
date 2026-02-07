@@ -17,6 +17,14 @@
     --text-dark-ink: #493524; /* A readable dark brown */
 }
 
+/* Registramos la fuente */
+@font-face {
+    font-family: 'HyliaSerif';
+    src: url('../fonts/HyliaSerifBeta-Regular.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
 .hylian-font {
     font-family: 'HyliaSerif', serif;
     text-shadow: 1px 1px 0px var(--zelda-text-shadow-dark), 2px 2px 5px var(--zelda-text-shadow-light);
@@ -36,13 +44,14 @@
         linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
         linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%);
     border: 6px solid var(--zelda-wood-dark);
+    border-radius: 15px;
     box-shadow: inset 0 0 20px rgba(0,0,0,0.4), 0 10px 25px rgba(0,0,0,0.3);
     position: relative; /* Crucial for nail positioning */
 }
 
 .wood-inner {
     background-color: #a1887f;
-    border-radius: 4px;
+    border-radius: 15px;
 }
 
 .modal-overlay .wood-texture { /* Changed from .wood-interface to .wood-texture */
@@ -419,6 +428,7 @@
 .wood-interface.is-danger {
     background: linear-gradient(145deg, #a23, #700); /* Darker red */
     border-color: #400; /* Even darker red for border */
+    border-radius: 15px;
 }
 
 /* New utility classes */
