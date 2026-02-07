@@ -2143,11 +2143,11 @@ body {
   display: flex;
   flex-direction: column;
   /* CRUCIAL: Añadido para que el contenido se apile verticalmente */
-  padding: 0 1rem 1rem 1rem;
+  padding: 2px 2px 2px 2px;
   gap: 1rem;
   width: 90%;
   /* Default to full width for small screens */
-  margin: 4rem auto 0 auto;
+  margin: 1rem auto 1rem auto;
   /* Add top margin and center horizontally */
 }
 

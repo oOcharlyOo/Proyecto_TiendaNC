@@ -161,9 +161,7 @@ html, body {
 
 body {
     font-family: 'Crimson Pro', serif;
-    background: radial-gradient(circle at 20% 30%, #fbcfe8 0%, transparent 40%), 
-                radial-gradient(circle at 80% 70%, #fef3c7 0%, transparent 40%),
-                linear-gradient(to bottom, #bae6fd, #e0f2fe);
+    background-image: url("../fondo2.png");
     min-height: 100vh;
     color: var(--zelda-wood-dark);
 }
