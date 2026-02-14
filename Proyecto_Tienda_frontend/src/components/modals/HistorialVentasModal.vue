@@ -18,6 +18,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'close'): void;
+  (event: 'ver-detalle', venta: VentaResumen): void;
+  (event: 'cancelar', venta: VentaResumen): void;
 }>();
 
 function formatoMoneda(valor: number) {
@@ -65,15 +67,26 @@ function formatoFecha(fecha?: string) {
               <th>Metodo</th>
               <th>Estatus</th>
               <th>Fecha</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="venta in ventas" :key="venta.idVenta">
+            <tr v-for="venta in ventas" :key="venta.idVenta" class="clickable-row" @click="emit('ver-detalle', venta)">
               <td>#{{ venta.numeroTicket ?? venta.idVenta }}</td>
               <td>{{ formatoMoneda(Number(venta.montoTotal ?? 0)) }}</td>
               <td>{{ venta.metodoPago || 'N/D' }}</td>
               <td>{{ venta.estatus || 'N/D' }}</td>
               <td>{{ formatoFecha(venta.fechaVenta) }}</td>
+              <td @click.stop>
+                <button 
+                  v-if="venta.estatus === 'C'" 
+                  type="button" 
+                  class="btn-cancelar"
+                  @click="emit('cancelar', venta)"
+                >
+                  Cancelar
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -227,6 +240,29 @@ th {
 
 tr:hover td {
   background: rgba(248, 214, 103, 0.2);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover td {
+  background: rgba(248, 214, 103, 0.35);
+}
+
+.btn-cancelar {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.65rem;
+  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
+  color: #fff;
+  border: 2px solid #2a1807;
+  cursor: pointer;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.btn-cancelar:hover {
+  filter: brightness(1.1);
 }
 
 .modal-actions {

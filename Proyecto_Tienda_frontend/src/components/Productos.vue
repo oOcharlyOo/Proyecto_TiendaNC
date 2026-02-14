@@ -22,7 +22,7 @@ type ProductoDTO = {
   is_gramaje: boolean;
 };
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const productos = ref<ProductoDTO[]>([]);
 const cargando = ref(false);

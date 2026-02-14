@@ -66,137 +66,139 @@ type Ticket = {
   desdeBackend?: boolean;
 };
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const AUTH_USER_ID_KEY = 'idUsuario';
-const TICKET_STORAGE_KEY = 'ticketActual';
-
-function guardarTickets() {
-  try {
-    localStorage.setItem(TICKET_STORAGE_KEY, JSON.stringify(tickets.value));
-    localStorage.setItem('ticketActualId', String(ticketActualId.value ?? ''));
-  } catch (e) {
-    console.error('Error al guardar tickets:', e);
-  }
-}
-
-function cargarTickets() {
-  try {
-    const stored = localStorage.getItem(TICKET_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        tickets.value = parsed;
-      }
-    }
-    const storedId = localStorage.getItem('ticketActualId');
-    if (storedId) {
-      const id = parseInt(storedId);
-      if (!isNaN(id)) {
-        ticketActualId.value = id;
-      }
-    }
-  } catch (e) {
-    console.error('Error al cargar tickets locales:', e);
-    localStorage.removeItem(TICKET_STORAGE_KEY);
-    localStorage.removeItem('ticketActualId');
-  }
-}
 
 async function cargarTicketsDesdeBackend() {
   const idUsuario = obtenerIdUsuarioSesion();
   if (!idUsuario) {
     ticketDelDia.value = 'N/D';
-    if (tickets.value.length === 0) {
-      crearNuevoTicket();
-    }
     return;
   }
 
   try {
-    const response = await getJson<ApiRespuesta<VentaPendienteDTO>>(`${API_BASE}/ventas/buscarVentaPendiente`);
+    const response = await getJson<ApiRespuesta<VentaPendienteDTO[]>>(`${API_BASE}/ventas/buscarVentasPendientes`);
 
     if (response?.codigo === 200 && response?.datos) {
-      const venta = response.datos;
-      const numeroTicket = Number(venta?.numeroTicket ?? 0);
-      const mensajeServidor = String(response?.mensaje ?? '');
+      const ventasPendientes = response.datos;
       
-      if (mensajeServidor.includes('venta pendiente')) {
-        const ticketExistente = tickets.value.find(t => t.id === venta.idVenta);
-        if (ticketExistente) {
-          ticketDelDia.value = String(numeroTicket);
-          return;
+      if (ventasPendientes.length > 0) {
+        tickets.value = [];
+        
+        for (const venta of ventasPendientes) {
+          const nuevoTicket: Ticket = {
+            id: venta.idVenta,
+            numero: Number(venta.numeroTicket ?? 0),
+            items: [],
+            estado: 'pendiente',
+            creadoEn: Date.now(),
+            desdeBackend: true
+          };
+          tickets.value.push(nuevoTicket);
         }
         
-        ticketDelDia.value = String(numeroTicket);
+        tickets.value.sort((a, b) => a.numero - b.numero);
         
-        const nuevoTicket: Ticket = {
-          id: venta.idVenta,
-          numero: numeroTicket,
-          items: [],
-          estado: 'pendiente',
-          creadoEn: Date.now(),
-          desdeBackend: true
-        };
+        const maxTicket = Math.max(...ventasPendientes.map(v => Number(v.numeroTicket ?? 0)));
+        ticketDelDia.value = String(maxTicket);
         
-        tickets.value.push(nuevoTicket);
-        ticketActualId.value = nuevoTicket.id;
-        guardarTickets();
-        mostrarMensaje(`Cargado ticket #${numeroTicket} desde el servidor`, 'info');
+        if (ticketActualId.value === null || !tickets.value.find(t => t.id === ticketActualId.value)) {
+          const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+          if (pendiente) {
+            ticketActualId.value = pendiente.id;
+          } else if (tickets.value.length > 0) {
+            ticketActualId.value = tickets.value[0].id;
+          }
+        }
         return;
       }
-
-      if (mensajeServidor.includes('ya completada')) {
-        ticketDelDia.value = String(numeroTicket + 1);
-        return;
-      }
-    } 
+    }
     
     if (tickets.value.length === 0) {
-      crearNuevoTicket();
+      await crearVentaPendienteEnBackend();
     }
   } catch (_error) {
     ticketDelDia.value = 'N/D';
+    if (tickets.value.length === 0) {
+      await crearVentaPendienteEnBackend();
+    }
   }
 }
 
-function crearNuevoTicket() {
-  const numActual = Number(ticketDelDia.value);
-  const maxLocal = tickets.value.length > 0 
-    ? Math.max(...tickets.value.filter(t => !t.desdeBackend).map(t => t.numero), 0)
-    : 0;
-  const maxBackend = tickets.value.length > 0 
-    ? Math.max(...tickets.value.filter(t => t.desdeBackend).map(t => t.numero), 0)
-    : 0;
-  const nuevoNumero = Math.max(numActual, maxLocal, maxBackend) + 1;
-  
-  const nuevoTicket: Ticket = {
-    id: Date.now(),
-    numero: nuevoNumero,
-    items: [],
-    estado: 'pendiente',
-    creadoEn: Date.now(),
-    desdeBackend: false
-  };
-  tickets.value.push(nuevoTicket);
-  ticketActualId.value = nuevoTicket.id;
-  const maxTotal = Math.max(numActual, maxLocal, maxBackend);
-  ticketDelDia.value = String(maxTotal + 1);
-  guardarTickets();
+async function crearVentaPendienteEnBackend() {
+  const idUsuario = obtenerIdUsuarioSesion();
+  if (!idUsuario) return;
+
+  try {
+    const payload = {
+      usuario: { idUsuario },
+      montoTotal: 0,
+      estatus: 'P',
+      metodoPago: 'EFECTIVO',
+      numeroTicket: 0
+    };
+
+    const data = await getJson<ApiRespuesta<VentaPendienteDTO>>(`${API_BASE}/ventas/agregarVenta`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (data?.codigo === 200 && data?.datos) {
+      const venta = data.datos;
+      
+      const ticketExistente = tickets.value.find(t => t.id === venta.idVenta);
+      if (ticketExistente) {
+        ticketActualId.value = venta.idVenta;
+        return;
+      }
+      
+      ticketDelDia.value = String(venta.numeroTicket);
+      
+      const nuevoTicket: Ticket = {
+        id: venta.idVenta,
+        numero: Number(venta.numeroTicket ?? 0),
+        items: [],
+        estado: 'pendiente',
+        creadoEn: Date.now(),
+        desdeBackend: true
+      };
+      
+      tickets.value.push(nuevoTicket);
+      ticketActualId.value = nuevoTicket.id;
+      mostrarMensaje(`Creado ticket #${venta.numeroTicket}`, 'info');
+    }
+  } catch (_error) {
+    console.error('Error al crear venta pendiente:', _error);
+  }
+}
+
+async function crearNuevoTicket() {
+  await crearVentaPendienteEnBackend();
 }
 
 function seleccionarTicket(id: number) {
   ticketActualId.value = id;
-  guardarTickets();
+
 }
 
-function eliminarTicket(id: number) {
+async function eliminarTicket(id: number) {
+  if (!confirm('¿Eliminar este ticket?')) return;
+  
+  try {
+    await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventas/eliminarVenta/${id}`, {
+      method: 'DELETE'
+    });
+  } catch (_error) {
+    console.error('Error al eliminar ticket del backend');
+  }
+  
   const ticketIndex = tickets.value.findIndex(t => t.id === id);
   if (ticketIndex === -1) return;
   
   tickets.value.splice(ticketIndex, 1);
   
   if (tickets.value.length === 0) {
-    crearNuevoTicket();
+    await crearNuevoTicket();
   } else if (ticketActualId.value === id) {
     const pendiente = tickets.value.find(t => t.estado === 'pendiente');
     if (pendiente) {
@@ -205,7 +207,6 @@ function eliminarTicket(id: number) {
       ticketActualId.value = tickets.value[0].id;
     }
   }
-  guardarTickets();
 }
 
 const terminoBusqueda = ref('');
@@ -218,7 +219,7 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Cajero');
 const sugerenciasVisibles = ref(false);
 const indiceSugerenciaActiva = ref(-1);
 const cargandoBusqueda = ref(false);
-const ticketDelDia = ref('Cargando...');
+const ticketDelDia = ref('1');
 const modalEntradaAbierto = ref(false);
 const modalSalidaAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
@@ -229,8 +230,13 @@ const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
 const historialGananciaTotal = ref(0);
 const historialVentas = ref<VentaDTO[]>([]);
+const historialDetalleCargando = ref(false);
+const historialVentaDetalle = ref<VentaDetalleDTO[]>([]);
+const historialVentaSeleccionada = ref<VentaDTO | null>(null);
+const modalDetalleVentaAbierto = ref(false);
 
 let temporizadorBusqueda: ReturnType<typeof setTimeout> | null = null;
+let intervaloSincronizacion: ReturnType<typeof setInterval> | null = null;
 
 const ticketActual = computed(() => {
   if (ticketActualId.value === null) return null;
@@ -258,14 +264,20 @@ const sugerenciasPorNombre = computed(() => {
 });
 
 onMounted(async () => {
-  cargarTickets();
   await cargarProductos();
   await cargarTicketsDesdeBackend();
+  
+  intervaloSincronizacion = setInterval(async () => {
+    await cargarTicketsDesdeBackend();
+  }, 30000);
 });
 
 onBeforeUnmount(() => {
   if (temporizadorBusqueda) {
     clearTimeout(temporizadorBusqueda);
+  }
+  if (intervaloSincronizacion) {
+    clearInterval(intervaloSincronizacion);
   }
 });
 
@@ -452,9 +464,9 @@ async function agregarDesdeBuscador() {
   indiceSugerenciaActiva.value = -1;
 }
 
-function agregarProductoATicket(producto: Producto) {
+async function agregarProductoATicket(producto: Producto) {
   if (!ticketActual.value) {
-    crearNuevoTicket();
+    await crearNuevoTicket();
   }
 
   const stockDisponible = producto.dto?.stock ?? Infinity;
@@ -484,7 +496,7 @@ function agregarProductoATicket(producto: Producto) {
     items.push({ ...producto, cantidad: 1 });
   }
 
-  guardarTickets();
+
   mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
 }
 
@@ -502,13 +514,13 @@ function aumentarCantidad(item: TicketItem) {
   }
 
   item.cantidad += 1;
-  guardarTickets();
+
 }
 
 function disminuirCantidad(item: TicketItem) {
   if (item.cantidad > 1) {
     item.cantidad -= 1;
-    guardarTickets();
+  
     return;
   }
 
@@ -518,13 +530,13 @@ function disminuirCantidad(item: TicketItem) {
 function quitarItem(id: number) {
   if (!ticketActual.value) return;
   ticketActual.value.items = ticketActual.value.items.filter((item) => item.id !== id);
-  guardarTickets();
+
 }
 
 function limpiarTicket() {
   if (!ticketActual.value) return;
   ticketActual.value.items = [];
-  guardarTickets();
+
   mostrarMensaje('Ticket reiniciado.', 'info');
 }
 
@@ -539,7 +551,7 @@ async function crearVenta(idUsuario: number): Promise<VentaDTO> {
     montoTotal: totalVenta.value,
     estatus: 'P',
     metodoPago: 'EFECTIVO',
-    numeroTicket: 0
+    numeroTicket: ticketActual.value?.numero ?? 1
   };
 
   const data = await getJson<ApiRespuesta<VentaDTO>>(`${API_BASE}/ventas/agregarVenta`, {
@@ -554,13 +566,13 @@ async function crearVenta(idUsuario: number): Promise<VentaDTO> {
   return data.datos;
 }
 
-async function crearDetalleVenta(venta: VentaDTO, item: TicketItem) {
+async function crearDetalleVenta(ventaId: number, item: TicketItem) {
   const payload = {
-    Venta: venta,
+    Venta: { idVenta: ventaId },
     Producto: item.dto,
     cantidad: item.cantidad,
     precioUnitarioVenta: item.precio,
-    tipoPrecioAplicado: 'VENTA'
+    tipoPrecioAplicado: item.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA'
   };
 
   const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/agregarVentaDetalle`, {
@@ -606,26 +618,19 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA') {
 
   try {
     const montoCobrado = totalVenta.value;
-    const venta = await crearVenta(idUsuario);
-    await Promise.all(ticketActual.value.items.map((item) => crearDetalleVenta(venta, item)));
-    await completarVenta(venta.idVenta, metodoPago, montoCobrado);
-    const numeroTicketVenta = venta.numeroTicket ? ` Ticket #${venta.numeroTicket}.` : '';
-    const numeroTicketActual = ` #${ticketActual.value.numero}`;
+    const ventaId = ticketActual.value.id;
+    const numeroTicket = ticketActual.value.numero;
     
-    const ticketEliminado = ticketActual.value;
-    const esDelBackend = ticketEliminado.desdeBackend === true;
+    await Promise.all(ticketActual.value.items.map((item) => crearDetalleVenta(ventaId, item)));
+    await completarVenta(ventaId, metodoPago, montoCobrado);
+    const numeroTicketVenta = numeroTicket ? ` Ticket #${numeroTicket}.` : '';
     
-    tickets.value = tickets.value.filter(t => t.id !== ticketEliminado.id);
+    tickets.value = tickets.value.filter(t => t.id !== ticketActual.value!.id);
     
-    const ticketsPendientesRestantes = tickets.value.filter(t => t.estado === 'pendiente' && t.items.length > 0);
-    if (ticketsPendientesRestantes.length > 0) {
-      ticketActualId.value = ticketsPendientesRestantes[0].id;
-    } else {
-      crearNuevoTicket();
-    }
+    await crearNuevoTicket();
     
-    guardarTickets();
-    mostrarMensaje(`Venta cobrada${numeroTicketActual} por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicketVenta}`, 'ok');
+  
+    mostrarMensaje(`Venta cobrada por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicketVenta}`, 'ok');
     modalCobroAbierto.value = false;
     await cargarTicketsDesdeBackend();
   } catch (error) {
@@ -740,7 +745,53 @@ async function historialVentasAbrir() {
   await cargarHistorialVentasDia();
 }
 
-function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }) {
+async function verDetalleVenta(venta: VentaDTO) {
+  historialVentaSeleccionada.value = venta;
+  historialDetalleCargando.value = true;
+  modalDetalleVentaAbierto.value = true;
+  
+  try {
+    const data = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
+      `${API_BASE}/ventasDetalle/porVenta/${venta.idVenta}`
+    );
+    historialVentaDetalle.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (_error) {
+    historialVentaDetalle.value = [];
+    mostrarMensaje('No se pudieron cargar los detalles de la venta.', 'error');
+  } finally {
+    historialDetalleCargando.value = false;
+  }
+}
+
+async function cancelarVentaDesdeHistorial(venta: VentaDTO) {
+  if (!confirm(`¿Estás seguro de cancelar la venta #${venta.numeroTicket}?`)) {
+    return;
+  }
+
+  try {
+    const data = await getJson<ApiRespuesta<VentaDTO>>(
+      `${API_BASE}/ventas/cancelarVenta/${venta.idVenta}`,
+      { method: 'PUT' }
+    );
+
+    if (data?.codigo === 200) {
+      mostrarMensaje(`Venta #${venta.numeroTicket} cancelada correctamente.`, 'ok');
+      await cargarHistorialVentasDia();
+    } else {
+      mostrarMensaje(data?.mensaje || 'No se pudo cancelar la venta.', 'error');
+    }
+  } catch (_error) {
+    mostrarMensaje('Error al cancelar la venta.', 'error');
+  }
+}
+
+function cerrarDetalleVenta() {
+  modalDetalleVentaAbierto.value = false;
+  historialVentaSeleccionada.value = null;
+  historialVentaDetalle.value = [];
+}
+
+async function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }) {
   const producto = modalProductoGramaje.value;
   if (!producto) {
     mostrarMensaje('No se encontro el producto de gramaje.', 'error');
@@ -748,7 +799,7 @@ function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }
   }
 
   if (!ticketActual.value) {
-    crearNuevoTicket();
+    await crearNuevoTicket();
   }
 
   const gramos = Math.max(1, Math.round(payload.gramos));
@@ -767,7 +818,7 @@ function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }
     });
   }
 
-  guardarTickets();
+
   modalGramajeAbierto.value = false;
   modalProductoGramaje.value = null;
   mostrarMensaje(`Agregado ${gramos}g de ${producto.nombre}.`, 'ok');
@@ -848,7 +899,7 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
     <section class="ventas-col ticket-col panel">
       <header class="panel-header">
         <div class="ticket-header-row">
-          <h2>Ticket #{{ ticketActual?.numero || '-' }}</h2>
+          <h2>Ticket #{{ ticketActual?.numero ?? '-' }}</h2>
           <button type="button" class="btn-new-ticket" @click="crearNuevoTicket" title="Nuevo ticket">
             + Nuevo
           </button>
@@ -935,7 +986,7 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 
           <div class="etiqueta-controles">
             <button type="button" @click="disminuirCantidad(item)">-</button>
-            <span>{{ item.cantidad }}</span>
+            <span>{{ item.cantidad }}{{ item.is_gramaje ? 'g' : '' }}</span>
             <button type="button" @click="aumentarCantidad(item)">+</button>
           </div>
 
@@ -1002,7 +1053,44 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
       :ganancia-total="historialGananciaTotal"
       :ventas="historialVentas"
       @close="modalHistorialAbierto = false"
+      @ver-detalle="verDetalleVenta"
+      @cancelar="cancelarVentaDesdeHistorial"
     />
+
+    <div v-if="modalDetalleVentaAbierto" class="modal-overlay" @click.self="cerrarDetalleVenta">
+      <section class="modal-card panel">
+        <header class="modal-header">
+          <h3>Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
+          <button type="button" class="btn-close" @click="cerrarDetalleVenta">×</button>
+        </header>
+
+        <div class="detalle-content">
+          <p v-if="historialDetalleCargando" class="estado">Cargando detalles...</p>
+          <p v-else-if="historialVentaDetalle.length === 0" class="estado">No hay detalles para esta venta.</p>
+          
+          <div v-else class="detalle-lista">
+            <div v-for="detalle in historialVentaDetalle" :key="detalle.idVentaDetalle" class="detalle-item">
+              <div class="detalle-info">
+                <strong>{{ detalle.producto?.nombre || 'Producto' }}</strong>
+                <span class="detalle-cantidad">
+                  {{ detalle.cantidad }}{{ detalle.producto?.is_gramaje ? 'g' : 'u' }}
+                </span>
+              </div>
+              <div class="detalle-precio">
+                {{ formatoMoneda(Number(detalle.precioUnitarioVenta)) }} c/u
+                <span class="detalle-subtotal">
+                  {{ formatoMoneda(Number(detalle.precioUnitarioVenta) * Number(detalle.cantidad)) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="modal-actions">
+          <button type="button" @click="cerrarDetalleVenta">Cerrar</button>
+        </footer>
+      </section>
+    </div>
 
     <CalculadoraGramajeModal
       :open="modalGramajeAbierto"
@@ -1732,5 +1820,78 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 
 .tab-close:hover {
   background: #a32d2d;
+}
+
+.detalle-content {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 3px solid #2a1807;
+  background: #f2e8bf;
+  padding: 0.5rem;
+}
+
+.detalle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem;
+  border-bottom: 1px dashed #baa15c;
+  background: #fff;
+  margin-bottom: 0.3rem;
+}
+
+.detalle-item:last-child {
+  border-bottom: none;
+}
+
+.detalle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.detalle-info strong {
+  font-size: 0.85rem;
+  color: #1d1606;
+}
+
+.detalle-cantidad {
+  font-size: 0.75rem;
+  color: #5a4a2a;
+  font-family: "Courier New", monospace;
+}
+
+.detalle-precio {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #5a4a2a;
+  font-family: "Courier New", monospace;
+}
+
+.detalle-subtotal {
+  display: block;
+  font-weight: 700;
+  color: #1f5b35;
+  font-size: 0.85rem;
+}
+
+.btn-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: #f8d667;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-close:hover {
+  color: #fff;
+}
+
+.modal-header {
+  position: relative;
 }
 </style>

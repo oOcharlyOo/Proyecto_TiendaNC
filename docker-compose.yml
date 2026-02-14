@@ -16,7 +16,7 @@ services:
 
   frontend:
     build:
-      context: ./Proyecto_TiendaNC_interfaz
+      context: ./Proyecto_Tienda_frontend
       dockerfile: Dockerfile
     ports:
       - "8081:80"

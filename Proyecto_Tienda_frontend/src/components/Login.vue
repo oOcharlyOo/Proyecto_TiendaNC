@@ -77,7 +77,7 @@ import MontoInicialModal from './modals/MontoInicialModal.vue';
 
 const AUTH_KEY = 'isAuth';
 const AUTH_USER_ID_KEY = 'idUsuario';
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const name = ref("");
 const pass = ref("");

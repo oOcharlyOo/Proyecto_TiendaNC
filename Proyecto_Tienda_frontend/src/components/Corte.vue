@@ -52,7 +52,7 @@ type VentaDetalleDTO = {
   };
 };
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const AUTH_USER_ID_KEY = 'idUsuario';
 
 const idUsuario = ref<number>(Number(localStorage.getItem(AUTH_USER_ID_KEY) || 0));
