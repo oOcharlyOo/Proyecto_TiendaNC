@@ -1,0 +1,177 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --zelda-gold: #f8d667;
+  --zelda-amber: #c79634;
+  --zelda-forest: #1f5b35;
+  --zelda-forest-dark: #133523;
+  --zelda-bg: #07150d;
+  --zelda-paper: #f6f2de;
+  --zelda-ink: #1a1401;
+  --zelda-danger: #b7393f;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: "Courier New", monospace;
+  color: var(--zelda-paper);
+  background:
+    radial-gradient(circle at 10% 18%, rgba(248, 214, 103, 0.1) 0 3px, transparent 4px),
+    radial-gradient(circle at 88% 82%, rgba(248, 214, 103, 0.09) 0 3px, transparent 4px),
+    linear-gradient(180deg, #11261b 0%, #0a1912 35%, var(--zelda-bg) 100%);
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--zelda-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 #000;
+}
+
+a {
+  color: var(--zelda-gold);
+  text-decoration: none;
+}
+
+a:hover {
+  filter: brightness(1.08);
+}
+
+button,
+.btn {
+  border: 3px solid #2a1807;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  color: var(--zelda-ink);
+  font-family: "Courier New", monospace;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 2px #ffeeb4,
+    0 4px 0 #6f4b1c,
+    0 8px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
+}
+
+button:hover,
+.btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+}
+
+button:active,
+.btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 0 0 2px #ffeeb4,
+    0 2px 0 #6f4b1c;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 3px solid #2a1807;
+  background: #f2e8bf;
+  color: #272013;
+  padding: 0.65rem 0.7rem;
+  font-family: "Courier New", monospace;
+  box-shadow: inset 0 0 0 2px #d4c27e;
+  outline: none;
+  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #7f7044;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  filter: brightness(1.04);
+  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 2px var(--zelda-gold);
+  transform: translateY(-1px);
+}
+
+.card,
+.panel,
+.zelda-panel {
+  background: linear-gradient(180deg, var(--zelda-forest) 0%, var(--zelda-forest-dark) 100%);
+  border: 4px solid var(--zelda-gold);
+  color: var(--zelda-paper);
+  box-shadow:
+    0 0 0 4px #2f1f09,
+    0 12px 0 #271c0f,
+    0 20px 28px rgba(0, 0, 0, 0.45);
+}
+
+.text-error,
+.error {
+  color: #ffb3b8;
+}
+
+.bg-error {
+  background-color: var(--zelda-danger);
+}
+
+/* Scroll global con estilo Zelda clasico */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--zelda-gold) #1a1401;
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, #2d1f0f 0%, #1a1401 100%);
+  border: 2px solid #2a1807;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  border: 2px solid #2a1807;
+  box-shadow: inset 0 0 0 1px #ffeeb4;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.05);
+}
+
+*::-webkit-scrollbar-corner {
+  background: #1a1401;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  button,
+  .btn {
+    padding: 0.65rem 0.85rem;
+  }
+}
