@@ -36,24 +36,182 @@ type VentaDTO = {
   fechaVenta?: string;
 };
 
+type VentaDetalleDTO = {
+  cantidad: number;
+  precioUnitarioVenta: number;
+  producto?: ProductoDTO;
+};
+
+type VentaPendienteDTO = VentaDTO;
+
 type Producto = {
   id: number;
   nombre: string;
   codigo_barras: string | null;
   precio: number;
   dto: ProductoDTO;
+  is_gramaje?: boolean;
 };
 
 type TicketItem = Producto & {
   cantidad: number;
 };
 
+type Ticket = {
+  id: number;
+  numero: number;
+  items: TicketItem[];
+  estado: 'pendiente' | 'completado';
+  creadoEn: number;
+  desdeBackend?: boolean;
+};
+
 const API_BASE = 'http://localhost:8080';
 const AUTH_USER_ID_KEY = 'idUsuario';
+const TICKET_STORAGE_KEY = 'ticketActual';
+
+function guardarTickets() {
+  try {
+    localStorage.setItem(TICKET_STORAGE_KEY, JSON.stringify(tickets.value));
+    localStorage.setItem('ticketActualId', String(ticketActualId.value ?? ''));
+  } catch (e) {
+    console.error('Error al guardar tickets:', e);
+  }
+}
+
+function cargarTickets() {
+  try {
+    const stored = localStorage.getItem(TICKET_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        tickets.value = parsed;
+      }
+    }
+    const storedId = localStorage.getItem('ticketActualId');
+    if (storedId) {
+      const id = parseInt(storedId);
+      if (!isNaN(id)) {
+        ticketActualId.value = id;
+      }
+    }
+  } catch (e) {
+    console.error('Error al cargar tickets locales:', e);
+    localStorage.removeItem(TICKET_STORAGE_KEY);
+    localStorage.removeItem('ticketActualId');
+  }
+}
+
+async function cargarTicketsDesdeBackend() {
+  const idUsuario = obtenerIdUsuarioSesion();
+  if (!idUsuario) {
+    ticketDelDia.value = 'N/D';
+    if (tickets.value.length === 0) {
+      crearNuevoTicket();
+    }
+    return;
+  }
+
+  try {
+    const response = await getJson<ApiRespuesta<VentaPendienteDTO>>(`${API_BASE}/ventas/buscarVentaPendiente`);
+
+    if (response?.codigo === 200 && response?.datos) {
+      const venta = response.datos;
+      const numeroTicket = Number(venta?.numeroTicket ?? 0);
+      const mensajeServidor = String(response?.mensaje ?? '');
+      
+      if (mensajeServidor.includes('venta pendiente')) {
+        const ticketExistente = tickets.value.find(t => t.id === venta.idVenta);
+        if (ticketExistente) {
+          ticketDelDia.value = String(numeroTicket);
+          return;
+        }
+        
+        ticketDelDia.value = String(numeroTicket);
+        
+        const nuevoTicket: Ticket = {
+          id: venta.idVenta,
+          numero: numeroTicket,
+          items: [],
+          estado: 'pendiente',
+          creadoEn: Date.now(),
+          desdeBackend: true
+        };
+        
+        tickets.value.push(nuevoTicket);
+        ticketActualId.value = nuevoTicket.id;
+        guardarTickets();
+        mostrarMensaje(`Cargado ticket #${numeroTicket} desde el servidor`, 'info');
+        return;
+      }
+
+      if (mensajeServidor.includes('ya completada')) {
+        ticketDelDia.value = String(numeroTicket + 1);
+        return;
+      }
+    } 
+    
+    if (tickets.value.length === 0) {
+      crearNuevoTicket();
+    }
+  } catch (_error) {
+    ticketDelDia.value = 'N/D';
+  }
+}
+
+function crearNuevoTicket() {
+  const numActual = Number(ticketDelDia.value);
+  const maxLocal = tickets.value.length > 0 
+    ? Math.max(...tickets.value.filter(t => !t.desdeBackend).map(t => t.numero), 0)
+    : 0;
+  const maxBackend = tickets.value.length > 0 
+    ? Math.max(...tickets.value.filter(t => t.desdeBackend).map(t => t.numero), 0)
+    : 0;
+  const nuevoNumero = Math.max(numActual, maxLocal, maxBackend) + 1;
+  
+  const nuevoTicket: Ticket = {
+    id: Date.now(),
+    numero: nuevoNumero,
+    items: [],
+    estado: 'pendiente',
+    creadoEn: Date.now(),
+    desdeBackend: false
+  };
+  tickets.value.push(nuevoTicket);
+  ticketActualId.value = nuevoTicket.id;
+  const maxTotal = Math.max(numActual, maxLocal, maxBackend);
+  ticketDelDia.value = String(maxTotal + 1);
+  guardarTickets();
+}
+
+function seleccionarTicket(id: number) {
+  ticketActualId.value = id;
+  guardarTickets();
+}
+
+function eliminarTicket(id: number) {
+  const ticketIndex = tickets.value.findIndex(t => t.id === id);
+  if (ticketIndex === -1) return;
+  
+  tickets.value.splice(ticketIndex, 1);
+  
+  if (tickets.value.length === 0) {
+    crearNuevoTicket();
+  } else if (ticketActualId.value === id) {
+    const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+    if (pendiente) {
+      ticketActualId.value = pendiente.id;
+    } else {
+      ticketActualId.value = tickets.value[0].id;
+    }
+  }
+  guardarTickets();
+}
 
 const terminoBusqueda = ref('');
 const productos = ref<Producto[]>([]);
-const ticket = ref<TicketItem[]>([]);
+const tickets = ref<Ticket[]>([]);
+const ticketActualId = ref<number | null>(null);
 const mensaje = ref('');
 const mensajeTipo = ref<'ok' | 'error' | 'info'>('info');
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Cajero');
@@ -74,6 +232,15 @@ const historialVentas = ref<VentaDTO[]>([]);
 
 let temporizadorBusqueda: ReturnType<typeof setTimeout> | null = null;
 
+const ticketActual = computed(() => {
+  if (ticketActualId.value === null) return null;
+  return tickets.value.find(t => t.id === ticketActualId.value) ?? null;
+});
+
+const ticket = computed(() => {
+  return ticketActual.value?.items ?? [];
+});
+
 const totalVenta = computed(() => {
   return ticket.value.reduce((acumulado, item) => acumulado + item.precio * item.cantidad, 0);
 });
@@ -82,13 +249,18 @@ const totalArticulos = computed(() => {
   return ticket.value.reduce((acumulado, item) => acumulado + item.cantidad, 0);
 });
 
+const ticketsPendientes = computed(() => {
+  return tickets.value.filter(t => t.estado === 'pendiente');
+});
+
 const sugerenciasPorNombre = computed(() => {
   return productos.value.slice(0, 6);
 });
 
 onMounted(async () => {
+  cargarTickets();
   await cargarProductos();
-  await cargarTicketDelDia();
+  await cargarTicketsDesdeBackend();
 });
 
 onBeforeUnmount(() => {
@@ -128,7 +300,8 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
         nombre,
         codigo_barras: codigo.length ? codigo : null,
         precio,
-        dto: item
+        dto: item,
+        is_gramaje: item.is_gramaje
       };
     })
     .filter((p) => p.id > 0 && p.nombre.length > 0 && Number.isFinite(p.precio));
@@ -280,30 +453,62 @@ async function agregarDesdeBuscador() {
 }
 
 function agregarProductoATicket(producto: Producto) {
-  if (Boolean(producto.dto?.is_gramaje)) {
+  if (!ticketActual.value) {
+    crearNuevoTicket();
+  }
+
+  const stockDisponible = producto.dto?.stock ?? Infinity;
+
+  if (stockDisponible <= 0) {
+    mostrarMensaje(`Sin stock: ${producto.nombre}`, 'error');
+    return;
+  }
+
+  if (producto.is_gramaje) {
     modalProductoGramaje.value = producto;
     modalGramajeAbierto.value = true;
     return;
   }
 
-  const existente = ticket.value.find((item) => item.id === producto.id);
+  const items = ticketActual.value!.items;
+  const existente = items.find((item) => item.id === producto.id);
 
   if (existente) {
+    const cantidadActual = existente.cantidad;
+    if (cantidadActual >= stockDisponible) {
+      mostrarMensaje(`Stock maximo alcanzado: ${producto.nombre} (${stockDisponible} unidades)`, 'error');
+      return;
+    }
     existente.cantidad += 1;
   } else {
-    ticket.value.push({ ...producto, cantidad: 1 });
+    items.push({ ...producto, cantidad: 1 });
   }
 
+  guardarTickets();
   mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
 }
 
 function aumentarCantidad(item: TicketItem) {
+  const stockDisponible = item.dto?.stock ?? Infinity;
+
+  if (stockDisponible <= 0) {
+    mostrarMensaje(`Sin stock: ${item.nombre}`, 'error');
+    return;
+  }
+
+  if (item.cantidad >= stockDisponible) {
+    mostrarMensaje(`Stock maximo alcanzado: ${item.nombre} (${stockDisponible} unidades)`, 'error');
+    return;
+  }
+
   item.cantidad += 1;
+  guardarTickets();
 }
 
 function disminuirCantidad(item: TicketItem) {
   if (item.cantidad > 1) {
     item.cantidad -= 1;
+    guardarTickets();
     return;
   }
 
@@ -311,11 +516,15 @@ function disminuirCantidad(item: TicketItem) {
 }
 
 function quitarItem(id: number) {
-  ticket.value = ticket.value.filter((item) => item.id !== id);
+  if (!ticketActual.value) return;
+  ticketActual.value.items = ticketActual.value.items.filter((item) => item.id !== id);
+  guardarTickets();
 }
 
 function limpiarTicket() {
-  ticket.value = [];
+  if (!ticketActual.value) return;
+  ticketActual.value.items = [];
+  guardarTickets();
   mostrarMensaje('Ticket reiniciado.', 'info');
 }
 
@@ -390,16 +599,35 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA') {
     return;
   }
 
+  if (!ticketActual.value || ticketActual.value.items.length === 0) {
+    mostrarMensaje('No hay productos en el ticket.', 'error');
+    return;
+  }
+
   try {
     const montoCobrado = totalVenta.value;
     const venta = await crearVenta(idUsuario);
-    await Promise.all(ticket.value.map((item) => crearDetalleVenta(venta, item)));
+    await Promise.all(ticketActual.value.items.map((item) => crearDetalleVenta(venta, item)));
     await completarVenta(venta.idVenta, metodoPago, montoCobrado);
-    const numeroTicket = venta.numeroTicket ? ` Ticket #${venta.numeroTicket}.` : '';
-    limpiarTicket();
-    mostrarMensaje(`Venta cobrada por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicket}`, 'ok');
+    const numeroTicketVenta = venta.numeroTicket ? ` Ticket #${venta.numeroTicket}.` : '';
+    const numeroTicketActual = ` #${ticketActual.value.numero}`;
+    
+    const ticketEliminado = ticketActual.value;
+    const esDelBackend = ticketEliminado.desdeBackend === true;
+    
+    tickets.value = tickets.value.filter(t => t.id !== ticketEliminado.id);
+    
+    const ticketsPendientesRestantes = tickets.value.filter(t => t.estado === 'pendiente' && t.items.length > 0);
+    if (ticketsPendientesRestantes.length > 0) {
+      ticketActualId.value = ticketsPendientesRestantes[0].id;
+    } else {
+      crearNuevoTicket();
+    }
+    
+    guardarTickets();
+    mostrarMensaje(`Venta cobrada${numeroTicketActual} por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicketVenta}`, 'ok');
     modalCobroAbierto.value = false;
-    await cargarTicketDelDia();
+    await cargarTicketsDesdeBackend();
   } catch (error) {
     const detalle = error instanceof Error ? error.message : 'Error inesperado.';
     mostrarMensaje(`No se pudo cobrar: ${detalle}`, 'error');
@@ -519,21 +747,27 @@ function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }
     return;
   }
 
+  if (!ticketActual.value) {
+    crearNuevoTicket();
+  }
+
   const gramos = Math.max(1, Math.round(payload.gramos));
   const precioUnitario = payload.precioTotal / gramos;
-  const existente = ticket.value.find((item) => item.id === producto.id);
+  const items = ticketActual.value!.items;
+  const existente = items.find((item) => item.id === producto.id);
 
   if (existente) {
     existente.cantidad += gramos;
     existente.precio = Number.isFinite(precioUnitario) ? precioUnitario : existente.precio;
   } else {
-    ticket.value.push({
+    items.push({
       ...producto,
       cantidad: gramos,
       precio: Number.isFinite(precioUnitario) ? precioUnitario : producto.precio
     });
   }
 
+  guardarTickets();
   modalGramajeAbierto.value = false;
   modalProductoGramaje.value = null;
   mostrarMensaje(`Agregado ${gramos}g de ${producto.nombre}.`, 'ok');
@@ -595,11 +829,60 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 
 <template>
   <main class="ventas-layout">
+    <div class="bg-fog"></div>
+    <div class="bg-scanlines"></div>
+    <div class="bg-stars" aria-hidden="true">
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+    </div>
+    <div class="bg-particles" aria-hidden="true">
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+    </div>
     <section class="ventas-col ticket-col panel">
       <header class="panel-header">
-        <h2>Ticket del dia #{{ ticketDelDia }}</h2>
+        <div class="ticket-header-row">
+          <h2>Ticket #{{ ticketActual?.numero || '-' }}</h2>
+          <button type="button" class="btn-new-ticket" @click="crearNuevoTicket" title="Nuevo ticket">
+            + Nuevo
+          </button>
+        </div>
         <p>Busca por nombre o codigo de barras y presiona Enter.</p>
       </header>
+
+      <div class="tickets-tabs">
+        <button
+          v-for="t in tickets"
+          :key="t.id"
+          type="button"
+          class="ticket-tab"
+          :class="{ 
+            active: t.id === ticketActualId, 
+            completed: t.estado === 'completado',
+            empty: t.items.length === 0
+          }"
+          @click="seleccionarTicket(t.id)"
+        >
+          <span class="tab-num">#{{ t.numero }}</span>
+          <span class="tab-total" v-if="t.items.length > 0">{{ formatoMoneda(t.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0)) }}</span>
+          <span class="tab-empty" v-else>vacío</span>
+          <button 
+            v-if="t.items.length === 0 && tickets.length > 1" 
+            type="button" 
+            class="tab-close"
+            @click.stop="eliminarTicket(t.id)"
+            title="Eliminar ticket"
+          >
+            ×
+          </button>
+        </button>
+      </div>
 
       <div class="buscador-wrap">
         <input
@@ -1238,5 +1521,216 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
     font-size: 0.72rem;
     padding: 0.6rem 0.7rem;
   }
+}
+
+@keyframes bgGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes bgFogDrift {
+  0% { transform: translateX(-5%) translateY(0) scale(1); }
+  50% { transform: translateX(5%) translateY(-5px) scale(1.02); }
+  100% { transform: translateX(-5%) translateY(0) scale(1); }
+}
+
+@keyframes bgPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes bgRupeeGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(248, 214, 103, 0.6)) brightness(1); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 12px rgba(248, 214, 103, 1)) brightness(1.3); transform: scale(1.15); }
+}
+
+@keyframes bgStarFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
+  50% { transform: translateY(-12px) rotate(180deg); opacity: 1; }
+}
+
+.bg-fog {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 30% at 50% 90%, rgba(19, 53, 35, 0.3) 0%, transparent 50%);
+  animation: bgFogDrift 10s ease-in-out infinite;
+}
+
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.1;
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.03) 2px 4px);
+  animation: bgPulse 0.1s ease-in-out infinite;
+}
+
+.bg-stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #f8d667 0%, #c79634 50%, #8b6914 80%, transparent 100%);
+  border-radius: 50%;
+  animation: bgRupeeGlow 2.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(248, 214, 103, 0.8);
+}
+
+.bg-star:nth-child(1) { top: 8%; left: 15%; animation-delay: 0s; }
+.bg-star:nth-child(2) { top: 5%; left: 85%; animation-delay: 0.3s; width: 5px; height: 5px; }
+.bg-star:nth-child(3) { top: 20%; left: 8%; animation-delay: 0.6s; }
+.bg-star:nth-child(4) { top: 12%; left: 70%; animation-delay: 0.9s; width: 4px; height: 4px; }
+.bg-star:nth-child(5) { top: 75%; left: 5%; animation-delay: 1.2s; }
+.bg-star:nth-child(6) { top: 88%; left: 20%; animation-delay: 1.5s; width: 5px; height: 5px; }
+
+.bg-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(135deg, #f8d667, #fff8e0);
+  border-radius: 50%;
+  animation: bgStarFloat 5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(248, 214, 103, 0.8);
+}
+
+.bg-particle:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 6s; }
+.bg-particle:nth-child(2) { left: 25%; animation-delay: 1s; animation-duration: 5s; }
+.bg-particle:nth-child(3) { left: 40%; animation-delay: 2s; animation-duration: 7s; }
+.bg-particle:nth-child(4) { left: 55%; animation-delay: 0.5s; animation-duration: 5.5s; }
+
+.ventas-layout {
+  position: relative;
+  z-index: 1;
+}
+
+.ticket-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ticket-header-row h2 {
+  margin: 0;
+}
+
+.btn-new-ticket {
+  border: 2px solid #2a1807;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: "Courier New", monospace;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  color: #1a1401;
+  box-shadow: 0 2px 0 #6f4b1c;
+}
+
+.btn-new-ticket:hover {
+  filter: brightness(1.1);
+}
+
+.btn-new-ticket:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.tickets-tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+
+.ticket-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  border: 2px solid #2a1807;
+  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
+  color: #1a1401;
+  font-family: "Courier New", monospace;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #8a7a5a;
+  min-width: 50px;
+}
+
+.ticket-tab:hover {
+  filter: brightness(1.05);
+}
+
+.ticket-tab.active {
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  box-shadow: 0 2px 0 #6f4b1c, 0 0 8px rgba(248, 214, 103, 0.4);
+}
+
+.ticket-tab.completed {
+  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
+  color: #0a2008;
+}
+
+.ticket-tab.empty {
+  opacity: 0.6;
+}
+
+.tab-num {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.tab-total {
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.tab-empty {
+  font-size: 0.55rem;
+  font-style: italic;
+}
+
+.tab-close {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #2a1807;
+  background: #c94f4f;
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-close:hover {
+  background: #a32d2d;
 }
 </style>

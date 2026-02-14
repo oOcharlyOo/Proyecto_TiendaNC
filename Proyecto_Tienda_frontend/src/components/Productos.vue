@@ -167,6 +167,22 @@ onMounted(() => cargarProductos());
 
 <template>
   <main class="productos-layout">
+    <div class="bg-fog"></div>
+    <div class="bg-scanlines"></div>
+    <div class="bg-stars" aria-hidden="true">
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+      <span class="bg-star"></span>
+    </div>
+    <div class="bg-particles" aria-hidden="true">
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+      <span class="bg-particle"></span>
+    </div>
 <section class="panel productos-panel">
       <header class="toolbar">
         <div>
@@ -687,5 +703,105 @@ onMounted(() => cargarProductos());
   .grid-layout {
     grid-template-columns: 1fr;
   }
+}
+
+@keyframes bgGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes bgFogDrift {
+  0% { transform: translateX(-5%) translateY(0) scale(1); }
+  50% { transform: translateX(5%) translateY(-5px) scale(1.02); }
+  100% { transform: translateX(-5%) translateY(0) scale(1); }
+}
+
+@keyframes bgPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes bgRupeeGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(248, 214, 103, 0.6)) brightness(1); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 12px rgba(248, 214, 103, 1)) brightness(1.3); transform: scale(1.15); }
+}
+
+@keyframes bgStarFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
+  50% { transform: translateY(-12px) rotate(180deg); opacity: 1; }
+}
+
+.bg-fog {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 30% at 50% 90%, rgba(19, 53, 35, 0.3) 0%, transparent 50%);
+  animation: bgFogDrift 10s ease-in-out infinite;
+}
+
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.1;
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.03) 2px 4px);
+  animation: bgPulse 0.1s ease-in-out infinite;
+}
+
+.bg-stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #f8d667 0%, #c79634 50%, #8b6914 80%, transparent 100%);
+  border-radius: 50%;
+  animation: bgRupeeGlow 2.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(248, 214, 103, 0.8);
+}
+
+.bg-star:nth-child(1) { top: 8%; left: 15%; animation-delay: 0s; }
+.bg-star:nth-child(2) { top: 5%; left: 85%; animation-delay: 0.3s; width: 5px; height: 5px; }
+.bg-star:nth-child(3) { top: 20%; left: 8%; animation-delay: 0.6s; }
+.bg-star:nth-child(4) { top: 12%; left: 70%; animation-delay: 0.9s; width: 4px; height: 4px; }
+.bg-star:nth-child(5) { top: 75%; left: 5%; animation-delay: 1.2s; }
+.bg-star:nth-child(6) { top: 88%; left: 20%; animation-delay: 1.5s; width: 5px; height: 5px; }
+
+.bg-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(135deg, #f8d667, #fff8e0);
+  border-radius: 50%;
+  animation: bgStarFloat 5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(248, 214, 103, 0.8);
+}
+
+.bg-particle:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 6s; }
+.bg-particle:nth-child(2) { left: 25%; animation-delay: 1s; animation-duration: 5s; }
+.bg-particle:nth-child(3) { left: 40%; animation-delay: 2s; animation-duration: 7s; }
+.bg-particle:nth-child(4) { left: 55%; animation-delay: 0.5s; animation-duration: 5.5s; }
+
+.productos-layout {
+  position: relative;
+  z-index: 1;
 }
 </style>
