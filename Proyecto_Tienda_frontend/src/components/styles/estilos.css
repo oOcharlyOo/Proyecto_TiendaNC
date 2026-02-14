@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+@font-face {
+  font-family: 'HyliaSerif';
+  src: url('/src/assets/fonts/HyliaSerifBeta-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
   --zelda-gold: #f8d667;
   --zelda-amber: #c79634;
@@ -21,7 +28,7 @@ body {
 }
 
 body {
-  font-family: "Courier New", monospace;
+  font-family: 'HyliaSerif', 'Courier New', monospace;
   color: var(--zelda-paper);
   background:
     radial-gradient(circle at 10% 18%, rgba(248, 214, 103, 0.1) 0 3px, transparent 4px),
@@ -174,4 +181,114 @@ textarea:focus {
   .btn {
     padding: 0.65rem 0.85rem;
   }
+}
+
+@media (max-width: 600px) {
+  button .btn-icono,
+  button .btn-texto {
+    display: inline-block;
+  }
+  
+  button .btn-texto,
+  .btn .btn-texto {
+    display: none;
+  }
+  
+  button .btn-icono,
+  .btn .btn-icono {
+    display: inline;
+  }
+  
+  button,
+  .btn {
+    padding: 0.5rem 0.75rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .btn-sm {
+    padding: 0.4rem 0.6rem;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+.scanner-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.scanner-viewport {
+  width: 100%;
+  max-width: 500px;
+  height: 300px;
+  background: #000;
+  border: 3px solid var(--zelda-gold);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scanner-viewport video,
+.scanner-viewport canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanner-laser {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: red;
+  top: 50%;
+  animation: scanner-line 2s infinite;
+  box-shadow: 0 0 8px red;
+}
+
+@keyframes scanner-line {
+  0%, 100% { top: 20%; }
+  50% { top: 80%; }
+}
+
+.scanner-cancel-btn {
+  margin-top: 1rem;
+  padding: 0.75rem 2rem;
+  background: var(--zelda-danger);
+  color: white;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  font-family: 'HyliaSerif', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.scanner-cancel-btn:hover {
+  filter: brightness(1.1);
+}
+
+.btn-scanner {
+  background: linear-gradient(180deg, #4a90d9 0%, #2d5a8a 100%);
+  color: white;
+  border: 2px solid #1a3a5c;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-scanner:hover {
+  filter: brightness(1.1);
 }

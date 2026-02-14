@@ -49,8 +49,14 @@ function confirmar() {
       </div>
 
       <footer class="modal-actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">Cancelar</button>
-        <button type="button" class="btn-danger" @click="confirmar">Registrar Salida</button>
+        <button type="button" class="btn-secondary" @click="emit('close')">
+          <span class="btn-icono">✕</span>
+          <span class="btn-texto">Cancelar</span>
+        </button>
+        <button type="button" class="btn-danger" @click="confirmar">
+          <span class="btn-icono">📤</span>
+          <span class="btn-texto">Registrar</span>
+        </button>
       </footer>
     </section>
   </div>

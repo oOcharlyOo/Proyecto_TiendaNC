@@ -38,8 +38,14 @@ const formatoMoneda = (valor: number) =>
     <td>{{ product.precio_mayoreo ? formatoMoneda(Number(product.precio_mayoreo)) : '-' }}</td>
     <td>{{ product.stock || 0 }}{{ product.is_gramaje ? 'g' : '' }}</td>
     <td class="actions-cell">
-      <button type="button" class="btn-secondary btn-sm" @click.stop="emit('edit', product)">Editar</button>
-      <button type="button" class="btn-danger btn-sm" @click.stop="emit('delete', product)">Eliminar</button>
+      <button type="button" class="btn-secondary btn-sm" @click.stop="emit('edit', product)">
+        <span class="btn-icono">✏️</span>
+        <span class="btn-texto">Editar</span>
+      </button>
+      <button type="button" class="btn-danger btn-sm" @click.stop="emit('delete', product)">
+        <span class="btn-icono">🗑️</span>
+        <span class="btn-texto">Eliminar</span>
+      </button>
     </td>
   </tr>
 </template>

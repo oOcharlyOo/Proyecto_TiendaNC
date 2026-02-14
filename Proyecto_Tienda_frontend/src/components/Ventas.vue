@@ -55,6 +55,7 @@ type Producto = {
 
 type TicketItem = Producto & {
   cantidad: number;
+  idVentaDetalle?: number;
 };
 
 type Ticket = {
@@ -95,6 +96,38 @@ async function cargarTicketsDesdeBackend() {
             desdeBackend: true
           };
           tickets.value.push(nuevoTicket);
+          
+          try {
+            const detallesResponse = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/ventasDetalle/porVenta/${venta.idVenta}`);
+            if (detallesResponse?.codigo === 200 && detallesResponse?.datos) {
+              for (const detalle of detallesResponse.datos) {
+                const producto = detalle.Producto || detalle.producto;
+                if (!producto) continue;
+                
+                let precio = Number(detalle.precioUnitarioVenta);
+                const cantidad = detalle.cantidad;
+                
+                if (producto.is_gramaje && cantidad > 0) {
+                  const precioTotal = precio * cantidad;
+                  const precioRedondeado = Math.round(precioTotal);
+                  precio = precioRedondeado / cantidad;
+                }
+                
+                const item: TicketItem = {
+                  id: producto.idProducto,
+                  nombre: producto.nombre,
+                  cantidad,
+                  precio,
+                  is_gramaje: producto.is_gramaje,
+                  dto: producto,
+                  idVentaDetalle: detalle.idVentaDetalle
+                };
+                nuevoTicket.items.push(item);
+              }
+            }
+          } catch (e) {
+            console.error('Error al cargar detalles del ticket', venta.idVenta, e);
+          }
         }
         
         tickets.value.sort((a, b) => a.numero - b.numero);
@@ -185,11 +218,20 @@ async function eliminarTicket(id: number) {
   if (!confirm('¿Eliminar este ticket?')) return;
   
   try {
-    await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventas/eliminarVenta/${id}`, {
+    const response = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventas/eliminarVenta/${id}`, {
       method: 'DELETE'
     });
+    
+    if (response?.codigo !== 200) {
+      mostrarMensaje(response?.mensaje || 'Error al eliminar ticket', 'error');
+      return;
+    }
+    
+    mostrarMensaje('Ticket eliminado', 'ok');
   } catch (_error) {
     console.error('Error al eliminar ticket del backend');
+    mostrarMensaje('Error al eliminar ticket', 'error');
+    return;
   }
   
   const ticketIndex = tickets.value.findIndex(t => t.id === id);
@@ -220,6 +262,9 @@ const sugerenciasVisibles = ref(false);
 const indiceSugerenciaActiva = ref(-1);
 const cargandoBusqueda = ref(false);
 const ticketDelDia = ref('1');
+const isRecording = ref(false);
+const scannerActivo = ref(false);
+const recognition = ref<any>(null);
 const modalEntradaAbierto = ref(false);
 const modalSalidaAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
@@ -236,7 +281,6 @@ const historialVentaSeleccionada = ref<VentaDTO | null>(null);
 const modalDetalleVentaAbierto = ref(false);
 
 let temporizadorBusqueda: ReturnType<typeof setTimeout> | null = null;
-let intervaloSincronizacion: ReturnType<typeof setInterval> | null = null;
 
 const ticketActual = computed(() => {
   if (ticketActualId.value === null) return null;
@@ -260,24 +304,17 @@ const ticketsPendientes = computed(() => {
 });
 
 const sugerenciasPorNombre = computed(() => {
-  return productos.value.slice(0, 6);
+  return [...productos.value].sort((a, b) => a.nombre.localeCompare(b.nombre)).slice(0, 50);
 });
 
 onMounted(async () => {
   await cargarProductos();
   await cargarTicketsDesdeBackend();
-  
-  intervaloSincronizacion = setInterval(async () => {
-    await cargarTicketsDesdeBackend();
-  }, 30000);
 });
 
 onBeforeUnmount(() => {
   if (temporizadorBusqueda) {
     clearTimeout(temporizadorBusqueda);
-  }
-  if (intervaloSincronizacion) {
-    clearInterval(intervaloSincronizacion);
   }
 });
 
@@ -492,15 +529,28 @@ async function agregarProductoATicket(producto: Producto) {
       return;
     }
     existente.cantidad += 1;
+    try {
+      await crearDetalleVenta(ticketActual.value.id, existente);
+    } catch (e) {
+      existente.cantidad -= 1;
+      throw e;
+    }
   } else {
     items.push({ ...producto, cantidad: 1 });
+    try {
+      const nuevoItem = items[items.length - 1];
+      await crearDetalleVenta(ticketActual.value.id, nuevoItem);
+    } catch (e) {
+      items.pop();
+      throw e;
+    }
   }
 
 
   mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
 }
 
-function aumentarCantidad(item: TicketItem) {
+async function aumentarCantidad(item: TicketItem) {
   const stockDisponible = item.dto?.stock ?? Infinity;
 
   if (stockDisponible <= 0) {
@@ -514,27 +564,66 @@ function aumentarCantidad(item: TicketItem) {
   }
 
   item.cantidad += 1;
-
+  
+  if (item.idVentaDetalle && ticketActual.value) {
+    try {
+      await crearDetalleVenta(ticketActual.value.id, item);
+    } catch (e) {
+      item.cantidad -= 1;
+    }
+  }
 }
 
-function disminuirCantidad(item: TicketItem) {
+async function disminuirCantidad(item: TicketItem) {
   if (item.cantidad > 1) {
     item.cantidad -= 1;
-  
+    
+    if (item.idVentaDetalle && ticketActual.value) {
+      try {
+        await crearDetalleVenta(ticketActual.value.id, item);
+      } catch (e) {
+        item.cantidad += 1;
+      }
+    }
     return;
   }
 
   quitarItem(item.id);
 }
 
-function quitarItem(id: number) {
+async function quitarItem(id: number) {
   if (!ticketActual.value) return;
+  
+  const item = ticketActual.value.items.find(i => i.id === id);
+  if (item?.idVentaDetalle) {
+    try {
+      await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.error('Error al eliminar detalle:', e);
+    }
+  }
+  
   ticketActual.value.items = ticketActual.value.items.filter((item) => item.id !== id);
-
 }
 
-function limpiarTicket() {
+async function limpiarTicket() {
   if (!ticketActual.value) return;
+  
+  const items = ticketActual.value.items;
+  for (const item of items) {
+    if (item.idVentaDetalle) {
+      try {
+        await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, {
+          method: 'DELETE'
+        });
+      } catch (e) {
+        console.error('Error al eliminar detalle:', e);
+      }
+    }
+  }
+  
   ticketActual.value.items = [];
 
   mostrarMensaje('Ticket reiniciado.', 'info');
@@ -575,10 +664,23 @@ async function crearDetalleVenta(ventaId: number, item: TicketItem) {
     tipoPrecioAplicado: item.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA'
   };
 
-  const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/agregarVentaDetalle`, {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  });
+  let data;
+  
+  if (item.idVentaDetalle) {
+    data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/actualizarVentaDetalle/${item.idVentaDetalle}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  } else {
+    data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/agregarVentaDetalle`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    
+    if (data?.codigo === 200 && data?.datos?.idVentaDetalle) {
+      item.idVentaDetalle = data.datos.idVentaDetalle;
+    }
+  }
 
   if (data?.codigo !== 200) {
     throw new Error(data?.mensaje || `No se pudo registrar detalle para ${item.nombre}.`);
@@ -627,7 +729,16 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA') {
     
     tickets.value = tickets.value.filter(t => t.id !== ticketActual.value!.id);
     
-    await crearNuevoTicket();
+    if (tickets.value.length === 0) {
+      await crearNuevoTicket();
+    } else {
+      const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+      if (pendiente) {
+        ticketActualId.value = pendiente.id;
+      } else {
+        ticketActualId.value = tickets.value[0].id;
+      }
+    }
     
   
     mostrarMensaje(`Venta cobrada por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicketVenta}`, 'ok');
@@ -810,12 +921,25 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   if (existente) {
     existente.cantidad += gramos;
     existente.precio = Number.isFinite(precioUnitario) ? precioUnitario : existente.precio;
+    try {
+      await crearDetalleVenta(ticketActual.value.id, existente);
+    } catch (e) {
+      existente.cantidad -= gramos;
+      throw e;
+    }
   } else {
     items.push({
       ...producto,
       cantidad: gramos,
       precio: Number.isFinite(precioUnitario) ? precioUnitario : producto.precio
     });
+    try {
+      const nuevoItem = items[items.length - 1];
+      await crearDetalleVenta(ticketActual.value.id, nuevoItem);
+    } catch (e) {
+      items.pop();
+      throw e;
+    }
   }
 
 
@@ -874,6 +998,236 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     sugerenciasVisibles.value = false;
     indiceSugerenciaActiva.value = -1;
+  }
+}
+
+function initSpeechRecognition() {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    mostrarMensaje('Tu navegador no soporta reconocimiento de voz.', 'error');
+    return null;
+  }
+  const rec = new SpeechRecognition();
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.lang = 'es-ES';
+  return rec;
+}
+
+async function startVoiceCommand() {
+  if (isRecording.value) {
+    if (recognition.value) {
+      recognition.value.stop();
+    }
+    return;
+  }
+
+  if (!recognition.value) {
+    recognition.value = initSpeechRecognition();
+    if (!recognition.value) return;
+
+    recognition.value.onstart = () => {
+      isRecording.value = true;
+      mostrarMensaje('Escuchando tu pedido...', 'info');
+    };
+
+    recognition.value.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      terminoBusqueda.value = transcript;
+      await processVoiceCommand(transcript);
+    };
+
+    recognition.value.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      isRecording.value = false;
+      mostrarMensaje(`Error en reconocimiento de voz: ${event.error}`, 'error');
+    };
+
+    recognition.value.onend = () => {
+      isRecording.value = false;
+    };
+  }
+
+  terminoBusqueda.value = '';
+  recognition.value.start();
+}
+
+let scannerProcessing = false;
+
+async function startScanner() {
+  if (typeof (window as any).Quagga === 'undefined') {
+    mostrarMensaje('Error: Librería de escáner no cargada', 'error');
+    return;
+  }
+
+  scannerActivo.value = true;
+  scannerProcessing = false;
+
+  await new Promise<void>((resolve) => {
+    (window as any).Quagga.init(
+      {
+        inputStream: {
+          name: 'Live',
+          type: 'LiveStream',
+          target: document.querySelector('#scanner-interactive'),
+          constraints: {
+            facingMode: 'environment',
+            width: { min: 640 },
+            height: { min: 480 },
+          },
+        },
+        decoder: {
+          readers: [
+            'code_128_reader',
+            'ean_reader',
+            'ean_8_reader',
+            'code_39_reader',
+            'upc_reader',
+          ],
+        },
+      },
+      function (err: any) {
+        if (err) {
+          console.error(err);
+          mostrarMensaje('Error al iniciar la cámara', 'error');
+          stopScanner();
+          resolve();
+          return;
+        }
+        (window as any).Quagga.start();
+        resolve();
+      }
+    );
+  });
+
+  (window as any).Quagga.onDetected(handleScannerDetection);
+}
+
+function handleScannerDetection(data: any) {
+  if (scannerProcessing) return;
+
+  const code = data.codeResult.code;
+  if (code) {
+    scannerProcessing = true;
+    stopScanner();
+    buscarYAgregarProducto(code);
+  }
+}
+
+function stopScanner() {
+  if (typeof (window as any).Quagga !== 'undefined') {
+    (window as any).Quagga.stop();
+    (window as any).Quagga.offDetected(handleScannerDetection);
+  }
+  scannerActivo.value = false;
+}
+
+async function buscarYAgregarProducto(codigo: string) {
+  const producto = productos.value.find(
+    (p) => (p.codigo_barras || '').toString() === codigo
+  );
+
+  if (producto) {
+    await agregarProducto(producto);
+    mostrarMensaje(`Escaneado: ${producto.nombre}`, 'ok');
+  } else {
+    terminoBusqueda.value = codigo;
+    await buscarProductosPorNombre(codigo);
+    if (productos.value.length > 0) {
+      await agregarProducto(productos.value[0]);
+      mostrarMensaje(`Agregado: ${productos.value[0].nombre}`, 'ok');
+    } else {
+      mostrarMensaje(`Producto no encontrado: ${codigo}`, 'error');
+    }
+  }
+}
+
+async function processVoiceCommand(comando: string) {
+  if (!comando.trim()) {
+    mostrarMensaje('No se detectó ningún comando de voz.', 'error');
+    return;
+  }
+
+  try {
+    mostrarMensaje('Procesando comando de voz...', 'info');
+    
+    const response = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/ventas/comando-texto`, {
+      method: 'POST',
+      body: JSON.stringify({ comando })
+    });
+
+    if (response?.codigo === 200 && response?.datos && response.datos.length > 0) {
+      let productsAddedCount = 0;
+      
+      for (const item of response.datos) {
+        if (item.producto && item.comando) {
+          const producto = item.producto;
+          const comando = item.comando;
+          const isGramaje = producto.is_gramaje || comando.tipo === 'PESO' || comando.unidad === 'g' || comando.unidad === 'gramos';
+          let cantidad = Number(comando.valor) || 1;
+          let precioUnitario = Number(producto.precio_venta);
+          
+          if (comando.tipo === 'PESO') {
+            cantidad = Number(comando.valor) || 1;
+          } else if (comando.tipo === 'PRECIO') {
+            const valorPesos = Number(comando.valor) || 0;
+            const precioVentaNum = Number(producto.precio_venta) || 0;
+            if (producto.is_gramaje && precioVentaNum > 0) {
+              cantidad = Math.round((valorPesos / precioVentaNum) * 1000);
+              precioUnitario = precioVentaNum / 1000;
+            } else {
+              cantidad = 1;
+              precioUnitario = valorPesos;
+            }
+          }
+          
+          if (!ticketActual.value) {
+            await crearNuevoTicket();
+          }
+          
+          const items = ticketActual.value!.items;
+          const existente = items.find(i => i.id === producto.idProducto);
+          
+          if (existente) {
+            existente.cantidad += cantidad;
+            existente.precio = precioUnitario;
+            if (existente.idVentaDetalle && ticketActual.value) {
+              try {
+                await crearDetalleVenta(ticketActual.value.id, existente);
+              } catch (e) {
+                existente.cantidad -= cantidad;
+              }
+            }
+          } else {
+            items.push({
+              id: producto.idProducto,
+              nombre: producto.nombre,
+              cantidad: cantidad,
+              precio: precioUnitario,
+              is_gramaje: isGramaje || comando.tipo === 'PRECIO',
+              dto: producto
+            });
+            try {
+              await crearDetalleVenta(ticketActual.value.id, items[items.length - 1]);
+            } catch (e) {
+              items.pop();
+            }
+          }
+          productsAddedCount++;
+        }
+      }
+      
+      if (productsAddedCount > 0) {
+        mostrarMensaje(`Se añadieron ${productsAddedCount} productos al ticket.`, 'ok');
+      } else {
+        mostrarMensaje('No se pudieron interpretar productos del comando.', 'error');
+      }
+    } else {
+      mostrarMensaje('No se encontraron productos en el comando de voz.', 'error');
+    }
+  } catch (error) {
+    console.error('Error processing voice command:', error);
+    mostrarMensaje('Error al procesar el comando de voz.', 'error');
   }
 }
 </script>
@@ -946,6 +1300,27 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
           @keydown="manejarTeclasSugerencias"
           @keydown.enter.prevent="agregarDesdeBuscador"
         >
+        <button
+          type="button"
+          class="btn-scanner"
+          @click="startScanner"
+          title="Escanear código de barras"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="btn-microphone"
+          :class="{ 'recording': isRecording }"
+          @mousedown.prevent="startVoiceCommand"
+          title="Comando por voz"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
 
         <ul
           v-if="sugerenciasVisibles && sugerenciasPorNombre.length > 0"
@@ -1005,8 +1380,9 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
       </div>
 
       <footer class="ticket-actions">
-        <button type="button" class="btn-secondary" @click="limpiarTicket">
-          Limpiar ticket
+        <button type="button" class="btn-secondary btn-limpiar" @click="limpiarTicket">
+          <span class="icono">🗑️</span>
+          <span class="texto">Limpiar</span>
         </button>
       </footer>
     </section>
@@ -1027,10 +1403,22 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
       </div>
 
       <div class="acciones-grid">
-        <button type="button" @click="cobrar">Cobrar</button>
-        <button type="button" @click="salidaEfectivo">Salida de efectivo</button>
-        <button type="button" @click="entradaEfectivo">Entrada de efectivo</button>
-        <button type="button" @click="historialVentasAbrir">Historial de ventas</button>
+        <button type="button" class="btn-accion btn-cobrar" @click="cobrar">
+          <span class="icono">💰</span>
+          <span class="texto">Cobrar</span>
+        </button>
+        <button type="button" class="btn-accion btn-salida" @click="salidaEfectivo">
+          <span class="icono">📤</span>
+          <span class="texto">Salida</span>
+        </button>
+        <button type="button" class="btn-accion btn-entrada" @click="entradaEfectivo">
+          <span class="icono">📥</span>
+          <span class="texto">Entrada</span>
+        </button>
+        <button type="button" class="btn-accion btn-historial" @click="historialVentasAbrir">
+          <span class="icono">📜</span>
+          <span class="texto">Historial</span>
+        </button>
       </div>
     </aside>
 
@@ -1058,28 +1446,57 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
     />
 
     <div v-if="modalDetalleVentaAbierto" class="modal-overlay" @click.self="cerrarDetalleVenta">
-      <section class="modal-card panel">
-        <header class="modal-header">
-          <h3>Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
-          <button type="button" class="btn-close" @click="cerrarDetalleVenta">×</button>
+      <section class="modal-card panel detalle-venta-modal">
+        <button type="button" class="btn-cerrar-modal" @click="cerrarDetalleVenta" title="Cerrar">
+          ✕
+        </button>
+        
+        <header class="modal-header-detalle">
+          <div class="titulo-detalle">
+            <span class="emoji-ticket">🎫</span>
+            <h3>Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
+          </div>
         </header>
 
+        <div class="info-venta-detalle">
+          <div class="info-item">
+            <span class="label">📅 Fecha:</span>
+            <span class="value">{{ historialVentaSeleccionada?.fechaVenta?.slice(0, 10) || '-' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">💰 Total:</span>
+            <span class="value total">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">💳 Método:</span>
+            <span class="value">{{ historialVentaSeleccionada?.metodoPago || 'EFECTIVO' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">📊 Estatus:</span>
+            <span class="value estatus" :class="historialVentaSeleccionada?.estatus">
+              {{ historialVentaSeleccionada?.estatus === 'C' ? '✅ Completada' : historialVentaSeleccionada?.estatus === 'P' ? '⏳ Pendiente' : '❌ Cancelada' }}
+            </span>
+          </div>
+        </div>
+
         <div class="detalle-content">
+          <h4 class="titulo-productos">🛒 Productos</h4>
           <p v-if="historialDetalleCargando" class="estado">Cargando detalles...</p>
           <p v-else-if="historialVentaDetalle.length === 0" class="estado">No hay detalles para esta venta.</p>
           
           <div v-else class="detalle-lista">
-            <div v-for="detalle in historialVentaDetalle" :key="detalle.idVentaDetalle" class="detalle-item">
+            <div v-for="(detalle, index) in historialVentaDetalle" :key="detalle.idVentaDetalle" class="detalle-item" :style="{ animationDelay: `${index * 50}ms` }">
               <div class="detalle-info">
-                <strong>{{ detalle.producto?.nombre || 'Producto' }}</strong>
-                <span class="detalle-cantidad">
-                  {{ detalle.cantidad }}{{ detalle.producto?.is_gramaje ? 'g' : 'u' }}
-                </span>
+                <span class="numero-item">{{ index + 1 }}.</span>
+                <strong>{{ (detalle.Producto || detalle.producto)?.nombre || 'Producto' }}</strong>
+              </div>
+              <div class="detalle-cantidad">
+                {{ detalle.cantidad }}{{ (detalle.Producto || detalle.producto)?.is_gramaje ? 'g' : 'pza' }}
               </div>
               <div class="detalle-precio">
-                {{ formatoMoneda(Number(detalle.precioUnitarioVenta)) }} c/u
+                <span class="precio-unit">{{ formatoMoneda(Number(detalle.precioUnitarioVenta)) }}/{{ (detalle.Producto || detalle.producto)?.is_gramaje ? 'g' : 'pza' }}</span>
                 <span class="detalle-subtotal">
-                  {{ formatoMoneda(Number(detalle.precioUnitarioVenta) * Number(detalle.cantidad)) }}
+                  = {{ formatoMoneda(Number(detalle.precioUnitarioVenta) * Number(detalle.cantidad)) }}
                 </span>
               </div>
             </div>
@@ -1087,7 +1504,9 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
         </div>
 
         <footer class="modal-actions">
-          <button type="button" @click="cerrarDetalleVenta">Cerrar</button>
+          <button type="button" class="btn-cerrar" @click="cerrarDetalleVenta">
+            👋 Cerrar
+          </button>
         </footer>
       </section>
     </div>
@@ -1106,10 +1525,465 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
       @confirmar-efectivo="confirmarCobroEfectivo"
       @confirmar-transferencia="confirmarCobroTransferencia"
     />
+
+    <div v-if="scannerActivo" class="scanner-container">
+      <div class="scanner-viewport">
+        <div id="scanner-interactive"></div>
+        <div class="scanner-laser"></div>
+      </div>
+      <button type="button" class="scanner-cancel-btn" @click="stopScanner">
+        Cancelar Escaneo
+      </button>
+    </div>
   </main>
 </template>
 
 <style scoped>
+.ventas-layout .modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(2, 4, 2, 0.92);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ventas-layout .modal-card {
+  width: min(100%, 520px);
+  max-height: 90vh;
+  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
+  border: 4px solid #f8d667;
+  box-shadow: 
+    0 0 0 4px #2f1f09,
+    0 14px 0 #271c0f,
+    0 20px 28px rgba(0, 0, 0, 0.5);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  animation: popIn 200ms ease-out;
+  overflow: hidden;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.ventas-layout .modal-card::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 2px dashed rgba(248, 214, 103, 0.3);
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+.btn-cerrar-modal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: #f8d667;
+  font-size: 1.2rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms;
+  z-index: 10;
+}
+
+.btn-cerrar-modal:hover {
+  background: #ef4444;
+  color: white;
+  transform: rotate(90deg);
+}
+
+.modal-header-detalle {
+  text-align: center;
+}
+
+.titulo-detalle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.emoji-ticket {
+  font-size: 1.8rem;
+}
+
+.modal-header-detalle h3 {
+  font-size: 1.4rem;
+  color: #f8d667;
+  text-shadow: 2px 2px 0 #1a1401;
+  margin: 0;
+}
+
+.info-venta-detalle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  border: 2px solid rgba(248, 214, 103, 0.2);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-item .label {
+  font-size: 0.75rem;
+  color: #a3a380;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-item .value {
+  font-size: 1rem;
+  color: #f6f2de;
+  font-weight: 600;
+}
+
+.info-item .value.total {
+  font-size: 1.3rem;
+  color: #67e0a8;
+  text-shadow: 0 0 10px rgba(103, 224, 168, 0.5);
+}
+
+.info-item .value.estatus {
+  font-size: 0.9rem;
+}
+
+.titulo-productos {
+  font-size: 1rem;
+  color: #a3a380;
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed rgba(248, 214, 103, 0.3);
+}
+
+.detalle-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.detalle-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.detalle-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.detalle-content::-webkit-scrollbar-thumb {
+  background: #f8d667;
+  border-radius: 3px;
+}
+
+.detalle-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detalle-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(248, 214, 103, 0.15);
+  animation: slideIn 200ms ease-out backwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.detalle-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.numero-item {
+  color: #67e0a8;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.detalle-info strong {
+  color: #f6f2de;
+  font-size: 0.95rem;
+}
+
+.detalle-cantidad {
+  background: #2a1807;
+  color: #f8d667;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 50px;
+  text-align: center;
+}
+
+.detalle-precio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.precio-unit {
+  font-size: 0.75rem;
+  color: #a3a380;
+}
+
+.detalle-subtotal {
+  font-size: 1rem;
+  color: #67e0a8;
+  font-weight: 700;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
+
+.btn-cerrar {
+  background: linear-gradient(180deg, #f8d667 0%, #c79634 100%);
+  color: #1a1401;
+  border: none;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 150ms;
+  box-shadow: 0 4px 0 #8b6914;
+}
+
+.btn-cerrar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #8b6914;
+}
+
+.btn-cerrar:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #8b6914;
+}
+
+@media (max-width: 600px) {
+  .ventas-layout .modal-card {
+    width: min(100%, 95vw);
+    max-height: 95vh;
+    padding: 1rem;
+  }
+  
+  .ventas-layout .modal-card::before {
+    inset: 8px;
+  }
+  
+  .btn-cerrar-modal {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  
+  .modal-header-detalle h3 {
+    font-size: 1.1rem;
+  }
+  
+  .emoji-ticket {
+    font-size: 1.4rem;
+  }
+  
+  .info-venta-detalle {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  
+  .info-item .value.total {
+    font-size: 1.1rem;
+  }
+  
+  .titulo-productos {
+    font-size: 0.9rem;
+  }
+  
+  .detalle-item {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 0.6rem;
+  }
+  
+  .detalle-info {
+    order: 1;
+  }
+  
+  .detalle-cantidad {
+    order: 2;
+    justify-self: start;
+  }
+  
+  .detalle-precio {
+    order: 3;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 0.5rem;
+    border-top: 1px dashed rgba(248, 214, 103, 0.2);
+  }
+  
+  .precio-unit {
+    font-size: 0.7rem;
+  }
+  
+  .detalle-subtotal {
+    font-size: 1rem;
+  }
+  
+  .btn-cerrar {
+    width: 100%;
+    padding: 0.75rem;
+  }
+}
+
+.ventas-layout .btn-accion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 2px solid #2a1807;
+  transition: all 150ms;
+}
+
+.ventas-layout .btn-accion .icono {
+  font-size: 1.2rem;
+}
+
+.ventas-layout .btn-accion .texto {
+  font-size: 0.85rem;
+}
+
+.ventas-layout .btn-cobrar {
+  background: linear-gradient(180deg, #67e0a8 0%, #2a9d5c 100%);
+  color: #1a1401;
+}
+
+.ventas-layout .btn-salida {
+  background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
+  color: #fff;
+}
+
+.ventas-layout .btn-entrada {
+  background: linear-gradient(180deg, #86efac 0%, #22c55e 100%);
+  color: #1a1401;
+}
+
+.ventas-layout .btn-historial {
+  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
+  color: #fff;
+}
+
+.ventas-layout .btn-limpiar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 2px solid #2a1807;
+  transition: all 150ms;
+}
+
+.ventas-layout .btn-limpiar .icono {
+  font-size: 1rem;
+}
+
+.ventas-layout .btn-limpiar .texto {
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .ventas-layout .btn-accion {
+    padding: 0.5rem;
+  }
+  
+  .ventas-layout .btn-accion .texto {
+    display: none;
+  }
+  
+  .ventas-layout .btn-accion .icono {
+    font-size: 1.5rem;
+  }
+  
+  .ventas-layout .btn-limpiar .texto {
+    display: none;
+  }
+  
+  .ventas-layout .btn-limpiar .icono {
+    font-size: 1.3rem;
+  }
+
+  .ticket-tab {
+    padding: 0.25rem 0.4rem;
+    min-width: 35px;
+  }
+
+  .tab-num {
+    font-size: 0.65rem;
+  }
+
+  .tab-total {
+    font-size: 0.5rem;
+  }
+
+  .tab-empty {
+    font-size: 0.45rem;
+  }
+
+  .tab-close {
+    transform: scale(0.5) !important;
+    top: -6px !important;
+    right: -6px !important;
+  }
+}
+
 .ventas-layout {
   --pixel-gold: #f8d667;
   --pixel-amber: #c79634;
@@ -1121,14 +1995,15 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   --pixel-rupee: #67e0a8;
   --pixel-rupee-dark: #2a9d5c;
   --ventas-space: 1.2rem;
-  height: 100%;
+  height: 90vh;
   min-height: 0;
   width: 100%;
+  margin: auto;
   padding: var(--ventas-space);
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 1rem;
-  overflow: hidden;
+  overflow: auto;
   background: 
     linear-gradient(180deg, #0a1912 0%, var(--pixel-bg) 100%),
     radial-gradient(circle at 8% 12%, rgba(248, 214, 103, 0.1) 0 8px, transparent 9px),
@@ -1136,12 +2011,13 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 }
 
 .ventas-col {
-  padding: 1rem;
+  padding: 0.75rem;
   margin-bottom: var(--ventas-space);
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.5rem;
   position: relative;
+  overflow: hidden;
 }
 
 .ventas-col::before {
@@ -1179,10 +2055,12 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 .buscador-wrap {
   position: relative;
   z-index: 30;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .buscador-wrap input {
-  width: 100%;
+  flex: 1;
   background: #f2e8bf;
   border: 3px solid #2a1807;
   padding: 0.7rem 0.8rem;
@@ -1192,6 +2070,34 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   outline: none;
   box-shadow: inset 0 0 0 3px #d4c27e;
   transition: box-shadow 120ms linear;
+}
+
+.btn-microphone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btn-microphone:hover {
+  background: #4b5563;
+}
+
+.btn-microphone.recording {
+  background: #ef4444;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .buscador-wrap input::placeholder {
@@ -1211,8 +2117,9 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   border: 3px solid #2a1807;
   background: var(--pixel-paper);
   z-index: 100;
-  max-height: 240px;
-  overflow: auto;
+  max-height: 280px;
+  height: auto;
+  overflow-y: scroll;
   box-shadow: 0 6px 0 #1a1005, 0 10px 16px rgba(0, 0, 0, 0.35);
   animation: slideDown 120ms steps(4);
 }
@@ -1297,9 +2204,9 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   flex: 1;
   overflow: auto;
   height: 100%;
-  max-height: calc(100vh - 280px);
+  max-height: 90%;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.4rem;
   padding-right: 0.3rem;
   z-index: 1;
   position: relative;
@@ -1307,15 +2214,15 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 }
 
 .ticket-etiqueta {
-  border: 3px solid #2a1807;
+  border: 2px solid #2a1807;
   background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
   color: #1d1606;
-  padding: 0.75rem;
+  padding: 0.4rem;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.6rem;
+  gap: 0.4rem;
   align-items: center;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 4px 0 #1a1005, 0 5px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.2);
   animation: popIn 150ms steps(4);
   transition: transform 100ms steps(2);
   pointer-events: auto;
@@ -1337,9 +2244,9 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 }
 
 .ticket-etiqueta h3 {
-  margin: 0 0 0.2rem 0;
+  margin: 0;
   color: #0f1f0c;
-  font-size: 0.88rem;
+  font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1347,7 +2254,7 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 }
 
 .ticket-etiqueta p {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: #5a4a2a;
   margin: 0;
   font-family: "Courier New", monospace;
@@ -1356,17 +2263,17 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 .etiqueta-controles {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 
 .etiqueta-controles button {
-  min-width: 30px;
-  padding: 0.3rem 0.35rem;
+  min-width: 24px;
+  padding: 0.2rem 0.25rem;
   border: 2px solid #2a1807;
   background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
   color: #1a1401;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.85rem;
   cursor: pointer;
   box-shadow: 0 2px 0 #6f4b1c;
   transition: transform 60ms steps(2), filter 60ms linear;
@@ -1382,10 +2289,10 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 }
 
 .etiqueta-controles span {
-  min-width: 28px;
+  min-width: 24px;
   text-align: center;
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-family: "Courier New", monospace;
   color: #1a1401;
   background: rgba(255, 255, 255, 0.5);
@@ -1396,13 +2303,13 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
 .etiqueta-total {
   grid-column: 1 / -1;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: var(--pixel-forest-dark);
   font-family: "Courier New", monospace;
   text-align: right;
   border-top: 1px dashed #c4b078;
-  padding-top: 0.4rem;
-  margin-top: 0.2rem;
+  padding-top: 0.3rem;
+  margin-top: 0.15rem;
 }
 
 .etiqueta-total::before {
@@ -1413,6 +2320,8 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
   background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
   color: #fff;
   border: 2px solid #2a1807;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
 }
 
 .btn-secondary {
@@ -1582,23 +2491,37 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
     grid-template-columns: 1fr;
   }
 
+  .ventas-col {
+    overflow: visible;
+  }
+
   .ticket-lista {
-    max-height: 45vh;
+    max-height: 35vh;
+    min-height: 120px;
+    gap: 0.4rem;
+  }
+
+  .resumen-col .ventas-col {
+    overflow: auto;
+    max-height: 25vh;
   }
 }
 
 @media (max-width: 520px) {
   .ventas-layout {
-    --ventas-space: 0.85rem;
+    --ventas-space: 0.6rem;
     padding: var(--ventas-space);
   }
 
   .ventas-col {
-    padding: 0.8rem;
+    padding: 0.6rem;
+    gap: 0.4rem;
   }
 
   .ticket-etiqueta {
     grid-template-columns: 1fr;
+    gap: 0.3rem;
+    padding: 0.3rem;
   }
 
   .etiqueta-controles {

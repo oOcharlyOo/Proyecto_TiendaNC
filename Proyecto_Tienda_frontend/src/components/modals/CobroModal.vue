@@ -65,9 +65,18 @@ function confirmarEfectivo() {
       </div>
 
       <footer class="modal-actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">Cancelar</button>
-        <button type="button" @click="confirmarEfectivo">Confirmar Efectivo</button>
-        <button type="button" @click="emit('confirmar-transferencia')">Confirmar Transferencia</button>
+        <button type="button" class="btn-secondary" @click="emit('close')">
+          <span class="btn-icono">✕</span>
+          <span class="btn-texto">Cancelar</span>
+        </button>
+        <button type="button" @click="confirmarEfectivo">
+          <span class="btn-icono">💵</span>
+          <span class="btn-texto">Efectivo</span>
+        </button>
+        <button type="button" @click="emit('confirmar-transferencia')">
+          <span class="btn-icono">📱</span>
+          <span class="btn-texto">Transferencia</span>
+        </button>
       </footer>
     </section>
   </div>

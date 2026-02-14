@@ -250,10 +250,12 @@ onMounted(async () => {
   --pixel-bg: #07150d;
   --pixel-ink: #1a1401;
   --pixel-paper: #f6f2de;
-  height: 100%;
+  height: 85vh;
   min-height: 0;
   width: 100%;
+  margin: auto;
   padding: 1rem;
+  padding-bottom: 2rem;
   display: grid;
   grid-template-columns: 1fr 1.5fr;
   grid-template-rows: auto 1fr;

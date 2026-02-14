@@ -460,12 +460,22 @@ onMounted(() => {
       <p v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">{{ mensaje }}</p>
 
       <div class="sign-grid">
-        <button class="wood-sign" :disabled="cargandoCorte" @click="generarCorte">
-          {{ cargandoCorte ? 'Calculando...' : '🧾 Generar Corte de Caja' }}
+        <button class="wood-sign btn-icono-only" :disabled="cargandoCorte" @click="generarCorte">
+          <span class="btn-icono">🧾</span>
+          <span class="btn-texto">{{ cargandoCorte ? 'Calculando...' : 'Corte de Caja' }}</span>
         </button>
-        <button class="wood-sign" @click="modalDiarioAbierto = true">📅 Reporte por Dia</button>
-        <button class="wood-sign" @click="modalMensualAbierto = true">🌙 Reporte Mensual</button>
-        <button class="wood-sign" @click="abrirHistorialVentas">📜 Historial de Ventas</button>
+        <button class="wood-sign btn-icono-only" @click="modalDiarioAbierto = true">
+          <span class="btn-icono">📅</span>
+          <span class="btn-texto">Reporte Diario</span>
+        </button>
+        <button class="wood-sign btn-icono-only" @click="modalMensualAbierto = true">
+          <span class="btn-icono">🌙</span>
+          <span class="btn-texto">Reporte Mensual</span>
+        </button>
+        <button class="wood-sign btn-icono-only" @click="abrirHistorialVentas">
+          <span class="btn-icono">📜</span>
+          <span class="btn-texto">Historial</span>
+        </button>
       </div>
 
       <section v-if="mostrarReporte && corteActual" class="reporte-wrap">
@@ -493,23 +503,30 @@ onMounted(() => {
 
     <div v-if="modalDiarioAbierto" class="modal-overlay" @click.self="modalDiarioAbierto = false">
       <section class="modal-card panel">
-        <h3>📅 Reporte por Dia</h3>
+        <button type="button" class="btn-cerrar-modal" @click="modalDiarioAbierto = false">✕</button>
+        <h3>📅 Reporte por Día</h3>
         <label>Selecciona fecha</label>
         <input v-model="fechaDiaria" type="date">
-        <div class="modal-actions">
-          <button type="button" @click="generarReporteDiario">Generar</button>
-          <button type="button" class="btn-secondary" @click="modalDiarioAbierto = false">Cancelar</button>
+        <div class="modal-actions solo-accion">
+          <button type="button" @click="generarReporteDiario">
+            <span class="btn-icono">📊</span>
+            <span class="btn-texto">Generar Reporte</span>
+          </button>
         </div>
       </section>
     </div>
 
     <div v-if="modalMensualAbierto" class="modal-overlay" @click.self="modalMensualAbierto = false">
       <section class="modal-card panel monthly-modal">
+        <button type="button" class="btn-cerrar-modal" @click="modalMensualAbierto = false">✕</button>
         <h3>🌙 Reporte Mensual</h3>
         <label>Selecciona mes</label>
         <div class="monthly-head">
           <input v-model="mesMensual" type="month">
-          <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual">{{ cargandoMensual ? 'Generando...' : 'Generar' }}</button>
+          <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual">
+            <span class="btn-icono">📊</span>
+            <span class="btn-texto">{{ cargandoMensual ? 'Generando...' : 'Generar' }}</span>
+          </button>
         </div>
 
         <div class="monthly-stats">
@@ -533,14 +550,18 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" @click="modalMensualAbierto = false">Cerrar</button>
+        <div class="modal-actions solo-accion">
+          <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual">
+            <span class="btn-icono">📊</span>
+            <span class="btn-texto">{{ cargandoMensual ? 'Generando...' : 'Generar Reporte' }}</span>
+          </button>
         </div>
       </section>
     </div>
 
     <div v-if="modalHistorialAbierto" class="modal-overlay" @click.self="modalHistorialAbierto = false">
       <section class="modal-card panel history-modal">
+        <button type="button" class="btn-cerrar-modal" @click="modalHistorialAbierto = false">✕</button>
         <h3>📜 Historial de Ventas</h3>
 
         <div class="history-filters">
@@ -558,60 +579,62 @@ onMounted(() => {
         </div>
 
         <div class="history-list">
-          <p v-if="cargandoHistorial" class="empty">Cargando historial...</p>
-          <p v-else-if="historialFiltrado.length === 0" class="empty">No hay ventas con el filtro actual.</p>
+          <p v-if="cargandoHistorial" class="empty">📡 Cargando historial...</p>
+          <p v-else-if="historialFiltrado.length === 0" class="empty">📭 No hay ventas con el filtro actual.</p>
 
           <article v-else v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="history-item" @click="abrirDetalleVenta(v.venta.idVenta)">
             <div>
-              <h4>Venta #{{ historialFiltrado.length - index }}</h4>
+              <h4>🎫 #{{ historialFiltrado.length - index }}</h4>
               <p>{{ formatoFecha(v.venta.fechaVenta) }}</p>
             </div>
             <div>
               <strong>{{ formatoMoneda(Number(v.venta.montoTotal || 0)) }}</strong>
-              <p>{{ v.venta.metodoPago || 'N/D' }}</p>
+              <p class="metodo">{{ v.venta.metodoPago === 'TRANSFERENCIA' ? '📱' : '💵' }} {{ v.venta.metodoPago || 'N/D' }}</p>
             </div>
           </article>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" @click="modalHistorialAbierto = false">Cerrar</button>
         </div>
       </section>
     </div>
 
     <div v-if="modalDetalleAbierto && ventaDetalleSeleccionada" class="modal-overlay" @click.self="modalDetalleAbierto = false">
       <section class="modal-card panel detail-modal">
+        <button type="button" class="btn-cerrar-modal" @click="modalDetalleAbierto = false">✕</button>
         <h3>🔎 Detalle Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h3>
 
         <div class="detail-grid">
-          <p><strong>Metodo:</strong> {{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}</p>
-          <p><strong>Fecha:</strong> {{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</p>
-          <p><strong>Total:</strong> {{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</p>
+          <div class="detail-item">
+            <span class="label">💳 Método</span>
+            <span class="value">{{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">📅 Fecha</span>
+            <span class="value">{{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</span>
+          </div>
+          <div class="detail-item total">
+            <span class="label">💰 Total</span>
+            <span class="value">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+          </div>
         </div>
 
         <div class="tabla-wrap">
           <table>
             <thead>
               <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>P.Unit</th>
-                <th>Importe</th>
+                <th>🛒 Producto</th>
+                <th>📦 Cant</th>
+                <th>💵 P.Unit</th>
+                <th>💳 Importe</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="d in ventaDetalleItems" :key="d.idVentaDetalle">
                 <td>{{ d.Producto.nombre }}</td>
-                <td>{{ d.cantidad }}{{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : '' }}</td>
+                <td>{{ d.cantidad }}{{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : 'pza' }}</td>
                 <td>{{ formatoMoneda(Number(d.precioUnitarioVenta || 0)) }}</td>
-                <td>{{ formatoMoneda(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
+                <td class="importe">{{ formatoMoneda(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
               </tr>
             </tbody>
           </table>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" @click="modalDetalleAbierto = false">Cerrar</button>
         </div>
       </section>
     </div>
@@ -693,6 +716,30 @@ onMounted(() => {
 .wood-sign:nth-child(2) { animation-delay: -0.4s; }
 .wood-sign:nth-child(3) { animation-delay: -0.8s; }
 .wood-sign:nth-child(4) { animation-delay: -1.2s; }
+
+.wood-sign.btn-icono-only .btn-texto {
+  display: inline;
+}
+
+.wood-sign.btn-icono-only .btn-icono {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .wood-sign.btn-icono-only .btn-texto {
+    display: none;
+  }
+  
+  .wood-sign.btn-icono-only .btn-icono {
+    display: inline;
+    font-size: 1.5rem;
+  }
+  
+  .wood-sign.btn-icono-only {
+    padding: 0.5rem;
+    min-width: 50px;
+  }
+}
 
 .reporte-wrap {
   border: 3px solid #2a1807;
@@ -810,6 +857,32 @@ onMounted(() => {
   inset: 10px;
   border: 2px dashed rgba(248, 214, 103, 0.4);
   pointer-events: none;
+  border-radius: 8px;
+}
+
+.btn-cerrar-modal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: #f8d667;
+  font-size: 1.2rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms;
+  z-index: 10;
+}
+
+.btn-cerrar-modal:hover {
+  background: #ef4444;
+  color: white;
+  transform: rotate(90deg);
 }
 
 .modal-card h3 {
@@ -1309,5 +1382,60 @@ th {
 .corte-layout {
   position: relative;
   z-index: 1;
+}
+
+@media (max-width: 600px) {
+  .btn-cerrar-modal {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  
+  .modal-card {
+    padding: 1rem;
+    max-height: 95vh;
+  }
+  
+  .modal-card h3 {
+    font-size: 0.9rem;
+    padding-right: 2rem;
+  }
+  
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.modal-actions.solo-accion {
+  justify-content: center;
+}
+  
+  .modal-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .history-filters {
+    grid-template-columns: 1fr;
+  }
+  
+  .history-list {
+    max-height: 50vh;
+  }
+  
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tabla-wrap {
+    max-height: 50vh;
+  }
+  
+  th, td {
+    padding: 0.4rem;
+    font-size: 0.7rem;
+  }
 }
 </style>

@@ -143,10 +143,17 @@ function handleSubmit() {
 
       <footer class="modal-actions">
         <button type="button" :disabled="props.loading" @click="handleSubmit">
-          {{ props.loading ? 'Guardando...' : props.data?.idProducto ? 'Actualizar' : 'Guardar' }}
+          <span class="btn-icono">💾</span>
+          <span class="btn-texto">{{ props.loading ? 'Guardando...' : props.data?.idProducto ? 'Actualizar' : 'Guardar' }}</span>
         </button>
-        <button v-if="props.data?.idProducto" type="button" class="btn-danger" @click="$emit('delete')">Eliminar</button>
-        <button type="button" class="btn-secondary" @click="$emit('close')">Cancelar</button>
+        <button v-if="props.data?.idProducto" type="button" class="btn-danger" @click="$emit('delete')">
+          <span class="btn-icono">🗑️</span>
+          <span class="btn-texto">Eliminar</span>
+        </button>
+        <button type="button" class="btn-secondary" @click="$emit('close')">
+          <span class="btn-icono">✕</span>
+          <span class="btn-texto">Cancelar</span>
+        </button>
       </footer>
     </section>
   </div>

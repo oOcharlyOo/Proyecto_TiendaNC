@@ -191,7 +191,10 @@ onMounted(() => cargarProductos());
         </div>
         <div class="toolbar-actions">
           <input v-model="terminoBusqueda" type="text" placeholder="Buscar por nombre o código">
-          <button type="button" class="btn-secondary" @click="abrirModalNuevoProducto">+ Nuevo Producto</button>
+          <button type="button" class="btn-secondary" @click="abrirModalNuevoProducto">
+            <span class="btn-icono">➕</span>
+            <span class="btn-texto">Nuevo Producto</span>
+          </button>
         </div>
       </header>
 
@@ -216,8 +219,14 @@ onMounted(() => cargarProductos());
               <p class="meta">Mayoreo: {{ producto.precio_mayoreo ? formatoMoneda(Number(producto.precio_mayoreo)) : '-' }}</p>
               <p class="meta">Stock: {{ producto.stock || 0 }}{{ producto.is_gramaje ? 'g' : '' }}</p>
               <div class="card-actions">
-                <button type="button" class="btn-secondary btn-sm" @click="abrirModalEditarProducto(producto)">Editar</button>
-                <button type="button" class="btn-danger btn-sm" @click="handleDeleteProducto(producto)">Eliminar</button>
+                <button type="button" class="btn-secondary btn-sm" @click="abrirModalEditarProducto(producto)">
+                  <span class="btn-icono">✏️</span>
+                  <span class="btn-texto">Editar</span>
+                </button>
+                <button type="button" class="btn-danger btn-sm" @click="handleDeleteProducto(producto)">
+                  <span class="btn-icono">🗑️</span>
+                  <span class="btn-texto">Eliminar</span>
+                </button>
               </div>
             </article>
           </div>

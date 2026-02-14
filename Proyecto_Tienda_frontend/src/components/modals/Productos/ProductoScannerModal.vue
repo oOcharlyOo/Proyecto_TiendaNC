@@ -28,8 +28,14 @@ function aplicar() {
       <div class="space-y-3">
         <input v-model="codigo" type="text" placeholder="750000000002">
         <div class="modal-actions">
-          <button type="button" @click="aplicar">Aplicar Codigo</button>
-          <button type="button" class="btn-secondary" @click="emit('close')">Cancelar</button>
+          <button type="button" @click="aplicar">
+            <span class="btn-icono">📷</span>
+            <span class="btn-texto">Aplicar</span>
+          </button>
+          <button type="button" class="btn-secondary" @click="emit('close')">
+            <span class="btn-icono">✕</span>
+            <span class="btn-texto">Cancelar</span>
+          </button>
         </div>
       </div>
     </section>
