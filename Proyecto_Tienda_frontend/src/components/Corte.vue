@@ -48,6 +48,7 @@ type VentaDetalleDTO = {
   Producto: {
     nombre: string;
     precio_costo?: number;
+    is_gramaje?: boolean;
   };
 };
 
@@ -352,7 +353,7 @@ async function generarReporteMensual() {
       return date.getFullYear() === year && date.getMonth() === targetMonth && ['C', 'F'].includes(String(d?.Venta?.estatus || ''));
     });
 
-    const salesMap = new Map<number, { fechaVenta?: string; metodoPago?: string; totalVenta: number; ganancia: number }>();
+    const salesMap = new Map<number, { fechaVenta?: string; metodoPago?: string; totalVenta: number; totalCosto: number }>();
 
     for (const d of monthlyDetails) {
       const idVenta = Number(d?.Venta?.idVenta || 0);
@@ -363,7 +364,7 @@ async function generarReporteMensual() {
           fechaVenta: d.Venta.fechaVenta,
           metodoPago: d.Venta.metodoPago,
           totalVenta: Number(d.Venta.montoTotal || 0),
-          ganancia: 0
+          totalCosto: 0
         });
       }
 
@@ -371,12 +372,15 @@ async function generarReporteMensual() {
       if (!sale) continue;
 
       const costoUnidad = Number(d?.Producto?.precio_costo || 0);
-      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE';
+      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.Producto?.is_gramaje === true;
       const cantidadCosto = isGramaje ? Number(d.cantidad || 0) / 1000 : Number(d.cantidad || 0);
-      sale.ganancia += Number(d.Venta.montoTotal || 0) - (cantidadCosto * costoUnidad);
+      sale.totalCosto += cantidadCosto * costoUnidad;
     }
 
-    const monthlySales = Array.from(salesMap.values());
+    const monthlySales = Array.from(salesMap.values()).map(sale => ({
+      ...sale,
+      ganancia: sale.totalVenta - sale.totalCosto
+    }));
 
     mensualTotalVentas.value = monthlySales.reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
     mensualTotalGanancias.value = monthlySales.reduce((sum, s) => sum + Number(s.ganancia || 0), 0);
