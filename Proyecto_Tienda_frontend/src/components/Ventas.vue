@@ -56,6 +56,7 @@ const productos = ref<Producto[]>([]);
 const ticket = ref<TicketItem[]>([]);
 const mensaje = ref('');
 const mensajeTipo = ref<'ok' | 'error' | 'info'>('info');
+const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Cajero');
 const sugerenciasVisibles = ref(false);
 const indiceSugerenciaActiva = ref(-1);
 const cargandoBusqueda = ref(false);
@@ -682,8 +683,8 @@ function manejarTeclasSugerencias(event: KeyboardEvent) {
       </header>
 
       <div class="resumen-card">
-        <p>Articulos:</p>
-        <strong>{{ totalArticulos }}</strong>
+        <p>Cajero:</p>
+        <strong>{{ nombreUsuario }}</strong>
       </div>
 
       <div class="resumen-card total">

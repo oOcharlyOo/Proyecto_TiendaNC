@@ -1,7 +1,27 @@
 <template>
   <div class="zelda-classic-scene">
+    <div class="fog-layer"></div>
     <div class="scanlines"></div>
-    <div class="rupee-stars" aria-hidden="true"></div>
+    <div class="rupee-stars" aria-hidden="true">
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+      <span class="rupee-star"></span>
+    </div>
+    <div class="floating-particles" aria-hidden="true">
+      <span class="particle"></span>
+      <span class="particle"></span>
+      <span class="particle"></span>
+      <span class="particle"></span>
+      <span class="particle"></span>
+      <span class="particle"></span>
+    </div>
 
     <div class="classic-card">
       <div class="triforce-classic" aria-hidden="true">
@@ -83,6 +103,7 @@ async function iniciarSesion() {
       if (usuario?.datos?.idUsuario) {
         const userId = usuario.datos.idUsuario;
         localStorage.setItem(AUTH_USER_ID_KEY, String(userId));
+        localStorage.setItem('nombreUsuario', name.value);
         idUsuarioActual.value = userId;
         
         await verificarCajaActiva(userId);
@@ -219,6 +240,110 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   }
 }
 
+@keyframes starFloat {
+  0%, 100% { 
+    transform: translateY(0) rotate(0deg); 
+    opacity: 0.4;
+  }
+  50% { 
+    transform: translateY(-12px) rotate(180deg); 
+    opacity: 1;
+  }
+}
+
+@keyframes rupeeGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 3px rgba(248, 214, 103, 0.6)) brightness(1);
+    transform: scale(1);
+  }
+  50% { 
+    filter: drop-shadow(0 0 12px rgba(248, 214, 103, 1)) brightness(1.3);
+    transform: scale(1.15);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes fogDrift {
+  0% { transform: translateX(-5%) translateY(0) scale(1); }
+  50% { transform: translateX(5%) translateY(-5px) scale(1.02); }
+  100% { transform: translateX(-5%) translateY(0) scale(1); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.05); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes shootingStar {
+  0% { 
+    transform: translateX(0) translateY(0); 
+    opacity: 1;
+  }
+  70% { 
+    opacity: 1;
+  }
+  100% { 
+    transform: translateX(300px) translateY(300px); 
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes floatUp {
+  0% { 
+    transform: translateY(100vh) scale(0); 
+    opacity: 0;
+  }
+  10% { 
+    opacity: 1; 
+    transform: translateY(90vh) scale(1);
+  }
+  90% { 
+    opacity: 1;
+  }
+  100% { 
+    transform: translateY(-10vh) scale(0.5); 
+    opacity: 0;
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes aurora {
+  0%, 100% { 
+    transform: translateX(0) skewX(0deg);
+    opacity: 0.15;
+  }
+  25% { 
+    transform: translateX(20px) skewX(5deg);
+    opacity: 0.25;
+  }
+  50% { 
+    transform: translateX(-10px) skewX(-3deg);
+    opacity: 0.2;
+  }
+  75% { 
+    transform: translateX(15px) skewX(2deg);
+    opacity: 0.22;
+  }
+}
+
 .zelda-classic-scene {
   --pixel-gold: #f8d667;
   --pixel-amber: #c79634;
@@ -235,34 +360,216 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   padding: 1.25rem;
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, var(--pixel-sky) 0%, #0a1912 35%, var(--pixel-bg) 100%);
+  background: 
+    linear-gradient(180deg, #050a08 0%, #07150d 30%, #0a1f18 70%, #07150d 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+}
+
+.aurora-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(ellipse 100% 60% at 0% 20%, rgba(31, 91, 53, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 40% at 100% 30%, rgba(72, 211, 8, 0.15) 0%, transparent 40%),
+    radial-gradient(ellipse 60% 30% at 50% 80%, rgba(248, 214, 103, 0.1) 0%, transparent 40%);
+  animation: aurora 12s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+.fog-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 30% at 50% 90%, rgba(19, 53, 35, 0.3) 0%, transparent 50%);
+  animation: fogDrift 10s ease-in-out infinite;
+}
+
+.fog-layer-2 {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(ellipse 70% 40% at 30% 70%, rgba(31, 91, 53, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 35% at 70% 20%, rgba(72, 211, 8, 0.1) 0%, transparent 40%);
+  animation: fogDrift 15s ease-in-out infinite reverse;
+  animation-delay: -5s;
 }
 
 .scanlines {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.22;
+  opacity: 0.15;
   background-image:
     repeating-linear-gradient(
       0deg,
-      rgba(255, 255, 255, 0.035) 0 2px,
-      rgba(0, 0, 0, 0.05) 2px 4px
+      rgba(255, 255, 255, 0.02) 0 2px,
+      rgba(0, 0, 0, 0.03) 2px 4px
     );
+  animation: pulse 0.1s ease-in-out infinite;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
 }
 
 .rupee-stars {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.5;
-  background-image:
-    radial-gradient(circle at 12% 22%, rgba(248, 214, 103, 0.45) 0 2px, transparent 3px),
-    radial-gradient(circle at 78% 18%, rgba(248, 214, 103, 0.45) 0 2px, transparent 3px),
-    radial-gradient(circle at 20% 80%, rgba(248, 214, 103, 0.38) 0 2px, transparent 3px),
-    radial-gradient(circle at 87% 74%, rgba(248, 214, 103, 0.38) 0 2px, transparent 3px);
 }
+
+.rupee-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #f8d667 0%, #c79634 50%, #8b6914 80%, transparent 100%);
+  border-radius: 50%;
+  animation: rupeeGlow 2.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(248, 214, 103, 0.8);
+}
+
+.rupee-star::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: radial-gradient(circle, rgba(248, 214, 103, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.rupee-star:nth-child(1) { top: 8%; left: 15%; animation-delay: 0s; }
+.rupee-star:nth-child(2) { top: 5%; left: 85%; animation-delay: 0.3s; width: 5px; height: 5px; }
+.rupee-star:nth-child(3) { top: 20%; left: 8%; animation-delay: 0.6s; }
+.rupee-star:nth-child(4) { top: 12%; left: 70%; animation-delay: 0.9s; width: 4px; height: 4px; }
+.rupee-star:nth-child(5) { top: 75%; left: 5%; animation-delay: 1.2s; }
+.rupee-star:nth-child(6) { top: 88%; left: 20%; animation-delay: 1.5s; width: 5px; height: 5px; }
+.rupee-star:nth-child(7) { top: 65%; left: 92%; animation-delay: 1.8s; }
+.rupee-star:nth-child(8) { top: 85%; left: 75%; animation-delay: 2.1s; width: 4px; height: 4px; }
+.rupee-star:nth-child(9) { top: 42%; left: 95%; animation-delay: 2.4s; }
+.rupee-star:nth-child(10) { top: 55%; left: 3%; animation-delay: 2.7s; width: 5px; height: 5px; }
+.rupee-star:nth-child(11) { top: 30%; left: 50%; animation-delay: 1s; }
+.rupee-star:nth-child(12) { top: 60%; left: 60%; animation-delay: 1.4s; width: 4px; height: 4px; }
+
+.floating-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(135deg, #f8d667, #fff8e0);
+  border-radius: 50%;
+  animation: starFloat 5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(248, 214, 103, 0.8);
+}
+
+.particle:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 6s; }
+.particle:nth-child(2) { left: 25%; animation-delay: 1s; animation-duration: 5s; }
+.particle:nth-child(3) { left: 40%; animation-delay: 2s; animation-duration: 7s; }
+.particle:nth-child(4) { left: 55%; animation-delay: 0.5s; animation-duration: 5.5s; }
+.particle:nth-child(5) { left: 70%; animation-delay: 1.5s; animation-duration: 6.5s; }
+.particle:nth-child(6) { left: 85%; animation-delay: 2.5s; animation-duration: 4.5s; }
+.particle:nth-child(7) { left: 15%; animation-delay: 3s; animation-duration: 7s; }
+.particle:nth-child(8) { left: 60%; animation-delay: 0.8s; animation-duration: 5.8s; }
+.particle:nth-child(9) { left: 80%; animation-delay: 1.8s; animation-duration: 6.2s; }
+.particle:nth-child(10) { left: 35%; animation-delay: 2.8s; animation-duration: 5.2s; }
+
+.fireflies {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.firefly {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #f8d667;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #f8d667, 0 0 20px #f8d667;
+  animation: twinkle 3s ease-in-out infinite, floatUp 8s linear infinite;
+}
+
+.firefly:nth-child(1) { left: 20%; animation-delay: 0s, 0s; }
+.firefly:nth-child(2) { left: 40%; animation-delay: 1s, 2s; }
+.firefly:nth-child(3) { left: 60%; animation-delay: 2s, 4s; }
+.firefly:nth-child(4) { left: 80%; animation-delay: 0.5s, 1s; }
+.firefly:nth-child(5) { left: 30%; animation-delay: 1.5s, 3s; }
+.firefly:nth-child(6) { left: 70%; animation-delay: 2.5s, 5s; }
+
+.light-rays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: 
+    conic-gradient(from 0deg at 50% 0%, transparent 0deg, rgba(248, 214, 103, 0.03) 10deg, transparent 20deg),
+    conic-gradient(from 120deg at 80% 20%, transparent 0deg, rgba(72, 211, 8, 0.02) 15deg, transparent 30deg),
+    conic-gradient(from 240deg at 20% 80%, transparent 0deg, rgba(248, 214, 103, 0.02) 12deg, transparent 24deg);
+  animation: rotate 60s linear infinite;
+  mix-blend-mode: screen;
+}
+
+.moon-glow {
+  position: absolute;
+  top: 5%;
+  right: 15%;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(248, 214, 103, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.moon-glow::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle, rgba(248, 214, 103, 0.15) 0%, transparent 60%);
+  border-radius: 50%;
+  animation: pulse 4s ease-in-out infinite reverse;
+}
+.rupee-star:nth-child(6) { top: 85%; left: 25%; animation-delay: 1.5s; width: 5px; height: 5px; }
+.rupee-star:nth-child(7) { top: 68%; left: 88%; animation-delay: 1.8s; }
+.rupee-star:nth-child(8) { top: 82%; left: 72%; animation-delay: 0.4s; width: 4px; height: 4px; }
+.rupee-star:nth-child(9) { top: 45%; left: 92%; animation-delay: 1.1s; }
+.rupee-star:nth-child(10) { top: 55%; left: 5%; animation-delay: 1.4s; width: 5px; height: 5px; }
+
+.floating-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: rgba(248, 214, 103, 0.7);
+  border-radius: 50%;
+  animation: starFloat 4s ease-in-out infinite;
+}
+
+.particle:nth-child(1) { top: 20%; left: 30%; animation-delay: 0s; }
+.particle:nth-child(2) { top: 35%; left: 70%; animation-delay: 0.5s; }
+.particle:nth-child(3) { top: 50%; left: 20%; animation-delay: 1s; }
+.particle:nth-child(4) { top: 65%; left: 80%; animation-delay: 1.5s; }
+.particle:nth-child(5) { top: 80%; left: 40%; animation-delay: 2s; }
+.particle:nth-child(6) { top: 15%; left: 55%; animation-delay: 2.5s; }
 
 .classic-card {
   width: min(100%, 470px);
