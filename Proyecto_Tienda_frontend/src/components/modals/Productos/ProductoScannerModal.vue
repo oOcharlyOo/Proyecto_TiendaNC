@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 const props = defineProps<{
   open: boolean;
@@ -11,28 +11,120 @@ const emit = defineEmits<{
 }>();
 
 const codigo = ref('');
+const scannerActivo = ref(false);
 
 function aplicar() {
   emit('apply', codigo.value.trim());
 }
+
+watch(() => props.open, async (newVal) => {
+  if (newVal) {
+    codigo.value = '';
+    scannerActivo.value = false;
+  }
+});
+
+async function iniciarScanner() {
+  if (typeof (window as any).Quagga === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
+    script.onload = () => initQuagga();
+    script.onerror = () => alert('Error al cargar el escáner');
+    document.head.appendChild(script);
+    return;
+  }
+  initQuagga();
+}
+
+async function initQuagga() {
+  scannerActivo.value = true;
+  
+  await nextTick();
+  
+  const targetElement = document.querySelector('#scanner-interactive-producto');
+  if (!targetElement) return;
+
+  (window as any).Quagga.init(
+    {
+      inputStream: {
+        name: 'Live',
+        type: 'LiveStream',
+        target: targetElement,
+        constraints: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      decoder: {
+        readers: [
+          'code_128_reader',
+          'ean_reader',
+          'ean_8_reader',
+          'code_39_reader',
+          'upc_reader',
+        ],
+      },
+      locate: true,
+    },
+    function (err: any) {
+      if (err) {
+        console.error(err);
+        scannerActivo.value = false;
+        return;
+      }
+      (window as any).Quagga.start();
+    }
+  );
+
+  (window as any).Quagga.onDetected((data: any) => {
+    const code = data.codeResult.code;
+    if (code) {
+      codigo.value = code;
+      detenerScanner();
+    }
+  });
+}
+
+function detenerScanner() {
+  if (typeof (window as any).Quagga !== 'undefined') {
+    (window as any).Quagga.stop();
+    (window as any).Quagga.offDetected(() => {});
+  }
+  scannerActivo.value = false;
+}
 </script>
 
 <template>
-  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="open" class="modal-overlay" @click.self="detenerScanner(); emit('close')">
     <section class="modal-card scanner-modal">
       <header class="modal-header">
-        <h3>📷 Escanear Codigo</h3>
-        <p>Pega el codigo o escribe manualmente.</p>
+        <h3>📷 Escanear Código</h3>
+        <p v-if="!scannerActivo">Pega el código o escribe manualmente.</p>
+        <p v-else>Apunta la cámara al código de barras.</p>
       </header>
 
       <div class="space-y-3">
+        <div v-if="scannerActivo" class="scanner-viewport">
+          <div id="scanner-interactive-producto"></div>
+          <div class="scanner-laser"></div>
+        </div>
+        
+        <div v-else class="scanner-preview">
+          <button type="button" class="btn-camera" @click="iniciarScanner">
+            <span class="camera-icon">📷</span>
+            <span>Abrir Cámara</span>
+          </button>
+        </div>
+
         <input v-model="codigo" type="text" placeholder="750000000002">
+        
         <div class="modal-actions">
-          <button type="button" @click="aplicar">
-            <span class="btn-icono">📷</span>
+          <button type="button" @click="aplicar" :disabled="!codigo.trim()">
+            <span class="btn-icono">✓</span>
             <span class="btn-texto">Aplicar</span>
           </button>
-          <button type="button" class="btn-secondary" @click="emit('close')">
+          <button type="button" class="btn-secondary" @click="detenerScanner(); emit('close')">
             <span class="btn-icono">✕</span>
             <span class="btn-texto">Cancelar</span>
           </button>
@@ -98,6 +190,77 @@ function aplicar() {
   opacity: 0.8;
 }
 
+.scanner-viewport {
+  width: 100%;
+  height: 200px;
+  background: #000;
+  border: 3px solid #f8d667;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scanner-viewport :deep(#scanner-interactive-producto) {
+  width: 100%;
+  height: 100%;
+}
+
+.scanner-viewport :deep(video) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanner-laser {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: red;
+  top: 50%;
+  animation: scanner-line 2s infinite;
+  box-shadow: 0 0 8px red;
+}
+
+@keyframes scanner-line {
+  0%, 100% { top: 20%; }
+  50% { top: 80%; }
+}
+
+.scanner-preview {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.btn-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  background: linear-gradient(180deg, #67e0a8 0%, #2a9d5c 100%);
+  border: 3px solid #133523;
+  border-radius: 8px;
+  color: #0a1912;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #0a1912;
+}
+
+.btn-camera:hover {
+  filter: brightness(1.1);
+}
+
+.btn-camera:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.camera-icon {
+  font-size: 2rem;
+}
+
 .scanner-modal input {
   width: 100%;
   background: #f2e8bf;
@@ -140,16 +303,21 @@ function aplicar() {
   color: #1a1401;
 }
 
+.modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .modal-actions button.btn-secondary {
   background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
   color: #1a1401;
 }
 
-.modal-actions button:hover {
+.modal-actions button:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
-.modal-actions button:active {
+.modal-actions button:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
 }

@@ -278,17 +278,32 @@ textarea:focus {
 }
 
 .btn-scanner {
-  background: linear-gradient(180deg, #4a90d9 0%, #2d5a8a 100%);
-  color: white;
-  border: 2px solid #1a3a5c;
-  padding: 0.5rem;
-  border-radius: 8px;
+  background: linear-gradient(180deg, #67e0a8 0%, #2a9d5c 45%, #1e7a47 100%);
+  color: #0a1912;
+  border: 2px solid #133523;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
+  box-shadow: 0 2px 0 #0a1912, 0 3px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 60ms steps(2), filter 60ms linear;
+  min-width: 44px;
+}
+
+.btn-scanner svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .btn-scanner:hover {
   filter: brightness(1.1);
+}
+
+.btn-scanner:active {
+  transform: translateY(2px);
+  box-shadow: none;
 }

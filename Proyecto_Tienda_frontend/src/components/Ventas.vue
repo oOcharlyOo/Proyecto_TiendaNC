@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import EntradaEfectivoModal from './modals/EntradaEfectivoModal.vue';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import HistorialVentasModal from './modals/HistorialVentasModal.vue';
@@ -832,7 +832,9 @@ async function cargarHistorialVentasDia() {
 
     historialCobroTotal.value = Number(data?.datos?.cobroTotal ?? 0);
     historialGananciaTotal.value = Number(data?.datos?.gananciaTotal ?? 0);
-    historialVentas.value = Array.isArray(data?.datos?.ventas) ? data.datos.ventas : [];
+    historialVentas.value = Array.isArray(data?.datos?.ventas) 
+      ? data.datos.ventas.sort((a, b) => (b.idVenta ?? 0) - (a.idVenta ?? 0))
+      : [];
   } catch (_error) {
     historialCobroTotal.value = 0;
     historialGananciaTotal.value = 0;
@@ -1055,25 +1057,55 @@ async function startVoiceCommand() {
 let scannerProcessing = false;
 
 async function startScanner() {
+  console.log('Starting scanner, Quagga available:', typeof (window as any).Quagga !== 'undefined');
+  
   if (typeof (window as any).Quagga === 'undefined') {
-    mostrarMensaje('Error: Librería de escáner no cargada', 'error');
+    mostrarMensaje('Cargando escáner...', 'info');
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
+    script.onload = () => {
+      console.log('Quagga loaded, starting scanner');
+      initScanner();
+    };
+    script.onerror = () => {
+      mostrarMensaje('Error al cargar librería de escáner', 'error');
+    };
+    document.head.appendChild(script);
+    return;
+  }
+  
+  await initScanner();
+}
+
+async function initScanner() {
+  scannerActivo.value = true;
+  scannerProcessing = false;
+  
+  await nextTick();
+  
+  const targetElement = document.querySelector('#scanner-interactive');
+  console.log('Scanner target element:', targetElement);
+  
+  if (!targetElement) {
+    mostrarMensaje('Error: Contenedor de escáner no encontrado', 'error');
+    stopScanner();
     return;
   }
 
-  scannerActivo.value = true;
-  scannerProcessing = false;
-
+  const Quagga = (window as any).Quagga;
+  
   await new Promise<void>((resolve) => {
-    (window as any).Quagga.init(
+    Quagga.init(
       {
         inputStream: {
           name: 'Live',
           type: 'LiveStream',
-          target: document.querySelector('#scanner-interactive'),
+          target: targetElement,
           constraints: {
             facingMode: 'environment',
-            width: { min: 640 },
-            height: { min: 480 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
         },
         decoder: {
@@ -1085,11 +1117,12 @@ async function startScanner() {
             'upc_reader',
           ],
         },
+        locate: true,
       },
       function (err: any) {
         if (err) {
-          console.error(err);
-          mostrarMensaje('Error al iniciar la cámara', 'error');
+          console.error('Quagga init error:', err);
+          mostrarMensaje('Error al iniciar la cámara: ' + err.message, 'error');
           stopScanner();
           resolve();
           return;
@@ -1123,22 +1156,24 @@ function stopScanner() {
 }
 
 async function buscarYAgregarProducto(codigo: string) {
-  const producto = productos.value.find(
-    (p) => (p.codigo_barras || '').toString() === codigo
+  console.log('Buscando código:', codigo);
+  
+  let producto = productos.value.find(
+    (p) => String(p.codigo_barras) === codigo || String(p.idProducto) === codigo
   );
 
+  if (!producto) {
+    console.log('Producto no encontrado localmente, buscando en backend...');
+    producto = await buscarProductoPorCodigoBarras(codigo);
+  }
+
   if (producto) {
-    await agregarProducto(producto);
+    console.log('Producto encontrado:', producto.nombre);
+    await agregarProductoATicket(producto);
     mostrarMensaje(`Escaneado: ${producto.nombre}`, 'ok');
   } else {
-    terminoBusqueda.value = codigo;
-    await buscarProductosPorNombre(codigo);
-    if (productos.value.length > 0) {
-      await agregarProducto(productos.value[0]);
-      mostrarMensaje(`Agregado: ${productos.value[0].nombre}`, 'ok');
-    } else {
-      mostrarMensaje(`Producto no encontrado: ${codigo}`, 'error');
-    }
+    console.log('Producto no encontrado en backend');
+    mostrarMensaje(`Producto no encontrado: ${codigo}`, 'error');
   }
 }
 
