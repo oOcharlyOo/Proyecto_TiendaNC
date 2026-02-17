@@ -1,10 +1,64 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, markRaw } from 'vue';
 import EntradaEfectivoModal from './modals/EntradaEfectivoModal.vue';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import HistorialVentasModal from './modals/HistorialVentasModal.vue';
 import CalculadoraGramajeModal from './modals/CalculadoraGramajeModal.vue';
 import CobroModal from './modals/CobroModal.vue';
+
+const audioContext = typeof window !== 'undefined' ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
+
+function playSound(type: 'add' | 'remove' | 'clear' | 'cash') {
+  if (!audioContext) return;
+  
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  switch (type) {
+    case 'add':
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.15);
+      break;
+    case 'remove':
+      oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(300, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.15);
+      break;
+    case 'clear':
+      oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.2);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+      break;
+    case 'cash':
+      for (let i = 0; i < 3; i++) {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.frequency.setValueAtTime(523, audioContext.currentTime + i * 0.15);
+        osc.frequency.setValueAtTime(659, audioContext.currentTime + i * 0.15 + 0.1);
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.15 + 0.2);
+        osc.start(audioContext.currentTime + i * 0.15);
+        osc.stop(audioContext.currentTime + i * 0.15 + 0.2);
+      }
+      break;
+  }
+}
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -252,7 +306,7 @@ async function eliminarTicket(id: number) {
 }
 
 const terminoBusqueda = ref('');
-const productos = ref<Producto[]>([]);
+const productos = shallowRef<Producto[]>([]);
 const tickets = ref<Ticket[]>([]);
 const ticketActualId = ref<number | null>(null);
 const mensaje = ref('');
@@ -260,7 +314,6 @@ const mensajeTipo = ref<'ok' | 'error' | 'info'>('info');
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Cajero');
 const sugerenciasVisibles = ref(false);
 const indiceSugerenciaActiva = ref(-1);
-const cargandoBusqueda = ref(false);
 const ticketDelDia = ref('1');
 const isRecording = ref(false);
 const scannerActivo = ref(false);
@@ -280,8 +333,6 @@ const historialVentaDetalle = ref<VentaDetalleDTO[]>([]);
 const historialVentaSeleccionada = ref<VentaDTO | null>(null);
 const modalDetalleVentaAbierto = ref(false);
 
-let temporizadorBusqueda: ReturnType<typeof setTimeout> | null = null;
-
 const ticketActual = computed(() => {
   if (ticketActualId.value === null) return null;
   return tickets.value.find(t => t.id === ticketActualId.value) ?? null;
@@ -299,23 +350,25 @@ const totalArticulos = computed(() => {
   return ticket.value.reduce((acumulado, item) => acumulado + item.cantidad, 0);
 });
 
-const ticketsPendientes = computed(() => {
-  return tickets.value.filter(t => t.estado === 'pendiente');
-});
-
 const sugerenciasPorNombre = computed(() => {
-  return [...productos.value].sort((a, b) => a.nombre.localeCompare(b.nombre)).slice(0, 50);
+  const query = terminoBusqueda.value.trim().toLowerCase();
+  let resultados = productos.value;
+  
+  if (query) {
+    resultados = productos.value.filter(p => 
+      p.nombre.toLowerCase().includes(query) ||
+      (p.codigo_barras && p.codigo_barras.includes(query))
+    );
+  }
+  
+  return resultados
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .slice(0, 50);
 });
 
 onMounted(async () => {
   await cargarProductos();
   await cargarTicketsDesdeBackend();
-});
-
-onBeforeUnmount(() => {
-  if (temporizadorBusqueda) {
-    clearTimeout(temporizadorBusqueda);
-  }
 });
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -349,7 +402,7 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
         nombre,
         codigo_barras: codigo.length ? codigo : null,
         precio,
-        dto: item,
+        dto: markRaw(item),
         is_gramaje: item.is_gramaje
       };
     })
@@ -367,67 +420,12 @@ async function cargarProductos() {
   }
 }
 
-async function cargarTicketDelDia() {
-  const idUsuario = obtenerIdUsuarioSesion();
-  if (!idUsuario) {
-    ticketDelDia.value = 'N/D';
-    return;
-  }
-
-  try {
-    const response = await getJson<ApiRespuesta<VentaDTO>>(`${API_BASE}/ventas/buscarVentaPendiente`);
-
-    if (response?.codigo === 200 && response?.datos) {
-      const venta = response.datos;
-      const numeroTicketActual = Number(venta?.numeroTicket ?? 0);
-      const mensajeServidor = String(response?.mensaje ?? '');
-
-      if (mensajeServidor === 'Se encontro la ultima venta ya completada') {
-        ticketDelDia.value = String(numeroTicketActual + 1);
-        return;
-      }
-
-      if (mensajeServidor.includes('venta pendiente')) {
-        ticketDelDia.value = String(numeroTicketActual || 1);
-        return;
-      }
-
-      ticketDelDia.value = String(numeroTicketActual || 1);
-      return;
-    }
-
-    ticketDelDia.value = '1';
-  } catch (_error) {
-    ticketDelDia.value = 'N/D';
-  }
-}
-
 function getFechaHoy() {
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
-}
-
-async function buscarProductosPorNombre(nombre: string) {
-  const query = nombre.trim();
-  if (!query) {
-    await cargarProductos();
-    return;
-  }
-
-  try {
-    cargandoBusqueda.value = true;
-    const data = await getJson<ApiRespuesta<ProductoDTO[]>>(
-      `${API_BASE}/productos/buscar?nombre=${encodeURIComponent(query)}`
-    );
-    productos.value = normalizarProductos(data?.datos);
-  } catch (_error) {
-    productos.value = [];
-  } finally {
-    cargandoBusqueda.value = false;
-  }
 }
 
 async function buscarProductoPorCodigoBarras(codigo: string): Promise<Producto | null> {
@@ -456,10 +454,7 @@ async function buscarProducto(termino: string): Promise<Producto | null> {
   if (porNombreParcial) return porNombreParcial;
 
   const desdeCodigo = await buscarProductoPorCodigoBarras(query);
-  if (desdeCodigo) return desdeCodigo;
-
-  await buscarProductosPorNombre(query);
-  return productos.value[0] ?? null;
+  return desdeCodigo;
 }
 
 function manejarFocusBusqueda() {
@@ -469,14 +464,6 @@ function manejarFocusBusqueda() {
 function manejarInputBusqueda() {
   sugerenciasVisibles.value = true;
   indiceSugerenciaActiva.value = -1;
-
-  if (temporizadorBusqueda) {
-    clearTimeout(temporizadorBusqueda);
-  }
-
-  temporizadorBusqueda = setTimeout(async () => {
-    await buscarProductosPorNombre(terminoBusqueda.value);
-  }, 250);
 }
 
 async function agregarDesdeBuscador() {
@@ -548,6 +535,7 @@ async function agregarProductoATicket(producto: Producto) {
 
 
   mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
+  playSound('add');
 }
 
 async function aumentarCantidad(item: TicketItem) {
@@ -563,26 +551,28 @@ async function aumentarCantidad(item: TicketItem) {
     return;
   }
 
+  const cantidadAnterior = item.cantidad;
   item.cantidad += 1;
   
   if (item.idVentaDetalle && ticketActual.value) {
     try {
       await crearDetalleVenta(ticketActual.value.id, item);
     } catch (e) {
-      item.cantidad -= 1;
+      item.cantidad = cantidadAnterior;
     }
   }
 }
 
 async function disminuirCantidad(item: TicketItem) {
   if (item.cantidad > 1) {
+    const cantidadAnterior = item.cantidad;
     item.cantidad -= 1;
     
     if (item.idVentaDetalle && ticketActual.value) {
       try {
         await crearDetalleVenta(ticketActual.value.id, item);
       } catch (e) {
-        item.cantidad += 1;
+        item.cantidad = cantidadAnterior;
       }
     }
     return;
@@ -595,38 +585,36 @@ async function quitarItem(id: number) {
   if (!ticketActual.value) return;
   
   const item = ticketActual.value.items.find(i => i.id === id);
-  if (item?.idVentaDetalle) {
-    try {
-      await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, {
-        method: 'DELETE'
-      });
-    } catch (e) {
-      console.error('Error al eliminar detalle:', e);
-    }
-  }
+  const idVentaDetalle = item?.idVentaDetalle;
   
   ticketActual.value.items = ticketActual.value.items.filter((item) => item.id !== id);
+  playSound('remove');
+  
+  if (idVentaDetalle) {
+    getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${idVentaDetalle}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  }
 }
 
 async function limpiarTicket() {
   if (!ticketActual.value) return;
   
   const items = ticketActual.value.items;
-  for (const item of items) {
-    if (item.idVentaDetalle) {
-      try {
-        await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, {
-          method: 'DELETE'
-        });
-      } catch (e) {
-        console.error('Error al eliminar detalle:', e);
-      }
-    }
-  }
+  const idsParaEliminar = items
+    .filter(item => item.idVentaDetalle)
+    .map(item => item.idVentaDetalle);
   
   ticketActual.value.items = [];
 
+  for (const id of idsParaEliminar) {
+    getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  }
+  
   mostrarMensaje('Ticket reiniciado.', 'info');
+  playSound('clear');
 }
 
 function obtenerIdUsuarioSesion() {
@@ -742,6 +730,7 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA') {
     
   
     mostrarMensaje(`Venta cobrada por ${formatoMoneda(montoCobrado)} con ${metodoPago}.${numeroTicketVenta}`, 'ok');
+    playSound('cash');
     modalCobroAbierto.value = false;
     await cargarTicketsDesdeBackend();
   } catch (error) {

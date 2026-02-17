@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -28,32 +28,38 @@ function obtenerEmojiInventario(id: number | undefined): string {
 
 const cargando = ref(false);
 const mensaje = ref('');
-const productos = ref<ProductoDTO[]>([]);
+const productos = shallowRef<ProductoDTO[]>([]);
 
 const bajoStock = computed(() => {
   return productos.value.filter((p) => Number(p.stock || 0) < Number(p.cantidad_min || 0));
 });
 
 const costoTotalInventario = computed(() => {
-  return productos.value.reduce((sum, p) => {
+  let sum = 0;
+  for (const p of productos.value) {
     const stock = Number(p.stock || 0);
     const costo = Number(p.precio_costo || 0);
     if (p.is_gramaje) {
-      return sum + (stock / 1000) * costo;
+      sum += (stock / 1000) * costo;
+    } else {
+      sum += stock * costo;
     }
-    return sum + stock * costo;
-  }, 0);
+  }
+  return sum;
 });
 
 const valorTotalVenta = computed(() => {
-  return productos.value.reduce((sum, p) => {
+  let sum = 0;
+  for (const p of productos.value) {
     const stock = Number(p.stock || 0);
     const venta = Number(p.precio_venta || 0);
     if (p.is_gramaje) {
-      return sum + (stock / 1000) * venta;
+      sum += (stock / 1000) * venta;
+    } else {
+      sum += stock * venta;
     }
-    return sum + stock * venta;
-  }, 0);
+  }
+  return sum;
 });
 
 const productosAgotados = computed(() => {

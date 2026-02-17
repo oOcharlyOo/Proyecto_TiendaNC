@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 
 type ApiRespuesta<T> = {
@@ -76,6 +76,8 @@ const modalDetalleAbierto = ref(false);
 
 const fechaDiaria = ref(new Date().toISOString().slice(0, 10));
 const mesMensual = ref(new Date().toISOString().slice(0, 7));
+const fechaRangoInicio = ref(new Date().toISOString().slice(0, 10));
+const fechaRangoFin = ref(new Date().toISOString().slice(0, 10));
 
 const corteActual = ref<CorteDTO | null>(null);
 const ventasEfectivo = ref(0);
@@ -86,13 +88,13 @@ const reporteTitulo = ref('Reporte del Corte Actual');
 const mensualTotalVentas = ref(0);
 const mensualTotalTransferencia = ref(0);
 const mensualTotalGanancias = ref(0);
-const mensualSemanas = ref<{ semana: number; ventas: number; ganancia: number }[]>([]);
+const mensualSemanas = shallowRef<{ semana: number; ventas: number; ganancia: number }[]>([]);
 
-const historialDetalles = ref<VentaDetalleDTO[]>([]);
+const historialDetalles = shallowRef<VentaDetalleDTO[]>([]);
 const filtroMesHistorial = ref('all');
 const filtroDiaHistorial = ref('all');
 const ventaDetalleSeleccionada = ref<VentaDTO | null>(null);
-const ventaDetalleItems = ref<VentaDetalleDTO[]>([]);
+const ventaDetalleItems = shallowRef<VentaDetalleDTO[]>([]);
 
 const historialVentasAgrupadas = computed(() => {
   const map = new Map<number, { venta: VentaDTO; detalles: VentaDetalleDTO[] }>();
@@ -150,7 +152,11 @@ const historialFiltrado = computed(() => {
 });
 
 const historialTotalFiltrado = computed(() => {
-  return historialFiltrado.value.reduce((sum, x) => sum + Number(x.venta.montoTotal || 0), 0);
+  let sum = 0;
+  for (const x of historialFiltrado.value) {
+    sum += Number(x.venta.montoTotal || 0);
+  }
+  return sum;
 });
 
 function formatoMoneda(valor: number) {
@@ -272,13 +278,44 @@ async function generarReporteDiario() {
       .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
       .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
 
+    // Obtener datos de caja (monto inicial, ingresos, egresos)
+    let montoInicial = 0;
+    let otrosIngresos = 0;
+    let totalEgresos = 0;
+    
+    if (idUsuario.value) {
+      try {
+        const cajaData = await fetchApi<any>(`/caja/reporteDiario/${fechaDiaria.value}?idUsuario=${idUsuario.value}`);
+        console.log('Caja data response:', cajaData);
+        const datos = cajaData?.datos || cajaData;
+        if (datos) {
+          montoInicial = Number(datos.montoInicial) || 0;
+          otrosIngresos = Number(datos.otrosIngresos) || 0;
+          totalEgresos = Number(datos.totalEgresos) || 0;
+        }
+      } catch (e) {
+        console.error('Error al obtener datos de caja:', e);
+      }
+    }
+
+    const totalVentas = Number(data?.cobroTotal || 0);
+    const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
+
+    console.log('Setting corteActual:', {
+      montoInicial,
+      totalVentas,
+      otrosIngresos,
+      totalEgresos,
+      saldoFinal
+    });
+
     corteActual.value = {
       fechaCorte: `${fechaDiaria.value}T00:00:00`,
-      montoInicial: 0,
-      totalVentas: Number(data?.cobroTotal || 0),
-      totalEgresos: 0,
-      otrosIngresos: 0,
-      saldoFinalCalculado: Number(data?.cobroTotal || 0),
+      montoInicial: montoInicial,
+      totalVentas: totalVentas,
+      totalEgresos: totalEgresos,
+      otrosIngresos: otrosIngresos,
+      saldoFinalCalculado: saldoFinal,
       gananciaTotal: Number(data?.gananciaTotal || 0)
     };
 
@@ -396,6 +433,108 @@ async function generarReporteMensual() {
     mensualTotalTransferencia.value = 0;
     mensualSemanas.value = [];
     mostrarMensaje(`Error al generar reporte mensual: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  } finally {
+    cargandoMensual.value = false;
+  }
+}
+
+async function generarReporteRangoFechas() {
+  if (!fechaRangoInicio.value || !fechaRangoFin.value) {
+    mostrarMensaje('Selecciona fecha inicial y final.', 'error');
+    return;
+  }
+
+  const fechaIni = new Date(fechaRangoInicio.value);
+  const fechaFin = new Date(fechaRangoFin.value);
+
+  if (fechaIni > fechaFin) {
+    mostrarMensaje('La fecha inicial no puede ser mayor a la final.', 'error');
+    return;
+  }
+
+  cargandoMensual.value = true;
+  try {
+    const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+
+    const rangeDetails = (allDetails || []).filter((d) => {
+      const date = new Date(d?.Venta?.fechaVenta || '');
+      if (Number.isNaN(date.getTime())) return false;
+      const fechaOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const iniOnly = new Date(fechaIni.getFullYear(), fechaIni.getMonth(), fechaIni.getDate());
+      const finOnly = new Date(fechaFin.getFullYear(), fechaFin.getMonth(), fechaFin.getDate());
+      return fechaOnly >= iniOnly && fechaOnly <= finOnly && ['C', 'F'].includes(String(d?.Venta?.estatus || ''));
+    });
+
+    const salesMap = new Map<number, { fechaVenta?: string; metodoPago?: string; totalVenta: number; totalCosto: number }>();
+
+    for (const d of rangeDetails) {
+      const idVenta = Number(d?.Venta?.idVenta || 0);
+      if (!idVenta) continue;
+
+      if (!salesMap.has(idVenta)) {
+        salesMap.set(idVenta, {
+          fechaVenta: d.Venta.fechaVenta,
+          metodoPago: d.Venta.metodoPago,
+          totalVenta: Number(d.Venta.montoTotal || 0),
+          totalCosto: 0
+        });
+      }
+
+      const sale = salesMap.get(idVenta);
+      if (!sale) continue;
+
+      const costoUnidad = Number(d?.Producto?.precio_costo || 0);
+      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.Producto?.is_gramaje === true;
+      const cantidadCosto = isGramaje ? Number(d.cantidad || 0) / 1000 : Number(d.cantidad || 0);
+      sale.totalCosto += cantidadCosto * costoUnidad;
+    }
+
+    const rangeSales = Array.from(salesMap.values()).map(sale => ({
+      ...sale,
+      ganancia: sale.totalVenta - sale.totalCosto
+    }));
+
+    mensualTotalVentas.value = rangeSales.reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
+    mensualTotalGanancias.value = rangeSales.reduce((sum, s) => sum + Number(s.ganancia || 0), 0);
+    mensualTotalTransferencia.value = rangeSales
+      .filter((s) => String(s.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
+      .reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
+
+    const inicio = new Date(fechaIni.getFullYear(), fechaIni.getMonth(), fechaIni.getDate());
+    const fin = new Date(fechaFin.getFullYear(), fechaFin.getMonth(), fechaFin.getDate());
+    const diasDiff = Math.ceil((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const semanas = Math.ceil(diasDiff / 7);
+    
+    const semanasMap = new Map<number, { ventas: number; ganancia: number }>();
+    for (let i = 0; i < semanas; i++) {
+      semanasMap.set(i + 1, { ventas: 0, ganancia: 0 });
+    }
+
+    for (const sale of rangeSales) {
+      const fechaVenta = new Date(sale.fechaVenta || '');
+      if (Number.isNaN(fechaVenta.getTime())) continue;
+      const diasDesdeInicio = Math.floor((fechaVenta.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+      const numSemana = Math.floor(diasDesdeInicio / 7) + 1;
+      const semana = semanasMap.get(numSemana);
+      if (semana) {
+        semana.ventas += Number(sale.totalVenta || 0);
+        semana.ganancia += Number(sale.ganancia || 0);
+      }
+    }
+
+    mensualSemanas.value = Array.from(semanasMap.entries()).map(([semana, data]) => ({
+      semana,
+      ventas: data.ventas,
+      ganancia: data.ganancia
+    }));
+
+    mostrarMensaje(`Reporte del ${fechaRangoInicio.value} al ${fechaRangoFin.value} generado.`, 'ok');
+  } catch (error) {
+    mensualTotalVentas.value = 0;
+    mensualTotalGanancias.value = 0;
+    mensualTotalTransferencia.value = 0;
+    mensualSemanas.value = [];
+    mostrarMensaje(`Error al generar reporte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
   }
@@ -520,6 +659,27 @@ onMounted(() => {
       <section class="modal-card panel monthly-modal">
         <button type="button" class="btn-cerrar-modal" @click="modalMensualAbierto = false">✕</button>
         <h3>🌙 Reporte Mensual</h3>
+        
+        <div class="range-section">
+          <label>📅 Por Rango de Fechas</label>
+          <div class="range-inputs">
+            <div class="range-field">
+              <span>Desde:</span>
+              <input v-model="fechaRangoInicio" type="date">
+            </div>
+            <div class="range-field">
+              <span>Hasta:</span>
+              <input v-model="fechaRangoFin" type="date">
+            </div>
+            <button type="button" :disabled="cargandoMensual" @click="generarReporteRangoFechas">
+              <span class="btn-icono">📊</span>
+              <span class="btn-texto">{{ cargandoMensual ? 'Generando...' : 'Generar' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="divider">ó</div>
+
         <label>Selecciona mes</label>
         <div class="monthly-head">
           <input v-model="mesMensual" type="month">
@@ -928,6 +1088,73 @@ onMounted(() => {
 .detail-modal {
   width: min(100%, 960px);
   max-height: 88vh;
+}
+
+.range-section {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px dashed rgba(248, 214, 103, 0.3);
+}
+
+.range-section label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--pixel-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.range-inputs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.range-field {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.range-field span {
+  font-size: 0.75rem;
+  color: var(--pixel-paper);
+}
+
+.range-field input {
+  background: #f2e8bf;
+  border: 2px solid #2a1807;
+  padding: 0.4rem;
+  color: #1d1606;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.range-inputs button {
+  border: 2px solid #2a1807;
+  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
+  color: #0a2008;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px #c4e8bc, 0 2px 0 #1a4a12;
+}
+
+.range-inputs button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.divider {
+  text-align: center;
+  color: var(--pixel-paper);
+  opacity: 0.5;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
 }
 
 .monthly-head {

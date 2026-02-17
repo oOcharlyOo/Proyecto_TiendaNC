@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import ProductoFormModal from './modals/Productos/ProductoFormModal.vue';
 import ProductoScannerModal from './modals/Productos/ProductoScannerModal.vue';
 
@@ -24,7 +24,7 @@ type ProductoDTO = {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-const productos = ref<ProductoDTO[]>([]);
+const productos = shallowRef<ProductoDTO[]>([]);
 const cargando = ref(false);
 const guardando = ref(false);
 const terminoBusqueda = ref('');
@@ -39,11 +39,16 @@ const scannerCode = ref('');
 const productosFiltrados = computed(() => {
   const termino = terminoBusqueda.value.trim().toLowerCase();
   if (!termino) return productos.value;
-  return productos.value.filter((producto) => {
+  
+  const results: ProductoDTO[] = [];
+  for (const producto of productos.value) {
     const nombre = (producto.nombre || '').toLowerCase();
     const codigo = (producto.codigoBarras || '').toLowerCase();
-    return nombre.includes(termino) || codigo.includes(termino);
-  });
+    if (nombre.includes(termino) || codigo.includes(termino)) {
+      results.push(producto);
+    }
+  }
+  return results;
 });
 
 function formatoMoneda(valor: number) {
