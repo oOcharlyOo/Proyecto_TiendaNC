@@ -23,6 +23,16 @@
       <span class="particle"></span>
     </div>
 
+    <div class="link-sprite" aria-hidden="true">
+      <div class="link-frame frame1"></div>
+      <div class="link-frame frame2"></div>
+    </div>
+
+    <div class="octo-sprite" aria-hidden="true">
+      <div class="octo-frame frame1"></div>
+      <div class="octo-frame frame2"></div>
+    </div>
+
     <div class="classic-card">
       <div class="triforce-classic" aria-hidden="true">
         <span></span>
@@ -104,6 +114,7 @@ async function iniciarSesion() {
         const userId = usuario.datos.idUsuario;
         localStorage.setItem(AUTH_USER_ID_KEY, String(userId));
         localStorage.setItem('nombreUsuario', name.value);
+        localStorage.setItem('tipoUsuario', String(usuario.datos.id_tipo_usuario || 2));
         idUsuarioActual.value = userId;
         
         await verificarCajaActiva(userId);
@@ -344,6 +355,51 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   }
 }
 
+@keyframes linkWalk {
+  0% { left: -100px; opacity: 1; }
+  100% { left: calc(100% + 100px); opacity: 1; }
+}
+
+@keyframes linkAppear {
+  to { opacity: 1; }
+}
+
+@keyframes linkSwing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes linkSwing2 {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes octoWalk {
+  0% { left: -100px; }
+  100% { left: calc(100% + 100px); }
+}
+
+@keyframes octoSwing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes octoSwing2 {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes linkBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes linkLegs {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+}
+
 .zelda-classic-scene {
   --pixel-gold: #f8d667;
   --pixel-amber: #c79634;
@@ -520,6 +576,70 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
     conic-gradient(from 240deg at 20% 80%, transparent 0deg, rgba(248, 214, 103, 0.02) 12deg, transparent 24deg);
   animation: rotate 60s linear infinite;
   mix-blend-mode: screen;
+}
+
+.link-sprite {
+  position: absolute;
+  bottom: 8%;
+  width: 180px;
+  height: 130px;
+  animation: linkWalk 12s linear infinite;
+  z-index: 0;
+  opacity: 0;
+  animation-fill-mode: forwards;
+  animation-delay: 3s;
+}
+
+.link-frame {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: linkSwing 0.8s steps(1) infinite;
+}
+
+.frame1 {
+  background-image: url('@/assets/img/1.png');
+  background-size: 180px 130px;
+}
+
+.frame2 {
+  background-image: url('@/assets/img/2.png');
+  background-size: 100px 130px;
+  animation: linkSwing2 0.8s steps(1) infinite;
+}
+
+.octo-sprite {
+  position: absolute;
+  bottom: 8%;
+  left: -80px;
+  width: 100px;
+  height: 100px;
+  animation: octoWalk 12s linear infinite;
+  z-index: 0;
+}
+
+.octo-frame {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: octoSwing 0.6s steps(1) infinite;
+}
+
+.octo-sprite .frame1 {
+  background-image: url('@/assets/img/octo1.png');
+  background-size: 100px 100px;
+}
+
+.octo-sprite .frame2 {
+  background-image: url('@/assets/img/octo2.png');
+  background-size: 100px 100px;
+  animation: octoSwing2 0.6s steps(1) infinite;
 }
 
 .moon-glow {
@@ -785,6 +905,10 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
 
   .classic-card::before {
     inset: 6px;
+  }
+
+  .link-sprite {
+    animation-delay: 5s;
   }
 }
 

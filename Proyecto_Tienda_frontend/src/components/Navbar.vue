@@ -1,19 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useTheme } from '@/composables/useTheme';
 
 const AUTH_KEY = 'isAuth';
 
 const route = useRoute();
 const router = useRouter();
 const menuAbierto = ref(false);
+const { currentTheme, setTheme, toggleTheme } = useTheme();
 
-const links = [
-  { to: '/ventas', label: 'Ventas' },
-  { to: '/productos', label: 'Productos' },
-  { to: '/inventario', label: 'Inventario' },
-  { to: '/corte', label: 'Corte' }
-];
+const tipoUsuario = computed(() => {
+  return Number(localStorage.getItem('tipoUsuario') || 2);
+});
+
+const esAdministrador = computed(() => tipoUsuario.value === 1);
+
+const links = computed(() => {
+  const linksBase = [
+    { to: '/ventas', label: 'Ventas', adminOnly: false },
+    { to: '/productos', label: 'Productos', adminOnly: false },
+    { to: '/inventario', label: 'Inventario', adminOnly: true },
+    { to: '/corte', label: 'Corte', adminOnly: false }
+  ];
+  return linksBase.filter(l => !l.adminOnly || esAdministrador.value);
+});
 
 function toggleMenu() {
   menuAbierto.value = !menuAbierto.value;
@@ -25,6 +36,7 @@ function cerrarMenu() {
 
 function cerrarSesion() {
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem('tipoUsuario');
   menuAbierto.value = false;
   router.push('/');
 }
@@ -64,6 +76,45 @@ function cerrarSesion() {
             </RouterLink>
           </li>
         </ul>
+
+        <div class="theme-selector">
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'zelda' }"
+            @click="setTheme('zelda')"
+            title="Tema Zelda"
+          >
+            🛡️
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'alforja' }"
+            @click="setTheme('alforja')"
+            title="Tema Alforja"
+          >
+            🎒
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'skyward' }"
+            @click="setTheme('skyward')"
+            title="Tema Skyward"
+          >
+            ☁️
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'deathmountain' }"
+            @click="setTheme('deathmountain')"
+            title="Tema Muerte Montaña"
+          >
+            🌋
+          </button>
+        </div>
 
         <button type="button" class="logout-btn" @click="cerrarSesion">
           Cerrar sesion
@@ -133,6 +184,35 @@ function cerrarSesion() {
 .menu-link.activo {
   filter: brightness(1.1);
   transform: translateY(1px);
+}
+
+.theme-selector {
+  display: flex;
+  gap: 0.3rem;
+  justify-content: center;
+}
+
+.theme-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid #2a1807;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.theme-btn:hover {
+  transform: scale(1.1);
+}
+
+.theme-btn.active {
+  filter: brightness(1.2);
+  box-shadow: 0 0 8px rgba(248, 214, 103, 0.8);
 }
 
 .logout-btn {

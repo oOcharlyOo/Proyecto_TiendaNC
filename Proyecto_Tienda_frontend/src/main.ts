@@ -1,6 +1,7 @@
 // src/main.ts
 import { createApp } from 'vue';
 import './components/styles/estilos.css';
+import './components/styles/themes.css';
 import App from './App.vue';
 import router from './router'; // Import the router instance
 

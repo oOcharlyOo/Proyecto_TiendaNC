@@ -39,6 +39,16 @@ type CorteDTO = {
   gananciaTotal: number;
 };
 
+type EgresoDTO = {
+  idCaja: number;
+  fechaMovimiento: string;
+  tipoMovimiento: string;
+  monto: number;
+  descripcion: string;
+  saldoResultante: number;
+  estatus: string;
+};
+
 type VentaDetalleDTO = {
   idVentaDetalle: number;
   cantidad: number;
@@ -52,11 +62,40 @@ type VentaDetalleDTO = {
   };
 };
 
+type ApartadoDTO = {
+  idApartado: number;
+  nombreProducto: string;
+  montoTotal: number;
+  montoPagado: number;
+  montoRestante: number;
+  frecuenciaPago: string;
+  montoPorPeriodo: number;
+  montoDiario: number;
+  fechaInicio: string;
+  fechaFin: string;
+  estatus: string;
+  idUsuario: number;
+  nombreUsuario?: string;
+  fechaRegistro: string;
+};
+
+type ApartadoPagoDTO = {
+  idPago: number;
+  idApartado: number;
+  nombreProducto: string;
+  monto: number;
+  fechaPago: string;
+  idUsuario: number;
+  nombreUsuario?: string;
+};
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const AUTH_USER_ID_KEY = 'idUsuario';
 
 const idUsuario = ref<number>(Number(localStorage.getItem(AUTH_USER_ID_KEY) || 0));
 const nombreUsuario = ref('Usuario');
+const tipoUsuario = ref<number>(Number(localStorage.getItem('tipoUsuario') || 2));
+const esAdministrador = computed(() => tipoUsuario.value === 1);
 const router = useRouter();
 
 const mensaje = ref('');
@@ -73,6 +112,31 @@ const modalDiarioAbierto = ref(false);
 const modalMensualAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
 const modalDetalleAbierto = ref(false);
+const modalEgresosAbierto = ref(false);
+const modalApartadosAbierto = ref(false);
+
+const apartadosActivos = ref<ApartadoDTO[]>([]);
+const cargandoApartados = ref(false);
+const totalApartarDiario = ref(0);
+const historialPagos = ref<ApartadoPagoDTO[]>([]);
+const cargandoHistorialPagos = ref(false);
+const mostrarHistorialApartado = ref(false);
+
+const apartadoActivo = computed(() => {
+  return apartadosActivos.value.length > 0 ? apartadosActivos.value[0] : null;
+});
+
+const nombreApartadoActivo = computed(() => {
+  return apartadoActivo.value?.nombreProducto || '';
+});
+
+const nuevoApartado = ref({
+  nombreProducto: '',
+  montoTotal: 0,
+  frecuenciaPago: 'mensual',
+  plazoMeses: 1,
+  fechaInicio: new Date().toISOString().slice(0, 10)
+});
 
 const fechaDiaria = ref(new Date().toISOString().slice(0, 10));
 const mesMensual = ref(new Date().toISOString().slice(0, 7));
@@ -88,7 +152,8 @@ const reporteTitulo = ref('Reporte del Corte Actual');
 const mensualTotalVentas = ref(0);
 const mensualTotalTransferencia = ref(0);
 const mensualTotalGanancias = ref(0);
-const mensualSemanas = shallowRef<{ semana: number; ventas: number; ganancia: number }[]>([]);
+const mensualSemanas = shallowRef<{ semana: number; ventas: number; ganancia: number; dias: string }[]>([]);
+const rangoFechasSemanas = ref<{ inicio: Date; fin: Date } | null>(null);
 
 const historialDetalles = shallowRef<VentaDetalleDTO[]>([]);
 const filtroMesHistorial = ref('all');
@@ -119,6 +184,9 @@ const historialVentasAgrupadas = computed(() => {
     return fb - fa;
   });
 });
+
+const egresosDia = ref<EgresoDTO[]>([]);
+const cargandoEgresos = ref(false);
 
 const historialMeses = computed(() => {
   const meses = new Set<string>();
@@ -163,6 +231,28 @@ function formatoMoneda(valor: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(valor || 0));
 }
 
+function getMaxVentas() {
+  if (!mensualSemanas.value.length) return 0;
+  return Math.max(...mensualSemanas.value.map(w => w.ventas), 0);
+}
+
+function getMaxGanancias() {
+  if (!mensualSemanas.value.length) return 0;
+  return Math.max(...mensualSemanas.value.map(w => w.ganancia), 0);
+}
+
+function getBarHeightVentas(ventas: number) {
+  const max = getMaxVentas();
+  if (max === 0) return 0;
+  return (ventas / max) * 100;
+}
+
+function getBarHeightGanancias(ganancia: number) {
+  const max = getMaxVentas();
+  if (max === 0) return 0;
+  return (ganancia / max) * 100;
+}
+
 function formatoFecha(fecha?: string) {
   if (!fecha) return 'N/D';
   const d = new Date(fecha);
@@ -197,8 +287,24 @@ async function fetchApi<T>(endpoint: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-function calcularSemanasMensual(ventas: Array<{ fechaVenta?: string; totalVenta: number; ganancia: number }>) {
-  const weeks = [1, 2, 3, 4].map((n) => ({ semana: n, ventas: 0, ganancia: 0 }));
+function calcularSemanasMensual(ventas: Array<{ fechaVenta?: string; totalVenta: number; ganancia: number }>, mes: number, anio: number) {
+  const weeks = [1, 2, 3, 4].map((n) => ({ semana: n, ventas: 0, ganancia: 0, dias: '' }));
+
+  const diasPorSemana = [
+    { inicio: 1, fin: 7 },
+    { inicio: 8, fin: 14 },
+    { inicio: 15, fin: 21 },
+    { inicio: 22, fin: 28 }
+  ];
+  
+  const ultimoDiaMes = new Date(anio, mes + 1, 0).getDate();
+  if (ultimoDiaMes > 28) {
+    diasPorSemana[3].fin = ultimoDiaMes;
+  }
+
+  for (let i = 0; i < 4; i++) {
+    weeks[i].dias = `${diasPorSemana[i].inicio} - ${diasPorSemana[i].fin}`;
+  }
 
   for (const sale of ventas) {
     const date = new Date(sale.fechaVenta || '');
@@ -252,6 +358,21 @@ async function generarCorte() {
     reporteTitulo.value = 'Reporte del Corte Actual';
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
+
+    if (idUsuario.value) {
+      try {
+        const totalApartadoData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+        totalApartarDiario.value = totalApartadoData?.datos || totalApartadoData || 0;
+        
+        const apartadosData = await fetchApi<ApartadoDTO[]>(`/apartado/activos?idUsuario=${idUsuario.value}`);
+        apartadosActivos.value = apartadosData?.datos || apartadosData || [];
+      } catch (e) {
+        console.error('Error al obtener total apartados:', e);
+        totalApartarDiario.value = 0;
+        apartadosActivos.value = [];
+      }
+    }
+
     mostrarMensaje('Corte de caja generado con exito.', 'ok');
   } catch (error) {
     mostrarMensaje(`Error al generar corte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
@@ -318,6 +439,16 @@ async function generarReporteDiario() {
       saldoFinalCalculado: saldoFinal,
       gananciaTotal: Number(data?.gananciaTotal || 0)
     };
+
+    if (idUsuario.value) {
+      try {
+        const totalApartadoData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+        totalApartarDiario.value = totalApartadoData?.datos || totalApartadoData || 0;
+      } catch (e) {
+        console.error('Error al obtener total apartados:', e);
+        totalApartarDiario.value = 0;
+      }
+    }
 
     totalTicketsDia.value = ventas.length;
     reporteTitulo.value = `Reporte del Dia: ${fechaDiaria.value}`;
@@ -425,7 +556,8 @@ async function generarReporteMensual() {
       .filter((s) => String(s.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
       .reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
 
-    mensualSemanas.value = calcularSemanasMensual(monthlySales);
+    mensualSemanas.value = calcularSemanasMensual(monthlySales, targetMonth, year);
+    rangoFechasSemanas.value = null;
     mostrarMensaje('Reporte mensual generado.', 'ok');
   } catch (error) {
     mensualTotalVentas.value = 0;
@@ -505,9 +637,16 @@ async function generarReporteRangoFechas() {
     const diasDiff = Math.ceil((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     const semanas = Math.ceil(diasDiff / 7);
     
-    const semanasMap = new Map<number, { ventas: number; ganancia: number }>();
+    rangoFechasSemanas.value = { inicio, fin };
+    
+    const semanasMap = new Map<number, { ventas: number; ganancia: number; diasInicio: Date; diasFin: Date }>();
     for (let i = 0; i < semanas; i++) {
-      semanasMap.set(i + 1, { ventas: 0, ganancia: 0 });
+      const diasInicioSem = new Date(inicio);
+      diasInicioSem.setDate(inicio.getDate() + (i * 7));
+      const diasFinSem = new Date(diasInicioSem);
+      diasFinSem.setDate(diasInicioSem.getDate() + 6);
+      if (diasFinSem > fin) diasFinSem.setTime(fin.getTime());
+      semanasMap.set(i + 1, { ventas: 0, ganancia: 0, diasInicio: diasInicioSem, diasFin: diasFinSem });
     }
 
     for (const sale of rangeSales) {
@@ -525,7 +664,8 @@ async function generarReporteRangoFechas() {
     mensualSemanas.value = Array.from(semanasMap.entries()).map(([semana, data]) => ({
       semana,
       ventas: data.ventas,
-      ganancia: data.ganancia
+      ganancia: data.ganancia,
+      dias: `${data.diasInicio.getDate()}/${data.diasInicio.getMonth() + 1} - ${data.diasFin.getDate()}/${data.diasFin.getMonth() + 1}`
     }));
 
     mostrarMensaje(`Reporte del ${fechaRangoInicio.value} al ${fechaRangoFin.value} generado.`, 'ok');
@@ -565,6 +705,126 @@ function abrirDetalleVenta(idVenta: number) {
   modalDetalleAbierto.value = true;
 }
 
+async function abrirModalEgresos() {
+  if (!corteActual.value || !idUsuario.value) return;
+  
+  const fecha = corteActual.value.fechaCorte.split('T')[0];
+  cargandoEgresos.value = true;
+  modalEgresosAbierto.value = true;
+  
+  try {
+    const data = await fetchApi<EgresoDTO[]>(`/caja/egresos/${fecha}?idUsuario=${idUsuario.value}`);
+    egresosDia.value = (data || []).sort((a, b) => 
+      new Date(a.fechaMovimiento).getTime() - new Date(b.fechaMovimiento).getTime()
+    );
+  } catch (error) {
+    egresosDia.value = [];
+    mostrarMensaje('Error al cargar egresos', 'error');
+  } finally {
+    cargandoEgresos.value = false;
+  }
+}
+
+async function abrirModalApartados() {
+  if (!idUsuario.value) return;
+  
+  cargandoApartados.value = true;
+  modalApartadosAbierto.value = true;
+  
+  try {
+    const data = await fetchApi<ApartadoDTO[]>(`/apartado/activos?idUsuario=${idUsuario.value}`);
+    apartadosActivos.value = data?.datos || data || [];
+    
+    const totalData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+    totalApartarDiario.value = totalData?.datos || totalData || 0;
+  } catch (error) {
+    apartadosActivos.value = [];
+    totalApartarDiario.value = 0;
+    mostrarMensaje('Error al cargar apartados', 'error');
+  } finally {
+    cargandoApartados.value = false;
+  }
+}
+
+async function crearApartado() {
+  if (!idUsuario.value) return;
+  
+  if (apartadosActivos.value.length > 0) {
+    mostrarMensaje('Ya tienes un apartado activo. Cancela o completa el actual primero.', 'error');
+    return;
+  }
+  
+  if (!nuevoApartado.value.nombreProducto || nuevoApartado.value.montoTotal <= 0) {
+    mostrarMensaje('Completa los datos del apartado', 'error');
+    return;
+  }
+  
+  try {
+    const data = await fetchApi<ApartadoDTO>('/apartado', {
+      method: 'POST',
+      body: JSON.stringify({
+        nombreProducto: nuevoApartado.value.nombreProducto,
+        montoTotal: nuevoApartado.value.montoTotal,
+        frecuenciaPago: nuevoApartado.value.frecuenciaPago,
+        plazoMeses: nuevoApartado.value.plazoMeses,
+        fechaInicio: nuevoApartado.value.fechaInicio,
+        idUsuario: idUsuario.value
+      })
+    });
+    
+    mostrarMensaje('Apartado creado exitosamente', 'ok');
+    nuevoApartado.value = {
+      nombreProducto: '',
+      montoTotal: 0,
+      frecuenciaPago: 'mensual',
+      plazoMeses: 1,
+      fechaInicio: new Date().toISOString().slice(0, 10)
+    };
+    await abrirModalApartados();
+  } catch (error) {
+    mostrarMensaje('Error al crear apartado', 'error');
+  }
+}
+
+async function pagarApartado(id: number, monto: number) {
+  try {
+    await fetchApi<ApartadoDTO>(`/apartado/pagar/${id}?monto=${monto}&idUsuario=${idUsuario.value}`, { method: 'PUT' });
+    mostrarMensaje('Pago registrado', 'ok');
+    await abrirModalApartados();
+  } catch (error) {
+    mostrarMensaje('Error al registrar pago', 'error');
+  }
+}
+
+async function toggleHistorialPagos(idApartado: number) {
+  if (mostrarHistorialApartado.value) {
+    mostrarHistorialApartado.value = false;
+    return;
+  }
+  
+  cargandoHistorialPagos.value = true;
+  try {
+    const data = await fetchApi<ApartadoPagoDTO[]>(`/apartado/historial/${idApartado}`);
+    historialPagos.value = data?.datos || data || [];
+    mostrarHistorialApartado.value = true;
+  } catch (error) {
+    mostrarMensaje('Error al cargar historial', 'error');
+  } finally {
+    cargandoHistorialPagos.value = false;
+  }
+}
+
+async function cancelarApartado(id: number) {
+  if (!confirm('¿Cancelar este apartado?')) return;
+  try {
+    await fetchApi<ApartadoDTO>(`/apartado/cancelar/${id}`, { method: 'PUT' });
+    mostrarMensaje('Apartado cancelado', 'ok');
+    await abrirModalApartados();
+  } catch (error) {
+    mostrarMensaje('Error al cancelar apartado', 'error');
+  }
+}
+
 onMounted(() => {
   if (idUsuario.value <= 0) {
     mostrarMensaje('No se encontro idUsuario en sesion. Algunas acciones pueden fallar.', 'info');
@@ -598,22 +858,26 @@ onMounted(() => {
 
       <p v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">{{ mensaje }}</p>
 
-      <div class="sign-grid">
+      <div class="sign-grid" :class="{ 'solo-corte': !esAdministrador }">
         <button class="wood-sign btn-icono-only" :disabled="cargandoCorte" @click="generarCorte">
           <span class="btn-icono">🧾</span>
           <span class="btn-texto">{{ cargandoCorte ? 'Calculando...' : 'Corte de Caja' }}</span>
         </button>
-        <button class="wood-sign btn-icono-only" @click="modalDiarioAbierto = true">
+        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="modalDiarioAbierto = true">
           <span class="btn-icono">📅</span>
           <span class="btn-texto">Reporte Diario</span>
         </button>
-        <button class="wood-sign btn-icono-only" @click="modalMensualAbierto = true">
+        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="modalMensualAbierto = true">
           <span class="btn-icono">🌙</span>
           <span class="btn-texto">Reporte Mensual</span>
         </button>
-        <button class="wood-sign btn-icono-only" @click="abrirHistorialVentas">
+        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="abrirHistorialVentas">
           <span class="btn-icono">📜</span>
           <span class="btn-texto">Historial</span>
+        </button>
+        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="abrirModalApartados">
+          <span class="btn-icono">🏦</span>
+          <span class="btn-texto">Apartados</span>
         </button>
       </div>
 
@@ -629,7 +893,8 @@ onMounted(() => {
           <article class="card-metric"><p>Tickets Dia</p><strong>{{ totalTicketsDia }}</strong></article>
           <article class="card-metric"><p>Total Ventas</p><strong>{{ formatoMoneda(corteActual.totalVentas) }}</strong></article>
           <article class="card-metric"><p>Otras Entradas</p><strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong></article>
-          <article class="card-metric"><p>Total Egresos</p><strong>{{ formatoMoneda(corteActual.totalEgresos) }}</strong></article>
+          <article class="card-metric"><p>Total Egresos</p><strong class="clickable" @click="abrirModalEgresos">{{ formatoMoneda(corteActual.totalEgresos) }}</strong></article>
+          <article class="card-metric"><p>Apartado ({{ nombreApartadoActivo }})</p><strong class="clickable" @click="abrirModalApartados">{{ formatoMoneda(totalApartarDiario) }}</strong></article>
           <article class="card-metric"><p>Ganancia Total</p><strong>{{ formatoMoneda(corteActual.gananciaTotal) }}</strong></article>
           <article class="card-metric total"><p>Saldo Final Calculado</p><strong>{{ formatoMoneda(corteActual.saldoFinalCalculado) }}</strong></article>
         </div>
@@ -697,15 +962,28 @@ onMounted(() => {
 
         <div class="weekly-chart">
           <h4>Rendimiento Semanal</h4>
+          <p class="chart-note">Las semanas se cuentan del día 1 al 7 = Semana 1, 8 al 14 = Semana 2, etc.</p>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color sales"></span> Ventas</span>
+            <span class="legend-item"><span class="legend-color profit"></span> Ganancias</span>
+          </div>
           <div v-if="mensualSemanas.length === 0" class="empty">Sin datos para el mes seleccionado.</div>
-          <div v-else class="bars">
-            <div v-for="w in mensualSemanas" :key="w.semana" class="bar-row">
-              <span>S{{ w.semana }}</span>
-              <div class="bar-track">
-                <div class="bar-sales" :style="{ width: `${mensualTotalVentas > 0 ? (w.ventas / mensualTotalVentas) * 100 : 0}%` }" />
-                <div class="bar-profit" :style="{ width: `${mensualTotalGanancias > 0 ? (w.ganancia / mensualTotalGanancias) * 100 : 0}%` }" />
+          <div v-else class="bars-vertical">
+            <div v-for="w in mensualSemanas" :key="w.semana" class="bar-column">
+              <div class="bar-values">
+                <div class="bar-container-indep">
+                  <div class="bar-sales-v" :style="{ height: `${getBarHeightVentas(w.ventas)}%` }">
+                    <span class="bar-tooltip">{{ formatoMoneda(w.ventas) }}</span>
+                  </div>
+                </div>
+                <div class="bar-container-indep">
+                  <div class="bar-profit-v" :style="{ height: `${getBarHeightGanancias(w.ganancia)}%` }">
+                    <span class="bar-tooltip">{{ formatoMoneda(w.ganancia) }}</span>
+                  </div>
+                </div>
               </div>
-              <small>{{ formatoMoneda(w.ventas) }} / {{ formatoMoneda(w.ganancia) }}</small>
+              <span class="bar-label">S{{ w.semana }}</span>
+              <span class="bar-days">{{ w.dias }}</span>
             </div>
           </div>
         </div>
@@ -798,6 +1076,101 @@ onMounted(() => {
         </div>
       </section>
     </div>
+
+    <div v-if="modalEgresosAbierto" class="modal-overlay" @click.self="modalEgresosAbierto = false">
+      <section class="modal-card panel history-modal">
+        <button type="button" class="btn-cerrar-modal" @click="modalEgresosAbierto = false">✕</button>
+        <h3>📉 Egresos del Día</h3>
+
+        <div v-if="cargandoEgresos" class="empty">📡 Cargando egresos...</div>
+        <div v-else-if="egresosDia.length === 0" class="empty">📭 No hay egresos para este día.</div>
+        
+        <div v-else class="history-list">
+          <article v-for="(egreso, index) in egresosDia" :key="egreso.idCaja" class="history-item">
+            <div>
+              <h4>📉 Egreso #{{ index + 1 }}</h4>
+              <p>{{ formatoFecha(egreso.fechaMovimiento) }}</p>
+              <p class="descripcion">{{ egreso.descripcion || 'Sin descripción' }}</p>
+            </div>
+            <div>
+              <strong class="monto-egreso">{{ formatoMoneda(Number(egreso.monto || 0)) }}</strong>
+            </div>
+          </article>
+        </div>
+
+        <div class="egresos-total">
+          <span>Total Egresos:</span>
+          <strong>{{ formatoMoneda(egresosDia.reduce((sum, e) => sum + Number(e.monto || 0), 0)) }}</strong>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="modalApartadosAbierto" class="modal-overlay" @click.self="modalApartadosAbierto = false">
+      <section class="modal-card panel history-modal">
+        <button type="button" class="btn-cerrar-modal" @click="modalApartadosAbierto = false">✕</button>
+        <h3>🏦 Apartados para Inversiones</h3>
+        
+        <div v-if="apartadosActivos.length === 0" class="apartado-form">
+          <h4>➕ Nuevo Apartado</h4>
+          <div class="form-grid">
+            <input v-model="nuevoApartado.nombreProducto" type="text" placeholder="Producto (ej: Refrigerador)" />
+            <input v-model.number="nuevoApartado.montoTotal" type="number" placeholder="Monto total" min="1" />
+            <select v-model="nuevoApartado.frecuenciaPago">
+              <option value="semanal">Semanal</option>
+              <option value="quincenal">Quincenal</option>
+              <option value="mensual">Mensual</option>
+            </select>
+            <input v-model.number="nuevoApartado.plazoMeses" type="number" placeholder="Meses" min="1" />
+            <input v-model="nuevoApartado.fechaInicio" type="date" />
+          </div>
+          <button class="btn-crear" @click="crearApartado">Crear Apartado</button>
+        </div>
+
+        <div v-if="apartadosActivos.length > 0" class="apartado-aviso">
+          <p>⚠️ Ya tienes un apartado activo. Cancela o completa el actual para crear otro.</p>
+        </div>
+
+        <div v-if="cargandoApartados" class="empty">📡 Cargando apartados...</div>
+        <div v-else-if="apartadosActivos.length === 0" class="empty">📭 No hay apartados activos.</div>
+        
+        <div v-else class="apartados-list">
+          <div class="apartado-total">
+            <span>💰 Total a apartar diariamente:</span>
+            <strong>{{ formatoMoneda(totalApartarDiario) }}</strong>
+          </div>
+          
+          <article v-for="apartado in apartadosActivos" :key="apartado.idApartado" class="apartado-item">
+            <div class="apartado-info">
+              <h4>🏦 {{ apartado.nombreProducto }}</h4>
+              <p>📅 {{ apartado.fechaInicio?.slice(0,10) }} al {{ apartado.fechaFin?.slice(0,10) }}</p>
+              <p>💵 Apartar: <strong>{{ formatoMoneda(apartado.montoDiario) }}</strong>/día</p>
+              <p>📊 Progreso: {{ formatoMoneda(apartado.montoPagado) }} / {{ formatoMoneda(apartado.montoTotal) }}</p>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: (apartado.montoPagado / apartado.montoTotal * 100) + '%' }"></div>
+              </div>
+            </div>
+            <div class="apartado-actions">
+              <button class="btn-pagar" @click="pagarApartado(apartado.idApartado, apartado.montoDiario)">Pagar</button>
+              <button class="btn-historial" @click="toggleHistorialPagos(apartado.idApartado)">📜</button>
+              <button class="btn-cancelar" @click="cancelarApartado(apartado.idApartado)">✕</button>
+            </div>
+          </article>
+
+          <div v-if="mostrarHistorialApartado" class="historial-pagos">
+            <h4>📜 Historial de Pagos</h4>
+            <div v-if="cargandoHistorialPagos" class="empty">📡 Cargando...</div>
+            <div v-else-if="historialPagos.length === 0" class="empty">No hay pagos registrados.</div>
+            <div v-else class="pagos-list">
+              <div v-for="pago in historialPagos" :key="pago.idPago" class="pago-item">
+                <span>📅 {{ pago.fechaPago?.slice(0, 10) }}</span>
+                <span>💵 {{ formatoMoneda(pago.monto) }}</span>
+              </div>
+            </div>
+            <button class="btn-cerrar-historial" @click="mostrarHistorialApartado = false">Cerrar</button>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -852,6 +1225,12 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.7rem;
+}
+
+.sign-grid.solo-corte {
+  grid-template-columns: 1fr;
+  max-width: 300px;
+  margin: 0 auto;
 }
 
 .wood-sign {
@@ -935,6 +1314,16 @@ onMounted(() => {
 
 .card-metric strong {
   font-size: 0.9rem;
+}
+
+.card-metric strong.clickable {
+  cursor: pointer;
+  color: #c94f4f;
+  text-decoration: underline;
+}
+
+.card-metric strong.clickable:hover {
+  color: #e88b8b;
 }
 
 .card-metric.total {
@@ -1199,36 +1588,168 @@ onMounted(() => {
   border: 3px solid #2a1807;
   background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
   color: #1d1606;
-  padding: 0.7rem;
+  padding: 1rem;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 3px 0 #1a1005;
+  border-radius: 12px;
 }
 
 .weekly-chart h4 {
   margin: 0 0 0.5rem 0;
-  font-size: 0.85rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: "Courier New", monospace;
+  text-align: center;
+  color: #2a1807;
+}
+
+.weekly-chart .chart-note {
+  font-size: 0.75rem;
+  color: #5a4a30;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #2a1807;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid #2a1807;
+}
+
+.legend-color.sales {
+  background: linear-gradient(180deg, #28a745 0%, #34ce57 100%);
+}
+
+.legend-color.profit {
+  background: linear-gradient(180deg, #d4a84b 0%, #e0b85a 100%);
+}
+
+.bars-vertical {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 220px;
+  padding: 1rem 0.5rem;
+  background: rgba(255,255,255,0.5);
+  border-radius: 8px;
+  border: 2px solid #2a1807;
+  overflow: hidden;
+}
+
+.bar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  height: 100%;
+}
+
+.bar-values {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 170px;
+  width: 100%;
+}
+
+.bar-container-indep {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.bar-sales-v,
+.bar-profit-v {
+  width: 24px;
+  border-radius: 4px 4px 0 0;
+  border: 2px solid #2a1807;
+  position: relative;
+  transition: height 0.3s;
+  min-height: 4px;
+  bottom: 0;
+}
+
+.bar-sales-v {
+  background: linear-gradient(180deg, #28a745 0%, #34ce57 100%);
+}
+
+.bar-profit-v {
+  background: linear-gradient(180deg, #d4a84b 0%, #e0b85a 100%);
+}
+
+.bar-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  white-space: nowrap;
+  background: #2a1807;
+  color: #fff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.bar-sales-v:hover .bar-tooltip,
+.bar-profit-v:hover .bar-tooltip {
+  opacity: 1;
+}
+
+.bar-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #2a1807;
+}
+
+.bar-days {
+  font-size: 0.65rem;
+  color: #5a4a30;
+  white-space: nowrap;
 }
 
 .bars {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.8rem;
 }
 
 .bar-row {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
-  gap: 0.45rem;
+  grid-template-columns: 50px 1fr auto;
+  gap: 0.6rem;
   align-items: center;
+  padding: 0.5rem;
+  background: rgba(255,255,255,0.5);
+  border-radius: 8px;
+  border: 2px solid #2a1807;
 }
 
 .bar-track {
   position: relative;
-  height: 14px;
+  height: 22px;
   background: #e7d897;
-  border: 1px solid #bda867;
+  border: 2px solid #bda867;
   overflow: hidden;
+  border-radius: 4px;
 }
 
 .bar-sales {
@@ -1236,7 +1757,7 @@ onMounted(() => {
   left: 0;
   top: 0;
   bottom: 0;
-  background: #48d308;
+  background: linear-gradient(90deg, #28a745 0%, #34ce57 100%);
 }
 
 .bar-profit {
@@ -1244,7 +1765,14 @@ onMounted(() => {
   left: 0;
   top: 0;
   bottom: 0;
-  background: rgba(248, 214, 103, 0.75);
+  background: linear-gradient(90deg, #d4a84b 0%, #e0b85a 100%);
+  opacity: 0.85;
+}
+
+.bar-row small {
+  font-size: 0.7rem;
+  color: #5a4a30;
+  white-space: nowrap;
 }
 
 .history-filters {
@@ -1664,5 +2192,270 @@ th {
     padding: 0.4rem;
     font-size: 0.7rem;
   }
+}
+
+.history-item .descripcion {
+  font-size: 0.7rem;
+  color: #5a4a2a;
+  margin-top: 0.2rem;
+}
+
+.monto-egreso {
+  color: #c94f4f !important;
+  font-size: 1rem;
+}
+
+.egresos-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.egresos-total span {
+  color: #f6f2de;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.egresos-total strong {
+  color: #ffb3b8;
+  font-size: 1.1rem;
+  font-family: "Courier New", monospace;
+}
+
+.apartado-form {
+  background: #fdf6e3;
+  padding: 1.2rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  border: 3px solid #2a1807;
+  box-shadow: inset 0 0 0 2px #d8c37c;
+}
+
+.apartado-form h4 {
+  margin: 0 0 1rem 0;
+  color: #2a1807;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.apartado-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.apartado-form input,
+.apartado-form select {
+  padding: 0.6rem;
+  border: 2px solid #2a1807;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btn-crear {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.8rem;
+  background: linear-gradient(180deg, #d4a84b 0%, #a67c29 100%);
+  color: #1d1606;
+  border: 2px solid #2a1807;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+  box-shadow: 0 4px 0 #5a4a30;
+  transition: all 0.1s;
+}
+
+.btn-crear:hover {
+  background: linear-gradient(180deg, #e0b85a 0%, #b68a35 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #5a4a30;
+}
+
+.btn-crear:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #5a4a30;
+}
+
+.apartado-aviso {
+  background: linear-gradient(180deg, #fdf6e3 0%, #f5e6c8 100%);
+  color: #5a4a30;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 3px solid #2a1807;
+  text-align: center;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.apartado-aviso p {
+  margin: 0;
+}
+
+.apartados-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.apartado-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(180deg, #1e5631 0%, #145224 100%);
+  padding: 1rem;
+  border-radius: 10px;
+  border: 3px solid #28a745;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.apartado-total strong {
+  color: #4ade80;
+  font-size: 1.3rem;
+}
+
+.apartado-item {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #fdf6e3 0%, #f5e6c8 100%);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 3px solid #2a1807;
+  box-shadow: inset 0 0 0 2px #d8c37c;
+}
+
+.apartado-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #2a1807;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.apartado-info p {
+  margin: 0.3rem 0;
+  font-size: 0.9rem;
+  color: #5a4a30;
+}
+
+.apartado-info strong {
+  color: #2a1807;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 14px;
+  background: #ddd;
+  border-radius: 7px;
+  margin-top: 0.6rem;
+  overflow: hidden;
+  border: 2px solid #2a1807;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745 0%, #34ce57 100%);
+  transition: width 0.3s;
+  border-radius: 5px;
+}
+
+.apartado-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: center;
+}
+
+.btn-pagar {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%);
+  color: white;
+  border: 2px solid #2a1807;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 3px 0 #155724;
+}
+
+.btn-pagar:hover {
+  background: linear-gradient(180deg, #34ce57 0%, #28a745 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #155724;
+}
+
+.historial-pagos {
+  background: linear-gradient(180deg, #fdf6e3 0%, #f5e6c8 100%);
+  border: 3px solid #2a1807;
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-top: 1rem;
+  box-shadow: inset 0 0 0 2px #d8c37c;
+}
+
+.historial-pagos h4 {
+  margin: 0 0 1rem 0;
+  color: #2a1807;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.pagos-list {
+  max-height: 250px;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 8px;
+  border: 2px solid #2a1807;
+}
+
+.pago-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.7rem 1rem;
+  border-bottom: 2px solid #d8c37c;
+}
+
+.pago-item:last-child {
+  border-bottom: none;
+}
+
+.pago-item span:first-child {
+  color: #5a4a30;
+  font-weight: bold;
+}
+
+.pago-item span:last-child {
+  color: #28a745;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.btn-cerrar-historial {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.7rem;
+  background: linear-gradient(180deg, #6c757d 0%, #545b62 100%);
+  color: white;
+  border: 2px solid #2a1807;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 3px 0 #1d1606;
+}
+
+.btn-cerrar-historial:hover {
+  background: linear-gradient(180deg, #7c858d 0%, #6c757d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #1d1606;
 }
 </style>

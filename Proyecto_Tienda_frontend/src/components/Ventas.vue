@@ -937,6 +937,7 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   modalGramajeAbierto.value = false;
   modalProductoGramaje.value = null;
   mostrarMensaje(`Agregado ${gramos}g de ${producto.nombre}.`, 'ok');
+  playSound('add');
 }
 
 function formatoMoneda(valor: number) {
@@ -1361,7 +1362,7 @@ async function processVoiceCommand(comando: string) {
               @mousedown.prevent="seleccionarSugerencia(producto)"
             >
               <span>{{ producto.nombre }}</span>
-              <small>{{ producto.codigo_barras || 'Sin codigo' }} - {{ formatoMoneda(producto.precio) }}</small>
+              <small>{{ formatoMoneda(producto.precio) }}</small>
             </button>
           </li>
         </ul>
@@ -1785,7 +1786,7 @@ async function processVoiceCommand(comando: string) {
 
 .precio-unit {
   font-size: 0.75rem;
-  color: #a3a380;
+  color: #8fbc8f;
 }
 
 .detalle-subtotal {
@@ -2225,10 +2226,8 @@ async function processVoiceCommand(comando: string) {
 }
 
 .ticket-lista {
-  flex: 1;
+  max-height: max-content;
   overflow: auto;
-  height: 100%;
-  max-height: 90%;
   display: grid;
   gap: 0.4rem;
   padding-right: 0.3rem;
@@ -2239,16 +2238,16 @@ async function processVoiceCommand(comando: string) {
 
 .ticket-etiqueta {
   border: 2px solid #2a1807;
-  background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
-  color: #1d1606;
+  background: transparent;
+  color: #f6f2de;
   padding: 0.4rem;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.4rem;
   align-items: center;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.2);
-  animation: popIn 150ms steps(4);
-  transition: transform 100ms steps(2);
+  box-shadow: 0 0 12px rgba(248, 214, 103, 0.4), inset 0 0 8px rgba(248, 214, 103, 0.15), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3);
+  animation: popIn 150ms steps(4), zeldaGlow 3s ease-in-out infinite alternate;
+  transition: transform 150ms ease, box-shadow 150ms ease;
   pointer-events: auto;
 }
 
@@ -2263,25 +2262,32 @@ async function processVoiceCommand(comando: string) {
   }
 }
 
+@keyframes zeldaGlow {
+  from { box-shadow: 0 0 8px rgba(248, 214, 103, 0.3), inset 0 0 5px rgba(248, 214, 103, 0.1), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3); }
+  to { box-shadow: 0 0 16px rgba(248, 214, 103, 0.5), inset 0 0 10px rgba(248, 214, 103, 0.2), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3); }
+}
+
 .ticket-etiqueta:hover {
-  transform: translateX(4px);
+  transform: translateX(4px) scale(1.02);
+  box-shadow: 0 0 20px rgba(248, 214, 103, 0.6), inset 0 0 12px rgba(248, 214, 103, 0.25), 0 4px 0 #1a1005, 0 6px 10px rgba(0, 0, 0, 0.4);
 }
 
 .ticket-etiqueta h3 {
   margin: 0;
-  color: #0f1f0c;
+  color: #f8d667;
   font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  text-shadow: none;
+  text-shadow: 0 0 10px rgba(248, 214, 103, 0.8), 2px 2px 0 #1a1005;
 }
 
 .ticket-etiqueta p {
   font-size: 0.65rem;
-  color: #5a4a2a;
+  color: #d4c27e;
   margin: 0;
   font-family: "Courier New", monospace;
+  text-shadow: 1px 1px 0 #1a1005;
 }
 
 .etiqueta-controles {
@@ -2695,7 +2701,6 @@ async function processVoiceCommand(comando: string) {
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
-  margin-bottom: 0.8rem;
 }
 
 .ticket-tab {
@@ -2840,5 +2845,10 @@ async function processVoiceCommand(comando: string) {
 
 .modal-header {
   position: relative;
+}
+
+.etiqueta-total,
+.ticket-etiqueta p {
+  color: #90ee90 !important;
 }
 </style>

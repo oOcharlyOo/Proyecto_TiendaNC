@@ -104,10 +104,10 @@ function formatoFecha(fecha?: string) {
                   <button 
                     v-if="venta.estatus === 'C'" 
                     type="button" 
-                    class="btn-cancelar"
+                    class="btn-cancelar btn-cancelar-icono"
                     @click="emit('cancelar', venta)"
                   >
-                    ❌ Cancelar
+                    ❌ <span class="btn-texto">Cancelar</span>
                   </button>
                   <button 
                     v-else
@@ -397,6 +397,7 @@ th {
 .btn-cancelar {
   background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
   color: #fff;
+  white-space: nowrap;
 }
 
 .btn-cancelar:hover {
@@ -483,6 +484,10 @@ th {
   td:nth-child(3),
   th:nth-child(5),
   td:nth-child(5) {
+    display: none;
+  }
+  
+  .btn-cancelar-icono .btn-texto {
     display: none;
   }
   
