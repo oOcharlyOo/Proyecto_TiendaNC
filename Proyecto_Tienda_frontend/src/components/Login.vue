@@ -97,7 +97,7 @@ const modalMontoInicialAbierto = ref(false);
 const idUsuarioActual = ref<number | null>(null);
 
 async function iniciarSesion() {
-  const usuarioDTO = { nombre: name.value, password_hash: pass.value };
+  const usuarioDTO = { usuario: name.value, password_hash: pass.value };
   try {
     const resLogin = await fetch(`${API_BASE}/usuarios/login`, {
       method: "POST",

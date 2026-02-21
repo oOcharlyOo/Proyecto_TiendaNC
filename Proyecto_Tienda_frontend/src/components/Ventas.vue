@@ -218,7 +218,7 @@ async function crearVentaPendienteEnBackend() {
 
   try {
     const payload = {
-      usuario: { idUsuario },
+      idUsuario,
       montoTotal: 0,
       estatus: 'P',
       metodoPago: 'EFECTIVO',
@@ -491,6 +491,10 @@ async function agregarDesdeBuscador() {
 async function agregarProductoATicket(producto: Producto) {
   if (!ticketActual.value) {
     await crearNuevoTicket();
+    if (!ticketActual.value) {
+      mostrarMensaje('No se pudo crear el ticket', 'error');
+      return;
+    }
   }
 
   const stockDisponible = producto.dto?.stock ?? Infinity;
@@ -624,7 +628,7 @@ function obtenerIdUsuarioSesion() {
 
 async function crearVenta(idUsuario: number): Promise<VentaDTO> {
   const payload = {
-    usuario: { idUsuario },
+    idUsuario,
     montoTotal: totalVenta.value,
     estatus: 'P',
     metodoPago: 'EFECTIVO',
@@ -762,7 +766,7 @@ async function registrarEntradaEfectivo(payload: { montoEoS: number; descripcion
     const body = {
       montoEoS: payload.montoEoS,
       descripcion: payload.descripcion,
-      usuario: { idUsuario }
+      idUsuario
     };
     const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/caja/entrada`, {
       method: 'POST',
@@ -792,7 +796,7 @@ async function registrarSalidaEfectivo(payload: { montoEoS: number; descripcion:
     const body = {
       montoEoS: payload.montoEoS,
       descripcion: payload.descripcion,
-      usuario: { idUsuario }
+      idUsuario
     };
     const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/caja/salida`, {
       method: 'POST',
@@ -902,6 +906,10 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
 
   if (!ticketActual.value) {
     await crearNuevoTicket();
+    if (!ticketActual.value) {
+      mostrarMensaje('No se pudo crear el ticket', 'error');
+      return;
+    }
   }
 
   const gramos = Math.max(1, Math.round(payload.gramos));
@@ -1208,6 +1216,7 @@ async function processVoiceCommand(comando: string) {
           
           if (!ticketActual.value) {
             await crearNuevoTicket();
+            if (!ticketActual.value) continue;
           }
           
           const items = ticketActual.value!.items;
