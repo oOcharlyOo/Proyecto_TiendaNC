@@ -9,8 +9,14 @@ services:
     restart: on-failure
     environment:
       - TZ=America/Mexico_City
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=tiendanc
+      - MINIO_PUBLIC_URL=https://minio.laleyendadeldulce.com
     depends_on:
       - database 
+      - minio
     networks:
       - tienda-red
 
@@ -44,6 +50,21 @@ services:
     networks:
       - tienda-red
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - tienda-red
+
   tunnel:
     container_name: cloudflared-tunnel
     image: cloudflare/cloudflared:latest
@@ -60,3 +81,4 @@ networks:
 
 volumes:
   db-data:
+  minio-data:

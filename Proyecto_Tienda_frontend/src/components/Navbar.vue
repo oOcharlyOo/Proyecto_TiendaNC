@@ -20,6 +20,7 @@ const links = computed(() => {
   const linksBase = [
     { to: '/ventas', label: 'Ventas', adminOnly: false },
     { to: '/productos', label: 'Productos', adminOnly: false },
+    { to: '/usuarios', label: 'Usuarios', adminOnly: true },
     { to: '/inventario', label: 'Inventario', adminOnly: true },
     { to: '/corte', label: 'Corte', adminOnly: false }
   ];
