@@ -49,8 +49,15 @@ const form = ref<UsuarioForm>({
 const tipoUsuarioActual = computed(() => Number(localStorage.getItem('tipoUsuario') || 2));
 const esAdmin = computed(() => tipoUsuarioActual.value === 1);
 
+const theme = ref(localStorage.getItem('theme') || 'zelda');
+
 onMounted(() => {
   cargarUsuarios();
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'theme') {
+      theme.value = e.newValue || 'zelda';
+    }
+  });
 });
 
 async function cargarUsuarios() {
@@ -258,13 +265,17 @@ function getTipoLabel(tipo: number) {
       </button>
     </div>
 
-    <div v-if="cargando" class="loading">Cargando...</div>
+    <div v-if="cargando" class="loading">
+      <div class="loading-spinner"></div>
+      <span>Cargando usuarios...</span>
+    </div>
 
     <div v-else class="usuarios-grid">
       <div 
-        v-for="usuario in usuarios" 
+        v-for="(usuario, index) in usuarios" 
         :key="usuario.idUsuario" 
         class="usuario-card"
+        :style="{ animationDelay: `${index * 0.05}s` }"
       >
         <div class="avatar-container">
           <img 
@@ -287,117 +298,122 @@ function getTipoLabel(tipo: number) {
         </div>
 
         <div v-if="esAdmin" class="usuario-actions">
-          <button class="btn-edit" @click="abrirModalEditar(usuario)">Editar</button>
+          <button class="btn-edit" @click="abrirModalEditar(usuario)">
+            <span class="btn-icon">✏️</span> Editar
+          </button>
           <button 
             class="btn-delete" 
             @click="eliminarUsuario(usuario.idUsuario)"
             :disabled="usuario.idUsuario === tipoUsuarioActual"
           >
-            Eliminar
+            <span class="btn-icon">🗑️</span> Eliminar
           </button>
         </div>
       </div>
     </div>
 
-    <div v-if="modalAbierto" class="modal-overlay" @click.self="cerrarModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ editando ? 'Editar Usuario' : 'Nuevo Usuario' }}</h2>
-          <button class="btn-close" @click="cerrarModal">&times;</button>
-        </div>
+    <Transition name="modal">
+      <div v-if="modalAbierto" class="modal-overlay" @click.self="cerrarModal">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>{{ editando ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
+            <button class="btn-cerrar-modal" @click="cerrarModal">&times;</button>
+          </div>
 
-        <div class="modal-body">
-          <div class="avatar-upload-section">
-            <label>Avatar</label>
-            <div 
-              class="avatar-dropzone"
-              :class="{ dragando }"
-              @dragover="handleDragOver"
-              @dragleave="handleDragLeave"
-              @drop="handleDrop"
-              @click="$refs.fileInput.click()"
-              @mousedown="handleMouseDown"
-              @wheel="handleWheel"
-            >
-              <input 
-                ref="fileInput"
-                type="file" 
-                accept="image/*" 
-                @change="handleFileSelect"
-                style="display: none"
-              />
-              
+          <div class="modal-body">
+            <div class="avatar-upload-section">
+              <label>Avatar</label>
               <div 
-                v-if="avatarPreview" 
-                class="avatar-preview-container"
+                class="avatar-dropzone"
+                :class="{ dragando }"
+                @dragover="handleDragOver"
+                @dragleave="handleDragLeave"
+                @drop="handleDrop"
+                @click="$refs.fileInput.click()"
+                @mousedown="handleMouseDown"
+                @wheel="handleWheel"
               >
-                <img 
-                  ref="imgAvatar"
-                  :src="avatarPreview" 
-                  class="avatar-preview"
-                  :style="{
-                    transform: `translate(${posicionAvatar.x}px, ${posicionAvatar.y}px) scale(${escalaAvatar})`
-                  }"
-                  draggable="false"
+                <input 
+                  ref="fileInput"
+                  type="file" 
+                  accept="image/*" 
+                  @change="handleFileSelect"
+                  style="display: none"
+                />
+                
+                <div 
+                  v-if="avatarPreview" 
+                  class="avatar-preview-container"
+                >
+                  <img 
+                    ref="imgAvatar"
+                    :src="avatarPreview" 
+                    class="avatar-preview"
+                    :style="{
+                      transform: `translate(${posicionAvatar.x}px, ${posicionAvatar.y}px) scale(${escalaAvatar})`
+                    }"
+                    draggable="false"
+                  />
+                </div>
+                <div v-else class="dropzone-placeholder">
+                  <span class="drop-icon">📁</span>
+                  <span>Arrastra una imagen o haz clic</span>
+                  <small>Usa el mouse para mover, scroll para zoom</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Usuario</label>
+                <input v-model="form.usuario" type="text" required placeholder="Nombre de usuario" />
+              </div>
+              <div class="form-group">
+                <label>Nombre</label>
+                <input v-model="form.nombre" type="text" required placeholder="Nombre" />
+              </div>
+              <div class="form-group">
+                <label>Apellido Paterno</label>
+                <input v-model="form.apellido_p" type="text" placeholder="Apellido paterno" />
+              </div>
+              <div class="form-group">
+                <label>Apellido Materno</label>
+                <input v-model="form.apellido_m" type="text" placeholder="Apellido materno" />
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input 
+                  v-model="form.password_hash" 
+                  type="password" 
+                  :placeholder="editando ? 'Dejar vacio para mantener' : 'Contraseña'"
                 />
               </div>
-              <div v-else class="dropzone-placeholder">
-                <span>Arrastra una imagen o haz clic</span>
-                <small>Usa el mouse para mover, scroll para zoom</small>
+              <div class="form-group">
+                <label>Tipo</label>
+                <select v-model="form.id_tipo_usuario">
+                  <option :value="1">Administrador</option>
+                  <option :value="2">Usuario</option>
+                </select>
               </div>
             </div>
           </div>
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Usuario</label>
-              <input v-model="form.usuario" type="text" required />
-            </div>
-            <div class="form-group">
-              <label>Nombre</label>
-              <input v-model="form.nombre" type="text" required />
-            </div>
-            <div class="form-group">
-              <label>Apellido Paterno</label>
-              <input v-model="form.apellido_p" type="text" />
-            </div>
-            <div class="form-group">
-              <label>Apellido Materno</label>
-              <input v-model="form.apellido_m" type="text" />
-            </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input 
-                v-model="form.password_hash" 
-                :type="editando ? 'password' : 'text'" 
-                :placeholder="editando ? 'Dejar vacio para mantener' : ''"
-              />
-            </div>
-            <div class="form-group">
-              <label>Tipo</label>
-              <select v-model="form.id_tipo_usuario">
-                <option :value="1">Administrador</option>
-                <option :value="2">Usuario</option>
-              </select>
-            </div>
+          <div class="modal-actions">
+            <button class="btn-cancel" @click="cerrarModal">Cancelar</button>
+            <button class="btn-save" @click="guardarUsuario">
+              {{ editando ? 'Actualizar' : 'Crear' }}
+            </button>
           </div>
         </div>
-
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="cerrarModal">Cancelar</button>
-          <button class="btn-save" @click="guardarUsuario">
-            {{ editando ? 'Actualizar' : 'Crear' }}
-          </button>
-        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
 .usuarios-page {
   padding: 1.5rem;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -406,52 +422,92 @@ function getTipoLabel(tipo: number) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .page-title {
-  color: #f8d667;
-  font-size: 1.8rem;
-  text-shadow: 2px 2px 0 #000;
+  font-size: 2rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
-  border: 2px solid #166534;
-  color: #000;
-  padding: 0.6rem 1.2rem;
-  font-weight: 900;
+  padding: 0.7rem 1.5rem;
+  font-weight: 700;
   text-transform: uppercase;
+  border-radius: 6px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .usuarios-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
 }
 
 .usuario-card {
-  background: linear-gradient(180deg, #2a1807 0%, #1a0f05 100%);
-  border: 3px solid #c99234;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 1.5rem;
   text-align: center;
-  transition: transform 0.2s;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeInUp 0.5s ease forwards;
+  opacity: 0;
 }
 
 .usuario-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-8px);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .avatar-container {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   margin: 0 auto 1rem;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid #f8d667;
+  border: 4px solid var(--border-color);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: transform 0.3s ease;
+}
+
+.usuario-card:hover .avatar-container {
+  transform: scale(1.05);
 }
 
 .avatar-img {
@@ -466,37 +522,27 @@ function getTipoLabel(tipo: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #4a3728 0%, #2a1807 100%);
-  color: #f8d667;
-  font-size: 2.5rem;
+  font-size: 3rem;
   font-weight: 900;
 }
 
 .usuario-nombre {
-  color: #f8d667;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   margin-bottom: 0.3rem;
 }
 
 .usuario-user {
-  color: #a89070;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
 
 .tipo-badge {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
-  background: #3d5a3d;
-  color: #4ade80;
+  padding: 0.3rem 0.8rem;
   font-size: 0.75rem;
-  border-radius: 4px;
+  border-radius: 20px;
   text-transform: uppercase;
-}
-
-.tipo-badge.admin {
-  background: #5a3d3d;
-  color: #f87171;
+  font-weight: 600;
 }
 
 .usuario-actions {
@@ -507,23 +553,14 @@ function getTipoLabel(tipo: number) {
 }
 
 .btn-edit, .btn-delete {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.8rem;
-  border: 2px solid;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
   cursor: pointer;
-  text-transform: uppercase;
-}
-
-.btn-edit {
-  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
-  border-color: #1d4ed8;
-  color: #000;
-}
-
-.btn-delete {
-  background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
-  border-color: #991b1b;
-  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
 }
 
 .btn-delete:disabled {
@@ -531,25 +568,22 @@ function getTipoLabel(tipo: number) {
   cursor: not-allowed;
 }
 
-.loading {
-  text-align: center;
-  color: #f8d667;
-  font-size: 1.2rem;
+.btn-icon {
+  font-size: 1rem;
 }
 
+/* Modal styles */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
-.modal-content {
-  background: linear-gradient(180deg, #2a1807 0%, #1a0f05 100%);
-  border: 3px solid #c99234;
+.modal-card {
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
@@ -562,20 +596,29 @@ function getTipoLabel(tipo: number) {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 2px solid #c99234;
+  border-bottom: 2px solid var(--border-color);
 }
 
-.modal-header h2 {
-  color: #f8d667;
+.modal-header h3 {
   margin: 0;
 }
 
-.btn-close {
-  background: none;
+.btn-cerrar-modal {
+  background: rgba(0, 0, 0, 0.3);
   border: none;
-  color: #f8d667;
-  font-size: 2rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.5rem;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-cerrar-modal:hover {
+  transform: scale(1.1);
 }
 
 .modal-body {
@@ -588,27 +631,31 @@ function getTipoLabel(tipo: number) {
 
 .avatar-upload-section label {
   display: block;
-  color: #f8d667;
   margin-bottom: 0.5rem;
+  font-weight: 600;
 }
 
 .avatar-dropzone {
-  width: 150px;
-  height: 150px;
+  width: 160px;
+  height: 160px;
   margin: 0 auto;
-  border: 3px dashed #c99234;
+  border: 3px dashed var(--border-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   overflow: hidden;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+}
+
+.avatar-dropzone:hover {
+  border-color: var(--accent-color);
 }
 
 .avatar-dropzone.dragando {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
+  border-color: var(--success-color);
+  background: rgba(0, 255, 0, 0.1);
 }
 
 .avatar-preview-container {
@@ -626,12 +673,18 @@ function getTipoLabel(tipo: number) {
   object-fit: cover;
   cursor: move;
   user-select: none;
+  transition: transform 0.1s ease;
 }
 
 .dropzone-placeholder {
   text-align: center;
-  color: #a89070;
   padding: 1rem;
+}
+
+.drop-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
 .dropzone-placeholder span {
@@ -641,7 +694,7 @@ function getTipoLabel(tipo: number) {
 
 .dropzone-placeholder small {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   margin-top: 0.5rem;
   opacity: 0.7;
 }
@@ -658,48 +711,104 @@ function getTipoLabel(tipo: number) {
 }
 
 .form-group label {
-  color: #f8d667;
   font-size: 0.85rem;
   margin-bottom: 0.3rem;
+  font-weight: 500;
 }
 
 .form-group input,
 .form-group select {
-  padding: 0.6rem;
-  border: 2px solid #4a3728;
-  background: #1a0f05;
-  color: #f8d667;
-  border-radius: 4px;
+  padding: 0.7rem;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #f8d667;
+  border-color: var(--accent-color);
 }
 
-.modal-footer {
+.modal-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
   padding: 1rem 1.5rem;
-  border-top: 2px solid #c99234;
+  border-top: 2px solid var(--border-color);
 }
 
 .btn-cancel {
-  background: #4a3728;
-  color: #f8d667;
-  border: 2px solid #c99234;
-  padding: 0.6rem 1.2rem;
+  padding: 0.7rem 1.5rem;
+  border-radius: 6px;
   cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .btn-save {
-  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
-  border: 2px solid #166534;
-  color: #000;
-  padding: 0.6rem 1.2rem;
-  font-weight: 900;
+  padding: 0.7rem 1.5rem;
+  border-radius: 6px;
   cursor: pointer;
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.btn-save:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+/* Modal transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .modal-card {
+  animation: modalIn 0.3s ease;
+}
+
+.modal-leave-active .modal-card {
+  animation: modalOut 0.3s ease;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .usuarios-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

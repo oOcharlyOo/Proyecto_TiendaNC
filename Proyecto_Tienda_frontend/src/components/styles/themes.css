@@ -3434,3 +3434,197 @@
   margin: 0 !important;
   background: transparent !important;
 }
+
+/* Tema Zelda - Estilo default */
+[data-theme="zelda"] {
+  --bg-primary: #07150d;
+  --bg-secondary: #11261b;
+  --bg-panel: #1a2e23;
+  --text-primary: #f6f2de;
+  --text-secondary: #a89070;
+  --border-color: #c99234;
+  --accent-color: #f8d667;
+  --accent-hover: #c79634;
+  --success-color: #4ade80;
+  --error-color: #f87171;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Usuarios page - Zelda */
+[data-theme="zelda"] .usuarios-page {
+  background: transparent;
+  min-height: 100vh;
+}
+
+[data-theme="zelda"] .page-title {
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--bg-primary);
+}
+
+[data-theme="zelda"] .btn-primary {
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+  border: 2px solid #166534;
+  color: #000;
+  font-weight: 700;
+}
+
+[data-theme="zelda"] .loading {
+  color: var(--text-secondary);
+}
+
+[data-theme="zelda"] .loading-spinner {
+  border-color: var(--border-color);
+  border-top-color: var(--accent-color);
+}
+
+[data-theme="zelda"] .usuarios-grid {
+  gap: 1.5rem;
+}
+
+[data-theme="zelda"] .usuario-card {
+  background: linear-gradient(180deg, #2a1807 0%, #1a0f05 100%);
+  border: 3px solid #c99234;
+  border-radius: 12px;
+}
+
+[data-theme="zelda"] .avatar-container {
+  border-color: var(--accent-color);
+}
+
+[data-theme="zelda"] .avatar-placeholder {
+  background: linear-gradient(180deg, #4a3728 0%, #2a1807 100%);
+  color: var(--accent-color);
+}
+
+[data-theme="zelda"] .usuario-nombre {
+  color: var(--accent-color);
+}
+
+[data-theme="zelda"] .usuario-user {
+  color: var(--text-secondary);
+}
+
+[data-theme="zelda"] .tipo-badge {
+  background: #3d5a3d;
+  color: #4ade80;
+}
+
+[data-theme="zelda"] .tipo-badge.admin {
+  background: #5a3d3d;
+  color: #f87171;
+}
+
+[data-theme="zelda"] .btn-edit {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  border: 2px solid #1d4ed8;
+  color: #000;
+}
+
+[data-theme="zelda"] .btn-delete {
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+  border: 2px solid #991b1b;
+  color: #fff;
+}
+
+/* Modal - Zelda */
+[data-theme="zelda"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.85) !important;
+}
+
+[data-theme="zelda"] .modal-card {
+  background: linear-gradient(180deg, #2a1807 0%, #1a0f05 100%) !important;
+  border: 4px solid var(--accent-color) !important;
+  box-shadow: 0 0 0 3px #1a0f05, 0 8px 0 #1a0f05, 0 12px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="zelda"] .modal-card::before {
+  border: 2px dashed rgba(248, 214, 103, 0.4) !important;
+}
+
+[data-theme="zelda"] .modal-header {
+  border-bottom: 2px solid rgba(248, 214, 103, 0.3) !important;
+}
+
+[data-theme="zelda"] .modal-header h3 {
+  color: var(--accent-color) !important;
+  text-shadow: 2px 2px 0 #1a0f05 !important;
+}
+
+[data-theme="zelda"] .btn-cerrar-modal {
+  background: rgba(0, 0, 0, 0.4) !important;
+  color: var(--accent-color) !important;
+}
+
+[data-theme="zelda"] .btn-cerrar-modal:hover {
+  background: var(--error-color) !important;
+  color: #fff !important;
+}
+
+[data-theme="zelda"] .modal-body {
+  padding: 1.5rem;
+}
+
+[data-theme="zelda"] .avatar-upload-section label {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="zelda"] .avatar-dropzone {
+  border-color: var(--border-color);
+  background: var(--bg-primary);
+}
+
+[data-theme="zelda"] .dropzone-placeholder {
+  color: var(--text-secondary);
+}
+
+[data-theme="zelda"] .form-group label {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="zelda"] .form-group input,
+[data-theme="zelda"] .form-group select {
+  background: var(--bg-primary) !important;
+  border: 2px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  border-radius: 4px;
+}
+
+[data-theme="zelda"] .form-group input:focus,
+[data-theme="zelda"] .form-group select:focus {
+  border-color: var(--accent-color) !important;
+  outline: none;
+}
+
+[data-theme="zelda"] .form-group input::placeholder {
+  color: #6a5a4a;
+}
+
+[data-theme="zelda"] .modal-actions {
+  border-top: 2px solid rgba(248, 214, 103, 0.3) !important;
+}
+
+[data-theme="zelda"] .modal-actions button {
+  border: 2px solid var(--border-color) !important;
+}
+
+[data-theme="zelda"] .btn-cancel {
+  background: #4a3728 !important;
+  color: var(--accent-color) !important;
+}
+
+[data-theme="zelda"] .btn-save {
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%) !important;
+  border: 2px solid #166534 !important;
+  color: #000 !important;
+}
+
+/* Responsive - Zelda */
+@media (max-width: 600px) {
+  [data-theme="zelda"] .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  [data-theme="zelda"] .usuarios-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1508,7 +1508,7 @@ async function processVoiceCommand(comando: string) {
           <div class="info-item">
             <span class="label">📊 Estatus:</span>
             <span class="value estatus" :class="historialVentaSeleccionada?.estatus">
-              {{ historialVentaSeleccionada?.estatus === 'C' ? '✅ Completada' : historialVentaSeleccionada?.estatus === 'P' ? '⏳ Pendiente' : '❌ Cancelada' }}
+              {{ historialVentaSeleccionada?.estatus === 'C' ? '✅ Completada' : historialVentaSeleccionada?.estatus === 'F' ? '✅ Finalizada' : historialVentaSeleccionada?.estatus === 'P' ? '⏳ Pendiente' : '❌ Inactiva' }}
             </span>
           </div>
         </div>

@@ -94,8 +94,8 @@ function formatoFecha(fecha?: string) {
               </td>
               <td>
                 <span class="estatus-badge" :class="venta.estatus">
-                  {{ venta.estatus === 'C' ? '✅' : venta.estatus === 'P' ? '⏳' : '❌' }}
-                  {{ venta.estatus === 'C' ? 'Completada' : venta.estatus === 'P' ? 'Pendiente' : 'Cancelada' }}
+                  {{ venta.estatus === 'C' ? '✅' : venta.estatus === 'F' ? '✅' : venta.estatus === 'P' ? '⏳' : '❌' }}
+                  {{ venta.estatus === 'C' ? 'Completada' : venta.estatus === 'F' ? 'Finalizada' : venta.estatus === 'P' ? 'Pendiente' : 'Inactiva' }}
                 </span>
               </td>
               <td class="fecha-cell">{{ formatoFecha(venta.fechaVenta) }}</td>
@@ -367,8 +367,16 @@ th {
   color: #16a34a;
 }
 
+.estatus-badge.F {
+  color: #2563eb;
+}
+
 .estatus-badge.P {
   color: #ca8a04;
+}
+
+.estatus-badge.I {
+  color: #dc2626;
 }
 
 .fecha-cell {
