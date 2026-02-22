@@ -55,11 +55,10 @@ type VentaDetalleDTO = {
   precioUnitarioVenta: number;
   tipoPrecioAplicado?: string;
   Venta: VentaDTO;
-  Producto: {
-    nombre: string;
-    precio_costo?: number;
-    is_gramaje?: boolean;
-  };
+  productoId?: number;
+  productoNombre?: string;
+  productoPrecioCosto?: number;
+  productoIsGramaje?: boolean;
 };
 
 type ApartadoDTO = {
@@ -539,8 +538,8 @@ async function generarReporteMensual() {
       const sale = salesMap.get(idVenta);
       if (!sale) continue;
 
-      const costoUnidad = Number(d?.Producto?.precio_costo || 0);
-      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.Producto?.is_gramaje === true;
+      const costoUnidad = Number(d?.productoPrecioCosto || 0);
+      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.productoIsGramaje === true;
       const cantidadCosto = isGramaje ? Number(d.cantidad || 0) / 1000 : Number(d.cantidad || 0);
       sale.totalCosto += cantidadCosto * costoUnidad;
     }
@@ -615,8 +614,8 @@ async function generarReporteRangoFechas() {
       const sale = salesMap.get(idVenta);
       if (!sale) continue;
 
-      const costoUnidad = Number(d?.Producto?.precio_costo || 0);
-      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.Producto?.is_gramaje === true;
+      const costoUnidad = Number(d?.productoPrecioCosto || 0);
+      const isGramaje = d?.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d?.productoIsGramaje === true;
       const cantidadCosto = isGramaje ? Number(d.cantidad || 0) / 1000 : Number(d.cantidad || 0);
       sale.totalCosto += cantidadCosto * costoUnidad;
     }
@@ -1066,7 +1065,7 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-for="d in ventaDetalleItems" :key="d.idVentaDetalle">
-                <td>{{ d.Producto.nombre }}</td>
+                <td>{{ d.productoNombre || 'Producto eliminado' }}</td>
                 <td>{{ d.cantidad }}{{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : 'pza' }}</td>
                 <td>{{ formatoMoneda(Number(d.precioUnitarioVenta || 0)) }}</td>
                 <td class="importe">{{ formatoMoneda(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
