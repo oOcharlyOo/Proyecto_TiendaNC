@@ -3532,7 +3532,6 @@
 }
 
 [data-theme="zelda"] .modal-card {
-  background: linear-gradient(180deg, #2a1807 0%, #1a0f05 100%) !important;
   border: 4px solid var(--accent-color) !important;
   box-shadow: 0 0 0 3px #1a0f05, 0 8px 0 #1a0f05, 0 12px 24px rgba(0, 0, 0, 0.5) !important;
 }

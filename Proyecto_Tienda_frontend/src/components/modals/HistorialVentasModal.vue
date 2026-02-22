@@ -272,6 +272,25 @@ function formatoFecha(fecha?: string) {
   flex: 1;
   overflow: auto;
   border: 3px solid #2a1807;
+  color: #1d1606;
+  min-height: 200px;
+  box-shadow: inset 0 0 0 3px #d4c27e;
+  position: relative;
+}
+[data-theme="zelda"] .tabla-wrap {
+  flex: 1;
+  overflow: auto;
+  border: 3px solid #2a1807;
+  background: #f2e8bf;
+  color: #1d1606;
+  min-height: 200px;
+  box-shadow: inset 0 0 0 3px #d4c27e;
+  position: relative;
+}
+[data-theme="skyward"] .tabla-wrap {
+  flex: 1;
+  overflow: auto;
+  border: 3px solid #2a1807;
   background: #f2e8bf;
   color: #1d1606;
   min-height: 200px;
