@@ -360,11 +360,12 @@ async function generarCorte() {
 
     if (idUsuario.value) {
       try {
-        const totalApartadoData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
-        totalApartarDiario.value = totalApartadoData?.datos || totalApartadoData || 0;
+        const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+        const totalValue = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+        totalApartarDiario.value = totalValue;
         
-        const apartadosData = await fetchApi<ApartadoDTO[]>(`/apartado/activos?idUsuario=${idUsuario.value}`);
-        apartadosActivos.value = apartadosData?.datos || apartadosData || [];
+        const apartadosData = await fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`);
+        apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
       } catch (e) {
         console.error('Error al obtener total apartados:', e);
         totalApartarDiario.value = 0;
@@ -441,8 +442,9 @@ async function generarReporteDiario() {
 
     if (idUsuario.value) {
       try {
-        const totalApartadoData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
-        totalApartarDiario.value = totalApartadoData?.datos || totalApartadoData || 0;
+        const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+        const totalValue = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+        totalApartarDiario.value = totalValue;
       } catch (e) {
         console.error('Error al obtener total apartados:', e);
         totalApartarDiario.value = 0;
@@ -731,11 +733,11 @@ async function abrirModalApartados() {
   modalApartadosAbierto.value = true;
   
   try {
-    const data = await fetchApi<ApartadoDTO[]>(`/apartado/activos?idUsuario=${idUsuario.value}`);
-    apartadosActivos.value = data?.datos || data || [];
+    const data = await fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`);
+    apartadosActivos.value = Array.isArray(data) ? data : (data?.datos || []);
     
-    const totalData = await fetchApi<{ datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
-    totalApartarDiario.value = totalData?.datos || totalData || 0;
+    const totalData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
+    totalApartarDiario.value = typeof totalData === 'number' ? totalData : (totalData?.datos || 0);
   } catch (error) {
     apartadosActivos.value = [];
     totalApartarDiario.value = 0;
@@ -803,8 +805,8 @@ async function toggleHistorialPagos(idApartado: number) {
   
   cargandoHistorialPagos.value = true;
   try {
-    const data = await fetchApi<ApartadoPagoDTO[]>(`/apartado/historial/${idApartado}`);
-    historialPagos.value = data?.datos || data || [];
+    const data = await fetchApi<ApartadoPagoDTO[] | { datos: ApartadoPagoDTO[] }>(`/apartado/historial/${idApartado}`);
+    historialPagos.value = Array.isArray(data) ? data : (data?.datos || []);
     mostrarHistorialApartado.value = true;
   } catch (error) {
     mostrarMensaje('Error al cargar historial', 'error');

@@ -91,9 +91,12 @@ type VentaDTO = {
 };
 
 type VentaDetalleDTO = {
+  idVentaDetalle?: number;
   cantidad: number;
   precioUnitarioVenta: number;
   producto?: ProductoDTO;
+  Producto?: ProductoDTO;
+  idProducto?: number;
 };
 
 type VentaPendienteDTO = VentaDTO;
@@ -168,13 +171,14 @@ async function cargarTicketsDesdeBackend() {
                 }
                 
                 const item: TicketItem = {
-                  id: producto.idProducto,
+                  id: producto.idProducto || producto.id,
                   nombre: producto.nombre,
                   cantidad,
                   precio,
                   is_gramaje: producto.is_gramaje,
                   dto: producto,
-                  idVentaDetalle: detalle.idVentaDetalle
+                  idVentaDetalle: detalle.idVentaDetalle,
+                  codigo_barras: producto.codigoBarras || producto.codigo_barras || null
                 };
                 nuevoTicket.items.push(item);
               }
@@ -330,7 +334,7 @@ const historialGananciaTotal = ref(0);
 const historialVentas = ref<VentaDTO[]>([]);
 const historialDetalleCargando = ref(false);
 const historialVentaDetalle = ref<VentaDetalleDTO[]>([]);
-const historialVentaSeleccionada = ref<VentaDTO | null>(null);
+const historialVentaSeleccionada = ref<VentaDTO | { idVenta: number; numeroTicket?: number; fechaVenta?: string; montoTotal?: number | string; metodoPago?: string; estatus?: string } | null>(null);
 const modalDetalleVentaAbierto = ref(false);
 
 const ticketActual = computed(() => {
@@ -428,21 +432,21 @@ function getFechaHoy() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-async function buscarProductoPorCodigoBarras(codigo: string): Promise<Producto | null> {
+async function buscarProductoPorCodigoBarras(codigo: string): Promise<Producto | undefined> {
   try {
     const data = await getJson<ApiRespuesta<ProductoDTO>>(
       `${API_BASE}/productos/buscarPorCodigoBarras/${encodeURIComponent(codigo)}`
     );
     const normalizados = normalizarProductos(data?.datos ? [data.datos] : []);
-    return normalizados[0] ?? null;
+    return normalizados[0] ?? undefined;
   } catch (_error) {
-    return null;
+    return undefined;
   }
 }
 
-async function buscarProducto(termino: string): Promise<Producto | null> {
+async function buscarProducto(termino: string): Promise<Producto | undefined> {
   const query = termino.trim().toLowerCase();
-  if (!query) return null;
+  if (!query) return undefined;
 
   const porCodigo = productos.value.find((p) => (p.codigo_barras || '').toLowerCase() === query);
   if (porCodigo) return porCodigo;
@@ -669,8 +673,9 @@ async function crearDetalleVenta(ventaId: number, item: TicketItem) {
       body: JSON.stringify(payload)
     });
     
-    if (data?.codigo === 200 && data?.datos?.idVentaDetalle) {
-      item.idVentaDetalle = data.datos.idVentaDetalle;
+    const responseData = data?.datos as { idVentaDetalle?: number } | null;
+    if (data?.codigo === 200 && responseData?.idVentaDetalle) {
+      item.idVentaDetalle = responseData.idVentaDetalle;
     }
   }
 
@@ -851,7 +856,7 @@ async function historialVentasAbrir() {
   await cargarHistorialVentasDia();
 }
 
-async function verDetalleVenta(venta: VentaDTO) {
+async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket?: number }) {
   historialVentaSeleccionada.value = venta;
   historialDetalleCargando.value = true;
   modalDetalleVentaAbierto.value = true;
@@ -869,7 +874,7 @@ async function verDetalleVenta(venta: VentaDTO) {
   }
 }
 
-async function cancelarVentaDesdeHistorial(venta: VentaDTO) {
+async function cancelarVentaDesdeHistorial(venta: VentaDTO | { idVenta: number; numeroTicket?: number }) {
   if (!confirm(`¿Estás seguro de cancelar la venta #${venta.numeroTicket}?`)) {
     return;
   }
@@ -1157,7 +1162,7 @@ async function buscarYAgregarProducto(codigo: string) {
   console.log('Buscando código:', codigo);
   
   let producto = productos.value.find(
-    (p) => String(p.codigo_barras) === codigo || String(p.idProducto) === codigo
+    (p) => String(p.codigo_barras) === codigo || String(p.id) === codigo
   );
 
   if (!producto) {
@@ -1234,12 +1239,13 @@ async function processVoiceCommand(comando: string) {
             }
           } else {
             items.push({
-              id: producto.idProducto,
+              id: producto.idProducto || producto.id,
               nombre: producto.nombre,
               cantidad: cantidad,
               precio: precioUnitario,
               is_gramaje: isGramaje || comando.tipo === 'PRECIO',
-              dto: producto
+              dto: producto,
+              codigo_barras: producto.codigoBarras || producto.codigo_barras || null
             });
             try {
               await crearDetalleVenta(ticketActual.value.id, items[items.length - 1]);
@@ -1519,16 +1525,16 @@ async function processVoiceCommand(comando: string) {
           <p v-else-if="historialVentaDetalle.length === 0" class="estado">No hay detalles para esta venta.</p>
           
           <div v-else class="detalle-lista">
-            <div v-for="(detalle, index) in historialVentaDetalle" :key="detalle.idVentaDetalle" class="detalle-item" :style="{ animationDelay: `${index * 50}ms` }">
+            <div v-for="(detalle, index) in historialVentaDetalle" :key="detalle.idVentaDetalle || index" class="detalle-item" :style="{ animationDelay: `${index * 50}ms` }">
               <div class="detalle-info">
                 <span class="numero-item">{{ index + 1 }}.</span>
-                <strong>{{ (detalle.Producto || detalle.producto)?.nombre || 'Producto' }}</strong>
+                <strong>{{ (detalle.producto || detalle.Producto)?.nombre || 'Producto' }}</strong>
               </div>
               <div class="detalle-cantidad">
-                {{ detalle.cantidad }}{{ (detalle.Producto || detalle.producto)?.is_gramaje ? 'g' : 'pza' }}
+                {{ detalle.cantidad }}{{ (detalle.producto || detalle.Producto)?.is_gramaje ? 'g' : 'pza' }}
               </div>
               <div class="detalle-precio">
-                <span class="precio-unit">{{ formatoMoneda(Number(detalle.precioUnitarioVenta)) }}/{{ (detalle.Producto || detalle.producto)?.is_gramaje ? 'g' : 'pza' }}</span>
+                <span class="precio-unit">{{ formatoMoneda(Number(detalle.precioUnitarioVenta)) }}/{{ (detalle.producto || detalle.Producto)?.is_gramaje ? 'g' : 'pza' }}</span>
                 <span class="detalle-subtotal">
                   = {{ formatoMoneda(Number(detalle.precioUnitarioVenta) * Number(detalle.cantidad)) }}
                 </span>
@@ -2038,10 +2044,6 @@ async function processVoiceCommand(comando: string) {
   grid-template-columns: 2fr 1fr;
   gap: 1rem;
   overflow: auto;
-  background: 
-    linear-gradient(180deg, #0a1912 0%, var(--pixel-bg) 100%),
-    radial-gradient(circle at 8% 12%, rgba(248, 214, 103, 0.1) 0 8px, transparent 9px),
-    radial-gradient(circle at 92% 88%, rgba(248, 214, 103, 0.08) 0 8px, transparent 9px);
 }
 
 .ventas-col {

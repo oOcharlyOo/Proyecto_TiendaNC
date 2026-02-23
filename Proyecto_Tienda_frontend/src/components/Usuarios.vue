@@ -329,7 +329,7 @@ function getTipoLabel(tipo: number) {
                 @dragover="handleDragOver"
                 @dragleave="handleDragLeave"
                 @drop="handleDrop"
-                @click="$refs.fileInput.click()"
+                @click="(($refs.fileInput as HTMLInputElement)?.click())"
                 @mousedown="handleMouseDown"
                 @wheel="handleWheel"
               >

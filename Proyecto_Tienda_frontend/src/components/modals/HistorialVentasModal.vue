@@ -240,11 +240,11 @@ function formatoFecha(fecha?: string) {
 }
 
 .total-card {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
-  color: #1d1606;
+  border: var(--border-width-thick, 3px) solid var(--border-color, #2a1807);
+  background: var(--bg-secondary, #fdfbf3);
+  color: var(--text-primary, #1d1606);
   padding: 1rem;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 4px 0 #1a1005;
+  box-shadow: inset 0 0 0 2px var(--bg-panel, rgba(255, 255, 255, 0.5)), 0 4px 0 var(--border-color, #1a1005);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -265,43 +265,24 @@ function formatoFecha(fecha?: string) {
 .card-content strong {
   font-size: 1.2rem;
   font-family: "Courier New", monospace;
-  color: #2a1807;
+  color: var(--success-color, #2a1807);
 }
 
 .tabla-wrap {
   flex: 1;
   overflow: auto;
-  border: 3px solid #2a1807;
-  color: #1d1606;
+  border: var(--border-width-thick, 3px) solid var(--border-color, #2a1807);
+  background: var(--bg-secondary, #f2e8bf);
+  color: var(--text-primary, #1d1606);
   min-height: 200px;
-  box-shadow: inset 0 0 0 3px #d4c27e;
-  position: relative;
-}
-[data-theme="zelda"] .tabla-wrap {
-  flex: 1;
-  overflow: auto;
-  border: 3px solid #2a1807;
-  background: #f2e8bf;
-  color: #1d1606;
-  min-height: 200px;
-  box-shadow: inset 0 0 0 3px #d4c27e;
-  position: relative;
-}
-[data-theme="skyward"] .tabla-wrap {
-  flex: 1;
-  overflow: auto;
-  border: 3px solid #2a1807;
-  background: #f2e8bf;
-  color: #1d1606;
-  min-height: 200px;
-  box-shadow: inset 0 0 0 3px #d4c27e;
+  box-shadow: inset 0 0 0 3px var(--bg-panel, #d4c27e);
   position: relative;
 }
 
 .estado {
   padding: 2rem;
   text-align: center;
-  color: #5a4a2a;
+  color: var(--text-secondary, #5a4a2a);
   font-family: "Courier New", monospace;
   font-size: 1rem;
 }
@@ -314,7 +295,7 @@ table {
 th,
 td {
   padding: 0.6rem 0.4rem;
-  border-bottom: 1px solid #baa15c;
+  border-bottom: 1px solid var(--bg-panel, #baa15c);
   text-align: left;
   font-size: 0.8rem;
   font-family: "Courier New", monospace;
@@ -323,11 +304,11 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: linear-gradient(180deg, #e8d790 0%, #d4c27e 100%);
+  background: var(--bg-panel, #e8d790);
+  color: var(--border-color, #1a1401);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 700;
-  color: #1a1401;
   white-space: nowrap;
 }
 
@@ -342,16 +323,16 @@ th {
 }
 
 .clickable-row:hover td {
-  background: rgba(248, 214, 103, 0.35);
+  background: color-mix(in srgb, var(--accent-color, #f8d667) 35%, transparent);
 }
 
 .ticket-cell {
   font-weight: bold;
-  color: #2a1807;
+  color: var(--border-color, #2a1807);
 }
 
 .monto-cell {
-  color: #1f5b35;
+  color: var(--success-color, #1f5b35);
   font-weight: 600;
 }
 
@@ -366,13 +347,13 @@ th {
 }
 
 .metodo-badge.efectivo {
-  background: rgba(34, 197, 94, 0.2);
-  color: #166534;
+  background: color-mix(in srgb, var(--success-color, #22c55e) 20%, transparent);
+  color: var(--success-color, #166534);
 }
 
 .metodo-badge.transferencia {
-  background: rgba(59, 130, 246, 0.2);
-  color: #1d4ed8;
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 20%, transparent);
+  color: var(--accent-color, #1d4ed8);
 }
 
 .estatus-badge {
@@ -383,24 +364,24 @@ th {
 }
 
 .estatus-badge.C {
-  color: #16a34a;
+  color: var(--success-color, #16a34a);
 }
 
 .estatus-badge.F {
-  color: #2563eb;
+  color: var(--accent-color, #2563eb);
 }
 
 .estatus-badge.P {
-  color: #ca8a04;
+  color: var(--accent-color, #ca8a04);
 }
 
 .estatus-badge.I {
-  color: #dc2626;
+  color: var(--error-color, #dc2626);
 }
 
 .fecha-cell {
   font-size: 0.7rem;
-  color: #5a4a2a;
+  color: var(--text-secondary, #5a4a2a);
 }
 
 .acciones-cell {
@@ -414,11 +395,22 @@ th {
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
-  border: 2px solid #2a1807;
+  border: 2px solid var(--border-color, #2a1807);
   border-radius: 4px;
   cursor: pointer;
   transition: all 150ms;
   white-space: nowrap;
+}
+
+.btn-cancelar {
+  background: linear-gradient(180deg, var(--error-color, #fca5a5) 0%, var(--error-color, #ef4444) 100%);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.btn-ver {
+  background: linear-gradient(180deg, var(--accent-color, #f8d667) 0%, var(--accent-color, #e2b84f) 100%);
+  color: var(--border-color, #1a1401);
 }
 
 .btn-cancelar {
