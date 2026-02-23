@@ -1236,7 +1236,6 @@ onMounted(() => {
 
 .wood-sign {
   border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #b37b39 0%, #8d5e28 45%, #6b4420 100%);
   color: #f5e9c2;
   text-shadow: 1px 1px 0 #2f1f09;
   font-weight: 900;
@@ -1811,16 +1810,6 @@ onMounted(() => {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
-.history-item {
-  padding: 0.7rem;
-  border-bottom: 1px solid #baa15c;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  cursor: pointer;
-  transition: background 80ms steps(2);
-}
-
 .history-item:hover {
   background: rgba(248, 214, 103, 0.3);
 }
@@ -1847,25 +1836,6 @@ onMounted(() => {
   font-family: "Courier New", monospace;
 }
 
-.detail-grid {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
-  color: #1d1606;
-  padding: 0.8rem;
-  display: grid;
-  gap: 0.5rem;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 3px 0 #1a1005;
-}
-
-.detail-grid p {
-  margin: 0;
-  font-size: 0.82rem;
-  font-family: "Courier New", monospace;
-}
-
-.detail-grid strong {
-  color: #18661a;
-}
 
 .tabla-wrap {
   overflow: auto;
@@ -1905,15 +1875,6 @@ td {
 
 .empty {
   padding: 0.9rem;
-}
-
-.detail-grid {
-  border: 2px solid #2a1807;
-  background: #f2e8bf;
-  color: #1d1606;
-  padding: 0.7rem;
-  display: grid;
-  gap: 0.4rem;
 }
 
 .tabla-wrap {
