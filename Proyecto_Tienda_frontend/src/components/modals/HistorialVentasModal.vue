@@ -328,7 +328,6 @@ th {
 
 .ticket-cell {
   font-weight: bold;
-  color: var(--border-color, #2a1807);
 }
 
 .monto-cell {

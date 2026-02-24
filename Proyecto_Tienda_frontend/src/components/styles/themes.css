@@ -434,6 +434,7 @@
 
 [data-theme="deathmountain"] .modal-card,
 [data-theme="skyward"] .modal-card,
+[data-theme="zelda"] .modal-card,
 [data-theme="alforja"] .modal-card {
   background: linear-gradient(180deg, var(--gradient-panel-start) 0%, var(--gradient-panel-end) 100%) !important;
   border: var(--border-width-thick) solid var(--accent-color) !important;
@@ -1307,6 +1308,7 @@
 /* ---------- Cell styles ---------- */
 [data-theme="deathmountain"] .ticket-cell,
 [data-theme="skyward"] .ticket-cell,
+[data-theme="zelda"] .ticket-cell,
 [data-theme="alforja"] .ticket-cell {
   color: var(--accent-color);
 }

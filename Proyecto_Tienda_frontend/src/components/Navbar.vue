@@ -16,6 +16,14 @@ const tipoUsuario = computed(() => {
 
 const esAdministrador = computed(() => tipoUsuario.value === 1);
 
+const avatarUsuario = computed(() => {
+  return localStorage.getItem('avatarUsuario') || null;
+});
+
+const nombreUsuario = computed(() => {
+  return localStorage.getItem('nombreUsuario') || 'Usuario';
+});
+
 const links = computed(() => {
   const linksBase = [
     { to: '/ventas', label: 'Ventas', adminOnly: false },
@@ -64,7 +72,41 @@ function cerrarSesion() {
         </span>
       </button>
 
+      <ul class="menu-links desktop-links">
+        <li v-for="link in links" :key="link.to">
+          <RouterLink
+            :to="link.to"
+            class="menu-link"
+            :class="{ activo: route.path === link.to }"
+            @click="cerrarMenu"
+          >
+            {{ link.label }}
+          </RouterLink>
+        </li>
+      </ul>
+
+      <button
+        type="button"
+        class="user-menu-btn"
+        :aria-expanded="menuAbierto"
+        aria-label="Menu de usuario"
+        @click="toggleMenu"
+      >
+        <div class="user-avatar-small">
+          <img v-if="avatarUsuario" :src="avatarUsuario" alt="Avatar" />
+          <span v-else class="avatar-initial">{{ nombreUsuario.charAt(0).toUpperCase() }}</span>
+        </div>
+      </button>
+
       <div class="menu" :class="{ abierto: menuAbierto }">
+        <div class="menu-user-section">
+          <div class="user-avatar">
+            <img v-if="avatarUsuario" :src="avatarUsuario" alt="Avatar" />
+            <span v-else class="avatar-initial">{{ nombreUsuario.charAt(0).toUpperCase() }}</span>
+          </div>
+          <span class="user-name">{{ nombreUsuario }}</span>
+        </div>
+
         <ul class="menu-links">
           <li v-for="link in links" :key="link.to">
             <RouterLink
@@ -154,6 +196,10 @@ function cerrarSesion() {
   width: auto;
   gap: 0.75rem;
   justify-content: flex-end;
+}
+
+.menu-user-section {
+  display: none;
 }
 
 .menu-links {
@@ -260,6 +306,34 @@ function cerrarSesion() {
   justify-self: center;
 }
 
+.user-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.user-avatar-small {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #f8d667;
+  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 @media (max-width: 980px) {
   .navbar {
     flex-wrap: wrap;
@@ -272,11 +346,134 @@ function cerrarSesion() {
   }
 }
 
+@media (min-width: 761px) {
+  .desktop-links {
+    display: flex;
+    list-style: none;
+    gap: 0.45rem;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .menu-user-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+  }
+
+  .menu-user-section .user-avatar {
+    width: 64px;
+    height: 64px;
+  }
+
+  .menu-user-section .avatar-initial {
+    font-size: 1.75rem;
+  }
+
+  .menu-user-section .user-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #f8d667;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .menu-user-section .user-avatar {
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #f8d667;
+    background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .menu-user-section .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .menu-user-section .avatar-initial {
+    font-weight: 900;
+    color: #2a1807;
+  }
+
+  .menu .menu-links {
+    display: none;
+  }
+
+  .menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 220px;
+    background: linear-gradient(180deg, #4a3520 0%, #2a1807 100%);
+    border: 3px solid #f8d667;
+    border-radius: 8px;
+    padding: 0.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-8px);
+    pointer-events: none;
+    transition:
+      max-height 200ms ease-out,
+      opacity 150ms ease-out,
+      transform 150ms ease-out;
+    z-index: 100;
+  }
+
+  .menu.abierto {
+    max-height: 400px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .theme-selector {
+    justify-content: center;
+    padding: 0.5rem 0;
+    border-top: 1px solid rgba(248, 214, 103, 0.3);
+    border-bottom: 1px solid rgba(248, 214, 103, 0.3);
+  }
+
+  .logout-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 @media (max-width: 760px) {
   .hamburger {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .desktop-links {
+    display: none;
+  }
+
+  .user-menu-btn {
+    display: none;
+  }
+
+  .menu-user-section .user-avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .menu-user-section .avatar-initial {
+    font-size: 2rem;
   }
 
   .menu {
@@ -298,14 +495,57 @@ function cerrarSesion() {
   }
 
   .menu.abierto {
-    max-height: 420px;
+    max-height: 500px;
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
     animation: pixelDrop 240ms steps(6);
   }
 
-  .menu-links {
+  .menu-user-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+  }
+
+  .user-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #f8d667;
+    background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-initial {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #2a1807;
+  }
+
+  .user-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f8d667;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .menu .menu-links {
     position: static;
     left: auto;
     transform: none;

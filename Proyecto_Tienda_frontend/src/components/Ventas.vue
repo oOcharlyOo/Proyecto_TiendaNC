@@ -70,6 +70,7 @@ type ProductoDTO = {
   idProducto: number;
   nombre: string;
   precio_venta: number | string;
+  precio_mayoreo?: number | string | null;
   codigoBarras: string;
   stock?: number;
   is_gramaje?: boolean;
@@ -106,6 +107,7 @@ type Producto = {
   nombre: string;
   codigo_barras: string | null;
   precio: number;
+  precio_mayoreo?: number | null;
   dto: ProductoDTO;
   is_gramaje?: boolean;
 };
@@ -113,6 +115,7 @@ type Producto = {
 type TicketItem = Producto & {
   cantidad: number;
   idVentaDetalle?: number;
+  is_mayoreo?: boolean;
 };
 
 type Ticket = {
@@ -175,7 +178,9 @@ async function cargarTicketsDesdeBackend() {
                   nombre: producto.nombre,
                   cantidad,
                   precio,
+                  precio_mayoreo: producto.precio_mayoreo != null ? Number(producto.precio_mayoreo) : null,
                   is_gramaje: producto.is_gramaje,
+                  is_mayoreo: (producto.precio_mayoreo != null && Number(producto.precio_mayoreo) > 0 && precio === Number(producto.precio_mayoreo)),
                   dto: producto,
                   idVentaDetalle: detalle.idVentaDetalle,
                   codigo_barras: producto.codigoBarras || producto.codigo_barras || null
@@ -400,17 +405,42 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
       const nombre = String(item?.nombre ?? '').trim();
       const codigo = String(item?.codigoBarras ?? '').trim();
       const precio = Number(item?.precio_venta ?? 0);
+      const precioMayoreo = item?.precio_mayoreo != null ? Number(item.precio_mayoreo) : null;
 
       return {
         id,
         nombre,
         codigo_barras: codigo.length ? codigo : null,
         precio,
+        precio_mayoreo: (precioMayoreo != null && precioMayoreo > 0) ? precioMayoreo : null,
         dto: markRaw(item),
         is_gramaje: item.is_gramaje
       };
     })
     .filter((p) => p.id > 0 && p.nombre.length > 0 && Number.isFinite(p.precio));
+}
+
+async function toggleMayoreo(item: TicketItem) {
+  if (!item.precio_mayoreo || item.precio_mayoreo <= 0) {
+    mostrarMensaje(`El producto "${item.nombre}" no tiene precio de mayoreo.`, 'error');
+    return;
+  }
+
+  const nuevoMayoreo = !item.is_mayoreo;
+  const precioAnterior = item.precio;
+  
+  item.is_mayoreo = nuevoMayoreo;
+  item.precio = nuevoMayoreo ? item.precio_mayoreo : (item.dto?.precio_venta ? Number(item.dto.precio_venta) : item.precio);
+
+  if (item.idVentaDetalle && ticketActual.value) {
+    try {
+      await crearDetalleVenta(ticketActual.value.id, item);
+    } catch (e) {
+      item.is_mayoreo = !nuevoMayoreo;
+      item.precio = precioAnterior;
+      mostrarMensaje('Error al actualizar precio.', 'error');
+    }
+  }
 }
 
 async function cargarProductos() {
@@ -1397,6 +1427,16 @@ async function processVoiceCommand(comando: string) {
             <h3>{{ item.nombre }}</h3>
             <p>Codigo: {{ item.codigo_barras || 'Sin codigo' }}</p>
             <p>Precio: {{ formatoMoneda(item.precio) }}</p>
+            <p v-if="item.precio_mayoreo && item.precio_mayoreo > 0">
+              <label class="mayoreo-label">
+                <input
+                  type="checkbox"
+                  :checked="item.is_mayoreo"
+                  @change="toggleMayoreo(item)"
+                >
+                Mayoreo ({{ formatoMoneda(item.precio_mayoreo) }})
+              </label>
+            </p>
           </div>
 
           <div class="etiqueta-controles">
@@ -2861,5 +2901,22 @@ async function processVoiceCommand(comando: string) {
 .etiqueta-total,
 .ticket-etiqueta p {
   color: #90ee90 !important;
+}
+
+.mayoreo-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #f8d667 !important;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.mayoreo-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: #f8d667;
 }
 </style>
