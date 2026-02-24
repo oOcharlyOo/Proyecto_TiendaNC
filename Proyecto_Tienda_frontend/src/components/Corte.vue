@@ -2275,7 +2275,6 @@ th {
   margin-top: 1rem;
   width: 100%;
   padding: 0.8rem;
-  background: linear-gradient(180deg, #d4a84b 0%, #a67c29 100%);
   color: #1d1606;
   border: 2px solid #2a1807;
   border-radius: 8px;
@@ -2455,7 +2454,6 @@ th {
   margin-top: 1rem;
   width: 100%;
   padding: 0.7rem;
-  background: linear-gradient(180deg, #6c757d 0%, #545b62 100%);
   color: white;
   border: 2px solid #2a1807;
   border-radius: 8px;

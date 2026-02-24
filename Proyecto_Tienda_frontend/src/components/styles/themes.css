@@ -1391,6 +1391,7 @@
 
 [data-theme="deathmountain"] .btn-crear,
 [data-theme="skyward"] .btn-crear,
+[data-theme="zelda"] .btn-crear,
 [data-theme="alforja"] .btn-crear {
   background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
   border: 2px solid var(--border-color) !important;
@@ -1423,6 +1424,7 @@
 
 [data-theme="deathmountain"] .btn-cerrar-historial,
 [data-theme="skyward"] .btn-cerrar-historial,
+[data-theme="zelda"] .btn-cerrar-historial,
 [data-theme="alforja"] .btn-cerrar-historial {
   background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%) !important;
   border: 2px solid var(--border-color) !important;
@@ -1485,7 +1487,7 @@
 [data-theme="alforja"] .btn-historial-completo {
   width: 100%;
   padding: 0.8rem;
-  background: linear-gradient(180deg, #6c757d 0%, #545b62 100%);
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
   color: white;
   border: 2px solid #2a1807;
   border-radius: 8px;
