@@ -1106,6 +1106,7 @@
 
 [data-theme="deathmountain"] tr.empty .stock-cell,
 [data-theme="skyward"] tr.empty .stock-cell,
+[data-theme="zelda"] tr.empty .stock-cell,
 [data-theme="alforja"] tr.empty .stock-cell {
   color: var(--error-color);
 }

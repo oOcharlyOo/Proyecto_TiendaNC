@@ -1881,7 +1881,6 @@ onMounted(() => {
 .empty {
   padding: 1.5rem;
   text-align: center;
-  color: #5a4a2a;
   font-family: "Courier New", monospace;
 }
 
