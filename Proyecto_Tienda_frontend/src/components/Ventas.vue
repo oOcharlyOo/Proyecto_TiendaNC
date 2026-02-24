@@ -361,10 +361,13 @@ const totalArticulos = computed(() => {
 
 const sugerenciasPorNombre = computed(() => {
   const query = terminoBusqueda.value.trim().toLowerCase();
-  let resultados = productos.value;
+  let resultados = productos.value.filter(p => {
+    const stock = p.dto?.stock;
+    return stock === undefined || stock === null || stock > 0;
+  });
   
   if (query) {
-    resultados = productos.value.filter(p => 
+    resultados = resultados.filter(p => 
       p.nombre.toLowerCase().includes(query) ||
       (p.codigo_barras && p.codigo_barras.includes(query))
     );

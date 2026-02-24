@@ -13,7 +13,7 @@
   --border-color: #2a1807;
   --accent-color: #f8d667;
   --accent-hover: #ffe48b;
-  --success-color: #67e0a8;
+  --success-color: #14b033;
   --error-color: #b7393f;
   --shadow-color: rgba(0, 0, 0, 0.45);
   
@@ -44,7 +44,7 @@
   --border-color: #2a1807;
   --accent-color: #c99234;
   --accent-hover: #ffe48b;
-  --success-color: #67e0a8;
+  --success-color: #14b033;
   --error-color: #b7393f;
   --shadow-color: rgba(0, 0, 0, 0.45);
   
@@ -824,12 +824,14 @@
 
 [data-theme="deathmountain"] .apartado-total strong,
 [data-theme="skyward"] .apartado-total strong,
+[data-theme="zelda"] .apartado-total strong,
 [data-theme="alforja"] .apartado-total strong {
   color: var(--accent-color);
 }
 
 [data-theme="deathmountain"] .apartado-item,
 [data-theme="skyward"] .apartado-item,
+[data-theme="zelda"] .apartado-item,
 [data-theme="alforja"] .apartado-item {
   background: var(--bg-primary);
   border: 2px solid var(--bg-panel);
@@ -838,12 +840,14 @@
 
 [data-theme="deathmountain"] .apartado-item:hover,
 [data-theme="skyward"] .apartado-item:hover,
+[data-theme="zelda"] .apartado-item:hover,
 [data-theme="alforja"] .apartado-item:hover {
-  background: var(--bg-secondary);
+  background: var(--zelda-forest-dark);
 }
 
 [data-theme="deathmountain"] .apartado-info h4,
 [data-theme="skyward"] .apartado-info h4,
+[data-theme="zelda"] .apartado-info h4,
 [data-theme="alforja"] .apartado-info h4 {
   color: var(--accent-color);
   margin: 0 0 0.3rem;
@@ -851,14 +855,16 @@
 
 [data-theme="deathmountain"] .apartado-info p,
 [data-theme="skyward"] .apartado-info p,
+[data-theme="zelda"] .apartado-info p,
 [data-theme="alforja"] .apartado-info p {
-  color: var(--text-secondary);
+  color: var(--accent-color);
   font-size: 0.8rem;
   margin: 0;
 }
 
 [data-theme="deathmountain"] .apartado-info strong,
 [data-theme="skyward"] .apartado-info strong,
+[data-theme="zelda"] .apartado-info strong,
 [data-theme="alforja"] .apartado-info strong {
   color: var(--success-color);
 }
@@ -1457,6 +1463,139 @@
 
 [data-theme="deathmountain"] .apartado-card:hover,
 [data-theme="skyward"] .apartado-card:hover,
+[data-theme="zelda"] .apartado-card:hover,
 [data-theme="alforja"] .apartado-card:hover {
   background: var(--bg-secondary);
+}
+
+/*-- Historial de Apartados --*/
+
+[data-theme="deathmountain"] .apartados-historial-section,
+[data-theme="skyward"] .apartados-historial-section,
+[data-theme="zelda"] .apartados-historial-section,
+[data-theme="alforja"] .apartados-historial-section {
+  margin-top: 1.5rem;
+  border-top: 2px dashed #d8c37c;
+  padding-top: 1rem;
+}
+
+[data-theme="deathmountain"] .btn-historial-completo,
+[data-theme="skyward"] .btn-historial-completo,
+[data-theme="zelda"] .btn-historial-completo,
+[data-theme="alforja"] .btn-historial-completo {
+  width: 100%;
+  padding: 0.8rem;
+  background: linear-gradient(180deg, #6c757d 0%, #545b62 100%);
+  color: white;
+  border: 2px solid #2a1807;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.95rem;
+  box-shadow: 0 3px 0 #1d1606;
+}
+
+[data-theme="deathmountain"] .btn-historial-completo:hover,
+[data-theme="skyward"] .btn-historial-completo:hover,
+[data-theme="zelda"] .btn-historial-completo:hover,
+[data-theme="alforja"] .btn-historial-completo:hover {
+  background: linear-gradient(180deg, #7c858d 0%, #6c757d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #1d1606;
+}
+
+[data-theme="deathmountain"] .historial-completados,
+[data-theme="skyward"] .historial-completados,
+[data-theme="zelda"] .historial-completados,
+[data-theme="alforja"] .historial-completados {
+  background: linear-gradient(180deg, #fdf6e3 0%, #f5e6c8 100%);
+  border: 3px solid #2a1807;
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-top: 1rem;
+  box-shadow: inset 0 0 0 2px #adb5bd;
+}
+
+[data-theme="deathmountain"] .historial-completados h4,
+[data-theme="skyward"] .historial-completados h4,
+[data-theme="zelda"] .historial-completados h4,
+[data-theme="alforja"] .historial-completados h4 {
+  margin: 0 0 1rem 0;
+  color: var(--zelda-gold);
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+[data-theme="deathmountain"] .apartados-completados-list,
+[data-theme="skyward"] .apartados-completados-list,
+[data-theme="zelda"] .apartados-completados-list,
+[data-theme="alforja"] .apartados-completados-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 2px solid #2a1807;
+}
+
+[data-theme="deathmountain"] .apartado-completado-item,
+[data-theme="skyward"] .apartado-completado-item,
+[data-theme="zelda"] .apartado-completado-item,
+[data-theme="alforja"] .apartado-completado-item {
+  padding: 1rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+[data-theme="deathmountain"] .apartado-completado-item:last-child,
+[data-theme="skyward"] .apartado-completado-item:last-child,
+[data-theme="zelda"] .apartado-completado-item:last-child,
+[data-theme="alforja"] .apartado-completado-item:last-child {
+  border-bottom: none;
+}
+
+[data-theme="deathmountain"] .apartado-completado-item .apartado-info h4,
+[data-theme="skyward"] .apartado-completado-item .apartado-info h4,
+[data-theme="zelda"] .apartado-completado-item .apartado-info h4,
+[data-theme="alforja"] .apartado-completado-item .apartado-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--zelda-gold);
+  font-size: 1rem;
+  text-align: left;
+}
+
+[data-theme="deathmountain"] .apartado-completado-item .apartado-info p,
+[data-theme="skyward"] .apartado-completado-item .apartado-info p,
+[data-theme="zelda"] .apartado-completado-item .apartado-info p,
+[data-theme="alforja"] .apartado-completado-item .apartado-info p {
+  margin: 0.2rem 0;
+  color: var(--zelda-gold);
+  font-size: 0.9rem;
+}
+
+[data-theme="deathmountain"] .estatus-badge,
+[data-theme="skyward"] .estatus-badge,
+[data-theme="zelda"] .estatus-badge,
+[data-theme="alforja"] .estatus-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+[data-theme="deathmountain"] .estatus-badge.PAGADO,
+[data-theme="skyward"] .estatus-badge.PAGADO,
+[data-theme="zelda"] .estatus-badge.PAGADO,
+[data-theme="alforja"] .estatus-badge.PAGADO {
+  background: linear-gradient(var(--success-color), var(--success-color));
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+[data-theme="deathmountain"] .estatus-badge.CANCELADO,
+[data-theme="skyward"] .estatus-badge.CANCELADO,
+[data-theme="zelda"] .estatus-badge.CANCELADO,
+[data-theme="alforja"] .estatus-badge.CANCELADO {
+  background:  linear-gradient(var(--error-color), var(--error-color));
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }

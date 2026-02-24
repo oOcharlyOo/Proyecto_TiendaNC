@@ -115,11 +115,14 @@ const modalEgresosAbierto = ref(false);
 const modalApartadosAbierto = ref(false);
 
 const apartadosActivos = ref<ApartadoDTO[]>([]);
+const apartadosCompletados = ref<ApartadoDTO[]>([]);
 const cargandoApartados = ref(false);
+const cargandoApartadosCompletados = ref(false);
 const totalApartarDiario = ref(0);
 const historialPagos = ref<ApartadoPagoDTO[]>([]);
 const cargandoHistorialPagos = ref(false);
 const mostrarHistorialApartado = ref(false);
+const mostrarHistorialCompletados = ref(false);
 
 const apartadoActivo = computed(() => {
   return apartadosActivos.value.length > 0 ? apartadosActivos.value[0] : null;
@@ -747,6 +750,24 @@ async function abrirModalApartados() {
   }
 }
 
+async function cargarApartadosCompletados() {
+  cargandoApartadosCompletados.value = true;
+  try {
+    const data = await fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>('/apartado/completados');
+    apartadosCompletados.value = Array.isArray(data) ? data : (data?.datos || []);
+  } catch (error) {
+    apartadosCompletados.value = [];
+    console.error('Error al cargar apartados completados:', error);
+  } finally {
+    cargandoApartadosCompletados.value = false;
+  }
+}
+
+function toggleHistorialCompletados() {
+  cargarApartadosCompletados();
+  mostrarHistorialCompletados.value = !mostrarHistorialCompletados.value;
+}
+
 async function crearApartado() {
   if (!idUsuario.value) return;
   
@@ -1168,6 +1189,36 @@ onMounted(() => {
               </div>
             </div>
             <button class="btn-cerrar-historial" @click="mostrarHistorialApartado = false">Cerrar</button>
+          </div>
+        </div>
+
+        <div class="apartados-historial-section">
+          <button 
+            type="button" 
+            class="btn-historial-completo" 
+            @click="toggleHistorialCompletados"
+          >
+            📜 Ver Historial de Apartados Completados
+          </button>
+          
+          <div v-if="mostrarHistorialCompletados" class="historial-completados">
+            <h4>📜 Historial de Apartados Completados</h4>
+            <div v-if="cargandoApartadosCompletados" class="empty">📡 Cargando...</div>
+            <div v-else-if="apartadosCompletados.length === 0" class="empty">No hay apartados completados.</div>
+            <div v-else class="apartados-completados-list">
+              <article v-for="apartado in apartadosCompletados" :key="apartado.idApartado" class="apartado-completado-item">
+                <div class="apartado-info">
+                  <h4>🏦 {{ apartado.nombreProducto }}</h4>
+                  <p>📅 {{ apartado.fechaInicio?.slice(0,10) }} al {{ apartado.fechaFin?.slice(0,10) }}</p>
+                  <p>💵 Total: <strong>{{ formatoMoneda(apartado.montoTotal) }}</strong></p>
+                  <p>📊 Pagado: {{ formatoMoneda(apartado.montoPagado) }}</p>
+                  <span class="estatus-badge" :class="apartado.estatus">
+                    {{ apartado.estatus === 'PAGADO' ? '✅ Completado' : '❌ Cancelado' }}
+                  </span>
+                </div>
+              </article>
+            </div>
+            <button class="btn-cerrar-historial" @click="mostrarHistorialCompletados = false">Cerrar</button>
           </div>
         </div>
       </section>
