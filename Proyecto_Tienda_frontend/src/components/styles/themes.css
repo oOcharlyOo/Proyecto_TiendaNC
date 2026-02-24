@@ -428,6 +428,7 @@
 /* ---------- Modal ---------- */
 [data-theme="deathmountain"] .modal-overlay,
 [data-theme="skyward"] .modal-overlay,
+[data-theme="zelda"] .modal-overlay,
 [data-theme="alforja"] .modal-overlay {
   background: color-mix(in srgb, var(--bg-primary) 92%, transparent) !important;
 }
@@ -443,11 +444,12 @@
 
 [data-theme="deathmountain"] .modal-card::before,
 [data-theme="skyward"] .modal-card::before,
+[data-theme="zelda"] .modal-card::before,
 [data-theme="alforja"] .modal-card::before {
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 40%, transparent) !important;
 }
 
 [data-theme="deathmountain"] .btn-cerrar-modal,
+[data-theme="zelda"] .btn-cerrar-modal,
 [data-theme="skyward"] .btn-cerrar-modal,
 [data-theme="alforja"] .btn-cerrar-modal {
   background: rgba(0, 0, 0, 0.4) !important;
@@ -456,6 +458,7 @@
 
 [data-theme="deathmountain"] .btn-cerrar-modal:hover,
 [data-theme="skyward"] .btn-cerrar-modal:hover,
+[data-theme="zelda"] .btn-cerrar-modal:hover,
 [data-theme="alforja"] .btn-cerrar-modal:hover {
   background: var(--error-color) !important;
   color: var(--text-primary) !important;

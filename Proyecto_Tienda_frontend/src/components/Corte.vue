@@ -1387,8 +1387,7 @@ onMounted(() => {
   width: min(100%, 520px);
   max-height: 90vh;
   background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
-  border: 4px solid #f8d667;
-  box-shadow: 
+  box-shadow:
     0 0 0 4px #2f1f09,
     0 14px 0 #271c0f,
     0 20px 28px rgba(0, 0, 0, 0.5);
@@ -1404,7 +1403,6 @@ onMounted(() => {
   content: "";
   position: absolute;
   inset: 10px;
-  border: 2px dashed rgba(248, 214, 103, 0.4);
   pointer-events: none;
   border-radius: 8px;
 }

@@ -377,7 +377,6 @@ textarea:focus {
   content: "";
   position: absolute;
   inset: 12px;
-  border: 2px dashed rgba(248, 214, 103, 0.3);
   pointer-events: none;
   border-radius: 8px;
 }
