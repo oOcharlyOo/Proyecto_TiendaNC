@@ -224,7 +224,7 @@
 }
 
 [data-theme="skyward"] body {
-  background: linear-gradient(180deg, var(--gradient-bg-start) 0%, var(--gradient-bg-mid) 50%, #b8e0f0 100%);
+  background: linear-gradient(180deg, var(--gradient-panel-start) 0%, var(--gradient-panel-end) 50%, #b8e0f0 100%);
   color: var(--text-primary);
 }
 
@@ -970,43 +970,47 @@
 
 [data-theme="deathmountain"] .stat-card,
 [data-theme="skyward"] .stat-card,
+[data-theme="zelda"] .stat-card,
 [data-theme="alforja"] .stat-card {
-  border: var(--border-width-thick) solid var(--border-color);
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  background: linear-gradient(180deg, var(--bg-panel, #1f5b35) 0%, var(--bg-secondary, #133523) 100%);
   padding: 0.7rem;
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent), 0 4px 0 var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: inset 0 -0.2rem 0.5rem var(--bg-primary);
 }
 
 [data-theme="deathmountain"] .stat-card.warning,
 [data-theme="skyward"] .stat-card.warning,
+[data-theme="zelda"] .stat-card.warning,
 [data-theme="alforja"] .stat-card.warning {
   background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
 }
 
 [data-theme="deathmountain"] .stat-card.danger,
 [data-theme="skyward"] .stat-card.danger,
+[data-theme="zelda"] .stat-card.danger,
 [data-theme="alforja"] .stat-card.danger {
   background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
 }
 
 [data-theme="deathmountain"] .stat-card.gold,
 [data-theme="skyward"] .stat-card.gold,
+[data-theme="zelda"] .stat-card.gold,
 [data-theme="alforja"] .stat-card.gold {
   background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
-  color: var(--border-color);
 }
 
 [data-theme="deathmountain"] .stat-card.gold .stat-info p,
 [data-theme="skyward"] .stat-card.gold .stat-info p,
+[data-theme="zelda"] .stat-card.gold .stat-info p,
 [data-theme="alforja"] .stat-card.gold .stat-info p {
-  color: var(--border-color);
 }
 
 [data-theme="deathmountain"] .stat-card.success,
 [data-theme="skyward"] .stat-card.success,
+[data-theme="zelda"] .stat-card.success,
 [data-theme="alforja"] .stat-card.success {
   background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
 }
@@ -1019,14 +1023,15 @@
 
 [data-theme="deathmountain"] .stat-info p,
 [data-theme="skyward"] .stat-info p,
+[data-theme="zelda"] .stat-info p,
 [data-theme="alforja"] .stat-info p {
-  color: var(--text-secondary);
+  color: white;
 }
 
 [data-theme="deathmountain"] .stat-info strong,
 [data-theme="skyward"] .stat-info strong,
+[data-theme="zelda"] .stat-info strong,
 [data-theme="alforja"] .stat-info strong {
-  color: var(--accent-color);
 }
 
 /* ---------- Badges adicionales ---------- */

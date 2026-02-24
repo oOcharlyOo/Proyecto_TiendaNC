@@ -414,7 +414,7 @@ function cerrarSesion() {
     top: 100%;
     right: 0;
     width: 220px;
-    background: linear-gradient(180deg, #4a3520 0%, #2a1807 100%);
+    background: var(--bg-primary);
     border: 3px solid #f8d667;
     border-radius: 8px;
     padding: 0.75rem;

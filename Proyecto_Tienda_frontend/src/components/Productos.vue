@@ -272,10 +272,6 @@ onMounted(() => cargarProductos());
   min-height: 0;
   width: 100%;
   padding: 1rem;
-  background:
-    linear-gradient(180deg, #0a1912 0%, var(--pixel-bg) 100%),
-    radial-gradient(circle at 12% 18%, rgba(248, 214, 103, 0.12) 0 6px, transparent 7px),
-    radial-gradient(circle at 86% 84%, rgba(248, 214, 103, 0.08) 0 6px, transparent 7px);
   overflow: hidden;
   display: flex;
   flex-direction: column;

@@ -283,38 +283,6 @@ onMounted(async () => {
   animation: fadeSlideIn 300ms ease-out;
   grid-area: stats;
 }
-
-.stat-card {
-  border: var(--border-width-thick, 3px) solid var(--border-color, #2a1807);
-  background: linear-gradient(180deg, var(--bg-panel, #1f5b35) 0%, var(--bg-secondary, #133523) 100%);
-  padding: 0.7rem;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  box-shadow: inset 0 0 0 2px var(--bg-panel, rgba(255, 255, 255, 0.1)), 0 4px 0 var(--border-color, #1a1005);
-}
-
-.stat-card.warning {
-  background: linear-gradient(180deg, var(--accent-color, #8b6914) 0%, color-mix(in srgb, var(--accent-color, #8b6914) 70%, black) 100%);
-}
-
-.stat-card.danger {
-  background: linear-gradient(180deg, var(--error-color, #8b2020) 0%, color-mix(in srgb, var(--error-color, #8b2020) 70%, black) 100%);
-}
-
-.stat-card.gold {
-  background: linear-gradient(180deg, var(--accent-color, #f8d667) 0%, var(--accent-hover, #c79634) 100%);
-  color: var(--border-color, #1a1401);
-}
-
-.stat-card.gold .stat-info p {
-  color: var(--border-color, #5c4a12);
-}
-
-.stat-card.success {
-  background: linear-gradient(180deg, var(--success-color, #48d308) 0%, color-mix(in srgb, var(--success-color, #48d308) 70%, black) 100%);
-}
-
 .stat-icon {
   font-size: 1.5rem;
 }
@@ -324,14 +292,12 @@ onMounted(async () => {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-primary, #f6f2de);
   font-family: "Courier New", monospace;
 }
 
 .stat-info strong {
   font-size: 0.95rem;
   font-family: "Courier New", monospace;
-  color: var(--accent-color, #f8d667);
 }
 
 .panel {
@@ -348,7 +314,6 @@ onMounted(async () => {
   content: "";
   position: absolute;
   inset: 8px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color, #f8d667) 25%, transparent);
   pointer-events: none;
   border-radius: 6px;
 }
@@ -356,14 +321,10 @@ onMounted(async () => {
 .panel-catalogo {
   grid-template-rows: auto auto 1fr;
   background: linear-gradient(180deg, var(--bg-panel, #1f5b35) 0%, var(--bg-secondary, #133523) 100%);
-  border: var(--border-width-thick, 3px) solid var(--success-color, #2a7d32);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--success-color, #2a7d32) 80%, black);
 }
 
 .panel-bajo-stock {
   background: linear-gradient(180deg, color-mix(in srgb, var(--error-color, #8b2020) 80%, var(--bg-panel)) 0%, color-mix(in srgb, var(--error-color, #8b2020) 60%, var(--bg-secondary)) 100%);
-  border: var(--border-width-thick, 3px) solid var(--error-color, #8b2020);
-  box-shadow: 0 4px 0 var(--border-color, #2a0a0a);
 }
 
 .panel-header {
