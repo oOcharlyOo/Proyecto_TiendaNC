@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Chart as ChartJS,
@@ -108,6 +108,20 @@ type ApartadoPagoDTO = {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const AUTH_USER_ID_KEY = 'idUsuario';
+
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+function updateWidth() {
+  windowWidth.value = window.innerWidth;
+}
+
+onMounted(() => {
+  window.addEventListener('resize', updateWidth);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateWidth);
+});
 
 const idUsuario = ref<number>(Number(localStorage.getItem(AUTH_USER_ID_KEY) || 0));
 const nombreUsuario = ref('Usuario');
@@ -604,7 +618,8 @@ const chartOptions = computed(() => ({
         color: 'rgba(0, 0, 0, 0.1)'
       },
       ticks: {
-        color: getZeldaGoldColor()
+        color: getZeldaGoldColor(),
+        font: { size: windowWidth.value < 600 ? 10 : 12 }
       }
     },
     y: {
@@ -612,7 +627,8 @@ const chartOptions = computed(() => ({
         display: false
       },
       ticks: {
-        color: getZeldaGoldColor()
+        color: getZeldaGoldColor(),
+        font: { size: windowWidth.value < 600 ? 10 : 12 }
       }
     }
   }
@@ -658,7 +674,9 @@ const weeklyChartOptions = computed(() => ({
       position: 'top' as const,
       labels: {
         color: getZeldaGoldColor(),
-        font: { size: 12 }
+        font: { size: windowWidth.value < 600 ? 10 : 12 },
+        boxWidth: windowWidth.value < 600 ? 12 : 15,
+        padding: windowWidth.value < 600 ? 8 : 15
       }
     },
     tooltip: {
@@ -675,7 +693,8 @@ const weeklyChartOptions = computed(() => ({
         color: 'rgba(0, 0, 0, 0.1)'
       },
       ticks: {
-        color: getZeldaGoldColor()
+        color: getZeldaGoldColor(),
+        font: { size: windowWidth.value < 600 ? 10 : 12 }
       }
     },
     y: {
@@ -685,7 +704,8 @@ const weeklyChartOptions = computed(() => ({
       },
       ticks: {
         callback: (value: any) => formatoMoneda(value),
-        color: getZeldaGoldColor()
+        color: getZeldaGoldColor(),
+        font: { size: windowWidth.value < 600 ? 9 : 11 }
       }
     }
   }
@@ -742,11 +762,12 @@ const cortePieChartOptions = computed(() => ({
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'bottom' as const,
+      position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
       labels: {
         color: getZeldaGoldColor(),
-        padding: 15,
-        font: { size: 12 }
+        padding: windowWidth.value < 600 ? 10 : 15,
+        font: { size: windowWidth.value < 600 ? 10 : 12 },
+        boxWidth: windowWidth.value < 600 ? 12 : 15
       }
     },
     tooltip: {
@@ -812,11 +833,12 @@ const diarioPieChartOptions = computed(() => ({
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'bottom' as const,
+      position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
       labels: {
         color: getZeldaGoldColor(),
-        padding: 15,
-        font: { size: 12 }
+        padding: windowWidth.value < 600 ? 10 : 15,
+        font: { size: windowWidth.value < 600 ? 10 : 12 },
+        boxWidth: windowWidth.value < 600 ? 12 : 15
       }
     },
     tooltip: {
@@ -2006,6 +2028,24 @@ onMounted(() => {
   margin-top: 0.2rem;
 }
 
+@media (max-width: 600px) {
+  .monthly-stats {
+    gap: 0.4rem;
+  }
+  
+  .monthly-stats article {
+    padding: 0.5rem;
+  }
+  
+  .monthly-stats article strong {
+    font-size: 0.95rem;
+  }
+  
+  .monthly-stats p {
+    font-size: 0.6rem;
+  }
+}
+
 .monthly-stats p {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -2033,6 +2073,20 @@ onMounted(() => {
   color: var(--chart-text, #2a1807);
 }
 
+@media (max-width: 600px) {
+  .weekly-chart {
+    padding: 0.7rem;
+  }
+  
+  .weekly-chart h4 {
+    font-size: 0.85rem;
+  }
+  
+  .weekly-chart .chart-note {
+    font-size: 0.65rem;
+  }
+}
+
 .weekly-chart .chart-note {
   font-size: 0.75rem;
   color: var(--chart-qty, #5a4a30);
@@ -2044,6 +2098,18 @@ onMounted(() => {
 .chart-container-weekly {
   height: 280px;
   margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  .chart-container-weekly {
+    height: 220px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .chart-container-weekly {
+    height: 320px;
+  }
 }
 
 .weekly-summary {
@@ -2062,6 +2128,17 @@ onMounted(() => {
   border-radius: 6px;
   border: 2px solid var(--chart-border, #2a1807);
   font-size: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .weekly-summary-item {
+    grid-template-columns: 60px 1fr 80px;
+    font-size: 0.65rem;
+  }
+  
+  .week-profit {
+    display: none;
+  }
 }
 
 .week-label {
@@ -2102,10 +2179,35 @@ onMounted(() => {
   color: var(--chart-text, #2a1807);
 }
 
+@media (max-width: 600px) {
+  .corte-pie-chart {
+    padding: 0.7rem;
+  }
+  
+  .corte-pie-chart h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+}
+
 .pie-chart-container {
   height: 250px;
   max-width: 400px;
   margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .pie-chart-container {
+    height: 200px;
+    max-width: 280px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .pie-chart-container {
+    height: 300px;
+    max-width: 500px;
+  }
 }
 
 .bars-vertical {
@@ -2257,9 +2359,32 @@ onMounted(() => {
   font-size: 1rem;
 }
 
+@media (max-width: 600px) {
+  .top-products-chart {
+    padding: 0.6rem;
+  }
+  
+  .top-products-chart h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+}
+
 .chart-container {
   height: 300px;
   margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  .chart-container {
+    height: 250px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .chart-container {
+    height: 380px;
+  }
 }
 
 .product-summary {
@@ -2280,6 +2405,19 @@ onMounted(() => {
   border-radius: 6px;
   border: 2px solid var(--chart-border, #2a1807);
   font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  .product-summary-item {
+    grid-template-columns: 25px 1fr 60px;
+    font-size: 0.7rem;
+    gap: 0.3rem;
+    padding: 0.3rem 0.4rem;
+  }
+  
+  .summary-amount {
+    display: none;
+  }
 }
 
 .summary-rank {
