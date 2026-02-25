@@ -26,6 +26,16 @@
   --gradient-bg-start: #11261b;
   --gradient-bg-mid: #0a1912;
   
+  /* Variables para gráficos */
+  --chart-border: #2a1807;
+  --chart-border-light: #d8c37c;
+  --chart-bg: #f2e8bf;
+  --chart-text: #2a1807;
+  --chart-item-bg: rgba(255,255,255,0.5);
+  --chart-qty: #5a4722;
+  --chart-amount: #14b033;
+  --zelda-gold: #c99234;
+  
   /* Bordes y sombras */
   --border-width: 3px;
   --border-width-thick: 4px;
@@ -33,8 +43,6 @@
   --shadow-inner: inset 0 0 0 2px;
 }
 
-/* ---------- TEMA: ZELDA (Classic) ---------- */
-/* Estilo Zelda classic - verde floresta */
 [data-theme="zelda"] {
   --bg-primary: #0e2d1d;
   --bg-secondary: #133523;
@@ -55,6 +63,16 @@
   --gradient-panel-end: #133523;
   --gradient-bg-start: #11261b;
   --gradient-bg-mid: #0a1912;
+  
+  /* Variables para gráficos */
+  --chart-border: #2a1807;
+  --chart-border-light: #d8c37c;
+  --chart-bg: #f2e8bf;
+  --chart-text: #2a1807;
+  --chart-item-bg: rgba(255,255,255,0.5);
+  --chart-qty: #5a4722;
+  --chart-amount: #14b033;
+  --zelda-gold: #c99234;
 }
 
 [data-theme="zelda"] body {
@@ -137,6 +155,16 @@
   --gradient-panel-end: #6b2a2a;
   --gradient-bg-start: #8b2a2a;
   --gradient-bg-mid: #4a1515;
+  
+  /* Variables para gráficos */
+  --chart-border: #ff6b35;
+  --chart-border-light: #ff8c5a;
+  --chart-bg: linear-gradient(180deg, #4a1a1a 0%, #2a0a0a 100%);
+  --chart-text: #f5e6c8;
+  --chart-item-bg: #2a0a0a;
+  --chart-qty: #d4a8a8;
+  --chart-amount: #4e8a4e;
+  --zelda-gold: #ff6b35;
 }
 
 /* Estilos específicos de deathmountain */
@@ -227,6 +255,16 @@
   --gradient-panel-end: #2a5a8c;
   --gradient-bg-start: #5ac8fa;
   --gradient-bg-mid: #87ceeb;
+  
+  /* Variables para gráficos */
+  --chart-border: #ffd700;
+  --chart-border-light: #ffed4a;
+  --chart-bg: linear-gradient(180deg, #1a3a5c 0%, #0d2840 100%);
+  --chart-text: #f0f8ff;
+  --chart-item-bg: #0d2840;
+  --chart-qty: #b8d4e8;
+  --chart-amount: #4ecdc4;
+  --zelda-gold: #ffd700;
 }
 
 [data-theme="skyward"] body {
@@ -309,6 +347,16 @@
   --gradient-panel-end: #5c4433;
   --gradient-bg-start: #4a3728;
   --gradient-bg-mid: #2a1a12;
+  
+  /* Variables para gráficos */
+  --chart-border: #c9a45c;
+  --chart-border-light: #d4b46c;
+  --chart-bg: linear-gradient(180deg, #4a3728 0%, #21140f 100%);
+  --chart-text: #f5e6c8;
+  --chart-item-bg: #21140f;
+  --chart-qty: #d4c4a8;
+  --chart-amount: #6b8e4e;
+  --zelda-gold: #c9a45c;
 }
 
 [data-theme="alforja"] body {

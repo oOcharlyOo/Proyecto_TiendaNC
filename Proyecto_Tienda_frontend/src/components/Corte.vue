@@ -1,6 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js';
+import { Bar, Pie } from 'vue-chartjs';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+
+function getZeldaGoldColor(): string {
+  const style = getComputedStyle(document.documentElement);
+  return style.getPropertyValue('--zelda-gold').trim() || '#c99234';
+}
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -467,6 +485,352 @@ async function generarReporteDiario() {
 
 const cargandoCerrarTurno = ref(false);
 
+type ProductoVendido = {
+  nombre: string;
+  cantidadTotal: number;
+  montoTotal: number;
+  isGramaje: boolean;
+};
+
+const productosMasVendidos = shallowRef<ProductoVendido[]>([]);
+
+function formatearCantidad(cantidad: number, isGramaje: boolean): string {
+  if (!isGramaje) {
+    return `${cantidad} pzs`;
+  }
+  if (cantidad >= 1000) {
+    const kg = cantidad / 1000;
+    return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(2)} kg`;
+  }
+  return `${cantidad} g`;
+}
+
+function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
+  const productosMap = new Map<string, ProductoVendido>();
+
+  for (const d of detalles) {
+    const nombre = d.productoNombre || 'Producto eliminado';
+    const cantidad = Number(d.cantidad || 0);
+    const importe = Number(d.precioUnitarioVenta || 0) * cantidad;
+    const isGramaje = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+
+    if (!productosMap.has(nombre)) {
+      productosMap.set(nombre, { nombre, cantidadTotal: 0, montoTotal: 0, isGramaje });
+    }
+
+    const producto = productosMap.get(nombre)!;
+    producto.cantidadTotal += cantidad;
+    producto.montoTotal += importe;
+    if (isGramaje) {
+      producto.isGramaje = true;
+    }
+  }
+
+  return Array.from(productosMap.values())
+    .sort((a, b) => b.cantidadTotal - a.cantidadTotal)
+    .slice(0, 10);
+}
+
+const chartData = computed(() => {
+  if (!productosMasVendidos.value.length) {
+    return { labels: [], datasets: [] };
+  }
+
+  const labels = productosMasVendidos.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  const data = productosMasVendidos.value.map(p => p.cantidadTotal);
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Cantidad Vendida',
+        data,
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
+          'rgba(199, 199, 199, 0.8)',
+          'rgba(83, 102, 255, 0.8)',
+          'rgba(40, 159, 64, 0.8)',
+          'rgba(210, 99, 132, 0.8)'
+        ],
+        borderColor: [
+          'rgb(255, 99, 132)',
+          'rgb(54, 162, 235)',
+          'rgb(255, 206, 86)',
+          'rgb(75, 192, 192)',
+          'rgb(153, 102, 255)',
+          'rgb(255, 159, 64)',
+          'rgb(199, 199, 199)',
+          'rgb(83, 102, 255)',
+          'rgb(40, 159, 64)',
+          'rgb(210, 99, 132)'
+        ],
+        borderWidth: 2,
+        borderRadius: 6,
+        borderSkipped: false,
+      }
+    ]
+  };
+});
+
+const chartOptions = computed(() => ({
+  indexAxis: 'y' as const,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const producto = productosMasVendidos.value[context.dataIndex];
+          return [
+            `Cantidad: ${formatearCantidad(producto.cantidadTotal, producto.isGramaje)}`,
+            `Monto: ${formatoMoneda(producto.montoTotal)}`
+          ];
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(0, 0, 0, 0.1)'
+      },
+      ticks: {
+        color: getZeldaGoldColor()
+      }
+    },
+    y: {
+      grid: {
+        display: false
+      },
+      ticks: {
+        color: getZeldaGoldColor()
+      }
+    }
+  }
+}));
+
+const weeklyChartData = computed(() => {
+  if (!mensualSemanas.value.length) {
+    return { labels: [], datasets: [] };
+  }
+
+  const labels = mensualSemanas.value.map(w => `Semana ${w.semana}`);
+  const ventasData = mensualSemanas.value.map(w => w.ventas);
+  const gananciaData = mensualSemanas.value.map(w => w.ganancia);
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Ventas',
+        data: ventasData,
+        backgroundColor: 'rgba(40, 167, 69, 0.8)',
+        borderColor: 'rgb(40, 167, 69)',
+        borderWidth: 2,
+        borderRadius: 6,
+      },
+      {
+        label: 'Ganancias',
+        data: gananciaData,
+        backgroundColor: 'rgba(212, 168, 75, 0.8)',
+        borderColor: 'rgb(212, 168, 75)',
+        borderWidth: 2,
+        borderRadius: 6,
+      }
+    ]
+  };
+});
+
+const weeklyChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+      labels: {
+        color: getZeldaGoldColor(),
+        font: { size: 12 }
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          return `${context.dataset.label}: ${formatoMoneda(context.raw)}`;
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: {
+        color: 'rgba(0, 0, 0, 0.1)'
+      },
+      ticks: {
+        color: getZeldaGoldColor()
+      }
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(0, 0, 0, 0.1)'
+      },
+      ticks: {
+        callback: (value: any) => formatoMoneda(value),
+        color: getZeldaGoldColor()
+      }
+    }
+  }
+}));
+
+const cortePieChartData = computed(() => {
+  if (!mostrarReporte.value || !corteActual.value) {
+    return { labels: [], datasets: [] };
+  }
+
+  const efectivo = Number(ventasEfectivo.value || 0);
+  const transferencia = Number(ventasTransferencia.value || 0);
+  const egresos = Number(corteActual.value.totalEgresos || 0);
+
+  const labels: string[] = [];
+  const data: number[] = [];
+  const colors: string[] = [];
+
+  if (efectivo > 0) {
+    labels.push('Efectivo');
+    data.push(efectivo);
+    colors.push('rgba(40, 167, 69, 0.8)');
+  }
+
+  if (transferencia > 0) {
+    labels.push('Transferencia');
+    data.push(transferencia);
+    colors.push('rgba(54, 162, 235, 0.8)');
+  }
+
+  if (egresos > 0) {
+    labels.push('Egresos');
+    data.push(egresos);
+    colors.push('rgba(255, 99, 132, 0.8)');
+  }
+
+  if (data.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  return {
+    labels,
+    datasets: [{
+      data,
+      backgroundColor: colors,
+      borderColor: colors.map(c => c.replace('0.8', '1')),
+      borderWidth: 2
+    }]
+  };
+});
+
+const cortePieChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: {
+        color: getZeldaGoldColor(),
+        padding: 15,
+        font: { size: 12 }
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const label = context.label || '';
+          const value = context.raw || 0;
+          return `${label}: ${formatoMoneda(value)}`;
+        }
+      }
+    }
+  }
+}));
+
+const diarioPieChartData = computed(() => {
+  if (!mostrarReporte.value || !corteActual.value) {
+    return { labels: [], datasets: [] };
+  }
+
+  const efectivo = Number(ventasEfectivo.value || 0);
+  const transferencia = Number(ventasTransferencia.value || 0);
+  const egresos = Number(corteActual.value.totalEgresos || 0);
+
+  const labels: string[] = [];
+  const data: number[] = [];
+  const colors: string[] = [];
+
+  if (efectivo > 0) {
+    labels.push('Efectivo');
+    data.push(efectivo);
+    colors.push('rgba(40, 167, 69, 0.8)');
+  }
+
+  if (transferencia > 0) {
+    labels.push('Transferencia');
+    data.push(transferencia);
+    colors.push('rgba(54, 162, 235, 0.8)');
+  }
+
+  if (egresos > 0) {
+    labels.push('Egresos');
+    data.push(egresos);
+    colors.push('rgba(255, 99, 132, 0.8)');
+  }
+
+  if (data.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  return {
+    labels,
+    datasets: [{
+      data,
+      backgroundColor: colors,
+      borderColor: colors.map(c => c.replace('0.8', '1')),
+      borderWidth: 2
+    }]
+  };
+});
+
+const diarioPieChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: {
+        color: getZeldaGoldColor(),
+        padding: 15,
+        font: { size: 12 }
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const label = context.label || '';
+          const value = context.raw || 0;
+          return `${label}: ${formatoMoneda(value)}`;
+        }
+      }
+    }
+  }
+}));
+
 async function cerrarTurno() {
   if (!corteActual.value || !idUsuario.value) {
     mostrarMensaje('Genera primero un corte de caja.', 'error');
@@ -561,6 +925,7 @@ async function generarReporteMensual() {
       .reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
 
     mensualSemanas.value = calcularSemanasMensual(monthlySales, targetMonth, year);
+    productosMasVendidos.value = calcularProductosMasVendidos(monthlyDetails);
     rangoFechasSemanas.value = null;
     mostrarMensaje('Reporte mensual generado.', 'ok');
   } catch (error) {
@@ -568,6 +933,7 @@ async function generarReporteMensual() {
     mensualTotalGanancias.value = 0;
     mensualTotalTransferencia.value = 0;
     mensualSemanas.value = [];
+    productosMasVendidos.value = [];
     mostrarMensaje(`Error al generar reporte mensual: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -672,12 +1038,15 @@ async function generarReporteRangoFechas() {
       dias: `${data.diasInicio.getDate()}/${data.diasInicio.getMonth() + 1} - ${data.diasFin.getDate()}/${data.diasFin.getMonth() + 1}`
     }));
 
+    productosMasVendidos.value = calcularProductosMasVendidos(rangeDetails);
+
     mostrarMensaje(`Reporte del ${fechaRangoInicio.value} al ${fechaRangoFin.value} generado.`, 'ok');
   } catch (error) {
     mensualTotalVentas.value = 0;
     mensualTotalGanancias.value = 0;
     mensualTotalTransferencia.value = 0;
     mensualSemanas.value = [];
+    productosMasVendidos.value = [];
     mostrarMensaje(`Error al generar reporte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -921,6 +1290,13 @@ onMounted(() => {
           <article class="card-metric total"><p>Saldo Final Calculado</p><strong>{{ formatoMoneda(corteActual.saldoFinalCalculado) }}</strong></article>
         </div>
 
+        <div class="corte-pie-chart" v-if="cortePieChartData.labels && cortePieChartData.labels.length > 0">
+          <h4>Distribución del Día</h4>
+          <div class="pie-chart-container">
+            <Pie :data="cortePieChartData" :options="cortePieChartOptions" />
+          </div>
+        </div>
+
         <button v-if="mostrarCerrarTurno" class="btn-cerrar" type="button" :disabled="cargandoCerrarTurno" @click="cerrarTurno">
           {{ cargandoCerrarTurno ? 'Cerrando...' : '🔒 Cerrar Turno' }}
         </button>
@@ -985,27 +1361,32 @@ onMounted(() => {
         <div class="weekly-chart">
           <h4>Rendimiento Semanal</h4>
           <p class="chart-note">Las semanas se cuentan del día 1 al 7 = Semana 1, 8 al 14 = Semana 2, etc.</p>
-          <div class="chart-legend">
-            <span class="legend-item"><span class="legend-color sales"></span> Ventas</span>
-            <span class="legend-item"><span class="legend-color profit"></span> Ganancias</span>
-          </div>
           <div v-if="mensualSemanas.length === 0" class="empty">Sin datos para el mes seleccionado.</div>
-          <div v-else class="bars-vertical">
-            <div v-for="w in mensualSemanas" :key="w.semana" class="bar-column">
-              <div class="bar-values">
-                <div class="bar-container-indep">
-                  <div class="bar-sales-v" :style="{ height: `${getBarHeightVentas(w.ventas)}%` }">
-                    <span class="bar-tooltip">{{ formatoMoneda(w.ventas) }}</span>
-                  </div>
-                </div>
-                <div class="bar-container-indep">
-                  <div class="bar-profit-v" :style="{ height: `${getBarHeightGanancias(w.ganancia)}%` }">
-                    <span class="bar-tooltip">{{ formatoMoneda(w.ganancia) }}</span>
-                  </div>
-                </div>
-              </div>
-              <span class="bar-label">S{{ w.semana }}</span>
-              <span class="bar-days">{{ w.dias }}</span>
+          <div v-else class="chart-container-weekly">
+            <Bar :data="weeklyChartData" :options="weeklyChartOptions" />
+          </div>
+          <div v-if="mensualSemanas.length > 0" class="weekly-summary">
+            <div v-for="w in mensualSemanas" :key="`week-${w.semana}`" class="weekly-summary-item">
+              <span class="week-label">Semana {{ w.semana }}</span>
+              <span class="week-dates">{{ w.dias }}</span>
+              <span class="week-sales">Ventas: {{ formatoMoneda(w.ventas) }}</span>
+              <span class="week-profit">Ganancia: {{ formatoMoneda(w.ganancia) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="top-products-chart">
+          <h4>🏆 Productos Más Vendidos</h4>
+          <div v-if="productosMasVendidos.length === 0" class="empty">Sin datos para el período seleccionado.</div>
+          <div v-else class="chart-container">
+            <Bar :data="chartData" :options="chartOptions" />
+          </div>
+          <div v-if="productosMasVendidos.length > 0" class="product-summary">
+            <div v-for="(producto, index) in productosMasVendidos" :key="`summary-${producto.nombre}`" class="product-summary-item">
+              <span class="summary-rank">{{ index + 1 }}</span>
+              <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
+              <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+              <span class="summary-amount">{{ formatoMoneda(producto.montoTotal) }}</span>
             </div>
           </div>
         </div>
@@ -1634,11 +2015,11 @@ onMounted(() => {
 }
 
 .weekly-chart {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
-  color: #1d1606;
+  border: 3px solid var(--chart-border, #2a1807);
+  background: var(--chart-bg, linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%));
+  color: var(--chart-text, #1d1606);
   padding: 1rem;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 3px 0 #1a1005;
+  box-shadow: inset 0 0 0 2px var(--chart-border-light, rgba(255, 255, 255, 0.5)), 0 3px 0 var(--chart-border, #1a1005);
   border-radius: 12px;
 }
 
@@ -1649,45 +2030,82 @@ onMounted(() => {
   letter-spacing: 0.05em;
   font-family: "Courier New", monospace;
   text-align: center;
-  color: #2a1807;
+  color: var(--chart-text, #2a1807);
 }
 
 .weekly-chart .chart-note {
   font-size: 0.75rem;
-  color: #5a4a30;
+  color: var(--chart-qty, #5a4a30);
   text-align: center;
   margin-bottom: 0.5rem;
   font-style: italic;
 }
 
-.chart-legend {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  margin-bottom: 0.8rem;
+.chart-container-weekly {
+  height: 280px;
+  margin-bottom: 1rem;
 }
 
-.legend-item {
+.weekly-summary {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.8rem;
-  color: #2a1807;
 }
 
-.legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  border: 2px solid #2a1807;
+.weekly-summary-item {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 100px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  background: var(--chart-item-bg, rgba(255,255,255,0.5));
+  border-radius: 6px;
+  border: 2px solid var(--chart-border, #2a1807);
+  font-size: 0.75rem;
 }
 
-.legend-color.sales {
-  background: linear-gradient(180deg, #28a745 0%, #34ce57 100%);
+.week-label {
+  font-weight: bold;
+  color: var(--chart-text, #2a1807);
 }
 
-.legend-color.profit {
-  background: linear-gradient(180deg, #d4a84b 0%, #e0b85a 100%);
+.week-dates {
+  color: var(--chart-qty, #5a4a30);
+  font-size: 0.7rem;
+}
+
+.week-sales {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.week-profit {
+  color: #d4a84b;
+  font-weight: bold;
+}
+
+.corte-pie-chart {
+  border: 3px solid var(--chart-border, #2a1807);
+  background: var(--chart-bg, linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%));
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 2px var(--chart-border-light, rgba(255, 255, 255, 0.5)), 0 3px 0 var(--chart-border, #1a1005);
+}
+
+.corte-pie-chart h4 {
+  margin: 0 0 0.8rem 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: "Courier New", monospace;
+  text-align: center;
+  color: var(--chart-text, #2a1807);
+}
+
+.pie-chart-container {
+  height: 250px;
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .bars-vertical {
@@ -1822,6 +2240,77 @@ onMounted(() => {
   font-size: 0.7rem;
   color: #5a4a30;
   white-space: nowrap;
+}
+
+.top-products-chart {
+  border: 3px solid var(--chart-border, #2a1807);
+  background: var(--chart-bg, #f2e8bf);
+  padding: 0.9rem;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 2px var(--chart-border-light, #d8c37c);
+}
+
+.top-products-chart h4 {
+  text-align: center;
+  margin-bottom: 0.8rem;
+  color: var(--chart-text, #2a1807);
+  font-size: 1rem;
+}
+
+.chart-container {
+  height: 300px;
+  margin-bottom: 1rem;
+}
+
+.product-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.product-summary-item {
+  display: grid;
+  grid-template-columns: 30px 1fr 70px 90px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  background: var(--chart-item-bg, rgba(255,255,255,0.5));
+  border-radius: 6px;
+  border: 2px solid var(--chart-border, #2a1807);
+  font-size: 0.8rem;
+}
+
+.summary-rank {
+  font-weight: bold;
+  color: var(--chart-text, #2a1807);
+  text-align: center;
+}
+
+.summary-name {
+  color: var(--chart-text, #1d1606);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-qty {
+  color: var(--chart-qty, #5a4722);
+  text-align: center;
+}
+
+.summary-amount {
+  color: var(--chart-amount, #14b033);
+  font-weight: bold;
+  text-align: right;
+}
+
+.product-amount {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #2a1807;
+  text-align: right;
 }
 
 .history-filters {
