@@ -471,30 +471,22 @@ async function generarReporteDiario() {
       .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
       .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
 
-    // Obtener datos de caja (monto inicial, ingresos, egresos)
+    // Obtener datos de caja (monto inicial, ingresos, egresos) del día sin importar usuario
     let montoInicial = 0;
     let otrosIngresos = 0;
     let totalEgresos = 0;
     
-    // Verificar si es el día de hoy y hay caja activa
-    const fechaHoy = new Date().toISOString().slice(0, 10);
-    const esFechaActual = fechaDiaria.value === fechaHoy;
-    
-    if (esFechaActual && montoInicialCajaActiva.value > 0) {
-      montoInicial = montoInicialCajaActiva.value;
-    } else if (idUsuario.value) {
-      try {
-        const cajaData = await fetchApi<any>(`/caja/reporteDiario/${fechaDiaria.value}?idUsuario=${idUsuario.value}`);
-        console.log('Caja data response:', cajaData);
-        const datos = cajaData?.datos || cajaData;
-        if (datos) {
-          montoInicial = Number(datos.montoInicial) || 0;
-          otrosIngresos = Number(datos.otrosIngresos) || 0;
-          totalEgresos = Number(datos.totalEgresos) || 0;
-        }
-      } catch (e) {
-        console.error('Error al obtener datos de caja:', e);
+    try {
+      const cajaData = await fetchApi<any>(`/caja/reporteDiario/${fechaDiaria.value}`);
+      console.log('Caja data response:', cajaData);
+      const datos = cajaData?.datos || cajaData;
+      if (datos) {
+        montoInicial = Number(datos.montoInicial) || 0;
+        otrosIngresos = Number(datos.otrosIngresos) || 0;
+        totalEgresos = Number(datos.totalEgresos) || 0;
       }
+    } catch (e) {
+      console.error('Error al obtener datos de caja:', e);
     }
 
     const totalVentas = Number(data?.cobroTotal || 0);
@@ -1637,8 +1629,8 @@ onMounted(() => {
               <tr v-for="d in ventaDetalleItems" :key="d.idVentaDetalle">
                 <td>{{ d.productoNombre || 'Producto eliminado' }}</td>
                 <td>{{ d.cantidad }}{{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : 'pza' }}</td>
-                <td>{{ formatoMoneda(Number(d.precioUnitarioVenta || 0)) }}</td>
-                <td class="importe">{{ formatoMoneda(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
+                <td>{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0)) }}</td>
+                <td class="importe">{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
               </tr>
             </tbody>
           </table>
