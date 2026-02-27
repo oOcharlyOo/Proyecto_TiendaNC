@@ -161,6 +161,17 @@ async function verificarCajaActiva(idUsuario: number) {
 async function registrarMontoInicial(payload: { montoInicial: number }) {
   if (!idUsuarioActual.value) return;
 
+  if (payload.montoInicial === 0) {
+    localStorage.setItem('montoInicialCaja', '0');
+    localStorage.setItem('modoReportes', 'true');
+    modalMontoInicialAbierto.value = false;
+    mostrarToast("Modo reportes activado.", 'success');
+    setTimeout(() => {
+      router.push('/ventas');
+    }, 500);
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/caja/apertura`, {
       method: "POST",
@@ -177,6 +188,7 @@ async function registrarMontoInicial(payload: { montoInicial: number }) {
 
     if (res.ok && data.codigo === 200) {
       localStorage.setItem('montoInicialCaja', String(payload.montoInicial));
+      localStorage.setItem('modoReportes', 'false');
       modalMontoInicialAbierto.value = false;
       mostrarToast("Caja iniciada. Bienvenido, heroe.", 'success');
       setTimeout(() => {

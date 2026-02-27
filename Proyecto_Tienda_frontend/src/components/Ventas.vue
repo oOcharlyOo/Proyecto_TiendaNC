@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, shallowRef, markRaw } from 'vue';
+import Quagga from '@ericblade/quagga2';
+import { useProductosCache } from '@/composables/useProductCache';
 import EntradaEfectivoModal from './modals/EntradaEfectivoModal.vue';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import HistorialVentasModal from './modals/HistorialVentasModal.vue';
@@ -278,39 +280,39 @@ function seleccionarTicket(id: number) {
 }
 
 async function eliminarTicket(id: number) {
-  if (!confirm('¿Eliminar este ticket?')) return;
+  const ticketIndex = tickets.value.findIndex(t => t.id === id);
+  if (ticketIndex === -1) return;
   
+  const tempTicketActual = ticketActualId.value;
+  const ticketsBackup = [...tickets.value];
+  
+  tickets.value.splice(ticketIndex, 1);
+  
+  if (tickets.value.length === 0) {
+    await crearNuevoTicket();
+  } else if (tempTicketActual === id) {
+    const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+    ticketActualId.value = pendiente?.id || tickets.value[0].id;
+  }
+
   try {
     const response = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventas/eliminarVenta/${id}`, {
       method: 'DELETE'
     });
     
     if (response?.codigo !== 200) {
+      tickets.value = ticketsBackup;
+      ticketActualId.value = tempTicketActual;
       mostrarMensaje(response?.mensaje || 'Error al eliminar ticket', 'error');
       return;
     }
     
     mostrarMensaje('Ticket eliminado', 'ok');
   } catch (_error) {
+    tickets.value = ticketsBackup;
+    ticketActualId.value = tempTicketActual;
     console.error('Error al eliminar ticket del backend');
     mostrarMensaje('Error al eliminar ticket', 'error');
-    return;
-  }
-  
-  const ticketIndex = tickets.value.findIndex(t => t.id === id);
-  if (ticketIndex === -1) return;
-  
-  tickets.value.splice(ticketIndex, 1);
-  
-  if (tickets.value.length === 0) {
-    await crearNuevoTicket();
-  } else if (ticketActualId.value === id) {
-    const pendiente = tickets.value.find(t => t.estado === 'pendiente');
-    if (pendiente) {
-      ticketActualId.value = pendiente.id;
-    } else {
-      ticketActualId.value = tickets.value[0].id;
-    }
   }
 }
 
@@ -446,14 +448,27 @@ async function toggleMayoreo(item: TicketItem) {
   }
 }
 
+const { getProductosCache, setProductosCache } = useProductosCache();
+
 async function cargarProductos() {
+  const cached = getProductosCache<ProductoDTO[]>();
+  if (cached) {
+    productos.value = normalizarProductos(cached);
+    mostrarMensaje('Catalogo cargado desde caché.', 'ok');
+  }
+
   try {
     const data = await getJson<ApiRespuesta<ProductoDTO[]>>(`${API_BASE}/productos/listarProductos`);
-    productos.value = normalizarProductos(data?.datos);
+    if (data?.datos) {
+      productos.value = normalizarProductos(data.datos);
+      setProductosCache(data.datos);
+    }
     mostrarMensaje(data?.mensaje || 'Catalogo cargado.', 'ok');
   } catch (_error) {
-    productos.value = [];
-    mostrarMensaje('No se pudo cargar el catalogo de productos.', 'error');
+    if (productos.value.length === 0) {
+      productos.value = [];
+      mostrarMensaje('No se pudo cargar el catalogo de productos.', 'error');
+    }
   }
 }
 
@@ -1093,24 +1108,7 @@ async function startVoiceCommand() {
 let scannerProcessing = false;
 
 async function startScanner() {
-  console.log('Starting scanner, Quagga available:', typeof (window as any).Quagga !== 'undefined');
-  
-  if (typeof (window as any).Quagga === 'undefined') {
-    mostrarMensaje('Cargando escáner...', 'info');
-    
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
-    script.onload = () => {
-      console.log('Quagga loaded, starting scanner');
-      initScanner();
-    };
-    script.onerror = () => {
-      mostrarMensaje('Error al cargar librería de escáner', 'error');
-    };
-    document.head.appendChild(script);
-    return;
-  }
-  
+  console.log('Starting scanner with bundled Quagga');
   await initScanner();
 }
 
@@ -1128,8 +1126,6 @@ async function initScanner() {
     stopScanner();
     return;
   }
-
-  const Quagga = (window as any).Quagga;
   
   await new Promise<void>((resolve) => {
     Quagga.init(
@@ -1154,7 +1150,7 @@ async function initScanner() {
           ],
         },
         locate: true,
-      },
+      } as any,
       function (err: any) {
         if (err) {
           console.error('Quagga init error:', err);
@@ -1163,13 +1159,13 @@ async function initScanner() {
           resolve();
           return;
         }
-        (window as any).Quagga.start();
+        Quagga.start();
         resolve();
       }
     );
   });
 
-  (window as any).Quagga.onDetected(handleScannerDetection);
+  Quagga.onDetected(handleScannerDetection);
 }
 
 function handleScannerDetection(data: any) {
@@ -1184,9 +1180,9 @@ function handleScannerDetection(data: any) {
 }
 
 function stopScanner() {
-  if (typeof (window as any).Quagga !== 'undefined') {
-    (window as any).Quagga.stop();
-    (window as any).Quagga.offDetected(handleScannerDetection);
+  if (Quagga) {
+    Quagga.stop();
+    Quagga.offDetected(handleScannerDetection);
   }
   scannerActivo.value = false;
 }
@@ -1240,12 +1236,17 @@ async function processVoiceCommand(comando: string) {
           
           if (comando.tipo === 'PESO') {
             cantidad = Number(comando.valor) || 1;
+            if (producto.is_gramaje && precioUnitario > 0) {
+              precioUnitario = precioUnitario / 1000;
+            }
           } else if (comando.tipo === 'PRECIO') {
             const valorPesos = Number(comando.valor) || 0;
             const precioVentaNum = Number(producto.precio_venta) || 0;
             if (producto.is_gramaje && precioVentaNum > 0) {
-              cantidad = Math.round((valorPesos / precioVentaNum) * 1000);
-              precioUnitario = precioVentaNum / 1000;
+              cantidad = Math.floor((valorPesos / precioVentaNum) * 1000);
+              cantidad = cantidad > 0 ? cantidad : 1;
+              const precioRedondeado = Math.round(valorPesos);
+              precioUnitario = precioRedondeado / cantidad;
             } else {
               cantidad = 1;
               precioUnitario = valorPesos;

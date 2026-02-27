@@ -29,10 +29,10 @@
   /* Variables para gráficos */
   --chart-border: #2a1807;
   --chart-border-light: #d8c37c;
-  --chart-bg: #f2e8bf;
-  --chart-text: #2a1807;
-  --chart-item-bg: rgba(255,255,255,0.5);
-  --chart-qty: #5a4722;
+  --chart-bg: #133523;
+  --chart-text: #f6f2de;
+  --chart-item-bg: rgba(255,255,255,0.1);
+  --chart-qty: #a3a380;
   --chart-amount: #14b033;
   --zelda-gold: #c99234;
   
@@ -67,10 +67,10 @@
   /* Variables para gráficos */
   --chart-border: #2a1807;
   --chart-border-light: #d8c37c;
-  --chart-bg: #f2e8bf;
-  --chart-text: #2a1807;
-  --chart-item-bg: rgba(255,255,255,0.5);
-  --chart-qty: #5a4722;
+  --chart-bg: #133523;
+  --chart-text: #f6f2de;
+  --chart-item-bg: rgba(255,255,255,0.1);
+  --chart-qty: #a3a380;
   --chart-amount: #14b033;
   --zelda-gold: #c99234;
 }

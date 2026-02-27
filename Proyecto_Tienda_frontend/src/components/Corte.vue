@@ -20,6 +20,21 @@ function getZeldaGoldColor(): string {
   return style.getPropertyValue('--zelda-gold').trim() || '#c99234';
 }
 
+function getChartBackgroundColor(): string {
+  const style = getComputedStyle(document.documentElement);
+  const bgValue = style.getPropertyValue('--chart-bg').trim();
+  if (bgValue.startsWith('linear-gradient')) {
+    const matches = bgValue.match(/#[a-fA-F0-9]{6}/);
+    return matches ? matches[0] : '#1a1a2e';
+  }
+  return bgValue || '#1a1a2e';
+}
+
+function getChartTextColor(): string {
+  const style = getComputedStyle(document.documentElement);
+  return style.getPropertyValue('--chart-text').trim() || '#f6f2de';
+}
+
 type ApiRespuesta<T> = {
   codigo: number;
   mensaje: string;
@@ -55,6 +70,9 @@ type CorteDTO = {
   otrosIngresos: number;
   saldoFinalCalculado: number;
   gananciaTotal: number;
+  ventasEfectivo?: number;
+  ventasTransferencia?: number;
+  totalTickets?: number;
 };
 
 type EgresoDTO = {
@@ -117,6 +135,7 @@ function updateWidth() {
 
 onMounted(() => {
   window.addEventListener('resize', updateWidth);
+  verificarCajaActiva();
 });
 
 onUnmounted(() => {
@@ -178,6 +197,7 @@ const fechaRangoInicio = ref(new Date().toISOString().slice(0, 10));
 const fechaRangoFin = ref(new Date().toISOString().slice(0, 10));
 
 const corteActual = ref<CorteDTO | null>(null);
+const montoInicialCajaActiva = ref<number>(0);
 const ventasEfectivo = ref(0);
 const ventasTransferencia = ref(0);
 const totalTicketsDia = ref(0);
@@ -263,6 +283,11 @@ const historialTotalFiltrado = computed(() => {
 
 function formatoMoneda(valor: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(valor || 0));
+}
+
+function formatoMonedaRedondeada(valor: number) {
+  const redondeado = Math.round(Number(valor || 0));
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(redondeado);
 }
 
 function getMaxVentas() {
@@ -352,6 +377,33 @@ function calcularSemanasMensual(ventas: Array<{ fechaVenta?: string; totalVenta:
   return weeks;
 }
 
+async function verificarCajaActiva() {
+  if (!idUsuario.value) return;
+  
+  const modoReportes = localStorage.getItem('modoReportes') === 'true';
+  
+  if (modoReportes) {
+    montoInicialCajaActiva.value = 0;
+    localStorage.setItem('montoInicialCaja', '0');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE}/caja/apertura/activa?idUsuario=${idUsuario.value}`);
+    const data = await res.json();
+
+    if (res.ok && data.datos !== null) {
+      montoInicialCajaActiva.value = Number(data.datos.monto || 0);
+      localStorage.setItem('montoInicialCaja', String(data.datos.monto || 0));
+    } else {
+      montoInicialCajaActiva.value = 0;
+    }
+  } catch (err) {
+    console.error("Error al verificar caja activa:", err);
+    montoInicialCajaActiva.value = 0;
+  }
+}
+
 async function generarCorte() {
   if (!idUsuario.value) {
     mostrarMensaje('No se encontro idUsuario en sesion.', 'error');
@@ -367,27 +419,12 @@ async function generarCorte() {
       method: 'POST'
     });
 
-    const ventas = await fetchApi<VentaDTO[]>(`/ventas/obtenerVentas`);
     const fechaCorte = new Date(corte.fechaCorte);
 
-    const ventasDia = (ventas || []).filter((v) => {
-      const date = new Date(v.fechaVenta || '');
-      if (Number.isNaN(date.getTime())) return false;
-      return date.getFullYear() === fechaCorte.getFullYear() &&
-        date.getMonth() === fechaCorte.getMonth() &&
-        date.getDate() === fechaCorte.getDate() &&
-        v.estatus === 'C';
-    });
-
-    ventasEfectivo.value = ventasDia
-      .filter((v) => String(v.metodoPago || '').toUpperCase() === 'EFECTIVO')
-      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
-
-    ventasTransferencia.value = ventasDia
-      .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
-      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
-
-    totalTicketsDia.value = ventasDia.length;
+    // Usar datos del corte directamente en lugar de llamar a obtenerVentas
+    ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
+    ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
+    totalTicketsDia.value = Number(corte.totalTickets || 0);
     corteActual.value = corte;
     reporteTitulo.value = 'Reporte del Corte Actual';
     mostrarReporte.value = true;
@@ -439,7 +476,13 @@ async function generarReporteDiario() {
     let otrosIngresos = 0;
     let totalEgresos = 0;
     
-    if (idUsuario.value) {
+    // Verificar si es el día de hoy y hay caja activa
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const esFechaActual = fechaDiaria.value === fechaHoy;
+    
+    if (esFechaActual && montoInicialCajaActiva.value > 0) {
+      montoInicial = montoInicialCajaActiva.value;
+    } else if (idUsuario.value) {
       try {
         const cajaData = await fetchApi<any>(`/caja/reporteDiario/${fechaDiaria.value}?idUsuario=${idUsuario.value}`);
         console.log('Caja data response:', cajaData);
@@ -475,6 +518,24 @@ async function generarReporteDiario() {
       gananciaTotal: Number(data?.gananciaTotal || 0)
     };
 
+    // Obtener productos más vendidos del día
+    try {
+      const idsVentasDia = ventas.filter(v => v.estatus === 'C').map(v => v.idVenta);
+      if (idsVentasDia.length > 0) {
+        const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+        const detallesDia = (allDetails || []).filter(d => {
+          const idVenta = Number(d?.Venta?.idVenta || 0);
+          return idsVentasDia.includes(idVenta);
+        });
+        productosMasVendidos.value = calcularProductosMasVendidos(detallesDia);
+      } else {
+        productosMasVendidos.value = [];
+      }
+    } catch (e) {
+      console.error('Error al obtener productos más vendidos:', e);
+      productosMasVendidos.value = [];
+    }
+
     if (idUsuario.value) {
       try {
         const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
@@ -507,6 +568,8 @@ type ProductoVendido = {
 };
 
 const productosMasVendidos = shallowRef<ProductoVendido[]>([]);
+const productosUnitarios = shallowRef<ProductoVendido[]>([]);
+const productosGranel = shallowRef<ProductoVendido[]>([]);
 
 function formatearCantidad(cantidad: number, isGramaje: boolean): string {
   if (!isGramaje) {
@@ -540,18 +603,23 @@ function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
     }
   }
 
-  return Array.from(productosMap.values())
+  const sorted = Array.from(productosMap.values())
     .sort((a, b) => b.cantidadTotal - a.cantidadTotal)
     .slice(0, 10);
+
+  productosUnitarios.value = sorted.filter(p => !p.isGramaje);
+  productosGranel.value = sorted.filter(p => p.isGramaje);
+  
+  return sorted;
 }
 
-const chartData = computed(() => {
-  if (!productosMasVendidos.value.length) {
+function getChartData(productos: ProductoVendido[]) {
+  if (!productos.length) {
     return { labels: [], datasets: [] };
   }
 
-  const labels = productosMasVendidos.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
-  const data = productosMasVendidos.value.map(p => p.cantidadTotal);
+  const labels = productos.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  const data = productos.map(p => p.cantidadTotal);
 
   return {
     labels,
@@ -589,50 +657,60 @@ const chartData = computed(() => {
       }
     ]
   };
-});
+}
 
-const chartOptions = computed(() => ({
-  indexAxis: 'y' as const,
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
+const chartData = computed(() => getChartData(productosMasVendidos.value));
+const chartDataUnitarios = computed(() => getChartData(productosUnitarios.value));
+const chartDataGranel = computed(() => getChartData(productosGranel.value));
+
+function getChartOptions(productos: ProductoVendido[]) {
+  return {
+    indexAxis: 'y' as const,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const producto = productos[context.dataIndex];
+            return [
+              `Cantidad: ${formatearCantidad(producto.cantidadTotal, producto.isGramaje)}`,
+              `Monto: ${formatoMonedaRedondeada(producto.montoTotal)}`
+            ];
+          }
+        }
+      }
     },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const producto = productosMasVendidos.value[context.dataIndex];
-          return [
-            `Cantidad: ${formatearCantidad(producto.cantidadTotal, producto.isGramaje)}`,
-            `Monto: ${formatoMoneda(producto.montoTotal)}`
-          ];
+    scales: {
+      x: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)'
+        },
+        ticks: {
+          color: getZeldaGoldColor(),
+          font: { size: windowWidth.value < 600 ? 10 : 12 }
+        }
+      },
+      y: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          color: getZeldaGoldColor(),
+          font: { size: windowWidth.value < 600 ? 10 : 12 }
         }
       }
     }
-  },
-  scales: {
-    x: {
-      beginAtZero: true,
-      grid: {
-        color: 'rgba(0, 0, 0, 0.1)'
-      },
-      ticks: {
-        color: getZeldaGoldColor(),
-        font: { size: windowWidth.value < 600 ? 10 : 12 }
-      }
-    },
-    y: {
-      grid: {
-        display: false
-      },
-      ticks: {
-        color: getZeldaGoldColor(),
-        font: { size: windowWidth.value < 600 ? 10 : 12 }
-      }
-    }
-  }
-}));
+  };
+}
+
+const chartOptions = computed(() => getChartOptions(productosMasVendidos.value));
+const chartOptionsUnitarios = computed(() => getChartOptions(productosUnitarios.value));
+const chartOptionsGranel = computed(() => getChartOptions(productosGranel.value));
 
 const weeklyChartData = computed(() => {
   if (!mensualSemanas.value.length) {
@@ -666,50 +744,53 @@ const weeklyChartData = computed(() => {
   };
 });
 
-const weeklyChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top' as const,
-      labels: {
-        color: getZeldaGoldColor(),
-        font: { size: windowWidth.value < 600 ? 10 : 12 },
-        boxWidth: windowWidth.value < 600 ? 12 : 15,
-        padding: windowWidth.value < 600 ? 8 : 15
+const weeklyChartOptions = computed(() => {
+  const textColor = getChartTextColor();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          color: textColor,
+          font: { size: windowWidth.value < 600 ? 10 : 12 },
+          boxWidth: windowWidth.value < 600 ? 12 : 15,
+          padding: windowWidth.value < 600 ? 8 : 15
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            return `${context.dataset.label}: ${formatoMoneda(context.raw)}`;
+          }
+        }
       }
     },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          return `${context.dataset.label}: ${formatoMoneda(context.raw)}`;
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          color: textColor,
+          font: { size: windowWidth.value < 600 ? 10 : 12 }
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          callback: (value: any) => formatoMoneda(value),
+          color: textColor,
+          font: { size: windowWidth.value < 600 ? 9 : 11 }
         }
       }
     }
-  },
-  scales: {
-    x: {
-      grid: {
-        color: 'rgba(0, 0, 0, 0.1)'
-      },
-      ticks: {
-        color: getZeldaGoldColor(),
-        font: { size: windowWidth.value < 600 ? 10 : 12 }
-      }
-    },
-    y: {
-      beginAtZero: true,
-      grid: {
-        color: 'rgba(0, 0, 0, 0.1)'
-      },
-      ticks: {
-        callback: (value: any) => formatoMoneda(value),
-        color: getZeldaGoldColor(),
-        font: { size: windowWidth.value < 600 ? 9 : 11 }
-      }
-    }
-  }
-}));
+  };
+});
 
 const cortePieChartData = computed(() => {
   if (!mostrarReporte.value || !corteActual.value) {
@@ -757,30 +838,33 @@ const cortePieChartData = computed(() => {
   };
 });
 
-const cortePieChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
-      labels: {
-        color: getZeldaGoldColor(),
-        padding: windowWidth.value < 600 ? 10 : 15,
-        font: { size: windowWidth.value < 600 ? 10 : 12 },
-        boxWidth: windowWidth.value < 600 ? 12 : 15
-      }
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const label = context.label || '';
-          const value = context.raw || 0;
-          return `${label}: ${formatoMoneda(value)}`;
+const cortePieChartOptions = computed(() => {
+  const textColor = getChartTextColor();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
+        labels: {
+          color: textColor,
+          padding: windowWidth.value < 600 ? 10 : 15,
+          font: { size: windowWidth.value < 600 ? 10 : 12 },
+          boxWidth: windowWidth.value < 600 ? 12 : 15
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            return `${label}: ${formatoMoneda(value)}`;
+          }
         }
       }
     }
-  }
-}));
+  };
+});
 
 const diarioPieChartData = computed(() => {
   if (!mostrarReporte.value || !corteActual.value) {
@@ -828,30 +912,33 @@ const diarioPieChartData = computed(() => {
   };
 });
 
-const diarioPieChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
-      labels: {
-        color: getZeldaGoldColor(),
-        padding: windowWidth.value < 600 ? 10 : 15,
-        font: { size: windowWidth.value < 600 ? 10 : 12 },
-        boxWidth: windowWidth.value < 600 ? 12 : 15
-      }
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const label = context.label || '';
-          const value = context.raw || 0;
-          return `${label}: ${formatoMoneda(value)}`;
+const diarioPieChartOptions = computed(() => {
+  const textColor = getChartTextColor();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
+        labels: {
+          color: textColor,
+          padding: windowWidth.value < 600 ? 10 : 15,
+          font: { size: windowWidth.value < 600 ? 10 : 12 },
+          boxWidth: windowWidth.value < 600 ? 12 : 15
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            return `${label}: ${formatoMoneda(value)}`;
+          }
         }
       }
     }
-  }
-}));
+  };
+});
 
 async function cerrarTurno() {
   if (!corteActual.value || !idUsuario.value) {
@@ -1319,6 +1406,36 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-if="productosUnitarios.length > 0" class="top-products-chart">
+          <h4>🏆 Productos Unitarios Más Vendidos</h4>
+          <div class="chart-container">
+            <Bar :data="chartDataUnitarios" :options="chartOptionsUnitarios" />
+          </div>
+          <div class="product-summary">
+            <div v-for="(producto, index) in productosUnitarios" :key="`diario-u-${producto.nombre}`" class="product-summary-item">
+              <span class="summary-rank">{{ index + 1 }}</span>
+              <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
+              <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+              <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="productosGranel.length > 0" class="top-products-chart">
+          <h4>🏆 Productos a Granel Más Vendidos</h4>
+          <div class="chart-container">
+            <Bar :data="chartDataGranel" :options="chartOptionsGranel" />
+          </div>
+          <div class="product-summary">
+            <div v-for="(producto, index) in productosGranel" :key="`diario-g-${producto.nombre}`" class="product-summary-item">
+              <span class="summary-rank">{{ index + 1 }}</span>
+              <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
+              <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+              <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
+            </div>
+          </div>
+        </div>
+
         <button v-if="mostrarCerrarTurno" class="btn-cerrar" type="button" :disabled="cargandoCerrarTurno" @click="cerrarTurno">
           {{ cargandoCerrarTurno ? 'Cerrando...' : '🔒 Cerrar Turno' }}
         </button>
@@ -1397,18 +1514,45 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="top-products-chart">
+        <div v-if="productosUnitarios.length > 0 || productosGranel.length > 0" class="top-products-chart">
           <h4>🏆 Productos Más Vendidos</h4>
-          <div v-if="productosMasVendidos.length === 0" class="empty">Sin datos para el período seleccionado.</div>
-          <div v-else class="chart-container">
-            <Bar :data="chartData" :options="chartOptions" />
+          
+          <div v-if="productosUnitarios.length > 0">
+            <h5 class="chart-subtitle">📦 Unitarios</h5>
+            <div class="chart-container">
+              <Bar :data="chartDataUnitarios" :options="chartOptionsUnitarios" />
+            </div>
+            <div class="product-summary">
+              <div v-for="(producto, index) in productosUnitarios" :key="`summary-u-${producto.nombre}`" class="product-summary-item">
+                <span class="summary-rank">{{ index + 1 }}</span>
+                <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
+                <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+                <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
+              </div>
+            </div>
           </div>
-          <div v-if="productosMasVendidos.length > 0" class="product-summary">
+
+          <div v-if="productosGranel.length > 0">
+            <h5 class="chart-subtitle">⚖️ Granel</h5>
+            <div class="chart-container">
+              <Bar :data="chartDataGranel" :options="chartOptionsGranel" />
+            </div>
+            <div class="product-summary">
+              <div v-for="(producto, index) in productosGranel" :key="`summary-g-${producto.nombre}`" class="product-summary-item">
+                <span class="summary-rank">{{ index + 1 }}</span>
+                <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
+                <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+                <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="productosMasVendidos.length > 0 && productosMasVendidos.length > (productosUnitarios.length + productosGranel.length)" class="product-summary">
             <div v-for="(producto, index) in productosMasVendidos" :key="`summary-${producto.nombre}`" class="product-summary-item">
               <span class="summary-rank">{{ index + 1 }}</span>
               <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
               <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-              <span class="summary-amount">{{ formatoMoneda(producto.montoTotal) }}</span>
+              <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
             </div>
           </div>
         </div>
@@ -2098,6 +2242,9 @@ onMounted(() => {
 .chart-container-weekly {
   height: 280px;
   margin-bottom: 1rem;
+  background: var(--chart-bg, #133523);
+  border-radius: 8px;
+  padding: 0.5rem;
 }
 
 @media (max-width: 600px) {
@@ -2124,9 +2271,9 @@ onMounted(() => {
   gap: 0.5rem;
   align-items: center;
   padding: 0.4rem 0.6rem;
-  background: var(--chart-item-bg, rgba(255,255,255,0.5));
+  background: var(--chart-item-bg, rgba(255,255,255,0.1));
   border-radius: 6px;
-  border: 2px solid var(--chart-border, #2a1807);
+  border: 2px solid var(--zelda-gold, #c99234);
   font-size: 0.75rem;
 }
 
@@ -2194,6 +2341,9 @@ onMounted(() => {
   height: 250px;
   max-width: 400px;
   margin: 0 auto;
+  background: var(--chart-bg, #133523);
+  border-radius: 8px;
+  padding: 0.5rem;
 }
 
 @media (max-width: 600px) {
@@ -2370,9 +2520,21 @@ onMounted(() => {
   }
 }
 
+.chart-subtitle {
+  color: var(--zelda-gold, #c99234);
+  font-size: 1rem;
+  margin: 1rem 0 0.5rem 0;
+  padding-left: 0.5rem;
+  border-left: 3px solid var(--zelda-gold, #c99234);
+}
+
 .chart-container {
   height: 300px;
   margin-bottom: 1rem;
+  background: var(--chart-bg, #133523);
+  border: 2px solid var(--zelda-gold, #c99234);
+  border-radius: 8px;
+  padding: 0.5rem;
 }
 
 @media (max-width: 600px) {
@@ -2401,9 +2563,9 @@ onMounted(() => {
   gap: 0.5rem;
   align-items: center;
   padding: 0.4rem 0.6rem;
-  background: var(--chart-item-bg, rgba(255,255,255,0.5));
+  background: var(--chart-item-bg, rgba(255,255,255,0.1));
   border-radius: 6px;
-  border: 2px solid var(--chart-border, #2a1807);
+  border: 2px solid var(--zelda-gold, #c99234);
   font-size: 0.8rem;
 }
 
