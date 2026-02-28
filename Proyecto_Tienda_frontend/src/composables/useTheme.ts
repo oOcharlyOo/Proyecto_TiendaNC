@@ -1,8 +1,8 @@
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
-export type Theme = 'zelda' | 'alforja' | 'skyward' | 'deathmountain';
+export type Theme = 'classic' | 'modern' | 'ocean' | 'forest';
 
-const currentTheme = ref<Theme>((localStorage.getItem('theme') as Theme) || 'zelda');
+const currentTheme = ref<Theme>((localStorage.getItem('theme') as Theme) || 'classic');
 
 export function useTheme() {
   const setTheme = (theme: Theme) => {
@@ -12,7 +12,7 @@ export function useTheme() {
   };
 
   const toggleTheme = () => {
-    const themes: Theme[] = ['zelda', 'alforja', 'skyward', 'deathmountain'];
+    const themes: Theme[] = ['classic', 'modern', 'ocean', 'forest'];
     const currentIndex = themes.indexOf(currentTheme.value);
     const nextIndex = (currentIndex + 1) % themes.length;
     setTheme(themes[nextIndex]);

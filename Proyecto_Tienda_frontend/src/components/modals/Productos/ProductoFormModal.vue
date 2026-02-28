@@ -107,10 +107,10 @@ function handleSubmit() {
 
       <div class="modal-scroll">
         <div class="modal-grid">
-          <label>Código de Barras / PIN</label>
+          <label>Codigo de Barras / PIN</label>
           <div class="barcode-row">
             <input v-model="form.codigoBarras" type="text" placeholder="750000000001">
-            <button type="button" class="btn-secondary" @click="emit('scan')">📷 Escanear</button>
+            <button type="button" class="btn-secondary" @click="emit('scan')">Escanear</button>
           </div>
 
           <label>Nombre</label>
@@ -128,10 +128,10 @@ function handleSubmit() {
           <label>{{ form.is_gramaje ? 'Stock (gramos)' : 'Stock' }}</label>
           <input v-model.number="form.stock" type="number" min="0" required>
 
-          <label>Cantidad mínima</label>
+          <label>Cantidad minima</label>
           <input v-model.number="form.cantidad_min" type="number" min="0" required>
 
-          <label>Cantidad máxima</label>
+          <label>Cantidad maxima</label>
           <input v-model.number="form.cantidad_max" type="number" min="0" required>
 
           <label class="check-row">
@@ -143,16 +143,13 @@ function handleSubmit() {
 
       <footer class="modal-actions">
         <button type="button" :disabled="props.loading" @click="handleSubmit">
-          <span class="btn-icono">💾</span>
-          <span class="btn-texto">{{ props.loading ? 'Guardando...' : props.data?.idProducto ? 'Actualizar' : 'Guardar' }}</span>
+          {{ props.loading ? 'Guardando...' : props.data?.idProducto ? 'Actualizar' : 'Guardar' }}
         </button>
         <button v-if="props.data?.idProducto" type="button" class="btn-danger" @click="$emit('delete')">
-          <span class="btn-icono">🗑️</span>
-          <span class="btn-texto">Eliminar</span>
+          Eliminar
         </button>
         <button type="button" class="btn-secondary" @click="$emit('close')">
-          <span class="btn-icono">✕</span>
-          <span class="btn-texto">Cancelar</span>
+          Cancelar
         </button>
       </footer>
     </section>
@@ -160,36 +157,83 @@ function handleSubmit() {
 </template>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(100%, 640px);
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 8px 24px var(--shadow-color);
+  padding: 1.5rem;
+  max-height: 86vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+}
+
+.modal-header {
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.modal-header p {
+  margin: 0.2rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.modal-scroll {
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
 .modal-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
+  gap: 0.8rem;
 }
 
 .modal-grid label {
   grid-column: span 2;
   text-transform: uppercase;
   font-size: 0.72rem;
-  color: var(--pixel-paper);
-  letter-spacing: 0.1em;
-  font-family: "Courier New", monospace;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  font-weight: 500;
 }
 
 .modal-grid input[type="text"],
 .modal-grid input[type="number"] {
   grid-column: span 2;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.55rem 0.65rem;
-  color: #1d1606;
-  font-family: "Courier New", monospace;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 0.7rem;
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
+  border-radius: 6px;
 }
 
 .modal-grid input:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 2px var(--pixel-gold);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
 }
 
 .barcode-row {
@@ -200,25 +244,11 @@ function handleSubmit() {
 }
 
 .barcode-row button {
-  border: 2px solid #2a1807;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: var(--pixel-ink);
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 2px 0 #6f4b1c;
   padding: 0.5rem 0.7rem;
-}
-
-.barcode-row button:hover {
-  filter: brightness(1.08);
-}
-
-.barcode-row button:active {
-  transform: translateY(1px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
 }
 
 .check-row {
@@ -226,16 +256,17 @@ function handleSubmit() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--pixel-paper);
+  color: var(--text-primary);
   text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
 }
 
 .check-row input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--pixel-gold);
+  accent-color: var(--accent-color);
+  cursor: pointer;
 }
 
 .modal-actions {
@@ -243,114 +274,50 @@ function handleSubmit() {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .modal-actions button {
-  border: 3px solid #2a1807;
   padding: 0.6rem 1rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 1px solid transparent;
 }
 
 .modal-actions button:first-child {
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: var(--pixel-ink);
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.modal-actions button:first-child:hover {
+  background: var(--accent-hover);
 }
 
 .modal-actions button.btn-danger {
-  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
+  background: var(--error-color);
   color: #fff;
-  box-shadow: inset 0 0 0 2px #ffb4b4, 0 3px 0 #6f2025, 0 5px 8px rgba(0, 0, 0, 0.3);
+}
+
+.modal-actions button.btn-danger:hover {
+  filter: brightness(1.1);
 }
 
 .modal-actions button.btn-secondary {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: var(--pixel-ink);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
-.modal-actions button:hover {
-  filter: brightness(1.08);
-}
-
-.modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+.modal-actions button.btn-secondary:hover {
+  background: var(--bg-panel);
 }
 
 .modal-actions button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgba(2, 4, 2, 0.92);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-}
-
-.modal-card {
-  width: min(100%, 640px);
-  background: linear-gradient(180deg, var(--pixel-forest) 0%, var(--pixel-forest-dark) 100%);
-  border: 4px solid var(--pixel-gold);
-  box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.5rem;
-  max-height: 86vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-card::before {
-  content: '';
-  position: absolute;
-  inset: 12px;
-  border: 2px dashed rgba(250, 217, 103, 0.5);
-  pointer-events: none;
-}
-
-.modal-scroll {
-  overflow: auto;
-  padding-right: 0.2rem;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.modal-card .modal-header {
-  position: relative;
-  padding-bottom: 0.4rem;
-  margin-bottom: 0.8rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.modal-card .modal-header h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  color: var(--pixel-gold);
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
-}
-
-.modal-card .modal-header p {
-  margin: 0.2rem 0 0;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
 }
 
 @media (max-width: 600px) {

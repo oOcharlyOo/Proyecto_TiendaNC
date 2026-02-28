@@ -1678,20 +1678,20 @@ async function processVoiceCommand(comando: string) {
   width: 36px;
   height: 36px;
   border: none;
-  background: rgba(0, 0, 0, 0.4);
-  color: #f8d667;
+  background: var(--bg-secondary, #334155);
+  color: var(--text-primary, #f1f5f9);
   font-size: 1.2rem;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 150ms;
+  transition: all 0.15s ease;
   z-index: 10;
 }
 
 .btn-cerrar-modal:hover {
-  background: #ef4444;
+  background: var(--error-color, #ef4444);
   color: white;
   transform: rotate(90deg);
 }
@@ -1861,26 +1861,23 @@ async function processVoiceCommand(comando: string) {
 }
 
 .btn-cerrar {
-  background: linear-gradient(180deg, #f8d667 0%, #c79634 100%);
-  color: #1a1401;
+  background: linear-gradient(135deg, var(--accent-color, #f97316) 0%, #ea580c 100%);
+  color: #ffffff;
   border: none;
   padding: 0.75rem 2rem;
   font-size: 1rem;
-  font-weight: 700;
-  border-radius: 8px;
+  font-weight: 600;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 150ms;
-  box-shadow: 0 4px 0 #8b6914;
+  transition: all 0.15s ease;
 }
 
 .btn-cerrar:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 #8b6914;
+  transform: translateY(-1px);
 }
 
 .btn-cerrar:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #8b6914;
+  transform: translateY(0);
 }
 
 @media (max-width: 600px) {
@@ -1969,9 +1966,9 @@ async function processVoiceCommand(comando: string) {
   gap: 0.5rem;
   padding: 0.6rem 1rem;
   font-weight: 600;
-  border-radius: 8px;
-  border: 2px solid #2a1807;
-  transition: all 150ms;
+  border-radius: 6px;
+  border: none;
+  transition: all 0.15s ease;
 }
 
 .ventas-layout .btn-accion .icono {
@@ -1983,23 +1980,27 @@ async function processVoiceCommand(comando: string) {
 }
 
 .ventas-layout .btn-cobrar {
-  background: linear-gradient(180deg, #67e0a8 0%, #2a9d5c 100%);
-  color: #1a1401;
+  background: var(--success-color, #22c55e);
+  color: #ffffff;
+  border: none;
 }
 
 .ventas-layout .btn-salida {
-  background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
-  color: #fff;
+  background: var(--error-color, #ef4444);
+  color: #ffffff;
+  border: none;
 }
 
 .ventas-layout .btn-entrada {
-  background: linear-gradient(180deg, #86efac 0%, #22c55e 100%);
-  color: #1a1401;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
 }
 
 .ventas-layout .btn-historial {
-  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
-  color: #fff;
+  background: var(--accent-color, #f97316);
+  color: #ffffff;
+  border: none;
 }
 
 .ventas-layout .btn-limpiar {
@@ -2010,9 +2011,15 @@ async function processVoiceCommand(comando: string) {
   width: 100%;
   padding: 0.6rem 1rem;
   font-weight: 600;
-  border-radius: 8px;
-  border: 2px solid #2a1807;
-  transition: all 150ms;
+  border-radius: 6px;
+  background: var(--bg-secondary, #334155);
+  color: var(--text-primary, #f1f5f9);
+  border: 1px solid var(--border-color, #475569);
+  transition: all 0.15s ease;
+}
+
+.ventas-layout .btn-limpiar:hover {
+  background: var(--bg-panel, #475569);
 }
 
 .ventas-layout .btn-limpiar .icono {
@@ -2141,15 +2148,14 @@ async function processVoiceCommand(comando: string) {
 
 .buscador-wrap input {
   flex: 1;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
+  background: var(--bg-primary, #1e293b);
+  border: 1px solid var(--border-color, #475569);
   padding: 0.7rem 0.8rem;
-  color: #1d1606;
-  font-family: "Courier New", monospace;
+  color: var(--text-primary, #f1f5f9);
   font-size: 0.95rem;
   outline: none;
-  box-shadow: inset 0 0 0 3px #d4c27e;
-  transition: box-shadow 120ms linear;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .btn-microphone {
@@ -2158,20 +2164,20 @@ async function processVoiceCommand(comando: string) {
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: #6b7280;
+  background: var(--bg-panel, #475569);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 150ms;
+  transition: all 0.15s ease;
 }
 
 .btn-microphone:hover {
-  background: #4b5563;
+  background: var(--accent-color, #f97316);
 }
 
 .btn-microphone.recording {
-  background: #ef4444;
+  background: var(--error-color, #ef4444);
   animation: pulse 1s infinite;
 }
 
@@ -2181,11 +2187,12 @@ async function processVoiceCommand(comando: string) {
 }
 
 .buscador-wrap input::placeholder {
-  color: #8a7a4a;
+  color: var(--text-secondary, #94a3b8);
 }
 
 .buscador-wrap input:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 3px var(--pixel-gold);
+  border-color: var(--accent-color, #f97316);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
 }
 
 .sugerencias-lista {
@@ -2292,17 +2299,17 @@ async function processVoiceCommand(comando: string) {
 }
 
 .ticket-etiqueta {
-  border: 2px solid #2a1807;
-  background: transparent;
-  color: #f6f2de;
+  border: 1px solid var(--border-color, #475569);
+  background: var(--bg-secondary, #334155);
+  color: var(--text-primary, #f1f5f9);
   padding: 0.4rem;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.4rem;
   align-items: center;
-  box-shadow: 0 0 12px rgba(248, 214, 103, 0.4), inset 0 0 8px rgba(248, 214, 103, 0.15), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3);
-  animation: popIn 150ms steps(4), zeldaGlow 3s ease-in-out infinite alternate;
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  border-radius: 6px;
+  animation: popIn 150ms ease-out;
+  transition: all 0.15s ease;
   pointer-events: auto;
 }
 
@@ -2317,32 +2324,22 @@ async function processVoiceCommand(comando: string) {
   }
 }
 
-@keyframes zeldaGlow {
-  from { box-shadow: 0 0 8px rgba(248, 214, 103, 0.3), inset 0 0 5px rgba(248, 214, 103, 0.1), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3); }
-  to { box-shadow: 0 0 16px rgba(248, 214, 103, 0.5), inset 0 0 10px rgba(248, 214, 103, 0.2), 0 2px 0 #1a1005, 0 3px 6px rgba(0, 0, 0, 0.3); }
-}
-
 .ticket-etiqueta:hover {
-  transform: translateX(4px) scale(1.02);
-  box-shadow: 0 0 20px rgba(248, 214, 103, 0.6), inset 0 0 12px rgba(248, 214, 103, 0.25), 0 4px 0 #1a1005, 0 6px 10px rgba(0, 0, 0, 0.4);
+  transform: translateX(4px);
+  background: var(--bg-panel, #475569);
 }
 
 .ticket-etiqueta h3 {
   margin: 0;
-  color: #f8d667;
+  color: var(--accent-color, #f97316);
   font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  text-shadow: 0 0 10px rgba(248, 214, 103, 0.8), 2px 2px 0 #1a1005;
+  font-weight: 600;
 }
 
 .ticket-etiqueta p {
   font-size: 0.65rem;
-  color: #d4c27e;
+  color: var(--text-secondary, #94a3b8);
   margin: 0;
-  font-family: "Courier New", monospace;
-  text-shadow: 1px 1px 0 #1a1005;
 }
 
 .etiqueta-controles {
@@ -2402,17 +2399,19 @@ async function processVoiceCommand(comando: string) {
 }
 
 .btn-danger {
-  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
-  color: #fff;
-  border: 2px solid #2a1807;
+  background: linear-gradient(135deg, var(--error-color, #ef4444) 0%, #dc2626 100%);
+  color: #ffffff;
+  border: none;
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
+  border-radius: 4px;
 }
 
 .btn-secondary {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
-  border: 2px solid #2a1807;
+  background: linear-gradient(135deg, var(--bg-secondary, #334155) 0%, var(--bg-primary, #1e293b) 100%);
+  color: var(--text-primary, #f1f5f9);
+  border: 1px solid var(--border-color, #475569);
+  border-radius: 4px;
 }
 
 .ticket-vacio {
@@ -2443,16 +2442,14 @@ async function processVoiceCommand(comando: string) {
 }
 
 .resumen-card {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #fdfbf3 0%, #e8d9a8 100%);
-  color: #1d1606;
+  border: 1px solid var(--border-color, #475569);
+  background: linear-gradient(135deg, var(--bg-secondary, #334155) 0%, var(--bg-primary, #1e293b) 100%);
+  color: var(--text-primary, #f1f5f9);
   padding: 0.85rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5), 0 4px 0 #1a1005;
-  position: relative;
-  z-index: 1;
+  border-radius: 8px;
 }
 
 .resumen-card p {
@@ -2461,39 +2458,32 @@ async function processVoiceCommand(comando: string) {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
 }
 
 .resumen-card strong {
   font-size: 1.05rem;
-  font-family: "Courier New", monospace;
+  color: var(--text-primary, #f1f5f9);
 }
 
 .resumen-card.total {
-  background: linear-gradient(180deg, #ffe48b 0%, #f8d667 50%, #e2b84f 100%);
-  box-shadow: inset 0 0 0 3px #ffeeb4, 0 4px 0 #6f4b1c;
-  animation: pulseGold 2s ease-in-out infinite;
-}
-
-@keyframes pulseGold {
-  0%, 100% {
-    box-shadow: inset 0 0 0 3px #ffeeb4, 0 4px 0 #6f4b1c;
-  }
-  50% {
-    box-shadow: inset 0 0 0 3px #fff4c4, 0 4px 0 #8a6a3a, 0 0 12px rgba(248, 214, 103, 0.3);
-  }
+  background: linear-gradient(135deg, var(--accent-color, #f97316) 0%, var(--accent-hover, #fb923c) 100%);
+  border: none;
+  animation: none;
 }
 
 .resumen-card.total p {
   font-size: 0.9rem;
+  color: #ffffff;
 }
 
 .resumen-card.total strong {
   font-size: 1.3rem;
-  color: #1a1401;
+  color: #ffffff;
 }
 
 .resumen-card.total strong::before {
-  content: "💎 ";
+  content: "💰 ";
 }
 
 .acciones-grid {
@@ -2731,16 +2721,16 @@ async function processVoiceCommand(comando: string) {
 }
 
 .btn-new-ticket {
-  border: 2px solid #2a1807;
+  border: none;
   padding: 0.3rem 0.6rem;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  font-family: "Courier New", monospace;
   cursor: pointer;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: #1a1401;
-  box-shadow: 0 2px 0 #6f4b1c;
+  background: var(--accent-color, #f97316);
+  color: #ffffff;
+  border-radius: 4px;
+  transition: all 0.15s ease;
 }
 
 .btn-new-ticket:hover {
@@ -2748,8 +2738,7 @@ async function processVoiceCommand(comando: string) {
 }
 
 .btn-new-ticket:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  transform: translateY(0);
 }
 
 .tickets-tabs {
@@ -2764,27 +2753,28 @@ async function processVoiceCommand(comando: string) {
   flex-direction: column;
   align-items: center;
   padding: 0.4rem 0.6rem;
-  border: 2px solid #2a1807;
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
-  font-family: "Courier New", monospace;
+  border: 2px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   cursor: pointer;
-  box-shadow: 0 2px 0 #8a7a5a;
   min-width: 50px;
+  border-radius: 6px;
 }
 
 .ticket-tab:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.1);
 }
 
 .ticket-tab.active {
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  box-shadow: 0 2px 0 #6f4b1c, 0 0 8px rgba(248, 214, 103, 0.4);
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
 }
 
 .ticket-tab.completed {
-  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
-  color: #0a2008;
+  background: var(--success-color);
+  border-color: var(--success-color);
+  color: #fff;
 }
 
 .ticket-tab.empty {
@@ -2832,9 +2822,10 @@ async function processVoiceCommand(comando: string) {
 .detalle-content {
   max-height: 400px;
   overflow-y: auto;
-  border: 3px solid #2a1807;
-  background: #f2e8bf;
+  border: 1px solid var(--border-color, #475569);
+  background: var(--bg-primary, #1e293b);
   padding: 0.5rem;
+  border-radius: 8px;
 }
 
 .detalle-item {
@@ -2842,9 +2833,10 @@ async function processVoiceCommand(comando: string) {
   justify-content: space-between;
   align-items: center;
   padding: 0.6rem;
-  border-bottom: 1px dashed #baa15c;
-  background: #fff;
+  border-bottom: 1px dashed var(--border-color, #475569);
+  background: var(--bg-secondary, #334155);
   margin-bottom: 0.3rem;
+  border-radius: 4px;
 }
 
 .detalle-item:last-child {
@@ -2859,26 +2851,25 @@ async function processVoiceCommand(comando: string) {
 
 .detalle-info strong {
   font-size: 0.85rem;
-  color: #1d1606;
+  color: var(--text-primary, #f1f5f9);
 }
 
 .detalle-cantidad {
   font-size: 0.75rem;
-  color: #5a4a2a;
-  font-family: "Courier New", monospace;
+  color: var(--text-secondary, #94a3b8);
 }
 
 .detalle-precio {
   text-align: right;
   font-size: 0.75rem;
-  color: #5a4a2a;
-  font-family: "Courier New", monospace;
+  color: var(--success-color, #22c55e);
+  font-weight: 600;
 }
 
 .detalle-subtotal {
   display: block;
   font-weight: 700;
-  color: #1f5b35;
+  color: #4ade80;
   font-size: 0.85rem;
 }
 
@@ -2888,14 +2879,14 @@ async function processVoiceCommand(comando: string) {
   right: 0.5rem;
   background: none;
   border: none;
-  color: #f8d667;
+  color: var(--accent-color, #f97316);
   font-size: 1.5rem;
   cursor: pointer;
   line-height: 1;
 }
 
 .btn-close:hover {
-  color: #fff;
+  color: var(--error-color, #ef4444);
 }
 
 .modal-header {

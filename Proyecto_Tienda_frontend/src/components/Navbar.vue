@@ -54,8 +54,8 @@ function cerrarSesion() {
 <template>
   <header class="navbar-wrap">
     <nav class="navbar panel">
-      <div class="brand">
-        <span class="brand-title">La Leyenda del Dulce</span>
+        <div class="brand">
+        <span class="brand-title">Mi Negocio POS</span>
       </div>
 
       <button
@@ -124,38 +124,38 @@ function cerrarSesion() {
           <button 
             type="button" 
             class="theme-btn" 
-            :class="{ active: currentTheme === 'zelda' }"
-            @click="setTheme('zelda')"
-            title="Tema Zelda"
+            :class="{ active: currentTheme === 'classic' }"
+            @click="setTheme('classic')"
+            title="Tema Classic"
           >
-            🛡️
+            ⬜
           </button>
           <button 
             type="button" 
             class="theme-btn" 
-            :class="{ active: currentTheme === 'alforja' }"
-            @click="setTheme('alforja')"
-            title="Tema Alforja"
+            :class="{ active: currentTheme === 'modern' }"
+            @click="setTheme('modern')"
+            title="Tema Modern"
           >
-            🎒
+            🌙
           </button>
           <button 
             type="button" 
             class="theme-btn" 
-            :class="{ active: currentTheme === 'skyward' }"
-            @click="setTheme('skyward')"
-            title="Tema Skyward"
+            :class="{ active: currentTheme === 'ocean' }"
+            @click="setTheme('ocean')"
+            title="Tema Ocean"
           >
-            ☁️
+            🌊
           </button>
           <button 
             type="button" 
             class="theme-btn" 
-            :class="{ active: currentTheme === 'deathmountain' }"
-            @click="setTheme('deathmountain')"
-            title="Tema Muerte Montaña"
+            :class="{ active: currentTheme === 'forest' }"
+            @click="setTheme('forest')"
+            title="Tema Forest"
           >
-            🌋
+            🌲
           </button>
         </div>
 
@@ -182,12 +182,11 @@ function cerrarSesion() {
 }
 
 .brand-title {
-  color: #f8d667;
+  color: var(--text-primary, #f1f5f9);
   font-size: clamp(0.8rem, 2vw, 1.1rem);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  text-shadow: 2px 2px 0 #000;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .menu {
@@ -215,17 +214,15 @@ function cerrarSesion() {
 
 .menu-link {
   display: inline-block;
-  border: 2px solid #2a1807;
+  border: 1px solid var(--border-color, #475569);
   padding: 0.45rem 0.65rem;
-  color: #1a1401;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  color: var(--text-primary, #f1f5f9);
+  background: var(--bg-secondary, #334155);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   font-size: 0.74rem;
-  font-weight: 900;
-  box-shadow:
-    inset 0 0 0 1px #ffeeb4,
-    0 2px 0 #6f4b1c;
+  font-weight: 600;
+  border-radius: 4px;
 }
 
 .menu-link.activo {
@@ -242,9 +239,9 @@ function cerrarSesion() {
 .theme-btn {
   width: 36px;
   height: 36px;
-  border: 2px solid #2a1807;
+  border: 1px solid var(--border-color, #475569);
   border-radius: 50%;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  background: var(--bg-secondary, #334155);
   cursor: pointer;
   font-size: 1.1rem;
   display: flex;
@@ -259,25 +256,27 @@ function cerrarSesion() {
 
 .theme-btn.active {
   filter: brightness(1.2);
-  box-shadow: 0 0 8px rgba(248, 214, 103, 0.8);
+  box-shadow: 0 0 8px var(--accent-color, rgba(249, 115, 22, 0.5));
 }
 
 .logout-btn {
-  background: #b7393f;
+  background: var(--error-color, #ef4444);
   color: #fff;
-  border: 2px solid #2a1807;
+  border: 1px solid transparent;
   padding: 0.48rem 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   font-size: 0.74rem;
-  font-weight: 900;
+  font-weight: 600;
+  border-radius: 4px;
 }
 
 .hamburger {
   display: none;
-  border: 2px solid #2a1807;
+  border: 1px solid var(--border-color, #475569);
   padding: 0.35rem;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  background: var(--bg-secondary, #334155);
+  border-radius: 4px;
 }
 
 .triforce-icon {
@@ -292,8 +291,7 @@ function cerrarSesion() {
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 12px solid #f8d667;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7));
+  border-bottom: 12px solid var(--accent-color, #0d6efd);
 }
 
 .triforce-icon span:nth-child(1) {
