@@ -1,0 +1,15 @@
+tunnel: 8fe5518b68ee86fcbcb7c126765d62b2
+protocol: http2
+
+ingress:
+  - hostname: minio.laleyendadeldulce.com
+    service: http://minio:9000
+  - hostname: minio-console.laleyendadeldulce.com  
+    service: http://minio:9001
+  - hostname: api.laleyendadeldulce.com
+    service: http://backend:8080
+  - hostname: layendadeldulce.com
+    service: http://frontend:80
+  - hostname: www.laleyendadeldulce.com
+    service: http://frontend:80
+  - service: http://frontend:80

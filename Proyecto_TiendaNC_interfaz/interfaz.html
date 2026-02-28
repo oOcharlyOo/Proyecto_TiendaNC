@@ -5,83 +5,155 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Punto de Venta - VENTA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resources/style/output.css">
     <link rel="stylesheet" href="resources/style/estilos.css">
+    <link rel="stylesheet" href="resources/style/cartel.css">
+    <link rel="stylesheet" href="resources/style/interfaz_scanner.css">
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;0,900;1,700&display=swap" rel="stylesheet">
+    <!-- QuaggaJS para lectura de códigos de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
 </head>
 
 <body class="main-page-body">
     <div id="navbar-placeholder"></div>
 
-    <div class="main-container flex-col md:flex-row p-2">
-                    <div id="ticketPanel" class="flex-grow flex flex-col rounded-lg shadow-xl overflow-hidden">            <div class="p-4 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800" style="color: var(--ticket-header-color);">VENTA - Ticket <span id="ticketIdDisplay">Cargando...</span>
-                </h2>
-                <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
-                    <div class="relative flex-grow">
-                        <label for="codigoProducto" class="block text-sm font-medium text-primary self-center" style="color: var(--neutral-800);">Código o Nombre del Producto:</label>
-                        <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
-                            disabled>
-                        <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
-                            <!-- Los resultados de la búsqueda se inyectarán aquí -->
-                        </div>  
-                    </div>
-                    <button id="agregarProductoBtn"
-                        class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end"
-                        disabled>ENTER - Agregar por Código</button>
+    <div class="main-container flex flex-col md:flex-row w-full max-w-7xl mx-auto mt-16 p-2 gap-4">
+        <div class="flex-grow flex flex-col">
+            <!-- Sección del Escáner -->
+            <div id="scanner-container" class="bg-white p-2 rounded-2xl shadow-lg mb-6 hidden">
+                <div id="interactive" class="viewport">
+                    <div class="scanner-laser"></div>
+                </div>
+                <button id="stopScannerBtn" class="w-full mt-2 py-2 text-red-600 font-medium text-sm">
+                    Cancelar Escaneo
+                </button>
+            </div>
+
+             <!-- Feedback de Último Escaneo -->
+             <div id="scan-feedback" class="hidden mb-6 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 flex items-center gap-3">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <div>
+                    <p class="font-bold">Código Detectado</p>
+                    <p id="detected-id" class="text-sm opacity-90"></p>
                 </div>
             </div>
-            <div class="flex-grow flex flex-col overflow-hidden">
-                <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">
-                    <div class="overflow-x-auto">
-                        <table id="ticketTable" class="w-full text-left ticket-table text-sm">
-                            <thead>
-                                <tr>
-                                    <th class="p-2 w-[15%]">Código</th>
-                                    <th class="p-2 w-[40%]">Descripción</th>
-                                    <th class="p-2 w-[15%] text-right">Precio</th>
-                                    <th class="p-2 w-[15%] text-center">Cantidad</th>
-                                    <th class="p-2 w-[15%] text-right">Importe</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ticketItems"></tbody>
-                        </table>
+
+            <div id="ticketPanel" class="wood-texture p-3 rounded-lg flex-grow flex flex-col shadow-xl overflow-hidden">
+                <div class="wood-inner p-4 border-b border-[#5d4037]/50">
+                    <h2 class="text-xl font-bold text-[#3e2723]">⚔️VENTA - Ticket <span id="ticketIdDisplay">Cargando...</span>
+                    </h2>
+                    <div class="flex flex-col sm:flex-row mt-3 space-y-2 sm:space-y-0 sm:space-x-2">
+                        <div class="relative flex-grow">
+                            <label for="codigoProducto" class="block text-sm font-medium text-[#3e2723]">Código o Nombre del Producto:</label>
+                            <input type="text" id="codigoProducto" placeholder="Escanear código o escribir nombre..."
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
+                                disabled>
+                            <div id="searchResultsContainer" class="absolute z-10 w-full border border-gray-300 rounded-b-lg shadow-lg mt-1 hidden max-h-60 overflow-y-auto">
+                                <!-- Los resultados de la búsqueda se inyectarán aquí -->
+                            </div>  
+                        </div>
+                        <button id="agregarProductoBtn"
+                            class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end"
+                            disabled>🍫 Agregar</button>
+                        <button id="startScannerBtn" class="flex items-center justify-center gap-3 bg-blue-600 text-white p-2 rounded-lg shadow-md hover:bg-blue-700 transition self-end">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <!-- NEW NLP Input Section -->
+                    <div class="hidden flex flex-col sm:flex-row mt-4 space-y-2 sm:space-y-0 sm:space-x-2 items-end">
+                        <div id="nlpTextInputGroup" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-end flex-grow">
+                            <label for="nlpTextInput" class="block text-sm font-medium text-[#3e2723]">Pedido en Lenguaje Natural:</label>
+                            <textarea id="nlpTextInput" placeholder="Ej: 2 cafés, 1 croissant y 3 manzanas"
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary input-focus-primary"
+                                rows="2"></textarea>
+                            <button id="processNlpBtn"
+                                class="btn-primary text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-dark transition duration-150 shadow-md self-end">
+                                Procesar Pedido (IA)
+                            </button>
+                        </div>
+                        <button id="startVoiceCommandBtn"
+                            class="bg-gray-500 text-white p-2 rounded-lg shadow-md hover:bg-gray-600 transition self-end"
+                            title="Comando por Voz">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-grow flex flex-col overflow-hidden">
+                    <div id="tablaEditada" class="flex-grow overflow-y-auto border-t border-gray-300">
+                        <!-- Encabezado de la tabla para escritorio -->
+                        <div class="hidden">
+                            <div class="col-span-2">Código</div>
+                            <div class="col-span-3">Descripción</div>
+                            <div class="col-span-2 text-right">P. Unit</div>
+                            <div class="col-span-1 text-center">Mayoreo</div>
+                            <div class="col-span-2 text-center">Cantidad</div>
+                            <div class="col-span-1 text-right">Importe</div>
+                            <div class="col-span-1 text-center">Acción</div>
+                        </div>
+                        <!-- Cuerpo de la lista de productos del ticket -->
+                        <div id="ticketItems" class="parchment-scroll divide-y divide-gray-200">
+                            <!-- Los productos del ticket se cargarán aquí -->
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-            <div class="w-full md:w-1/4 min-w-[280px] flex flex-col panel-transparent rounded-lg shadow-xl p-4">            
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Resumen de Venta</h3>
-            <div class="flex-grow">
-                <div class="summary-row"><span>Subtotal:</span><span id="subtotalDisplay">$0.00</span></div>
-                <div class="summary-total mt-4 border-t-2 border-gray-200"><span>TOTAL:</span><span id="totalDisplay"
-                        class="text-primary">$0.00</span></div>
-            </div>
-            <div class="mt-4 space-y-3">
-                <button id="cobrarEfectivoBtn"
-                    class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">F12
-                    - Cobrar (Efectivo)
-                </button>
-                <button id="verHistorialBtn"
-                    class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
-                    Historial de Ventas
-                </button>
+        <div id="summaryPanel" class="w-full md:w-1/4 min-w-[280px] flex flex-col wood-texture p-3 rounded-lg shadow-xl">            
+            <div class="wood-inner p-4 border-b border-[#5d4037]/50">
+                <h3 class="text-lg font-bold text-[#3e2723]">📜Resumen de Venta</h3>
+                <div class="flex-grow">
+                    <div class="summary-row flex justify-between items-center text-[#3e2723] text-lg"><span>Subtotal:</span><span id="subtotalDisplay">$0.00</span></div>
+                    <div class="summary-total mt-4 pt-4 border-t-2 border-gray-200 flex justify-between items-center text-xl font-bold"><span>TOTAL:</span><span id="totalDisplay"
+                            class="text-primary">$0.00</span></div>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <button id="abrirModalEntradaBtn"
+                        class="w-full bg-green-500 text-white font-semibold py-3 rounded-lg hover:bg-green-600 transition duration-150 shadow-md flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span>Entrada de Efectivo</span>
+                    </button>
+                    <button id="abrirModalSalidaBtn"
+                        class="w-full bg-red-500 text-white font-semibold py-3 rounded-lg hover:bg-red-600 transition duration-150 shadow-md flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
+                        </svg>
+                        <span>Salida de Efectivo</span>
+                    </button>
+                    <button id="cobrarEfectivoBtn"class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
+                        💰 Cobrar
+                    </button>
+                    <button id="verHistorialBtn" class="w-full btn-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
+                        ⌛Historial de Ventas
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="paymentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Cobro en Efectivo</h3>
-                <div class="mt-2 px-7 py-3">
+    <!-- MODAL para Cobro en Efectivo -->
+    <div id="paymentModal" class="modal-overlay">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 class="hylian-font text-xl text-zelda-gold font-bold">Cobro en Efectivo</h3>
+                </header>
+                <div class="text-center mt-2 px-7 py-3">
                     <p class="text-sm text-gray-500">Total a Pagar:</p>
                     <p id="modalTotalAmount" class="text-3xl font-bold text-primary">$0.00</p>
                     <div class="mt-4">
                         <label for="amountPaid" class="block text-sm font-medium text-gray-700">Monto Recibido</label>
                         <input type="number" id="amountPaid"
-                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
                             placeholder="0.00">
                     </div>
                     <div class="mt-4">
@@ -107,102 +179,266 @@
         </div>
     </div>
 
-    <!-- Modal para Historial de Ventas -->
-    <div id="historialVentasModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center">
-        <div class="historial-modal-content relative">
-            <h3 class="text-xl leading-6 font-bold text-gray-900 mb-4">Historial de Ventas del Día</h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
-                <div class="bg-gray-100 p-3 rounded-lg">
-                    <p class="text-sm text-gray-600">Cobro Total del Día</p>
-                    <p id="historialCobroTotal" class="text-2xl font-bold text-income-color">$0.00</p>
-                </div>
-                <div class="bg-gray-100 p-3 rounded-lg">
-                    <p class="text-sm text-gray-600">Ganancia Total del Día</p>
-                    <p id="historialGananciaTotal" class="text-2xl font-bold text-profit-color">$0.00</p>
-                </div>
-            </div>
+    <!-- HISTORY MODAL -->
+    <div id="historialVentasModal" class="modal-overlay">
+        <div class="wood-texture w-full max-w-2xl md:max-w-4xl p-3 rounded-lg animate-pop flex flex-col max-h-screen overflow-y-auto">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col p-4 md:p-8 rounded relative">
+                <header class="mb-8 border-b-2 border-[#3e2723]/30 pb-4">
+                    <h2 class="text-3xl font-black text-dark-ink uppercase italic">📜 Historial de Ventas del Día</h2>
+                </header>
 
-            <div class="max-h-96 overflow-y-auto overflow-x-auto">
-                <table class="historial-table">
-                    <thead>
-                        <tr>
-                            <th>ID Venta</th>
-                            <th>Monto</th>
-                            <th>Método Pago</th>
-                            <th>Estatus</th>
-                            <th>Fecha</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historialVentasBody">
-                        <!-- Las filas de ventas se insertarán aquí -->
-                    </tbody>
-                </table>
-            </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="embedded-item p-6 rounded-lg text-center">
+                        <p class="text-dark-ink font-black text-sm uppercase tracking-widest mb-1">Cobro Total del Día</p>
+                        <p id="historialCobroTotal" class="text-4xl font-black text-[#10b981]">$0.00</p>
+                    </div>
+                    <div class="embedded-item p-6 rounded-lg text-center">
+                        <p class="text-dark-ink font-black text-sm uppercase tracking-widest mb-1">Ganancia Total del Día</p>
+                        <p id="historialGananciaTotal" class="text-4xl font-black text-[#3b82f6]">$0.00</p>
+                    </div>
+                </div>
 
-            <div class="mt-6 text-right">
-                <button id="cerrarHistorialModalBtn" class="btn-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-dark">
-                    Cerrar
-                </button>
+                <div class="embedded-item p-4 rounded-lg overflow-x-auto min-h-[300px]">
+                    <table class="w-full text-left text-dark-ink font-bold">
+                        <thead>
+                            <tr>
+                                <th class="p-2 text-center">Ticket #</th>
+                                <th class="p-2 text-center">Monto</th>
+                                <th class="p-2 text-center">Método Pago</th>
+                                <th class="p-2 text-center">Estatus</th>
+                                <th class="p-2 text-center">Fecha</th>
+                                <th class="p-2 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historialVentasBody">
+                            <!-- Rows will be injected here by interfaz-v3.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-8 flex justify-end">
+                    <button id="cerrarHistorialModalBtn" class="btn-zelda bg-[#3e2723]/60 hover:bg-[#3e2723] text-white px-8 py-3 rounded-lg font-black uppercase tracking-widest border-b-4 border-black shadow-lg">
+                        Cerrar Registro
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="resources/js/interfaz.js" defer></script>
-    <script src="nav.js" defer></script>
+    <!-- Modal para Entrada de Efectivo -->
+    <div id="cashInModal" class="modal-overlay">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 class="hylian-font text-xl text-zelda-gold font-bold">Registrar Entrada de Efectivo</h3>
+                </header>
+                <form id="cashInForm" class="mt-2 px-7 py-3">
+                    <div class="mb-4">
+                        <label for="cashInAmount" class="block text-sm font-medium text-gray-700 text-left">Monto:</label>
+                        <input type="number" id="cashInAmount" name="montoEoS"
+                            class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                            placeholder="0.00" step="0.01" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="cashInDescription" class="block text-sm font-medium text-gray-700 text-left">Descripción:</label>
+                        <textarea id="cashInDescription" name="descripcion" rows="3"
+                            class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                            placeholder="Motivo de la entrada de efectivo"></textarea>
+                    </div>
+                    <!-- Assuming idUsuario and montoInicial will be handled by JS or backend -->
+                    <input type="hidden" id="cashInUserId" name="idUsuario" value="1"> 
+                    <div class="items-center px-4 py-3">
+                        <button type="submit"
+                            class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+                            Registrar Entrada
+                        </button>
+                        <button type="button" id="cancelCashInBtn"
+                            class="mt-2 px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Salida de Efectivo -->
+    <div id="cashOutModal" class="modal-overlay">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 class="hylian-font text-xl text-zelda-gold font-bold">Registrar Salida de Efectivo</h3>
+                </header>
+                <form id="cashOutForm" class="mt-2 px-7 py-3">
+                    <div class="mb-4">
+                        <label for="cashOutAmount" class="block text-sm font-medium text-gray-700 text-left">Monto:</label>
+                        <input type="number" id="cashOutAmount" name="montoEoS"
+                            class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                            placeholder="0.00" step="0.01" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="cashOutDescription" class="block text-sm font-medium text-gray-700 text-left">Descripción:</label>
+                        <textarea id="cashOutDescription" name="descripcion" rows="3"
+                            class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                            placeholder="Motivo de la salida de efectivo"></textarea>
+                    </div>
+                    <!-- Assuming idUsuario and montoInicial will be handled by JS or backend -->
+                    <input type="hidden" id="cashOutUserId" name="idUsuario" value="1">
+                    <div class="items-center px-4 py-3">
+                        <button type="submit"
+                            class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                            Registrar Salida
+                        </button>
+                        <button type="button" id="cancelCashOutBtn"
+                            class="mt-2 px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="resources/js/main.js" defer></script>
+    <script src="/resources/js/interfaz-v3.js" defer></script>
 
     <!-- Modal para Calculadora de Gramaje -->
-    <div id="gramajeCalculatorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center z-50">
-                    <div class="relative p-5 border w-11/12 md:max-w-3xl shadow-lg rounded-md bg-white text-center">
-                        <h3 class="text-lg leading-6 font-medium text-primary mb-4">Calculadora de Gramaje</h3>
-                        <div class="mb-3">
-                            <label for="calcProductName" class="block text-sm font-medium text-gray-700">Producto:</label>
-                            <input type="text" id="calcProductName" class="config-input" readonly>
-                            <input type="hidden" id="calcProductId">
-                            <input type="hidden" id="calcProductPricePerKilo"> <!-- This will be the original price_venta from product, used in calculations -->
-                            <input type="hidden" id="calcProductStock">
-                        </div>
-                        
-                        <div class="grid-table">
-                            <!-- Fila 1: Títulos -->
-                            <div class="calc-header-text">Gramaje a vender (g)</div>
-                            <div class="calc-header-text">Precio Total ($)</div>
-        
-                            <!-- Fila 2: Inputs/Valores -->
-                            <div>
-                                <input type="number" id="gramajeInput" class="big-number input-focus" value="" step="10" placeholder="0">
-                            </div>
-                            <div>
-                                <input type="number" id="precioTotal" class="big-number text-profit-color" value="0.00" step="0.01" placeholder="0">
-                            </div>
-                        </div>
-        
-                        <div class="controls">
-                            <div>
-                                <label class="label">Precio por Kilogramo (1000g)</label>
-                                <input type="number" id="precioBase" class="config-input" value="" step="0.5">
-                            </div>
-                            <div>
-                                <label class="label">Acciones rápidas</label>
-                                <div class="flex gap-2">
-                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="250">250g</button>
-                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="500">500g</button>
-                                    <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="1000">1kg</button>
-                                </div>
-                            </div>
-                            
-                            <button type="button" id="calcResetBtn" class="calc-btn-reset">Limpiar Campos</button>
-                        </div>
-                        <div class="flex justify-around items-center space-x-2 mt-4">
-                            <button id="calcAddToCartBtn" class="w-full btn-primary text-white font-semibold py-2 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
-                                Agregar a Venta
-                            </button>
-                            <button id="calcCancelBtn" class="w-full btn-secondary text-white font-semibold py-2 rounded-lg hover:bg-secondary-dark transition duration-150 shadow-md">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>    </div>
-</body>
+    <div id="gramajeCalculatorModal" class="modal-overlay">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 class="hylian-font text-xl text-zelda-gold font-bold">Calculadora de Gramaje</h3>
+                </header>
+                <div class="mb-3">
+                    <label for="calcProductName" class="block text-sm font-medium text-gray-700">Producto:</label>
+                    <input type="text" id="calcProductName" class="config-input" readonly>
+                    <input type="hidden" id="calcProductId">
+                    <input type="hidden" id="calcProductPricePerKilo"> <!-- This will be the original price_venta from product, used in calculations -->
+                    <input type="hidden" id="calcProductStock">
+                </div>
+                
+                <div class="grid-table">
+                    <!-- Fila 1: Títulos -->
+                    <div class="calc-header-text">Gramaje a vender (g)</div>
+                    <div class="calc-header-text">Precio Total ($)</div>
 
-</html>
+                    <!-- Fila 2: Inputs/Valores -->
+                    <div>
+                        <input type="number" id="gramajeInput" class="big-number input-focus" value="" step="10" placeholder="0">
+                    </div>
+                    <div>
+                        <input type="number" id="precioTotal" class="big-number text-profit-color" value="0.00" step="0.01" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div>
+                        <label class="label">Precio por Kilogramo (1000g)</label>
+                        <input type="number" id="precioBase" class="config-input" value="" step="0.5">
+                    </div>
+                    <div>
+                        <label class="label">Acciones rápidas</label>
+                        <div class="flex gap-2">
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="250">250g</button>
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="500">500g</button>
+                            <button type="button" class="bg-gray-200 px-4 py-2 rounded-lg font-bold" data-gramaje="1000">1kg</button>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="calcResetBtn" class="calc-btn-reset">Limpiar Campos</button>
+                </div>
+                <div class="flex justify-around items-center space-x-2 mt-4">
+                    <button id="calcAddToCartBtn" class="w-full btn-primary text-white font-semibold py-2 rounded-lg hover:bg-primary-dark transition duration-150 shadow-md">
+                        Agregar a Venta
+                    </button>
+                    <button id="calcCancelBtn" class="w-full btn-secondary text-white font-semibold py-2 rounded-lg hover:bg-secondary-dark transition duration-150 shadow-md">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Alert Modal -->
+    <div id="alertModal" class="modal-overlay">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <header class="text-center p-4 border-b-2 border-yellow-800/10">
+                    <h3 id="alertModalTitle" class="hylian-font text-xl text-zelda-gold font-bold"></h3>
+                </header>
+                <div class="mt-2 px-7 py-3">
+                    <p id="alertModalMessage" class="text-sm text-gray-500"></p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="alertModalCloseBtn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL para Detalle de Venta -->
+    <div id="saleDetailsModal" class="modal-overlay z-[110]">
+        <div class="wood-texture flex flex-col">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll flex-grow flex flex-col">
+                <h3 id="saleDetailsModalTitle" class="text-xl leading-6 font-bold text-dark-ink mb-4">Detalles de Venta #<span id="detailNumeroTicket"></span></h3>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4 text-sm text-dark-ink">
+                    <div><span class="font-semibold">ID Venta:</span> <span id="detailIdVenta"></span></div>
+                    <div><span class="font-semibold">Monto Total:</span> <span id="detailMontoTotal"></span></div>
+                    <div><span class="font-semibold">Método de Pago:</span> <span id="detailMetodoPago"></span></div>
+                    <div><span class="font-semibold">Estatus:</span> <span id="detailEstatus"></span></div>
+                    <div><span class="font-semibold">Fecha:</span> <span id="detailFechaVenta"></span></div>
+                </div>
+
+                <h4 class="text-lg font-bold text-dark-ink mb-2">Productos en la Venta</h4>
+                <div class="max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-dark-ink ticket-table text-sm">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="p-2 text-center">Código</th>
+                                <th class="p-2 text-center">Descripción</th>
+                                <th class="p-2 text-center">Cantidad</th>
+                                <th class="p-2 text-center">Precio Unitario</th>
+                                <th class="p-2 text-center">Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody id="saleDetailsTableBody" class="bg-white">
+                            <!-- Detalles de productos se insertarán aquí -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-6 text-right">
+                    <button id="closeSaleDetailsModalBtn" class="btn-secondary text-white px-4 py-2 rounded-md hover:bg-secondary-dark">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>

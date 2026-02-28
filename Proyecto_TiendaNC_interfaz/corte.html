@@ -4,32 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Punto de Venta - CORTE DE CAJA</title>
-    <!-- Incluir Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Incluir Chart.js para la gráfica -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resources/style/output.css">
     <link rel="stylesheet" href="resources/style/estilos.css">
+    <link rel="stylesheet" href="resources/style/cartel.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Quicksand:wght@300;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resources/style/sign-button.css">
+    <link rel="stylesheet" href="resources/style/hanging-buttons.css">
 </head>
 <body class="main-page-body">
     
     <!-- BARRA SUPERIOR DE NAVEGACIÓN -->
     <div id="navbar-placeholder"></div>
 
-    <div class="main-container" style="height: max-content;">
-        <div class="items-center justify-center w-full panel-transparent rounded-lg shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 z-50">
+    <div class="main-container wood-texture"> <!-- Added wood-texture class -->
+        <div class="nail n-tl"></div>
+        <div class="nail n-tr"></div>
+        <div class="nail n-bl"></div>
+        <div class="nail n-br"></div>
+        <div class="wood-inner parchment-scroll flex flex-col flex-grow min-h-0">
             <header class="border-b pb-4">
                 <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Corte de Caja</h1>
                 <p class="text-sm sm:text-base text-gray-600 mt-1">Genera y visualiza el reporte de tu corte de caja o consulta reportes de días anteriores.</p>
             </header>
 
-            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4 sm:mb-8 justify-center">
-                <button id="generateCorteBtn" class="btn-primary text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg transition duration-150 shadow-md text-base sm:text-lg">
-                    Generar Corte de Caja
-                </button>
-                <button id="generateDailyReportBtn" class="btn-primary text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded-lg transition duration-150 shadow-md text-base sm:text-lg hidden">
-                    Generar Reporte por Día
-                </button>
+            <div class="hanging-structure">
+                <!-- Viga principal -->
+                <div class="main-beam"></div>
+                
+                <div class="signs-column">
+                    <!-- Bloque de Cartel 1 -->
+                    <div class="hanging-group">
+                        <div class="rope-pair">
+                            <div class="rope"></div>
+                            <div class="rope"></div>
+                        </div>
+                        <button id="generateCorteBtn" class="wood-sign sign-1">
+                            <span class="triforce-engraved">▲</span>
+                            Generar Corte de Caja
+                        </button>
+                    </div>
+
+                    <!-- Bloque de Cartel 2 -->
+                    <div class="hanging-group" style="animation-delay: -0.5s;">
+                        <div class="rope-pair">
+                            <div class="rope"></div>
+                            <div class="rope"></div>
+                        </div>
+                        <button id="generateDailyReportBtn" class="wood-sign sign-2">
+                            <span class="triforce-engraved">▲</span>
+                            Reporte por Día
+                        </button>
+                    </div>
+
+                    <!-- Bloque de Cartel 3 -->
+                    <div class="hanging-group" style="animation-delay: -1s;">
+                        <div class="rope-pair">
+                            <div class="rope"></div>
+                            <div class="rope"></div>
+                        </div>
+                        <button id="generateMonthlyReportBtn" class="wood-sign sign-3">
+                            <span class="triforce-engraved">▲</span>
+                            Reporte Mensual
+                        </button>
+                    </div>
+
+                    <!-- Bloque de Cartel 4 -->
+                    <div class="hanging-group" style="animation-delay: -1.5s;">
+                        <div class="rope-pair">
+                            <div class="rope"></div>
+                            <div class="rope"></div>
+                        </div>
+                        <button id="showHistoryBtn" class="wood-sign sign-1">
+                            <span class="triforce-engraved">▲</span>
+                            Historial de Ventas
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <section id="corteReporte" class="hidden">
@@ -50,32 +102,30 @@
                         <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Monto Inicial</p>
                         <p id="reporteMontoInicial" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
-                    <!-- New card for Ventas en Efectivo -->
                     <div class="summary-card">
                         <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Ventas en Efectivo</p>
                         <p id="reporteVentasEfectivo" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
-                    <!-- Ventas por Transferencia (formerly Otros Ingresos) -->
                     <div class="summary-card">
                         <p class="summary-title text-xs sm:text-sm text-profit-color whitespace-normal break-words">Ventas por Transferencia</p>
                         <p id="reporteOtrosIngresos" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
-                    <!-- Tickets del Día -->
                     <div class="summary-card">
                         <p class="summary-title text-xs sm:text-sm text-cash-flow-color whitespace-normal break-words">Tickets del Día</p>
                         <p id="reporteTotalTicketsDia" class="summary-value text-xl sm:text-2xl whitespace-normal break-words">0</p>
                     </div>
-                    <!-- Total Ventas (SPANS 2 COLUMNS) -->
                     <div class="summary-card md:col-span-2">
                         <p class="summary-title text-xs sm:text-sm text-income-color whitespace-normal break-words">Total Ventas</p>
                         <p id="reporteTotalVentas" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words"></p>
                     </div>
-                    <!-- Total Egresos -->
+                    <div class="summary-card">
+                        <p class="summary-title text-xs sm:text-sm text-[#af7810] whitespace-normal break-words">Otras Entradas</p>
+                        <p id="reporteOtrasEntradas" class="summary-value text-xl sm:text-2xl income-value whitespace-normal break-words">$0.00</p>
+                    </div>
                     <div class="summary-card">
                         <p class="summary-title text-xs sm:text-sm text-danger whitespace-normal break-words">Total Egresos</p>
                         <p id="reporteTotalEgresos" class="summary-value text-xl sm:text-2xl expense-value whitespace-normal break-words"></p>
                     </div>
-                    <!-- Ganancia Total -->
                     <div class="summary-card profit-card">
                         <p class="summary-title text-xs sm:text-sm text-profit-color whitespace-normal break-words">Ganancia Total</p>
                         <p id="reporteGananciaTotal" class="summary-value text-xl sm:text-2xl profit-value whitespace-normal break-words"></p>
@@ -88,14 +138,12 @@
                     <p id="reporteSaldoFinalCalculado" class="summary-value text-3xl sm:text-4xl cash-flow-value whitespace-normal break-words"></p>
                 </div>
                 
-                <!-- GRÁFICA PIE CHART AGREGADA AQUÍ -->
                 <div class="mt-6 sm:mt-8">
                     <h3 id="chartTitle" class="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4 border-t pt-3 sm:pt-4">Composición del Flujo de Efectivo Bruto (Entradas)</h3>
                     <div class="panel-transparent p-4 sm:p-6 rounded-xl shadow-lg flex justify-center items-center min-h-0">
                         <canvas id="cashFlowChart"></canvas>
                     </div>
                 </div>
-                <!-- FIN GRÁFICA -->
                 
                 <div class="flex justify-center pt-6 sm:pt-8">
                     <button id="cerrarTurnoBtn" class="btn-primary text-white font-semibold py-2 px-8 sm:py-3 sm:px-12 rounded-lg transition duration-150 shadow-xl text-base sm:text-lg">
@@ -106,20 +154,27 @@
         </div>
     </div>
 
-    <!-- Modal para seleccionar fecha de reporte diario -->
-    <div id="dailyReportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Generar Reporte por Día</h3>
-                <div class="mt-4 px-7 py-3">
-                    <label for="reportDate" class="block text-sm font-medium text-gray-700 text-left">Selecciona una fecha:</label>
-                    <input type="date" id="reportDate" name="reportDate" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+    <!-- Modal para seleccionar fecha de reporte diario con estilo de madera -->
+    <div id="dailyReportModal" class="modal-overlay">
+        <div class="wood-texture" style="width: 500px; height: auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; min-height: auto;">
+                <header class="text-center p-6 border-b-2 border-yellow-800/10">
+                    <h1 class="hylian-font text-2xl text-yellow-950 font-bold">Reporte por Día</h1>
+                    <p class="text-sm text-yellow-900/70 mt-1">Selecciona una fecha para ver el registro.</p>
+                </header>
+                <div class="p-8 text-center">
+                    <label for="reportDate" class="filter-label text-left block">Sol (Día)</label>
+                    <input type="date" id="reportDate" name="reportDate" class="hylian-select w-full text-center text-lg p-2">
                 </div>
-                <div class="items-center px-4 py-3 space-x-4">
-                    <button id="generateReportFromModalBtn" class="px-4 py-2 btn-primary text-white text-base font-medium rounded-md shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary">
-                        Generar Reporte
+                <div class="flex justify-center gap-4 pb-6">
+                    <button id="generateReportFromModalBtn" class="btn-wood-aesthetic py-2 px-6">
+                        Generar
                     </button>
-                    <button id="cancelModalBtn" class="px-4 py-2 btn-secondary text-white text-base font-medium rounded-md shadow-sm hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary">
+                    <button id="cancelModalBtn" class="btn-wood-aesthetic py-2 px-6" style="background-color: #a35a44;">
                         Cancelar
                     </button>
                 </div>
@@ -127,8 +182,326 @@
         </div>
     </div>
 
+    <!-- Modal para reporte mensual (Nuevo Diseño con Estilo de Madera) -->
+    <div id="monthlyReportModal" class="modal-overlay">
+        <div class="wood-texture" style="width: 90vw; max-width: 1200px; height: 90vh;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="margin: 15px; display: flex; flex-direction: column; height: 450px;">
+                <header class="p-4 border-b-2 border-yellow-800/10 flex items-center justify-between">
+                    <div>
+                        <h3 class="hylian-font text-xl font-bold text-yellow-950">Reporte Mensual de Ventas</h3>
+                        <p class="text-sm text-yellow-900/70">Analiza el rendimiento de tus ventas mes a mes.</p>
+                    </div>
+                    <button id="cancelMonthlyModalBtn" class="p-2 rounded-full hover:bg-yellow-800/10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-950" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </header>
+                <div class="flex-grow p-4 grid grid-cols-12 gap-6 overflow-y-auto">
+                    <div class="col-span-12 lg:col-span-4 bg-white/30 rounded-lg p-4 space-y-6">
+                        <div>
+                            <label for="reportMonth" class="filter-label">Seleccionar Luna (Mes):</label>
+                            <input type="month" id="reportMonth" name="reportMonth" class="hylian-select w-full text-base">
+                            <button id="modalGenerateMonthlyReportBtn" class="w-full mt-3 btn-wood-aesthetic py-2 px-4">
+                                Generar Reporte
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="text-sm font-bold text-yellow-900/60 uppercase tracking-wider">Estadísticas del Mes</h4>
+                            <!-- Contenido de estadísticas sin cambios -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-indigo-100 rounded-md"><svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ventas Totales</span>
+                                </div>
+                                <div class="text-right">
+                                    <p id="monthlyReport-stats-ventas-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-ventas-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-purple-100 rounded-md"><svg class="h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.356-2A8.001 8.001 0 0119.418 15m0 0H15"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ventas por Transferencia</span>
+                                </div>
+                                 <div class="text-right">
+                                    <p id="monthlyReport-stats-transferencia-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-transferencia-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="p-2 bg-amber-100 rounded-md"><svg class="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg></div>
+                                    <span class="font-bold text-sm text-slate-600">Ganancias</span>
+                                </div>
+                                <div class="text-right">
+                                    <p id="monthlyReport-stats-ganancias-value" class="font-bold text-slate-800 text-sm">$0.00</p>
+                                    <p id="monthlyReport-stats-ganancias-change" class="text-xs font-mono text-slate-500">--%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-12 lg:col-span-8 bg-white/30 rounded-lg p-4 flex flex-col">
+                        <div id="monthlyReport-selectedMonth" class="mb-4">
+                            <span class="hylian-font text-lg font-bold text-yellow-950">Seleccione un mes</span>
+                        </div>
+                        <div id="monthly-report-chart-container" class="flex-grow mb-4">
+                            <canvas id="monthlyReportChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div id="monthlyReport-footer-tip" class="p-3 bg-yellow-800/10 border-t border-yellow-800/20 rounded-b-lg text-center hidden">
+                     <p id="monthlyReport-footer-tip-text" class="hylian-font text-xs text-yellow-900/80">Tip: Compara la ganancia semanal para identificar tendencias.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <script src="nav.js"></script>
-        <script src="resources/js/corte.js"></script>
+    <!-- Modal de Historial Completo -->
+    <div id="historyModal" class="modal-overlay">
+        <div class="wood-texture" style="width: 90vw; height: 90vh; max-width: 1200px; margin: 5vh auto;">
+            <div class="nail n-tl"></div>
+            <div class="nail n-tr"></div>
+            <div class="nail n-bl"></div>
+            <div class="nail n-br"></div>
+            <div class="parchment-scroll" style="height: 450px;">
+                <header>
+                    <h1 class="hylian-font text-3xl text-yellow-950 font-bold mb-1">TABLÓN DE MERCADER</h1>
+                    <div class="w-32 h-0.5 bg-yellow-800/20 mx-auto mb-4"></div>
+                    <div class="flex justify-between items-center px-6">
+                        <div class="text-left">
+                            <p class="text-[10px] uppercase font-bold text-yellow-900/60 tracking-wider">Puesto de Venta</p>
+                            <p class="hylian-font text-sm font-bold text-yellow-900">Aldea Kakariko</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] uppercase font-bold text-yellow-900/60 tracking-wider">Balance Total</p>
+                            <p class="text-2xl hylian-font text-green-800 font-bold" id="total-revenue">0 <small class="text-xs">Rupias</small></p>
+                        </div>
+                    </div>
+                </header>
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label class="filter-label">Luna (Mes)</label>
+                        <select id="filter-month" class="hylian-select" onchange="renderGroupedSales()">
+                            <option value="all">Todas las Lunas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Sol (Día)</label>
+                        <select id="filter-day" class="hylian-select" onchange="renderGroupedSales()">
+                            <option value="all">Cualquier Sol</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="sales-list" id="sales-container">
+                </div>
+                <footer class="p-3 bg-white/10 text-center border-t border-yellow-800/10">
+                    <p class="hylian-font text-[9px] tracking-[0.3em] text-yellow-900 opacity-50 uppercase font-bold">Registro Oficial del Reino de Hyrule</p>
+                </footer>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="modal-overlay-details">
+        <div class="modal-content">
+            <div class="close-btn" onclick="closeModalDetails()">×</div>
+            <div class="stamp">APROBADO<br>POR<br>HYRULE</div>
+            <div class="border-b border-gray-300 pb-3 mb-6">
+                <h2 class="hylian-font text-2xl text-yellow-950" id="modal-item-name">Nombre</h2>
+                <p class="text-xs uppercase tracking-widest text-gray-500 font-bold" id="modal-category">Categoría</p>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-gray-400">Metodo de Pago</span>
+                    <span id="modal-customer" class="hylian-font font-bold text-yellow-900">---</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-gray-400">Fecha de Trato</span>
+                    <span id="modal-date" class="text-sm">---</span>
+                </div>
+                <div class="flex justify-between items-center py-4 border-y border-gray-100 mt-6">
+                    <span class="text-xs font-bold uppercase text-gray-400">Monto del Pago</span>
+                    <span class="text-green-700 font-bold text-3xl" id="modal-total">0 ◆</span>
+                </div>
+            </div>
+            <div class="mt-8 text-center">
+                <div class="btn-action" onclick="closeModalDetails()">Cerrar Registro</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="resources/js/main.js"></script>
+    <script src="resources/js/corte-v2.js"></script>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const showHistoryBtn = document.getElementById('showHistoryBtn');
+            const historyModal = document.getElementById('historyModal');
+            const detailsModal = document.getElementById('modal-overlay-details');
+            let groupedSalesData = []; // Store the grouped and transformed data globally
+            const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+            // --- Event Listeners ---
+            showHistoryBtn.addEventListener('click', async () => {
+                historyModal.style.display = 'flex';
+                await fetchAndRenderSales();
+            });
+
+            historyModal.addEventListener('click', (event) => {
+                if (event.target === historyModal) {
+                    historyModal.style.display = 'none';
+                }
+            });
+            
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    historyModal.style.display = 'none';
+                    closeSaleDetailsModal();
+                }
+            });
+
+            // --- Data Fetching and Processing ---
+            async function fetchAndRenderSales() {
+                try {
+                    const response = await fetch('http://localhost:8080/ventasDetalle/obtenerTodosLosVentasDetalles');
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const result = await response.json();
+                    if (result.codigo !== 200 || !Array.isArray(result.datos)) {
+                        throw new Error('API response not in expected format.');
+                    }
+
+                    const salesMap = new Map();
+                    result.datos.forEach(detail => {
+                        const ventaId = detail.Venta.idVenta;
+                        if (!salesMap.has(ventaId)) {
+                            salesMap.set(ventaId, { ...detail.Venta, products: [] });
+                        }
+                        salesMap.get(ventaId).products.push(detail);
+                    });
+
+                    groupedSalesData = Array.from(salesMap.values()).sort((a, b) => new Date(b.fechaVenta) - new Date(a.fechaVenta));
+                    
+                    initFilters(); // Populate filters based on fetched data
+                    renderGroupedSales(); // Render initial view
+
+                } catch (error) {
+                    console.error("Error fetching sales history:", error);
+                    document.getElementById('sales-container').innerHTML = `<div class="text-center py-20 opacity-30 italic hylian-font">Ningún registro hallado...</div>`;
+                }
+            }
+
+            function initFilters() {
+                const monthSelect = document.getElementById('filter-month');
+                const daySelect = document.getElementById('filter-day');
+
+                const uniqueMonths = [...new Set(groupedSalesData.map(s => new Date(s.fechaVenta).getMonth()))];
+                const uniqueDays = [...new Set(groupedSalesData.map(s => new Date(s.fechaVenta).getDate()))].sort((a, b) => a - b);
+
+                monthSelect.innerHTML = '<option value="all">Todas las Lunas</option>';
+                uniqueMonths.forEach(monthIndex => {
+                    const option = document.createElement('option');
+                    option.value = monthIndex;
+                    option.textContent = monthNames[monthIndex];
+                    monthSelect.appendChild(option);
+                });
+
+                daySelect.innerHTML = '<option value="all">Cualquier Sol</option>';
+                uniqueDays.forEach(day => {
+                    const option = document.createElement('option');
+                    option.value = day;
+                    option.textContent = String(day).padStart(2, '0');
+                    daySelect.appendChild(option);
+                });
+            }
+
+            // --- Rendering Functions ---
+            window.renderGroupedSales = function() {
+                const monthFilter = document.getElementById('filter-month').value;
+                const dayFilter = document.getElementById('filter-day').value;
+
+                const filteredSales = groupedSalesData.filter(sale => {
+                    const saleDate = new Date(sale.fechaVenta);
+                    const monthMatch = (monthFilter === 'all') || (saleDate.getMonth() == monthFilter);
+                    const dayMatch = (dayFilter === 'all') || (saleDate.getDate() == dayFilter);
+                    return monthMatch && dayMatch;
+                });
+
+                const totalRevenue = filteredSales.reduce((acc, sale) => acc + sale.montoTotal, 0);
+                document.getElementById('total-revenue').innerHTML = `${totalRevenue.toFixed(2)} <small class="text-xs">Rupias</small>`;
+                
+                const container = document.getElementById('sales-container');
+                if (filteredSales.length === 0) {
+                    container.innerHTML = `<div class="text-center py-20 opacity-30 italic hylian-font">Ningún registro hallado...</div>`;
+                    return;
+                }
+
+                container.innerHTML = filteredSales.map((sale, index) => {
+                    const saleDate = new Date(sale.fechaVenta);
+                    const formattedDate = `${String(saleDate.getDate()).padStart(2, '0')}/${String(saleDate.getMonth() + 1).padStart(2, '0')}/${saleDate.getFullYear()}`;
+                    const displayTicketNumber = filteredSales.length - index;
+                    
+                    return `
+                        <div class="sale-card" onclick="openSaleDetailsModal(${sale.idVenta}, ${displayTicketNumber})">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-yellow-900/5 rounded-full flex items-center justify-center text-xl opacity-50 font-bold">${displayTicketNumber}</div>
+                                <div>
+                                    <h3 class="hylian-font font-bold text-base text-yellow-950">Venta #${displayTicketNumber}</h3>
+                                    <span class="text-[9px] opacity-50 uppercase tracking-wider">${formattedDate}</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="block text-lg hylian-font text-green-800 font-bold">${sale.montoTotal.toFixed(2)} ◆</span>
+                                <span class="text-[9px] font-bold opacity-30 uppercase tracking-tighter">${sale.metodoPago}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // --- Modal Control ---
+            window.openSaleDetailsModal = function(saleId, displayTicketNumber) {
+                const sale = groupedSalesData.find(s => s.idVenta === saleId);
+                if (!sale) return;
+
+                const saleDate = new Date(sale.fechaVenta);
+                const formattedDate = `${String(saleDate.getDate()).padStart(2, '0')}/${String(saleDate.getMonth() + 1).padStart(2, '0')}/${saleDate.getFullYear()}`;
+
+                document.getElementById('modal-item-name').innerText = `Venta #${displayTicketNumber}`;
+                document.getElementById('modal-category').innerText = `Vendido por: ${sale.usuario.nombre} (Ticket del día: #${sale.numeroTicket})`;
+                document.getElementById('modal-customer').innerText = sale.metodoPago;
+                document.getElementById('modal-date').innerText = formattedDate;
+                document.getElementById('modal-total').innerText = `${sale.montoTotal.toFixed(2)} ◆`;
+
+                const productListHtml = sale.products.map(p => {
+                    const quantity = p.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? `${p.cantidad} gr` : `${p.cantidad} u`;
+                    return `<div class="flex justify-between text-sm py-1"><span class="opacity-80">${p.Producto.nombre}</span><span class="font-bold">${quantity}</span></div>`;
+                }).join('');
+                
+                const detailsContainer = document.querySelector('#modal-overlay-details .space-y-4');
+                const oldProductList = detailsContainer.querySelector('.product-list-dynamic');
+                if (oldProductList) oldProductList.remove();
+                
+                const productListContainer = document.createElement('div');
+                productListContainer.className = 'product-list-dynamic border-t mt-4 pt-4';
+                productListContainer.innerHTML = `<h4 class="hylian-font text-sm font-bold mb-2 text-yellow-950">Productos en esta Venta:</h4>${productListHtml}`;
+                detailsContainer.appendChild(productListContainer);
+                
+                detailsModal.style.display = 'flex';
+                setTimeout(() => detailsModal.classList.add('modal-active'), 10);
+            }
+
+            window.closeSaleDetailsModal = function() {
+                detailsModal.classList.remove('modal-active');
+                setTimeout(() => {
+                    detailsModal.style.display = 'none';
+                    const productList = detailsModal.querySelector('.product-list-dynamic');
+                    if (productList) productList.remove();
+                }, 300);
+            }
+            window.closeModalDetails = window.closeSaleDetailsModal; 
+        });
+    </script>
 </body>
 </html>
