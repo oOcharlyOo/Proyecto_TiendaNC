@@ -48,18 +48,21 @@ type UsuarioDTO = {
 
 type VentaDTO = {
   idVenta: number;
+  idUsuario?: number;
   numeroTicket?: number;
   fechaVenta?: string;
   metodoPago?: string;
   montoTotal?: number;
   estatus?: string;
   usuario?: UsuarioDTO;
+  nombreUsuario?: string;
 };
 
 type GananciasDTO = {
   cobroTotal?: number;
   gananciaTotal?: number;
   ventas?: VentaDTO[];
+  nombreUsuario?: string;
 };
 
 type CorteDTO = {
@@ -290,6 +293,11 @@ function formatoMonedaRedondeada(valor: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(redondeado);
 }
 
+function formatoMonedaRedonda(valor: number) {
+  const redondeado = Math.round(Number(valor || 0));
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(redondeado);
+}
+
 function getMaxVentas() {
   if (!mensualSemanas.value.length) return 0;
   return Math.max(...mensualSemanas.value.map(w => w.ventas), 0);
@@ -459,9 +467,16 @@ async function generarReporteDiario() {
     return;
   }
 
+  productosMasVendidos.value = [];
+  productosUnitarios.value = [];
+  productosGranel.value = [];
+  mostrarReporte.value = false;
+
   try {
     const data = await fetchApi<GananciasDTO>(`/ventas/obtenerVentaPorDia/${fechaDiaria.value}`);
+    console.log('Data response:', data);
     const ventas = Array.isArray(data?.ventas) ? data.ventas : [];
+    console.log('Ventas:', ventas);
 
     ventasEfectivo.value = ventas
       .filter((v) => ['EFECTIVO', 'Efectivo'].includes(String(v.metodoPago || '')))
@@ -492,6 +507,36 @@ async function generarReporteDiario() {
     const totalVentas = Number(data?.cobroTotal || 0);
     const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
 
+    if (data?.nombreUsuario) {
+      nombreUsuario.value = data.nombreUsuario;
+    } else {
+      const ventasCountMap = new Map<number, { nombre: string; count: number }>();
+      for (const v of ventas) {
+        const nombre = v.nombreUsuario || v.usuario?.nombre;
+        const id = v.idUsuario || v.usuario?.idUsuario;
+        if (id && nombre) {
+          const current = ventasCountMap.get(id);
+          if (current) {
+            current.count++;
+          } else {
+            ventasCountMap.set(id, { nombre, count: 1 });
+          }
+        }
+      }
+      let cajeroPrincipal = 'Varios';
+      let maxVentas = 0;
+      for (const [, dataVenta] of ventasCountMap) {
+        if (dataVenta.count > maxVentas) {
+          maxVentas = dataVenta.count;
+          cajeroPrincipal = dataVenta.nombre;
+        }
+      }
+      if (ventasCountMap.size === 1) {
+        cajeroPrincipal = Array.from(ventasCountMap.values())[0]?.nombre || 'Usuario';
+      }
+      nombreUsuario.value = cajeroPrincipal;
+    }
+
     console.log('Setting corteActual:', {
       montoInicial,
       totalVentas,
@@ -512,20 +557,30 @@ async function generarReporteDiario() {
 
     // Obtener productos más vendidos del día
     try {
-      const idsVentasDia = ventas.filter(v => v.estatus === 'C').map(v => v.idVenta);
+      const idsVentasDia = ventas.filter(v => v.estatus === 'C' || v.estatus === 'F').map(v => v.idVenta);
+      console.log('IDs ventas dia:', idsVentasDia);
       if (idsVentasDia.length > 0) {
         const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+        console.log('All details:', allDetails);
         const detallesDia = (allDetails || []).filter(d => {
           const idVenta = Number(d?.Venta?.idVenta || 0);
           return idsVentasDia.includes(idVenta);
         });
-        productosMasVendidos.value = calcularProductosMasVendidos(detallesDia);
+        console.log('Detalles filtrados:', detallesDia);
+        calcularProductosReporte(detallesDia, 'diario');
+        console.log('Productos diario:', productosDiario.value);
+        console.log('Productos unitarios diario:', productosUnitariosDiario.value);
+        console.log('Productos granel diario:', productosGranelDiario.value);
       } else {
-        productosMasVendidos.value = [];
+        productosDiario.value = [];
+        productosUnitariosDiario.value = [];
+        productosGranelDiario.value = [];
       }
     } catch (e) {
       console.error('Error al obtener productos más vendidos:', e);
-      productosMasVendidos.value = [];
+      productosDiario.value = [];
+      productosUnitariosDiario.value = [];
+      productosGranelDiario.value = [];
     }
 
     if (idUsuario.value) {
@@ -563,6 +618,14 @@ const productosMasVendidos = shallowRef<ProductoVendido[]>([]);
 const productosUnitarios = shallowRef<ProductoVendido[]>([]);
 const productosGranel = shallowRef<ProductoVendido[]>([]);
 
+const productosDiario = shallowRef<ProductoVendido[]>([]);
+const productosUnitariosDiario = shallowRef<ProductoVendido[]>([]);
+const productosGranelDiario = shallowRef<ProductoVendido[]>([]);
+
+const productosMensual = shallowRef<ProductoVendido[]>([]);
+const productosUnitariosMensual = shallowRef<ProductoVendido[]>([]);
+const productosGranelMensual = shallowRef<ProductoVendido[]>([]);
+
 function formatearCantidad(cantidad: number, isGramaje: boolean): string {
   if (!isGramaje) {
     return `${cantidad} pzs`;
@@ -581,7 +644,8 @@ function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
     const nombre = d.productoNombre || 'Producto eliminado';
     const cantidad = Number(d.cantidad || 0);
     const importe = Number(d.precioUnitarioVenta || 0) * cantidad;
-    const isGramaje = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+    const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
+    const isGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
 
     if (!productosMap.has(nombre)) {
       productosMap.set(nombre, { nombre, cantidadTotal: 0, montoTotal: 0, isGramaje });
@@ -596,13 +660,62 @@ function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
   }
 
   const sorted = Array.from(productosMap.values())
-    .sort((a, b) => b.cantidadTotal - a.cantidadTotal)
-    .slice(0, 10);
+    .sort((a, b) => b.cantidadTotal - a.cantidadTotal);
 
-  productosUnitarios.value = sorted.filter(p => !p.isGramaje);
-  productosGranel.value = sorted.filter(p => p.isGramaje);
+  const unitarios = sorted.filter(p => !p.isGramaje);
+  const granel = sorted.filter(p => p.isGramaje);
+
+  productosMasVendidos.value = sorted;
+  productosUnitarios.value = unitarios;
+  productosGranel.value = granel;
   
   return sorted;
+}
+
+function calcularProductosReporte(detalles: VentaDetalleDTO[], tipo: 'diario' | 'mensual') {
+  const productosMap = new Map<string, ProductoVendido>();
+
+  for (const d of detalles) {
+    const nombre = d.productoNombre || 'Producto eliminado';
+    const cantidad = Number(d.cantidad || 0);
+    const importe = Number(d.precioUnitarioVenta || 0) * cantidad;
+    const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
+    const isGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+
+    if (!productosMap.has(nombre)) {
+      productosMap.set(nombre, { nombre, cantidadTotal: 0, montoTotal: 0, isGramaje });
+    }
+
+    const producto = productosMap.get(nombre)!;
+    producto.cantidadTotal += cantidad;
+    producto.montoTotal += importe;
+    if (isGramaje) {
+      producto.isGramaje = true;
+    }
+  }
+
+  const unitarios = Array.from(productosMap.values()).filter(p => !p.isGramaje);
+  const granel = Array.from(productosMap.values()).filter(p => p.isGramaje);
+
+  if (tipo === 'diario') {
+    const sortedUnitarios = unitarios.sort((a, b) => b.montoTotal - a.montoTotal).slice(0, 5);
+    const sortedGranel = granel.sort((a, b) => b.montoTotal - a.montoTotal).slice(0, 5);
+    productosDiario.value = [...sortedUnitarios, ...sortedGranel];
+    productosUnitariosDiario.value = sortedUnitarios;
+    productosGranelDiario.value = sortedGranel;
+  } else {
+    const sorted = Array.from(productosMap.values())
+      .sort((a, b) => b.cantidadTotal - a.cantidadTotal)
+      .slice(0, 10);
+    const sortedLimitado = sorted.slice(0, 10);
+    const unitariosLimitado = sortedLimitado.filter(p => !p.isGramaje);
+    const granelLimitado = sortedLimitado.filter(p => p.isGramaje);
+    productosMensual.value = sortedLimitado;
+    productosUnitariosMensual.value = unitariosLimitado;
+    productosGranelMensual.value = granelLimitado;
+  }
+  
+  return unitarios;
 }
 
 function getChartData(productos: ProductoVendido[]) {
@@ -655,7 +768,220 @@ const chartData = computed(() => getChartData(productosMasVendidos.value));
 const chartDataUnitarios = computed(() => getChartData(productosUnitarios.value));
 const chartDataGranel = computed(() => getChartData(productosGranel.value));
 
+const chartDataCombinado = computed(() => {
+  const unitarios = productosUnitarios.value;
+  const granel = productosGranel.value;
+  
+  if (unitarios.length === 0 && granel.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  const allProducts = [...unitarios, ...granel];
+  const labels = allProducts.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  const data = allProducts.map(p => p.cantidadTotal);
+  const isGramaje = allProducts.map(p => p.isGramaje);
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Cantidad Vendida',
+      data,
+      backgroundColor: isGramaje.map(g => g ? 'rgba(75, 192, 192, 0.8)' : 'rgba(54, 162, 235, 0.8)'),
+      borderColor: isGramaje.map(g => g ? 'rgb(75, 192, 192)' : 'rgb(54, 162, 235)'),
+      borderWidth: 2,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  };
+});
+
+const chartOptionsCombinado = computed(() => {
+  const allProducts = [...productosUnitarios.value, ...productosGranel.value];
+  return getChartOptions(allProducts);
+});
+
+const chartDataDiarioCombinado = computed(() => {
+  const unitarios = productosUnitariosDiario.value;
+  const granel = productosGranelDiario.value;
+  
+  if (unitarios.length === 0 && granel.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  const allProducts = [...unitarios, ...granel];
+  const labels = allProducts.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  const data = allProducts.map(p => p.montoTotal);
+  const isGramaje = allProducts.map(p => p.isGramaje);
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Monto Vendido',
+      data,
+      backgroundColor: isGramaje.map(g => g ? 'rgba(75, 192, 192, 0.8)' : 'rgba(54, 162, 235, 0.8)'),
+      borderColor: isGramaje.map(g => g ? 'rgb(75, 192, 192)' : 'rgb(54, 162, 235)'),
+      borderWidth: 2,
+    }]
+  };
+});
+
+const chartDataDiarioUnitarios = computed(() => {
+  const productos = productosUnitariosDiario.value;
+  if (!productos.length) return { labels: [], datasets: [] };
+  const labels = productos.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  return {
+    labels,
+    datasets: [{
+      label: 'Monto Vendido',
+      data: productos.map(p => p.montoTotal),
+      backgroundColor: [
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(153, 102, 255, 0.8)',
+        'rgba(255, 159, 64, 0.8)'
+      ],
+      borderColor: [
+        'rgb(54, 162, 235)',
+        'rgb(255, 99, 132)',
+        'rgb(255, 206, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)'
+      ],
+      borderWidth: 2,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  };
+});
+
+const chartDataDiarioGranel = computed(() => {
+  const productos = productosGranelDiario.value;
+  if (!productos.length) return { labels: [], datasets: [] };
+  const labels = productos.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  return {
+    labels,
+    datasets: [{
+      label: 'Monto Vendido',
+      data: productos.map(p => p.montoTotal),
+      backgroundColor: [
+        'rgba(75, 192, 192, 0.8)',
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(153, 102, 255, 0.8)',
+        'rgba(255, 159, 64, 0.8)'
+      ],
+      borderColor: [
+        'rgb(75, 192, 192)',
+        'rgb(255, 99, 132)',
+        'rgb(255, 206, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)'
+      ],
+      borderWidth: 2,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  };
+});
+
+const chartOptionsDiarioDoughnut = computed(() => {
+  const textColor = getChartTextColor();
+  const isSmall = windowWidth.value < 480;
+  const fontSize = isSmall ? 10 : 12;
+  
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right' as const,
+        labels: {
+          color: textColor,
+          font: { size: fontSize },
+          padding: 10,
+          generateLabels: (chart: any) => {
+            const datasets = chart.data.datasets;
+            return chart.data.labels.map((label: string, i: number) => ({
+              text: label,
+              fillStyle: datasets[0].backgroundColor[i],
+              strokeStyle: datasets[0].borderColor[i],
+              lineWidth: 2,
+              index: i
+            }));
+          }
+        }
+      },
+      tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
+        callbacks: {
+          label: (context: any) => {
+            const producto = productosDiario.value[context.dataIndex];
+            return [
+              `Monto: ${formatoMoneda(producto?.montoTotal || 0)}`,
+              `Cantidad: ${formatearCantidad(producto?.cantidadTotal || 0, producto?.isGramaje || false)}`
+            ];
+          }
+        }
+      }
+    }
+  };
+});
+
+const chartOptionsDiarioCombinado = computed(() => {
+  const allProducts = [...productosUnitariosDiario.value, ...productosGranelDiario.value];
+  return getChartOptions(allProducts);
+});
+
+const chartOptionsDiarioUnitarios = computed(() => getChartOptions(productosUnitariosDiario.value));
+const chartOptionsDiarioGranel = computed(() => getChartOptions(productosGranelDiario.value));
+
+const chartDataMensualCombinado = computed(() => {
+  const unitarios = productosUnitariosMensual.value;
+  const granel = productosGranelMensual.value;
+  
+  if (unitarios.length === 0 && granel.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  const allProducts = [...unitarios, ...granel];
+  const labels = allProducts.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre);
+  const data = allProducts.map(p => p.cantidadTotal);
+  const isGramaje = allProducts.map(p => p.isGramaje);
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Cantidad Vendida',
+      data,
+      backgroundColor: isGramaje.map(g => g ? 'rgba(75, 192, 192, 0.8)' : 'rgba(54, 162, 235, 0.8)'),
+      borderColor: isGramaje.map(g => g ? 'rgb(75, 192, 192)' : 'rgb(54, 162, 235)'),
+      borderWidth: 2,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  };
+});
+
+const chartDataMensualUnitarios = computed(() => getChartData(productosUnitariosMensual.value));
+const chartDataMensualGranel = computed(() => getChartData(productosGranelMensual.value));
+
+const chartOptionsMensualCombinado = computed(() => {
+  const allProducts = [...productosUnitariosMensual.value, ...productosGranelMensual.value];
+  return getChartOptions(allProducts);
+});
+
+const chartOptionsMensualUnitarios = computed(() => getChartOptions(productosUnitariosMensual.value));
+const chartOptionsMensualGranel = computed(() => getChartOptions(productosGranelMensual.value));
+
 function getChartOptions(productos: ProductoVendido[]) {
+  const isSmall = windowWidth.value < 480;
+  const isMedium = windowWidth.value >= 480 && windowWidth.value < 768;
+  const isLarge = windowWidth.value >= 1200;
+  
+  const fontSize = isSmall ? 9 : isMedium ? 10 : isLarge ? 14 : 12;
+
   return {
     indexAxis: 'y' as const,
     responsive: true,
@@ -665,6 +991,8 @@ function getChartOptions(productos: ProductoVendido[]) {
         display: false
       },
       tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
         callbacks: {
           label: (context: any) => {
             const producto = productos[context.dataIndex];
@@ -684,7 +1012,7 @@ function getChartOptions(productos: ProductoVendido[]) {
         },
         ticks: {
           color: getZeldaGoldColor(),
-          font: { size: windowWidth.value < 600 ? 10 : 12 }
+          font: { size: fontSize }
         }
       },
       y: {
@@ -693,7 +1021,7 @@ function getChartOptions(productos: ProductoVendido[]) {
         },
         ticks: {
           color: getZeldaGoldColor(),
-          font: { size: windowWidth.value < 600 ? 10 : 12 }
+          font: { size: fontSize }
         }
       }
     }
@@ -738,6 +1066,11 @@ const weeklyChartData = computed(() => {
 
 const weeklyChartOptions = computed(() => {
   const textColor = getChartTextColor();
+  const isSmall = windowWidth.value < 480;
+  const isMedium = windowWidth.value >= 480 && windowWidth.value < 768;
+  const isLarge = windowWidth.value >= 1200;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : isLarge ? 14 : 12;
+  
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -746,12 +1079,14 @@ const weeklyChartOptions = computed(() => {
         position: 'top' as const,
         labels: {
           color: textColor,
-          font: { size: windowWidth.value < 600 ? 10 : 12 },
-          boxWidth: windowWidth.value < 600 ? 12 : 15,
-          padding: windowWidth.value < 600 ? 8 : 15
+          font: { size: fontSize },
+          boxWidth: isSmall ? 10 : isMedium ? 12 : 18,
+          padding: isSmall ? 5 : isMedium ? 10 : 15
         }
       },
       tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
         callbacks: {
           label: (context: any) => {
             return `${context.dataset.label}: ${formatoMoneda(context.raw)}`;
@@ -766,7 +1101,7 @@ const weeklyChartOptions = computed(() => {
         },
         ticks: {
           color: textColor,
-          font: { size: windowWidth.value < 600 ? 10 : 12 }
+          font: { size: fontSize }
         }
       },
       y: {
@@ -777,7 +1112,7 @@ const weeklyChartOptions = computed(() => {
         ticks: {
           callback: (value: any) => formatoMoneda(value),
           color: textColor,
-          font: { size: windowWidth.value < 600 ? 9 : 11 }
+          font: { size: fontSize - 1 }
         }
       }
     }
@@ -832,20 +1167,27 @@ const cortePieChartData = computed(() => {
 
 const cortePieChartOptions = computed(() => {
   const textColor = getChartTextColor();
+  const isSmall = windowWidth.value < 480;
+  const isMedium = windowWidth.value >= 480 && windowWidth.value < 768;
+  const isLarge = windowWidth.value >= 1200;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : isLarge ? 14 : 12;
+  
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: windowWidth.value < 600 ? 'bottom' as const : 'right' as const,
+        position: isSmall ? 'bottom' as const : 'right' as const,
         labels: {
           color: textColor,
-          padding: windowWidth.value < 600 ? 10 : 15,
-          font: { size: windowWidth.value < 600 ? 10 : 12 },
-          boxWidth: windowWidth.value < 600 ? 12 : 15
+          padding: isSmall ? 8 : isMedium ? 12 : 18,
+          font: { size: fontSize },
+          boxWidth: isSmall ? 10 : isMedium ? 12 : 18
         }
       },
       tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
         callbacks: {
           label: (context: any) => {
             const label = context.label || '';
@@ -1026,7 +1368,7 @@ async function generarReporteMensual() {
       .reduce((sum, s) => sum + Number(s.totalVenta || 0), 0);
 
     mensualSemanas.value = calcularSemanasMensual(monthlySales, targetMonth, year);
-    productosMasVendidos.value = calcularProductosMasVendidos(monthlyDetails);
+    calcularProductosReporte(monthlyDetails, 'mensual');
     rangoFechasSemanas.value = null;
     mostrarMensaje('Reporte mensual generado.', 'ok');
   } catch (error) {
@@ -1034,7 +1376,9 @@ async function generarReporteMensual() {
     mensualTotalGanancias.value = 0;
     mensualTotalTransferencia.value = 0;
     mensualSemanas.value = [];
-    productosMasVendidos.value = [];
+    productosMensual.value = [];
+    productosUnitariosMensual.value = [];
+    productosGranelMensual.value = [];
     mostrarMensaje(`Error al generar reporte mensual: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -1139,7 +1483,7 @@ async function generarReporteRangoFechas() {
       dias: `${data.diasInicio.getDate()}/${data.diasInicio.getMonth() + 1} - ${data.diasFin.getDate()}/${data.diasFin.getMonth() + 1}`
     }));
 
-    productosMasVendidos.value = calcularProductosMasVendidos(rangeDetails);
+    calcularProductosReporte(rangeDetails, 'mensual');
 
     mostrarMensaje(`Reporte del ${fechaRangoInicio.value} al ${fechaRangoFin.value} generado.`, 'ok');
   } catch (error) {
@@ -1147,7 +1491,9 @@ async function generarReporteRangoFechas() {
     mensualTotalGanancias.value = 0;
     mensualTotalTransferencia.value = 0;
     mensualSemanas.value = [];
-    productosMasVendidos.value = [];
+    productosMensual.value = [];
+    productosUnitariosMensual.value = [];
+    productosGranelMensual.value = [];
     mostrarMensaje(`Error al generar reporte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -1387,7 +1733,7 @@ onMounted(() => {
           <article class="card-metric"><p>Otras Entradas</p><strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong></article>
           <article class="card-metric"><p>Total Egresos</p><strong class="clickable" @click="abrirModalEgresos">{{ formatoMoneda(corteActual.totalEgresos) }}</strong></article>
           <article class="card-metric"><p>Apartado ({{ nombreApartadoActivo }})</p><strong class="clickable" @click="abrirModalApartados">{{ formatoMoneda(totalApartarDiario) }}</strong></article>
-          <article class="card-metric"><p>Ganancia Total</p><strong>{{ formatoMoneda(corteActual.gananciaTotal) }}</strong></article>
+          <article class="card-metric"><p>Ganancia Total</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaTotal) }}</strong></article>
           <article class="card-metric total"><p>Saldo Final Calculado</p><strong>{{ formatoMoneda(corteActual.saldoFinalCalculado) }}</strong></article>
         </div>
 
@@ -1398,13 +1744,13 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="productosUnitarios.length > 0" class="top-products-chart">
+        <div v-if="productosUnitariosDiario.length > 0" class="top-products-chart">
           <h4>🏆 Productos Unitarios Más Vendidos</h4>
           <div class="chart-container">
-            <Bar :data="chartDataUnitarios" :options="chartOptionsUnitarios" />
+            <Bar :data="chartDataDiarioUnitarios" :options="chartOptionsDiarioUnitarios" />
           </div>
           <div class="product-summary">
-            <div v-for="(producto, index) in productosUnitarios" :key="`diario-u-${producto.nombre}`" class="product-summary-item">
+            <div v-for="(producto, index) in productosUnitariosDiario" :key="`diario-u-${producto.nombre}`" class="product-summary-item">
               <span class="summary-rank">{{ index + 1 }}</span>
               <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
               <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
@@ -1413,13 +1759,13 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="productosGranel.length > 0" class="top-products-chart">
+        <div v-if="productosGranelDiario.length > 0" class="top-products-chart">
           <h4>🏆 Productos a Granel Más Vendidos</h4>
           <div class="chart-container">
-            <Bar :data="chartDataGranel" :options="chartOptionsGranel" />
+            <Bar :data="chartDataDiarioGranel" :options="chartOptionsDiarioGranel" />
           </div>
           <div class="product-summary">
-            <div v-for="(producto, index) in productosGranel" :key="`diario-g-${producto.nombre}`" class="product-summary-item">
+            <div v-for="(producto, index) in productosGranelDiario" :key="`diario-g-${producto.nombre}`" class="product-summary-item">
               <span class="summary-rank">{{ index + 1 }}</span>
               <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
               <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
@@ -1486,7 +1832,7 @@ onMounted(() => {
         <div class="monthly-stats">
           <article><p>Ventas Totales</p><strong>{{ formatoMoneda(mensualTotalVentas) }}</strong></article>
           <article><p>Transferencia</p><strong>{{ formatoMoneda(mensualTotalTransferencia) }}</strong></article>
-          <article><p>Ganancias</p><strong>{{ formatoMoneda(mensualTotalGanancias) }}</strong></article>
+          <article><p>Ganancias</p><strong>{{ formatoMonedaRedonda(mensualTotalGanancias) }}</strong></article>
         </div>
 
         <div class="weekly-chart">
@@ -1501,21 +1847,21 @@ onMounted(() => {
               <span class="week-label">Semana {{ w.semana }}</span>
               <span class="week-dates">{{ w.dias }}</span>
               <span class="week-sales">Ventas: {{ formatoMoneda(w.ventas) }}</span>
-              <span class="week-profit">Ganancia: {{ formatoMoneda(w.ganancia) }}</span>
+              <span class="week-profit">Ganancia: {{ formatoMonedaRedonda(w.ganancia) }}</span>
             </div>
           </div>
         </div>
 
-        <div v-if="productosUnitarios.length > 0 || productosGranel.length > 0" class="top-products-chart">
+        <div v-if="productosUnitariosMensual.length > 0 || productosGranelMensual.length > 0" class="top-products-chart">
           <h4>🏆 Productos Más Vendidos</h4>
           
-          <div v-if="productosUnitarios.length > 0">
+          <div v-if="productosUnitariosMensual.length > 0">
             <h5 class="chart-subtitle">📦 Unitarios</h5>
             <div class="chart-container">
-              <Bar :data="chartDataUnitarios" :options="chartOptionsUnitarios" />
+              <Bar :data="chartDataMensualUnitarios" :options="chartOptionsMensualUnitarios" />
             </div>
             <div class="product-summary">
-              <div v-for="(producto, index) in productosUnitarios" :key="`summary-u-${producto.nombre}`" class="product-summary-item">
+              <div v-for="(producto, index) in productosUnitariosMensual" :key="`summary-u-${producto.nombre}`" class="product-summary-item">
                 <span class="summary-rank">{{ index + 1 }}</span>
                 <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
                 <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
@@ -1524,27 +1870,18 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="productosGranel.length > 0">
+          <div v-if="productosGranelMensual.length > 0">
             <h5 class="chart-subtitle">⚖️ Granel</h5>
             <div class="chart-container">
-              <Bar :data="chartDataGranel" :options="chartOptionsGranel" />
+              <Bar :data="chartDataMensualGranel" :options="chartOptionsMensualGranel" />
             </div>
             <div class="product-summary">
-              <div v-for="(producto, index) in productosGranel" :key="`summary-g-${producto.nombre}`" class="product-summary-item">
+              <div v-for="(producto, index) in productosGranelMensual" :key="`summary-g-${producto.nombre}`" class="product-summary-item">
                 <span class="summary-rank">{{ index + 1 }}</span>
                 <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
                 <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
                 <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
               </div>
-            </div>
-          </div>
-
-          <div v-if="productosMasVendidos.length > 0 && productosMasVendidos.length > (productosUnitarios.length + productosGranel.length)" class="product-summary">
-            <div v-for="(producto, index) in productosMasVendidos" :key="`summary-${producto.nombre}`" class="product-summary-item">
-              <span class="summary-rank">{{ index + 1 }}</span>
-              <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
-              <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-              <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
             </div>
           </div>
         </div>
@@ -2239,9 +2576,16 @@ onMounted(() => {
   padding: 0.5rem;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .chart-container-weekly {
-    height: 220px;
+    height: 200px;
+    padding: 0.3rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .chart-container-weekly {
+    height: 240px;
   }
 }
 
@@ -2338,10 +2682,18 @@ onMounted(() => {
   padding: 0.5rem;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .pie-chart-container {
-    height: 200px;
-    max-width: 280px;
+    height: 180px;
+    max-width: 220px;
+    padding: 0.3rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .pie-chart-container {
+    height: 220px;
+    max-width: 300px;
   }
 }
 
@@ -2529,9 +2881,16 @@ onMounted(() => {
   padding: 0.5rem;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .chart-container {
-    height: 250px;
+    height: 220px;
+    padding: 0.3rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .chart-container {
+    height: 260px;
   }
 }
 
