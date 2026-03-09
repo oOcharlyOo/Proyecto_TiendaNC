@@ -121,42 +121,80 @@ function cerrarSesion() {
         </ul>
 
         <div class="theme-selector">
-          <button 
-            type="button" 
-            class="theme-btn" 
-            :class="{ active: currentTheme === 'zelda' }"
-            @click="setTheme('zelda')"
-            title="Tema Zelda"
-          >
-            🛡️
-          </button>
-          <button 
-            type="button" 
-            class="theme-btn" 
-            :class="{ active: currentTheme === 'alforja' }"
-            @click="setTheme('alforja')"
-            title="Tema Alforja"
-          >
-            🎒
-          </button>
-          <button 
-            type="button" 
-            class="theme-btn" 
-            :class="{ active: currentTheme === 'skyward' }"
-            @click="setTheme('skyward')"
-            title="Tema Skyward"
-          >
-            ☁️
-          </button>
-          <button 
-            type="button" 
-            class="theme-btn" 
-            :class="{ active: currentTheme === 'deathmountain' }"
-            @click="setTheme('deathmountain')"
-            title="Tema Muerte Montaña"
-          >
-            🌋
-          </button>
+          <div class="theme-carousel" ref="carouselRef">
+            <button 
+              type="button" 
+              class="theme-btn" 
+              :class="{ active: currentTheme === 'zelda' }"
+              @click="setTheme('zelda')"
+              title="Tema Zelda"
+            >
+              🛡️
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn" 
+              :class="{ active: currentTheme === 'alforja' }"
+              @click="setTheme('alforja')"
+              title="Tema Alforja"
+            >
+              🎒
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn" 
+              :class="{ active: currentTheme === 'skyward' }"
+              @click="setTheme('skyward')"
+              title="Tema Skyward"
+            >
+              ☁️
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn" 
+              :class="{ active: currentTheme === 'deathmountain' }"
+              @click="setTheme('deathmountain')"
+              title="Tema Muerte Montaña"
+            >
+              🌋
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn dark" 
+              :class="{ active: currentTheme === 'darkforest' }"
+              @click="setTheme('darkforest')"
+              title="Tema Bosque Oscuro"
+            >
+              🌲
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn dark" 
+              :class="{ active: currentTheme === 'darkmountain' }"
+              @click="setTheme('darkmountain')"
+              title="Tema Montaña Oscura"
+            >
+              ⛰️
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn dark" 
+              :class="{ active: currentTheme === 'darkskyward' }"
+              @click="setTheme('darkskyward')"
+              title="Tema Cielo Oscuro"
+            >
+              🌙
+            </button>
+            <button 
+              type="button" 
+              class="theme-btn dark" 
+              :class="{ active: currentTheme === 'darknight' }"
+              @click="setTheme('darknight')"
+              title="Tema Noche Oscura"
+            >
+              ⭐
+            </button>
+          </div>
         </div>
 
         <button type="button" class="logout-btn" @click="cerrarSesion">
@@ -235,8 +273,25 @@ function cerrarSesion() {
 
 .theme-selector {
   display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: center;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.theme-selector::-webkit-scrollbar {
+  display: none;
+}
+
+.theme-carousel {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 0.3rem;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .theme-btn {
@@ -251,6 +306,23 @@ function cerrarSesion() {
   align-items: center;
   justify-content: center;
   transition: transform 0.2s, filter 0.2s;
+  scroll-snap-align: center;
+  flex-shrink: 0;
+}
+
+.theme-btn.dark {
+  background: linear-gradient(180deg, #3d3d3d 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border-color: #f8d667;
+}
+
+.theme-btn.dark:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(248, 214, 103, 0.6);
+}
+
+.theme-btn.dark.active {
+  filter: brightness(1.3);
+  box-shadow: 0 0 10px rgba(248, 214, 103, 0.9);
 }
 
 .theme-btn:hover {
@@ -356,6 +428,14 @@ function cerrarSesion() {
     transform: translateX(-50%);
   }
 
+  .theme-carousel {
+    width: auto;
+    max-width: 400px;
+    overflow: hidden;
+    flex-wrap: nowrap;
+    scroll-behavior: smooth;
+  }
+
   .menu-user-section {
     display: flex;
     flex-direction: column;
@@ -413,7 +493,7 @@ function cerrarSesion() {
     position: absolute;
     top: 100%;
     right: 0;
-    width: 220px;
+    width: max-content;
     background: var(--bg-primary);
     border: 3px solid #f8d667;
     border-radius: 8px;
@@ -444,6 +524,14 @@ function cerrarSesion() {
     padding: 0.5rem 0;
     border-top: 1px solid rgba(248, 214, 103, 0.3);
     border-bottom: 1px solid rgba(248, 214, 103, 0.3);
+    overflow-x: auto;
+  }
+
+  .theme-carousel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+
   }
 
   .logout-btn {
@@ -564,6 +652,17 @@ function cerrarSesion() {
       width: 100%;
       padding: 0.62rem 0.6rem;
     }
+
+  .theme-selector {
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: visible;
+  }
+
+  .theme-carousel {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
 @keyframes pixelDrop {

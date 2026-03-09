@@ -153,7 +153,7 @@ function formatoFecha(fecha?: string) {
 .modal-card {
   width: min(100%, 920px);
   max-height: 90vh;
-  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
+  background: linear-gradient(var(--bg-primary));
   border: 4px solid #f8d667;
   box-shadow: 
     0 0 0 4px #2f1f09,
@@ -305,7 +305,7 @@ th {
   position: sticky;
   top: 0;
   background: var(--bg-panel, #e8d790);
-  color: var(--border-color, #1a1401);
+  color: var(--text-primary, #1a1401);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 700;

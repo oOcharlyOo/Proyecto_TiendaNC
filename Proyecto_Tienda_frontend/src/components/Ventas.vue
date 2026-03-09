@@ -1634,6 +1634,7 @@ async function processVoiceCommand(comando: string) {
   animation: fadeIn 150ms ease-out;
 }
 
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1762,7 +1763,6 @@ async function processVoiceCommand(comando: string) {
   color: #a3a380;
   margin: 0;
   padding-bottom: 0.5rem;
-  border-bottom: 1px dashed rgba(248, 214, 103, 0.3);
 }
 
 .detalle-content {
@@ -1826,7 +1826,6 @@ async function processVoiceCommand(comando: string) {
 }
 
 .detalle-cantidad {
-  background: #2a1807;
   color: #f8d667;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -1850,7 +1849,7 @@ async function processVoiceCommand(comando: string) {
 
 .detalle-subtotal {
   font-size: 1rem;
-  color: #67e0a8;
+  color: var(--success-color);
   font-weight: 700;
 }
 
@@ -1983,23 +1982,23 @@ async function processVoiceCommand(comando: string) {
 }
 
 .ventas-layout .btn-cobrar {
-  background: linear-gradient(180deg, #67e0a8 0%, #2a9d5c 100%);
-  color: #1a1401;
+  background: linear-gradient(var(--bg-primary), var(--success-color));
+  color: var(--text-primary);
 }
 
 .ventas-layout .btn-salida {
-  background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
-  color: #fff;
+  background: linear-gradient(var(--bg-primary), var(--error-color));
+  color: var(--text-primary);
 }
 
 .ventas-layout .btn-entrada {
-  background: linear-gradient(180deg, #86efac 0%, #22c55e 100%);
-  color: #1a1401;
+  background: linear-gradient(var(--bg-primary), var(--infoBlueColor));
+  color: var(--text-primary);
 }
 
 .ventas-layout .btn-historial {
-  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
-  color: #fff;
+  background: linear-gradient(var(--bg-primary), var(--hystorybtn));
+  color: var(--text-primary);
 }
 
 .ventas-layout .btn-limpiar {
@@ -2518,26 +2517,6 @@ async function processVoiceCommand(comando: string) {
   transition: transform 80ms steps(2), filter 80ms linear;
 }
 
-.acciones-grid button:first-child {
-  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
-  color: #0a2008;
-}
-
-.acciones-grid button:nth-child(2) {
-  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
-  color: #fff;
-}
-
-.acciones-grid button:nth-child(3) {
-  background: linear-gradient(180deg, #8bcfff 0%, #4a9ed4 50%, #2d7aa8 100%);
-  color: #fff;
-}
-
-.acciones-grid button:nth-child(4) {
-  background: linear-gradient(180deg, #c4a3ff 0%, #8a5cd4 50%, #5d2ea8 100%);
-  color: #fff;
-}
-
 .acciones-grid button:hover {
   filter: brightness(1.1);
   transform: translateY(-2px);
@@ -2829,28 +2808,24 @@ async function processVoiceCommand(comando: string) {
   background: #a32d2d;
 }
 
+.detalle-venta-modal {
+  height: max-content;
+}
+
 .detalle-content {
-  max-height: 400px;
-  overflow-y: auto;
-  border: 3px solid #2a1807;
-  background: #f2e8bf;
+  max-height: max-content;
+    overflow-y: auto;
   padding: 0.5rem;
 }
 
 .detalle-item {
+  border: solid var(--zelda-amber);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.6rem;
-  border-bottom: 1px dashed #baa15c;
-  background: #fff;
   margin-bottom: 0.3rem;
 }
-
-.detalle-item:last-child {
-  border-bottom: none;
-}
-
 .detalle-info {
   display: flex;
   flex-direction: column;
@@ -2859,12 +2834,12 @@ async function processVoiceCommand(comando: string) {
 
 .detalle-info strong {
   font-size: 0.85rem;
-  color: #1d1606;
+  color: var(--text-primary);
 }
 
 .detalle-cantidad {
   font-size: 0.75rem;
-  color: #5a4a2a;
+  color: var(--zelda-gold);
   font-family: "Courier New", monospace;
 }
 
@@ -2878,7 +2853,6 @@ async function processVoiceCommand(comando: string) {
 .detalle-subtotal {
   display: block;
   font-weight: 700;
-  color: #1f5b35;
   font-size: 0.85rem;
 }
 

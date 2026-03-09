@@ -9,6 +9,8 @@
   --bg-secondary: #133523;
   --bg-panel: #1f5b35;
   --text-primary: #f6f2de;
+  --infoBlueColor: #6e96b8;
+  --hystorybtn: purple;
   --text-secondary: #a3a380;
   --border-color: #2a1807;
   --accent-color: #f8d667;
@@ -244,7 +246,7 @@
   --border-color: #0d2840;
   --accent-color: #ffd700;
   --accent-hover: #ffed4a;
-  --success-color: #4ecdc4;
+  --success-color: #4ecd85;
   --error-color: #ff6b6b;
   --shadow-color: rgba(0, 0, 0, 0.3);
   
@@ -490,8 +492,13 @@
 [data-theme="deathmountain"] .modal-card,
 [data-theme="skyward"] .modal-card,
 [data-theme="zelda"] .modal-card,
-[data-theme="alforja"] .modal-card {
-  background: linear-gradient(180deg, var(--gradient-panel-start) 0%, var(--gradient-panel-end) 100%) !important;
+[data-theme="alforja"] .modal-card,
+[data-theme="darkmountain"] .modal-card,
+[data-theme="darknight"] .modal-card,
+[data-theme="darkskyward"] .modal-card,
+[data-theme="darkforest"] .modal-card
+{
+  background: linear-gradient(var(--bg-primary)) !important;
   border: var(--border-width-thick) solid var(--accent-color) !important;
   box-shadow: var(--shadow-inner) var(--border-color), 0 8px 0 var(--border-color), 0 12px 24px var(--shadow-color) !important;
 }
@@ -1464,9 +1471,9 @@
 [data-theme="deathmountain"] .btn-historial,
 [data-theme="skyward"] .btn-historial,
 [data-theme="alforja"] .btn-historial {
-  background: linear-gradient(180deg, var(--accent-color) 0%, var(--gradient-btn-mid) 100%) !important;
+  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--hystorybtn) 100%) !important;
   border: 2px solid var(--border-color) !important;
-  color: var(--border-color) !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="deathmountain"] .btn-cancelar,
@@ -1655,4 +1662,269 @@
   background:  linear-gradient(var(--error-color), var(--error-color));
   color: #721c24;
   border: 1px solid #f5c6cb;
+}
+
+/* ================================================
+   TEMAS DARK - 4 temas adicionales
+   ================================================ */
+
+/* Dark Forest - Verde oscuro */
+[data-theme="darkforest"] {
+  --bg-primary: #0d1a12;
+  --bg-secondary: #152a1f;
+  --bg-panel: rgba(21, 42, 31, 0.8);
+  --text-primary: #e8f5e9;
+  --text-secondary: rgba(232, 245, 233, 0.7);
+  --border-color: rgba(102, 187, 106, 0.25);
+  --accent-color: #81c784;
+  --accent-hover: rgba(129, 199, 132, 0.2);
+  --success-color: #81c784;
+  --error-color: #e57373;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --gradient-btn: rgba(129, 199, 132, 0.15);
+  --gradient-panel: linear-gradient(180deg, #152a1f 0%, #0d1a12 100%);
+  --gradient-bg: linear-gradient(180deg, #0d1a12 0%, #050f08 100%);
+  --chart-border: rgba(102, 187, 106, 0.25);
+  --chart-bg: rgba(21, 42, 31, 0.5);
+  --chart-text: #e8f5e9;
+  --chart-item-bg: rgba(255,255,255,0.05);
+  --chart-qty: rgba(232, 245, 233, 0.6);
+  --chart-amount: #81c784;
+  --zelda-gold: #81c784;
+  --pixel-gold: #81c784;
+  --pixel-paper: #e8f5e9;
+  --accent-light: rgba(129, 199, 132, 0.15);
+  --accent-medium: rgba(129, 199, 132, 0.25);
+  --success-light: rgba(129, 199, 132, 0.15);
+  --success-medium: rgba(129, 199, 132, 0.25);
+  --error-light: rgba(229, 115, 115, 0.15);
+  --error-medium: rgba(229, 115, 115, 0.25);
+  --dark-overlay: rgba(0, 0, 0, 0.3);
+  --dark-overlay-heavy: rgba(0, 0, 0, 0.5);
+  --secondary-accent: rgba(144, 202, 249, 0.2);
+  --border-width: 1px;
+  --border-radius: 6px;
+}
+
+/* Dark Mountain - Gris oscuro rocoso */
+[data-theme="darkmountain"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-panel: rgba(45, 45, 45, 0.9);
+  --text-primary: #e0e0e0;
+  --text-secondary: rgba(224, 224, 224, 0.7);
+  --border-color: rgba(255, 255, 255, 0.15);
+  --accent-color: #bdbdbd;
+  --accent-hover: rgba(189, 189, 189, 0.2);
+  --success-color: #81c784;
+  --error-color: #e57373;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --gradient-btn: rgba(189, 189, 189, 0.1);
+  --gradient-panel: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+  --gradient-bg: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+  --chart-border: rgba(255, 255, 255, 0.15);
+  --chart-bg: rgba(45, 45, 45, 0.6);
+  --chart-text: #e0e0e0;
+  --chart-item-bg: rgba(255,255,255,0.03);
+  --chart-qty: rgba(224, 224, 224, 0.6);
+  --chart-amount: #81c784;
+  --zelda-gold: #bdbdbd;
+  --pixel-gold: #bdbdbd;
+  --pixel-paper: #e0e0e0;
+  --accent-light: rgba(189, 189, 189, 0.15);
+  --accent-medium: rgba(189, 189, 189, 0.25);
+  --success-light: rgba(129, 199, 132, 0.15);
+  --success-medium: rgba(129, 199, 132, 0.25);
+  --error-light: rgba(229, 115, 115, 0.15);
+  --error-medium: rgba(229, 115, 115, 0.25);
+  --dark-overlay: rgba(0, 0, 0, 0.3);
+  --dark-overlay-heavy: rgba(0, 0, 0, 0.5);
+  --secondary-accent: rgba(144, 202, 249, 0.2);
+  --border-width: 1px;
+  --border-radius: 6px;
+}
+
+/* Dark Skyward - Azul oscuro celestial */
+[data-theme="darkskyward"] {
+  --bg-primary: #0a1929;
+  --bg-secondary: #132f4c;
+  --bg-panel: rgba(19, 47, 76, 0.9);
+  --text-primary: #e3f2fd;
+  --text-secondary: rgba(227, 242, 253, 0.7);
+  --border-color: rgba(100, 181, 246, 0.25);
+  --accent-color: #64b5f6;
+  --accent-hover: rgba(100, 181, 246, 0.2);
+  --success-color: #81c784;
+  --error-color: #e57373;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --gradient-btn: rgba(100, 181, 246, 0.15);
+  --gradient-panel: linear-gradient(180deg, #132f4c 0%, #0a1929 100%);
+  --gradient-bg: linear-gradient(180deg, #0a1929 0%, #050f14 100%);
+  --chart-border: rgba(100, 181, 246, 0.25);
+  --chart-bg: rgba(19, 47, 76, 0.5);
+  --chart-text: #e3f2fd;
+  --chart-item-bg: rgba(255,255,255,0.03);
+  --chart-qty: rgba(227, 242, 253, 0.6);
+  --chart-amount: #81c784;
+  --zelda-gold: #64b5f6;
+  --pixel-gold: #64b5f6;
+  --pixel-paper: #e3f2fd;
+  --accent-light: rgba(100, 181, 246, 0.15);
+  --accent-medium: rgba(100, 181, 246, 0.25);
+  --success-light: rgba(129, 199, 132, 0.15);
+  --success-medium: rgba(129, 199, 132, 0.25);
+  --error-light: rgba(229, 115, 115, 0.15);
+  --error-medium: rgba(229, 115, 115, 0.25);
+  --dark-overlay: rgba(0, 0, 0, 0.3);
+  --dark-overlay-heavy: rgba(0, 0, 0, 0.5);
+  --secondary-accent: rgba(144, 202, 249, 0.2);
+  --border-width: 1px;
+  --border-radius: 6px;
+}
+
+/* Dark Night - Negro puro minimalista */
+[data-theme="darknight"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-panel: rgba(10, 10, 10, 0.95);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --border-color: rgba(255, 215, 0, 0.35);
+  --accent-color: #ffd700;
+  --accent-hover: rgba(255, 215, 0, 0.2);
+  --success-color: #00e676;
+  --error-color: #ff5252;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --gradient-btn: rgba(255, 215, 0, 0.1);
+  --gradient-panel: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  --gradient-bg: linear-gradient(180deg, #000000 0%, #000000 100%);
+  --chart-border: rgba(255, 215, 0, 0.35);
+  --chart-bg: rgba(10, 10, 10, 0.8);
+  --chart-text: #ffffff;
+  --chart-item-bg: rgba(255,255,255,0.03);
+  --chart-qty: rgba(255, 255, 255, 0.6);
+  --chart-amount: #00e676;
+  --zelda-gold: #ffd700;
+  --pixel-gold: #ffd700;
+  --pixel-paper: #ffffff;
+  --accent-light: rgba(255, 215, 0, 0.15);
+  --accent-medium: rgba(255, 215, 0, 0.25);
+  --success-light: rgba(0, 230, 118, 0.15);
+  --success-medium: rgba(0, 230, 118, 0.25);
+  --error-light: rgba(255, 82, 82, 0.15);
+  --error-medium: rgba(255, 82, 82, 0.25);
+  --dark-overlay: rgba(0, 0, 0, 0.3);
+  --dark-overlay-heavy: rgba(0, 0, 0, 0.5);
+  --secondary-accent: rgba(144, 202, 249, 0.2);
+  --border-width: 1px;
+  --border-radius: 6px;
+}
+
+/* ================================================
+   OVERRIDES PARA TEMAS DARK - Eliminar colores crema/blanco
+   ================================================ */
+
+[data-theme="darkforest"] .apartado-form,
+[data-theme="darkmountain"] .apartado-form,
+[data-theme="darkskyward"] .apartado-form,
+[data-theme="darknight"] .apartado-form {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="darkforest"] .apartado-form h4,
+[data-theme="darkmountain"] .apartado-form h4,
+[data-theme="darkskyward"] .apartado-form h4,
+[data-theme="darknight"] .apartado-form h4 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .apartado-form input,
+[data-theme="darkforest"] .apartado-form select,
+[data-theme="darkmountain"] .apartado-form input,
+[data-theme="darkmountain"] .apartado-form select,
+[data-theme="darkskyward"] .apartado-form input,
+[data-theme="darkskyward"] .apartado-form select,
+[data-theme="darknight"] .apartado-form input,
+[data-theme="darknight"] .apartado-form select {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .resumen-section,
+[data-theme="darkmountain"] .resumen-section,
+[data-theme="darkskyward"] .resumen-section,
+[data-theme="darknight"] .resumen-section {
+  background: var(--bg-secondary) !important;
+}
+
+[data-theme="darkforest"] .resumen-section h3,
+[data-theme="darkmountain"] .resumen-section h3,
+[data-theme="darkskyward"] .resumen-section h3,
+[data-theme="darknight"] .resumen-section h3 {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .metodo-pago-card,
+[data-theme="darkmountain"] .metodo-pago-card,
+[data-theme="darkskyward"] .metodo-pago-card,
+[data-theme="darknight"] .metodo-pago-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="darkforest"] .metodo-pago-card h4,
+[data-theme="darkmountain"] .metodo-pago-card h4,
+[data-theme="darkskyward"] .metodo-pago-card h4,
+[data-theme="darknight"] .metodo-pago-card h4 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .metodo-pago-card .monto,
+[data-theme="darkmountain"] .metodo-pago-card .monto,
+[data-theme="darkskyward"] .metodo-pago-card .monto,
+[data-theme="darknight"] .metodo-pago-card .monto {
+  color: var(--accent-color) !important;
+}
+
+[data-theme="darkforest"] .btn-crear,
+[data-theme="darkmountain"] .btn-crear,
+[data-theme="darkskyward"] .btn-crear,
+[data-theme="darknight"] .btn-crear {
+  background: var(--accent-color) !important;
+  color: #000 !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="darkforest"] .total-corte,
+[data-theme="darkmountain"] .total-corte,
+[data-theme="darkskyward"] .total-corte,
+[data-theme="darknight"] .total-corte {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .total-corte .monto,
+[data-theme="darkmountain"] .total-corte .monto,
+[data-theme="darkskyward"] .total-corte .monto,
+[data-theme="darknight"] .total-corte .monto {
+  color: var(--accent-color) !important;
+}
+
+[data-theme="darkforest"] .detalle-item,
+[data-theme="darkmountain"] .detalle-item,
+[data-theme="darkskyward"] .detalle-item,
+[data-theme="darknight"] .detalle-item {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="darkforest"] .detalle-item .label,
+[data-theme="darkmountain"] .detalle-item .label,
+[data-theme="darkskyward"] .detalle-item .label,
+[data-theme="darknight"] .detalle-item .label {
+  color: var(--text-secondary) !important;
 }

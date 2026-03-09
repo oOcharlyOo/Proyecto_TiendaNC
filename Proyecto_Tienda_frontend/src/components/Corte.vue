@@ -1885,13 +1885,6 @@ onMounted(() => {
             </div>
           </div>
         </div>
-
-        <div class="modal-actions solo-accion">
-          <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual">
-            <span class="btn-icono">📊</span>
-            <span class="btn-texto">{{ cargandoMensual ? 'Generando...' : 'Generar Reporte' }}</span>
-          </button>
-        </div>
       </section>
     </div>
 

@@ -99,7 +99,6 @@ button,
   border: 3px solid #2a1807;
   padding: 0.7rem 1rem;
   background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: var(--zelda-ink);
   font-family: "Courier New", monospace;
   font-weight: 900;
   text-transform: uppercase;
