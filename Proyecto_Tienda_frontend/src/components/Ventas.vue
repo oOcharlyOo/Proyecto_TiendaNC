@@ -1630,7 +1630,6 @@ async function processVoiceCommand(comando: string) {
   flex-direction: column;
   gap: 0.5rem;
   position: relative;
-  overflow: hidden;
   background: var(--bg-secondary);
     border-radius: 8px;
 }
@@ -1967,7 +1966,6 @@ async function processVoiceCommand(comando: string) {
 
 .acciones-grid {
   margin-top: 0.5rem;
-  display: grid;
   gap: 0.6rem;
   z-index: 1;
 }

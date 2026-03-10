@@ -195,18 +195,20 @@ function handleWheel(e: WheelEvent) {
   escalaAvatar.value = Math.max(0.5, Math.min(2, escalaAvatar.value + delta));
 }
 
-function formatAvatarUrl(url: string | null) {
-  if (!url) return null;
+function formatAvatarUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
   if (url.startsWith('data:')) return url;
   
-  // Si la URL contiene 'minio:9000', la redirigimos a través del backend
-  if (url.includes('minio:9000')) {
-    const path = url.split(':9000')[1];
-    const baseUrl = API_BASE.replace(/\/api$/, '');
-    return `${baseUrl}${path}`;
+  if (url.startsWith('http')) {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname;
+    const fileName = path.split('/').pop();
+    const folder = path.split('/').slice(-2, -1)[0];
+    if (fileName && folder) {
+      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
+    }
+    return url;
   }
-  
-  if (url.startsWith('http')) return url;
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 

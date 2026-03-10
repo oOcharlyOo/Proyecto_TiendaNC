@@ -22,29 +22,20 @@ const avatarUsuario = computed(() => {
   return formatAvatarUrl(avatar);
 });
 
-function formatAvatarUrl(url: string | null) {
-  if (!url) return null;
+function formatAvatarUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
   if (url.startsWith('data:')) return url;
   
-  // Detectamos si es una URL de Minio (interna o externa)
-  const isMinio = url.includes('minio:9000') || url.includes('minio.laleyendadeldulce.com');
-  
-  if (isMinio) {
-    // Extraemos la ruta después del dominio/puerto (ej: /tiendanc/avatares/foto.png)
-    let path = "";
-    if (url.includes(':9000')) {
-      path = url.split(':9000')[1];
-    } else if (url.includes('.com')) {
-      path = url.split('.com')[1];
+  if (url.startsWith('http')) {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname;
+    const fileName = path.split('/').pop();
+    const folder = path.split('/').slice(-2, -1)[0];
+    if (fileName && folder) {
+      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
     }
-    
-    // Construimos la URL usando el API_BASE del backend
-    // Si tu backend sirve los archivos en la raíz, usamos baseUrl
-    const baseUrl = API_BASE.replace(/\/api$/, '');
-    return `${baseUrl}${path}`;
+    return url;
   }
-  
-  if (url.startsWith('http')) return url;
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 

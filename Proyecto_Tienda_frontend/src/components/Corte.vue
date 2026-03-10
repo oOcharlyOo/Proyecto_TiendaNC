@@ -118,6 +118,7 @@ type VentaDetalleDTO = {
   precioUnitarioVenta: number;
   tipoPrecioAplicado?: string;
   Venta: VentaDTO;
+  venta?: VentaDTO;
   productoId?: number;
   productoNombre?: string;
   productoPrecioCosto?: number;
@@ -1016,30 +1017,39 @@ const chartOptionsMensualCombinado = computed(() => {
 const chartOptionsMensualUnitarios = computed(() => getChartOptions(productosUnitariosMensual.value));
 const chartOptionsMensualGranel = computed(() => getChartOptions(productosGranelMensual.value));
 
-function getChartOptions(productos: ProductoVendido[]) {
-  const isSmall = windowWidth.value < 480;
-  const isMedium = windowWidth.value >= 480 && windowWidth.value < 768;
-  const isLarge = windowWidth.value >= 1200;
+function getChartOptions(productosList: ProductoVendido[]) {
+  const isSmall = windowWidth.value < 600;
+  const isMedium = windowWidth.value >= 600 && windowWidth.value < 1024;
   
-  const fontSize = isSmall ? 9 : isMedium ? 10 : isLarge ? 14 : 12;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : 12;
+  const textColor = getChartTextColor();
 
   return {
     indexAxis: 'y' as const,
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: isSmall ? 5 : 10
+    },
     plugins: {
       legend: {
-        display: false
+        display: !isSmall,
+        position: 'top' as const,
+        labels: {
+          color: textColor,
+          font: { size: fontSize }
+        }
       },
       tooltip: {
         titleFont: { size: fontSize + 1 },
         bodyFont: { size: fontSize },
         callbacks: {
           label: (context: any) => {
-            const producto = productos[context.dataIndex];
+            const producto = productosList[context.dataIndex];
+            if (!producto) return '';
             return [
               `Cantidad: ${formatearCantidad(producto.cantidadTotal, producto.isGramaje)}`,
-              `Monto: ${formatoMonedaRedondeada(producto.montoTotal)}`
+              `Monto: ${formatoMoneda(producto.montoTotal)}`
             ];
           }
         }
@@ -1049,10 +1059,10 @@ function getChartOptions(productos: ProductoVendido[]) {
       x: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
+          color: 'rgba(255, 255, 255, 0.05)'
         },
         ticks: {
-          color: getZeldaGoldColor(),
+          color: textColor,
           font: { size: fontSize }
         }
       },
@@ -1061,7 +1071,7 @@ function getChartOptions(productos: ProductoVendido[]) {
           display: false
         },
         ticks: {
-          color: getZeldaGoldColor(),
+          color: textColor,
           font: { size: fontSize }
         }
       }
@@ -2259,7 +2269,6 @@ onMounted(() => {
 
 .reporte-wrap {
   border: var(--border-width-thick) solid var(--border-color);
-  background: var(--bg-secondary);
   color: var(--text-primary);
   padding: 0.9rem;
   display: grid;
@@ -2390,7 +2399,6 @@ onMounted(() => {
   inset: 10px;
   pointer-events: none;
   border-radius: 8px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .btn-cerrar-modal {
