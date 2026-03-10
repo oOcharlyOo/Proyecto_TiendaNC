@@ -1999,7 +1999,7 @@ async function processVoiceCommand(comando: string) {
 .btn-cobrar {
   grid-column: span 2;
   height: 85px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--success-color) 80%, white) 0%, var(--success-color) 50%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, white) 0%, var(--success-color) 0%, color-mix(in srgb, var(--accent-color) 0%, black) 100%) !important;
   color: var(--text-primary) !important;
   font-size: 1.1rem;
 }
@@ -2162,7 +2162,7 @@ async function processVoiceCommand(comando: string) {
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
-  background: linear-gradient(180deg, var(--error-color) 0%, var(--zelda-gold) 100%);
+  background: linear-gradient(180deg, var(--accent-color) 0%, var(--bg-primary) 100%);
   color: var(--text-primary);
   box-shadow: 0 2px 0 var(--border-color);
 }

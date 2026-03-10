@@ -263,6 +263,8 @@ function cerrarSesion() {
 
 .menu-link {
   display: inline-block;
+  width: 7rem;
+  text-align: center;
   border: var(--border-width) solid var(--border-color);
   padding: 0.45rem 0.7rem;
   color: var(--btn-text, var(--bg-primary));
