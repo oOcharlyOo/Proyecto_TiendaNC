@@ -74,8 +74,10 @@ function confirmar() {
       </header>
 
       <div class="modal-body">
-        <label>Producto</label>
-        <input type="text" :value="producto?.nombre || ''" readonly>
+        <div class="form-group">
+          <label>Producto</label>
+          <input type="text" :value="producto?.nombre || ''" readonly>
+        </div>
 
         <div class="inputs-grid">
           <section class="input-block">
@@ -125,11 +127,11 @@ function confirmar() {
       </div>
 
       <footer class="modal-actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">
+        <button type="button" class="btn-cancel" @click="emit('close')">
           <span class="btn-icono">✕</span>
           <span class="btn-texto">Cancelar</span>
         </button>
-        <button type="button" @click="confirmar">
+        <button type="button" class="btn-save" @click="confirmar">
           <span class="btn-icono">➕</span>
           <span class="btn-texto">Agregar</span>
         </button>
@@ -143,209 +145,136 @@ function confirmar() {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(2, 4, 2, 0.92);
   display: grid;
   place-items: center;
   padding: 1rem;
+  background: var(--shadow-color);
+  backdrop-filter: blur(4px);
 }
 
 .modal-card {
   width: min(100%, 480px);
-  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
-  border: 4px solid #f8d667;
-  box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.2rem;
+  background: var(--bg-panel);
+  border: var(--border-width-thick) solid var(--accent-color);
+  box-shadow: 0 20px 40px var(--shadow-color);
+  padding: 1.5rem;
   display: grid;
-  gap: 0.8rem;
+  gap: 1rem;
   position: relative;
-  animation: popIn 150ms steps(4);
+  animation: popIn 200ms ease-out;
 }
 
 @keyframes popIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-card::before {
   content: "";
   position: absolute;
-  inset: 10px;
-  border: 2px dashed rgba(248, 214, 103, 0.4);
+  inset: 12px;
+  border: 2px dashed color-mix(in srgb, var(--accent-color) 20%, transparent);
   pointer-events: none;
+  border-radius: 8px;
 }
 
 .modal-header {
-  position: relative;
-  border-bottom: 2px solid rgba(248, 214, 103, 0.3);
-  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
+  padding-bottom: 0.75rem;
+  text-align: center;
 }
 
 .modal-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: #f8d667;
+  color: var(--accent-color);
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
-}
-
-.modal-header h3::before {
-  content: "⚖️ ";
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 0 var(--border-color);
 }
 
 .modal-body {
   display: grid;
-  gap: 0.7rem;
-  position: relative;
+  gap: 1rem;
 }
 
 .modal-body label {
-  font-size: 0.72rem;
-  color: #f6f2de;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
 }
 
-.modal-body input[type="text"],
-.modal-body input[type="number"] {
-  width: 100%;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.7rem;
-  color: #1d1606;
-  font-family: "Courier New", monospace;
-  font-size: 1rem;
-  font-weight: 600;
-  outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
-}
-
-.modal-body input[type="text"]:focus,
-.modal-body input[type="number"]:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 3px #f8d667;
-}
-
-.modal-body input[type="text"] {
-  background: #e8d9a8;
-  cursor: not-allowed;
+.modal-body input {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-color);
 }
 
 .inputs-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
+  gap: 1rem;
 }
 
 .input-block {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.5rem;
 }
 
 .quick-buttons {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .quick-buttons button {
-  border: 2px solid #2a1807;
-  padding: 0.35rem 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-family: "Courier New", monospace;
-  cursor: pointer;
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
-  box-shadow: 0 2px 0 #6f4b1c;
-  transition: transform 60ms steps(2), filter 60ms linear;
-}
-
-.quick-buttons button:hover {
-  filter: brightness(1.08);
-}
-
-.quick-buttons button:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  padding: 0.4rem 0.2rem;
+  font-size: 0.7rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .result-card {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #ffe48b 0%, #f8d667 50%, #e2b84f 100%);
-  color: #1a1401;
-  padding: 0.65rem;
-  display: grid;
-  gap: 0.15rem;
-  box-shadow: inset 0 0 0 3px #ffeeb4, 0 4px 0 #6f4b1c;
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--accent-color);
+  padding: 1rem;
+  border-radius: 8px;
 }
 
 .result-card p {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: 0.03em;
   display: flex;
   justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0.2rem 0;
 }
 
 .result-card p strong {
-  font-family: "Courier New", monospace;
-  font-size: 0.85rem;
+  color: var(--accent-color);
+  font-size: 1rem;
 }
 
 .modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  position: relative;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
-.modal-actions button {
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-family: "Courier New", monospace;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 80ms steps(2), filter 80ms linear;
+.btn-cancel {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
-.modal-actions button:first-child {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
+.btn-save {
+  background: var(--success-color);
+  color: var(--bg-primary);
+  border: var(--border-width) solid var(--border-color);
 }
 
-.modal-actions button:last-child {
-  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
-  color: #0a2008;
-}
-
-.modal-actions button:hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
-}
-
-.modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
-}
-
-@media (max-width: 760px) {
-  .inputs-grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 520px) {
+  .inputs-grid { grid-template-columns: 1fr; }
 }
 </style>

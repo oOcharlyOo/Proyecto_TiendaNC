@@ -195,6 +195,21 @@ function handleWheel(e: WheelEvent) {
   escalaAvatar.value = Math.max(0.5, Math.min(2, escalaAvatar.value + delta));
 }
 
+function formatAvatarUrl(url: string | null) {
+  if (!url) return null;
+  if (url.startsWith('data:')) return url;
+  
+  // Si la URL contiene 'minio:9000', la redirigimos a través del backend
+  if (url.includes('minio:9000')) {
+    const path = url.split(':9000')[1];
+    const baseUrl = API_BASE.replace(/\/api$/, '');
+    return `${baseUrl}${path}`;
+  }
+  
+  if (url.startsWith('http')) return url;
+  return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 async function guardarUsuario() {
   const payload = {
     usuario: form.value.usuario,
@@ -258,6 +273,8 @@ function getTipoLabel(tipo: number) {
 
 <template>
   <div class="usuarios-page">
+    <div class="bg-fog"></div>
+    <div class="bg-scanlines"></div>
     <div class="page-header">
       <h1 class="page-title">Gestion de Usuarios</h1>
       <button v-if="esAdmin" class="btn-primary" @click="abrirModalNuevo">
@@ -280,7 +297,7 @@ function getTipoLabel(tipo: number) {
         <div class="avatar-container">
           <img 
             v-if="usuario.avatar" 
-            :src="usuario.avatar" 
+            :src="formatAvatarUrl(usuario.avatar)" 
             :alt="usuario.nombre"
             class="avatar-img"
           />
@@ -415,6 +432,11 @@ function getTipoLabel(tipo: number) {
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 90vh;
+  position: relative;
+  z-index: 1;
 }
 
 .page-header {
@@ -424,12 +446,16 @@ function getTipoLabel(tipo: number) {
   margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
+  position: relative;
+  z-index: 1;
 }
 
 .page-title {
   font-size: 2rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--border-color);
 }
 
 .btn-primary {
@@ -441,6 +467,10 @@ function getTipoLabel(tipo: number) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  color: var(--btn-text, var(--bg-primary));
+  border: var(--border-width) solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color);
 }
 
 .loading {
@@ -469,19 +499,25 @@ function getTipoLabel(tipo: number) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 .usuario-card {
+  background: var(--bg-secondary);
+  border: var(--border-width-thick) solid var(--border-color);
   border-radius: 12px;
   padding: 1.5rem;
   text-align: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   animation: fadeInUp 0.5s ease forwards;
   opacity: 0;
+  box-shadow: 0 4px 0 var(--border-color);
 }
 
 .usuario-card:hover {
   transform: translateY(-8px);
+  filter: brightness(1.05);
 }
 
 @keyframes fadeInUp {
@@ -501,9 +537,10 @@ function getTipoLabel(tipo: number) {
   margin: 0 auto 1rem;
   border-radius: 50%;
   overflow: hidden;
-  border: 4px solid var(--border-color);
+  border: 4px solid var(--accent-color);
   box-shadow: 0 4px 12px var(--shadow-color);
   transition: transform 0.3s ease;
+  background: var(--bg-primary);
 }
 
 .usuario-card:hover .avatar-container {
@@ -524,16 +561,20 @@ function getTipoLabel(tipo: number) {
   justify-content: center;
   font-size: 3rem;
   font-weight: 900;
+  color: var(--accent-color);
+  background: var(--bg-primary);
 }
 
 .usuario-nombre {
   font-size: 1.2rem;
   margin-bottom: 0.3rem;
+  color: var(--text-primary);
 }
 
 .usuario-user {
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
+  color: var(--text-secondary);
 }
 
 .tipo-badge {
@@ -543,6 +584,14 @@ function getTipoLabel(tipo: number) {
   border-radius: 20px;
   text-transform: uppercase;
   font-weight: 600;
+  background: var(--bg-panel);
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+}
+
+.tipo-badge.admin {
+  background: var(--accent-color);
+  color: var(--bg-primary);
 }
 
 .usuario-actions {
@@ -561,6 +610,17 @@ function getTipoLabel(tipo: number) {
   align-items: center;
   gap: 0.3rem;
   transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+}
+
+.btn-edit {
+  background: var(--success-color);
+  color: var(--bg-primary);
+}
+
+.btn-delete {
+  background: var(--error-color);
+  color: var(--text-primary);
 }
 
 .btn-delete:disabled {
@@ -568,11 +628,6 @@ function getTipoLabel(tipo: number) {
   cursor: not-allowed;
 }
 
-.btn-icon {
-  font-size: 1rem;
-}
-
-/* Modal styles */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -581,14 +636,19 @@ function getTipoLabel(tipo: number) {
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+  background: var(--shadow-color);
+  backdrop-filter: blur(4px);
 }
 
 .modal-card {
+  background: var(--bg-panel);
+  border: var(--border-width-thick) solid var(--accent-color);
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 40px var(--shadow-color);
 }
 
 .modal-header {
@@ -601,6 +661,9 @@ function getTipoLabel(tipo: number) {
 
 .modal-header h3 {
   margin: 0;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .btn-cerrar-modal {
@@ -614,25 +677,17 @@ function getTipoLabel(tipo: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.btn-cerrar-modal:hover {
-  transform: scale(1.1);
+  color: var(--accent-color);
 }
 
 .modal-body {
   padding: 1.5rem;
 }
 
-.avatar-upload-section {
-  margin-bottom: 1.5rem;
-}
-
 .avatar-upload-section label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.8rem;
 }
 
 .avatar-dropzone {
@@ -641,174 +696,80 @@ function getTipoLabel(tipo: number) {
   margin: 0 auto;
   border: 3px dashed var(--border-color);
   border-radius: 50%;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.avatar-dropzone:hover {
-  border-color: var(--accent-color);
-}
-
-.avatar-dropzone.dragando {
-  border-color: var(--success-color);
-  background: rgba(0, 255, 0, 0.1);
 }
 
 .avatar-preview-container {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  position: relative;
 }
 
 .avatar-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  cursor: move;
-  user-select: none;
-  transition: transform 0.1s ease;
-}
-
-.dropzone-placeholder {
-  text-align: center;
-  padding: 1rem;
-}
-
-.drop-icon {
-  font-size: 2.5rem;
   display: block;
-  margin-bottom: 0.5rem;
-}
-
-.dropzone-placeholder span {
-  display: block;
-  font-size: 0.9rem;
-}
-
-.dropzone-placeholder small {
-  display: block;
-  font-size: 0.75rem;
-  margin-top: 0.5rem;
-  opacity: 0.7;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
 }
 
 .form-group label {
-  font-size: 0.85rem;
-  margin-bottom: 0.3rem;
-  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.75rem;
 }
 
 .form-group input,
 .form-group select {
-  padding: 0.7rem;
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: var(--accent-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-color);
 }
 
 .modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  padding: 1rem 1.5rem;
   border-top: 2px solid var(--border-color);
 }
 
 .btn-cancel {
-  padding: 0.7rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-save {
-  padding: 0.7rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 700;
-  text-transform: uppercase;
-  transition: all 0.2s ease;
+  background: var(--success-color);
+  color: var(--bg-primary);
+  border: var(--border-width) solid var(--border-color);
 }
 
-.btn-save:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
+.bg-fog {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.1) 0%, transparent 50%);
+  animation: bgFogDrift 10s ease-in-out infinite;
 }
 
-/* Modal transitions */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
+@keyframes bgFogDrift {
+  0% { transform: translateX(-2%) translateY(0); }
+  50% { transform: translateX(2%) translateY(-5px); }
+  100% { transform: translateX(-2%) translateY(0); }
 }
 
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .modal-card {
-  animation: modalIn 0.3s ease;
-}
-
-.modal-leave-active .modal-card {
-  animation: modalOut 0.3s ease;
-}
-
-@keyframes modalIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes modalOut {
-  from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.9) translateY(20px);
-  }
-}
-
-@media (max-width: 600px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .usuarios-grid {
-    grid-template-columns: 1fr;
-  }
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.03) 2px 4px);
 }
 </style>
