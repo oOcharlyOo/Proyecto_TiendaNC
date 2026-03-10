@@ -152,7 +152,7 @@ type ApartadoPagoDTO = {
   nombreUsuario?: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const AUTH_USER_ID_KEY = 'idUsuario';
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -2180,7 +2180,6 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   padding: 1rem;
-  display: grid;
   grid-template-rows: auto auto auto 1fr;
   gap: 0.9rem;
   overflow: auto;
@@ -2251,6 +2250,11 @@ onMounted(() => {
   display: none;
 }
 
+.detail-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 @media (max-width: 600px) {
   .wood-sign.btn-icono-only .btn-texto {
     display: none;
@@ -2271,7 +2275,6 @@ onMounted(() => {
   border: var(--border-width-thick) solid var(--border-color);
   color: var(--text-primary);
   padding: 0.9rem;
-  display: grid;
   gap: 0.8rem;
   border-radius: 8px;
   box-shadow: inset 0 0 0 2px var(--bg-panel);
@@ -2386,7 +2389,6 @@ onMounted(() => {
     0 14px 0 var(--border-color),
     0 20px 28px var(--shadow-color);
   padding: 1.2rem;
-  display: grid;
   gap: 0.8rem;
   overflow: auto;
   animation: fadeSlideIn 200ms ease-out;
@@ -3461,7 +3463,6 @@ th {
   .detail-grid {
     grid-template-columns: 1fr;
   }
-  
   .tabla-wrap {
     max-height: 50vh;
   }

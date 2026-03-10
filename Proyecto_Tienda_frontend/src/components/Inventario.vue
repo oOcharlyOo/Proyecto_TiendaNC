@@ -17,7 +17,7 @@ type ProductoDTO = {
   is_gramaje?: boolean;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const EMOJIS_INVENTARIO = ['📦', '🎒', '🎰', '🗝️', '💎', '🛡️', '⚔️', '🧪', '📜', '🎴'];
 

@@ -22,7 +22,7 @@ type UsuarioForm = {
   avatar: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const usuarios = ref<Usuario[]>([]);
 const cargando = ref(false);

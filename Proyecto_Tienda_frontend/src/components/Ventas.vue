@@ -129,7 +129,7 @@ type Ticket = {
   desdeBackend?: boolean;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const AUTH_USER_ID_KEY = 'idUsuario';
 
 async function cargarTicketsDesdeBackend() {
@@ -1483,6 +1483,8 @@ async function processVoiceCommand(comando: string) {
           <span class="icono">📥</span>
           <span class="texto">Entrada</span>
         </button>
+      </div>
+      <div class="div-historialbtn">
         <button type="button" class="btn-accion btn-historial" @click="historialVentasAbrir">
           <span class="icono">📜</span>
           <span class="texto">Historial</span>
@@ -1965,9 +1967,13 @@ async function processVoiceCommand(comando: string) {
 }
 
 .acciones-grid {
+  display: grid;
   margin-top: 0.5rem;
   gap: 0.6rem;
   z-index: 1;
+}
+.div-historialbtn {
+  width: auto;
 }
 
 .btn-accion {
@@ -1994,7 +2000,7 @@ async function processVoiceCommand(comando: string) {
   grid-column: span 2;
   height: 85px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--success-color) 80%, white) 0%, var(--success-color) 50%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
-  color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
   font-size: 1.1rem;
 }
 
@@ -2074,7 +2080,6 @@ async function processVoiceCommand(comando: string) {
   display: grid;
   grid-template-columns: 1fr auto 120px;
   align-items: center;
-  gap: 1rem;
   padding: 0.8rem 1rem;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);

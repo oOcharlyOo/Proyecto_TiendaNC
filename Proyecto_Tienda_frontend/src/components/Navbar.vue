@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '@/composables/useTheme';
 
 const AUTH_KEY = 'isAuth';
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const route = useRoute();
 const router = useRouter();
