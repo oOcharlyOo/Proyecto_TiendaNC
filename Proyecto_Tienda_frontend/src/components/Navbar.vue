@@ -292,7 +292,6 @@ function cerrarSesion() {
 .user-avatar-small {
   width: 42px;
   height: 42px;
-  border-radius: 50%;
   overflow: hidden;
   border: 2px solid var(--accent-color);
   background: var(--bg-primary);
