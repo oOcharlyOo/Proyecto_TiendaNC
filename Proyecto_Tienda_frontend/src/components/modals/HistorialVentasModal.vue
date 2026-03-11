@@ -107,7 +107,7 @@ function formatoFecha(fecha?: string) {
                     class="btn-cancelar btn-cancelar-icono"
                     @click="emit('cancelar', venta)"
                   >
-                    ❌ <span class="btn-texto">Cancelar</span>
+                    ❌
                   </button>
                   <button 
                     v-else
@@ -294,9 +294,12 @@ table {
 
 th,
 td {
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+  text-align: center;
   padding: 0.6rem 0.4rem;
   border-bottom: 1px solid var(--bg-panel, #baa15c);
-  text-align: left;
   font-size: 0.8rem;
   font-family: "Courier New", monospace;
 }
@@ -307,7 +310,6 @@ th {
   background: var(--bg-panel, #e8d790);
   color: var(--text-primary, #1a1401);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -386,16 +388,18 @@ th {
 .acciones-cell {
   display: flex;
   gap: 0.5rem;
+  justify-content: center;
 }
 
 .btn-cancelar,
 .btn-ver {
   padding: 0.35rem 0.6rem;
-  font-size: 0.65rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   border: 2px solid var(--border-color, #2a1807);
-  border-radius: 4px;
+  border-radius: 40%;
+  margin: 5px;
   cursor: pointer;
   transition: all 150ms;
   white-space: nowrap;
@@ -474,6 +478,10 @@ th {
   th, td {
     padding: 0.5rem 0.3rem;
     font-size: 0.7rem;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    text-align: center;
   }
   
   .modal-header h3 {

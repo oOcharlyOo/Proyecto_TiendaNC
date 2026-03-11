@@ -1762,10 +1762,11 @@ async function processVoiceCommand(comando: string) {
   top: calc(100% + 0.25rem);
   left: 0;
   right: 0;
+  border-radius: 5%;
   border: var(--border-width) solid var(--border-color);
   background: var(--bg-secondary);
   z-index: 100;
-  max-height: 280px;
+  max-height: 210px;
   height: auto;
   overflow-y: scroll;
   box-shadow: 0 6px 0 var(--border-color), 0 10px 16px var(--shadow-color);
