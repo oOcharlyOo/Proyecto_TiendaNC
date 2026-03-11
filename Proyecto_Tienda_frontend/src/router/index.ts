@@ -6,6 +6,7 @@ import Productos from "@/components/Productos.vue";
 import Inventario from "@/components/Inventario.vue";
 import Corte from "@/components/Corte.vue";
 import Usuarios from "@/components/Usuarios.vue";
+import Finanzas from "@/components/Finanzas.vue";
 
 const AUTH_KEY = 'isAuth';
 
@@ -43,6 +44,12 @@ const routes = [
     path: '/usuarios',
     name: 'Usuarios',
     component: Usuarios,
+    meta: { requiresAuth: true, adminOnly: true },
+  },
+  {
+    path: '/finanzas',
+    name: 'Finanzas',
+    component: Finanzas,
     meta: { requiresAuth: true, adminOnly: true },
   }
 ];

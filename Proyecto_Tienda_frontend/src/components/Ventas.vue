@@ -2190,3 +2190,25 @@ async function processVoiceCommand(comando: string) {
   accent-color: var(--accent-color);
 }
 </style>
+ -- 1. Crear la tabla específica para la Bóveda (Tesorería Real)
+ CREATE TABLE tiendadb.boveda (
+     id_boveda SERIAL PRIMARY KEY,
+     fecha_movimiento TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     monto_total DECIMAL(12, 2) NOT NULL,    -- Saldo total acumulado en ese momento exacto
+     monto_ajuste DECIMAL(12, 2) NOT NULL DEFAULT 0, -- Diferencia del movimiento (+/-)
+     tipo_movimiento VARCHAR(50) NOT NULL,   -- 'AJUSTE', 'VENTA', 'INGRESO_EXTRA', 'EGRESO', 'CANCELACION_VENTA'
+     descripcion TEXT,                       -- Detalle (ej. "Venta #105", "Surtido de dulces")
+     id_usuario INT NOT NULL,                -- Usuario que realizó el movimiento
+
+     CONSTRAINT fk_usuario_boveda
+         FOREIGN KEY(id_usuario)
+         REFERENCES tiendadb.usuarios(id_usuario)
+         ON DELETE RESTRICT
+         ON UPDATE CASCADE
+ );
+
+ -- 2. Índice opcional para mejorar la velocidad de búsqueda por fecha (recomendado para historial)
+ CREATE INDEX idx_boveda_fecha ON tiendadb.boveda(fecha_movimiento DESC);
+
+ -- 3. Comentario de ayuda para la tabla
+ COMMENT ON TABLE tiendadb.boveda IS 'Registro histórico por hora de todo el capital real en la bóveda de la tienda';

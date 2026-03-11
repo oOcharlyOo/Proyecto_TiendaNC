@@ -13,6 +13,7 @@ import {
   ArcElement
 } from 'chart.js';
 import { Bar, Pie } from 'vue-chartjs';
+import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -191,7 +192,42 @@ const modalMensualAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
 const modalDetalleAbierto = ref(false);
 const modalEgresosAbierto = ref(false);
+const modalSalidaAbierto = ref(false);
 const modalApartadosAbierto = ref(false);
+
+async function registrarSalida(payload: { montoEoS: number, descripcion: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/caja/salida`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, idUsuario: idUsuario.value })
+    });
+    
+    if (res.ok) {
+      mostrarMensaje("Salida de efectivo registrada correctamente.", "ok");
+      modalSalidaAbierto.value = false;
+      
+      // Si el modal de egresos está abierto, recargar los datos
+      if (modalEgresosAbierto.value) {
+        await abrirModalEgresos();
+      }
+      
+      // Recargar el corte si está visible
+      if (mostrarReporte.value && !modalDiarioAbierto.value) {
+        if (reporteTitulo.value === 'Reporte del Corte Actual') {
+          await generarCorte();
+        } else {
+          await generarReporteDiario();
+        }
+      }
+    } else {
+      const errorData = await res.json();
+      mostrarMensaje(`Error: ${errorData.mensaje || 'No se pudo registrar la salida'}`, "error");
+    }
+  } catch (e) {
+    mostrarMensaje("Error de conexión al registrar la salida.", "error");
+  }
+}
 const tipoGraficaCorte = ref<'unitario' | 'gramaje'>('unitario');
 const tipoGraficaDiaria = ref<'unitario' | 'gramaje'>('unitario');
 const tipoGraficaMensual = ref<'unitario' | 'gramaje'>('unitario');
@@ -2098,7 +2134,10 @@ onMounted(() => {
     <div v-if="modalEgresosAbierto" class="modal-overlay" @click.self="modalEgresosAbierto = false">
       <section class="modal-card panel history-modal">
         <button type="button" class="btn-cerrar-modal" @click="modalEgresosAbierto = false">✕</button>
-        <h3>📉 Egresos del Día</h3>
+        <div class="modal-header-with-action">
+          <h3>📉 Egresos del Día</h3>
+          <button class="btn-nueva-salida" @click="modalSalidaAbierto = true">➕ Nueva Salida</button>
+        </div>
 
         <div v-if="cargandoEgresos" class="empty">📡 Cargando egresos...</div>
         <div v-else-if="egresosDia.length === 0" class="empty">📭 No hay egresos para este día.</div>
@@ -2122,6 +2161,8 @@ onMounted(() => {
         </div>
       </section>
     </div>
+
+    <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalida" />
 
     <div v-if="modalApartadosAbierto" class="modal-overlay" @click.self="modalApartadosAbierto = false">
       <section class="modal-card panel history-modal">
@@ -2338,6 +2379,10 @@ onMounted(() => {
   gap: 0.8rem;
   border-radius: 8px;
   box-shadow: inset 0 0 0 2px var(--bg-panel);
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+  text-align: center;
 }
 
 .cards-grid {
@@ -2377,8 +2422,8 @@ onMounted(() => {
 }
 
 .card-metric.total {
-  grid-column: span 2;
-  background: var(--accent-color);
+  grid-column: span 4;
+  background: var(--zelda-gold);
 }
 
 .card-metric.total p,
@@ -2486,6 +2531,38 @@ onMounted(() => {
   background: var(--error-color);
   color: var(--text-primary);
   transform: rotate(90deg);
+}
+
+.modal-header-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-right: 3rem;
+}
+
+.btn-nueva-salida {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--border-color);
+  transition: transform 0.1s;
+}
+
+.btn-nueva-salida:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-nueva-salida:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .modal-card h3 {

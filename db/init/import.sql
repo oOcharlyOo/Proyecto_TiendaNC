@@ -56,6 +56,23 @@ CREATE TABLE tiendadb.caja (
         ON UPDATE CASCADE
 );
 
+-- Tabla específica para la Bóveda (Tesorería Real)
+CREATE TABLE tiendadb.boveda (
+    id_boveda SERIAL PRIMARY KEY,
+    fecha_movimiento TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    monto_total DECIMAL(12, 2) NOT NULL,
+    monto_ajuste DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    tipo_movimiento VARCHAR(50) NOT NULL, -- 'AJUSTE', 'VENTA', 'INGRESO_EXTRA', 'EGRESO'
+    descripcion TEXT,
+    id_usuario INT NOT NULL,
+
+    CONSTRAINT fk_usuario_boveda
+        FOREIGN KEY(id_usuario) 
+        REFERENCES tiendadb.usuarios(id_usuario)
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE
+);
+
 -- 3. Tabla de Productos
 CREATE TABLE tiendadb.productos (
     id_producto SERIAL PRIMARY KEY,

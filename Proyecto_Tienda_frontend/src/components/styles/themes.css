@@ -501,7 +501,7 @@
 }
 
 [data-theme] .modal-body label {
-  color: var(--text-secondary) !important;
+  color: var(--bg-primary) !important;
 }
 
 [data-theme] .modal-body input,

@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean;
-}>();
+  title?: string;
+  subtitle?: string;
+  confirmText?: string;
+  label?: string;
+}>(), {
+  title: 'Monto Inicial de Caja',
+  subtitle: 'Ingresa el monto con el que abres la caja hoy',
+  confirmText: 'Continuar a Ventas',
+  label: 'Cantidad inicial'
+});
 
 const emit = defineEmits<{
   (event: 'close'): void;
@@ -57,12 +66,12 @@ function manejarKeydown(event: KeyboardEvent) {
 
       <div class="parchment-content">
         <header class="modal-header">
-          <h3>Monto Inicial de Caja</h3>
-          <p>Ingresa el monto con el que abres la caja hoy</p>
+          <h3>{{ title }}</h3>
+          <p>{{ subtitle }}</p>
         </header>
 
         <div class="modal-body">
-          <label for="monto-inicial">Cantidad inicial</label>
+          <label for="monto-inicial">{{ label }}</label>
           <input
             id="monto-inicial"
             v-model="montoInicial"
@@ -82,7 +91,7 @@ function manejarKeydown(event: KeyboardEvent) {
             :disabled="cargando"
             @click="confirmar"
           >
-            {{ cargando ? 'Procesando...' : 'Continuar a Ventas' }}
+            {{ cargando ? 'Procesando...' : confirmText }}
           </button>
         </footer>
       </div>

@@ -49,7 +49,8 @@ const links = computed(() => {
     { to: '/productos', label: 'Productos', adminOnly: false },
     { to: '/usuarios', label: 'Usuarios', adminOnly: true },
     { to: '/inventario', label: 'Inventario', adminOnly: true },
-    { to: '/corte', label: 'Corte', adminOnly: false }
+    { to: '/corte', label: 'Corte', adminOnly: false },
+    { to: '/finanzas', label: 'Finanzas', adminOnly: true }
   ];
   return linksBase.filter(l => !l.adminOnly || esAdministrador.value);
 });
