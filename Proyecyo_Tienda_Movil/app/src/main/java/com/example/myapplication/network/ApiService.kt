@@ -24,6 +24,9 @@ interface ApiService {
     @POST("usuarios/login")
     suspend fun login(@Body loginRequest: LoginRequest): RespuestaPersonalizada<UsuariosDTO>
 
+    @GET("usuarios/listarUsuarios")
+    suspend fun getUsuarios(): RespuestaPersonalizada<List<UsuariosDTO>>
+
     // --- VENTAS ---
     @POST("ventas/agregarVenta")
     suspend fun addVenta(@Body venta: VentasDTO): RespuestaPersonalizada<VentasDTO>
@@ -110,4 +113,8 @@ interface ApiService {
     // --- CORTE ---
     @GET("corte/obtenerReporteDelDia")
     suspend fun getDailyReport(): RespuestaPersonalizada<Map<String, Any>>
+
+    // --- COMANDOS ---
+    @POST("ventas/comando-texto")
+    suspend fun procesarComandoTexto(@Body comando: Map<String, String>): RespuestaPersonalizada<List<Product>>
 }

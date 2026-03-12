@@ -1062,7 +1062,7 @@ fun ProductosScreen() {
                             
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    "${String.format("%.2f", product.precioFinal)}", 
+                                    "$${String.format("%.2f", if (product.isGramaje) product.precioFinal / 1000.0 else product.precioFinal)}${if (product.isGramaje) "/g" else ""}", 
                                     style = MaterialTheme.typography.titleLarge, 
                                     color = colors.primary, 
                                     fontWeight = FontWeight.Bold
@@ -1096,35 +1096,37 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 600
-    val isMedium = configuration.screenWidthDp in 600..839
 
     var activeTicketIndex by remember { mutableStateOf(0) }
-    var tickets by remember { mutableStateOf(listOf(mutableListOf<SaleItemInternal>(), mutableListOf(), mutableListOf())) }
+    var tickets by remember { mutableStateOf(listOf(mutableListOf<SaleItemInternal>())) }
     
     var searchQuery by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<Product>>(emptyList()) }
     var allProducts by remember { mutableStateOf<List<Product>>(emptyList()) }
     var isProcessing by remember { mutableStateOf(false) }
     var showCobroModal by remember { mutableStateOf(false) }
-    var isLoadingTickets by remember { mutableStateOf(false) }
+    var showGramajeModal by remember { mutableStateOf(false) }
+    var showEntradaModal by remember { mutableStateOf(false) }
+    var showSalidaModal by remember { mutableStateOf(false) }
+    var showHistorialModal by remember { mutableStateOf(false) }
+    var gramajeProducto by remember { mutableStateOf<Product?>(null) }
     var currentVentaId by remember { mutableStateOf<Long?>(null) }
+    var cajeroNombre by remember { mutableStateOf("Cajero") }
 
     fun loadPendingTickets() {
         scope.launch {
-            isLoadingTickets = true
             try {
                 val resp = RetrofitClient.apiService.getVentasPendientes()
-                if (resp.codigo == 200 && resp.datos != null) {
-                    val ventasPendientes = resp.datos
-                    if (ventasPendientes.isNotEmpty()) {
-                        tickets = MutableList(ventasPendientes.size.coerceAtLeast(3)) { mutableListOf() }
-                        currentVentaId = ventasPendientes.firstOrNull()?.id_venta
+                if (resp.codigo == 200 && resp.datos != null && resp.datos.isNotEmpty()) {
+                    val newTickets = mutableListOf<MutableList<SaleItemInternal>>()
+                    for (venta in resp.datos) {
+                        newTickets.add(mutableListOf())
                     }
+                    tickets = newTickets
+                    currentVentaId = resp.datos.firstOrNull()?.id_venta
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-            } finally {
-                isLoadingTickets = false
             }
         }
     }
@@ -1141,9 +1143,10 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                 if (resp.codigo == 200 && resp.datos != null) {
                     currentVentaId = resp.datos.id_venta
                     val newTickets = tickets.toMutableList()
-                    newTickets.add(mutableListOf<SaleItemInternal>())
+                    newTickets.add(mutableListOf())
                     tickets = newTickets
                     activeTicketIndex = tickets.size - 1
+                    Toast.makeText(context, "Ticket #${tickets.size} creado", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Error al crear ticket", Toast.LENGTH_SHORT).show()
@@ -1168,25 +1171,41 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
     }
 
     val currentCart = tickets.getOrElse(activeTicketIndex) { mutableListOf() }
-    val total = currentCart.sumOf { it.product.precioFinal * it.quantity }
-
-    fun searchProductByBarcode(barcode: String): Product? {
-        val local = allProducts.find { it.codigoBarras == barcode }
-        if (local != null) return local
-        
-        return null
+    val total = currentCart.sumOf { 
+        val precioUnitario = if (it.product.isGramaje) it.product.precioFinal / 1000.0 else it.product.precioFinal
+        kotlin.math.round(precioUnitario * it.quantity * 100) / 100
     }
 
-    fun addToCart(product: Product) {
-        val existingIndex = currentCart.indexOfFirst { it.product.id_producto == product.id_producto }
+    fun addToCart(product: Product, cantidad: Int = 1) {
+        if (product.isGramaje) {
+            gramajeProducto = product
+            showGramajeModal = true
+            return
+        }
+        
+        val existingIndex = currentCart.indexOfFirst { it.product.productoId == product.productoId }
         if (existingIndex != -1) {
             val item = currentCart[existingIndex]
-            currentCart[existingIndex] = item.copy(quantity = item.quantity + 1)
+            currentCart[existingIndex] = item.copy(quantity = item.quantity + cantidad)
         } else {
-            currentCart.add(SaleItemInternal(product, 1))
+            currentCart.add(SaleItemInternal(product, cantidad))
         }
         tickets = tickets.toList()
         searchQuery = ""
+    }
+
+    fun addGramajeToCart(gramos: Int) {
+        val producto = gramajeProducto ?: return
+        val existingIndex = currentCart.indexOfFirst { it.product.productoId == producto.productoId }
+        if (existingIndex != -1) {
+            val item = currentCart[existingIndex]
+            currentCart[existingIndex] = item.copy(quantity = item.quantity + gramos)
+        } else {
+            currentCart.add(SaleItemInternal(producto, gramos))
+        }
+        tickets = tickets.toList()
+        showGramajeModal = false
+        gramajeProducto = null
     }
 
     fun processVenta() {
@@ -1226,9 +1245,7 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                                 metodoPago = metodoPago
                             )
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    } catch (e: Exception) { e.printStackTrace() }
                     
                     val cambio = if (metodoPago == "EFECTIVO") montoRecibido - total else 0.0
                     Toast.makeText(
@@ -1249,13 +1266,97 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
         }
     }
 
+    fun registrarEntrada(monto: Double, descripcion: String) {
+        scope.launch {
+            try {
+                val entrada = EntradaSalidaDTO(
+                    montoEoS = monto,
+                    descripcion = descripcion,
+                    tipo = "ENTRADA"
+                )
+                val resp = RetrofitClient.apiService.crearEntrada(entrada)
+                if (resp.codigo == 200) {
+                    Toast.makeText(context, "Entrada registrada: $${String.format("%.2f", monto)}", Toast.LENGTH_SHORT).show()
+                }
+                showEntradaModal = false
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al registrar entrada", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun registrarSalida(monto: Double, descripcion: String) {
+        scope.launch {
+            try {
+                val salida = EntradaSalidaDTO(
+                    montoEoS = monto,
+                    descripcion = descripcion,
+                    tipo = "SALIDA"
+                )
+                val resp = RetrofitClient.apiService.crearSalida(salida)
+                if (resp.codigo == 200) {
+                    Toast.makeText(context, "Salida registrada: $${String.format("%.2f", monto)}", Toast.LENGTH_SHORT).show()
+                }
+                showSalidaModal = false
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al registrar salida", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Header con cajero y acciones
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Cajero:", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                Text(cajeroNombre, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, fontWeight = FontWeight.Bold)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    onClick = { showEntradaModal = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = colors.success.copy(alpha = 0.2f)
+                ) {
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = colors.success, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Entrada", color = colors.success, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Surface(
+                    onClick = { showSalidaModal = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = colors.error.copy(alpha = 0.2f)
+                ) {
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Remove, contentDescription = null, tint = colors.error, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Salida", color = colors.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Surface(
+                    onClick = { showHistorialModal = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = colors.primary.copy(alpha = 0.2f)
+                ) {
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Historial", color = colors.primary, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
         // Selector de tickets
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             tickets.forEachIndexed { index, _ ->
                 val isActive = activeTicketIndex == index
@@ -1274,6 +1375,19 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                         textAlign = TextAlign.Center
                     )
                 }
+            }
+            Surface(
+                onClick = { createNewTicket() },
+                shape = RoundedCornerShape(12.dp),
+                color = colors.primary.copy(alpha = 0.1f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Nuevo ticket",
+                    tint = colors.primary,
+                    modifier = Modifier.padding(12.dp).size(24.dp)
+                )
             }
         }
 
@@ -1360,7 +1474,7 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                                     )
                                 }
                                 Text(
-                                    "${String.format("%.2f", product.precioFinal)}", 
+                                    "$${String.format("%.2f", if (product.isGramaje) product.precioFinal / 1000.0 else product.precioFinal)}${if (product.isGramaje) "/g" else ""}", 
                                     color = colors.primary, 
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleMedium
@@ -1420,7 +1534,7 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Text(
-                                        "$${String.format("%.2f", item.product.precioFinal)} c/u", 
+                                        "$${String.format("%.2f", if (item.product.isGramaje) item.product.precioFinal / 1000.0 else item.product.precioFinal)} ${if (item.product.isGramaje) "g" else "pza"}", 
                                         fontSize = 12.sp, 
                                         color = colors.textSecondary
                                     )
@@ -1431,13 +1545,19 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                                 ) {
                                     Surface(
                                         onClick = {
-                                            if (item.quantity > 1) {
-                                                val idx = currentCart.indexOf(item)
-                                                currentCart[idx] = item.copy(quantity = item.quantity - 1)
-                                            } else {
-                                                currentCart.remove(item)
+                                            val productId = item.product.productoId
+                                            val mutableList = tickets.toMutableList()
+                                            val cart = mutableList.getOrElse(activeTicketIndex) { mutableListOf() }
+                                            val idx = cart.indexOfFirst { it.product.productoId == productId }
+                                            if (idx != -1) {
+                                                val currentItem = cart[idx]
+                                                if (currentItem.quantity > 1) {
+                                                    cart[idx] = currentItem.copy(quantity = currentItem.quantity - 1)
+                                                } else {
+                                                    cart.removeAt(idx)
+                                                }
+                                                tickets = mutableList.toList()
                                             }
-                                            tickets = tickets.toList()
                                         },
                                         shape = RoundedCornerShape(8.dp),
                                         color = colors.error.copy(alpha = 0.2f)
@@ -1457,9 +1577,15 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                                     )
                                     Surface(
                                         onClick = {
-                                            val idx = currentCart.indexOf(item)
-                                            currentCart[idx] = item.copy(quantity = item.quantity + 1)
-                                            tickets = tickets.toList()
+                                            val productId = item.product.productoId
+                                            val mutableList = tickets.toMutableList()
+                                            val cart = mutableList.getOrElse(activeTicketIndex) { mutableListOf() }
+                                            val idx = cart.indexOfFirst { it.product.productoId == productId }
+                                            if (idx != -1) {
+                                                val currentItem = cart[idx]
+                                                cart[idx] = currentItem.copy(quantity = currentItem.quantity + 1)
+                                                tickets = mutableList.toList()
+                                            }
                                         },
                                         shape = RoundedCornerShape(8.dp),
                                         color = colors.success.copy(alpha = 0.2f)
@@ -1522,6 +1648,36 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
             onPagoTransferencia = {
                 processVentaCobro("TRANSFERENCIA", 0.0)
             }
+        )
+    }
+
+    if (showGramajeModal && gramajeProducto != null) {
+        GramajeCalculatorModal(
+            producto = gramajeProducto!!,
+            onDismiss = { showGramajeModal = false; gramajeProducto = null },
+            onConfirm = { gramos -> addGramajeToCart(gramos) }
+        )
+    }
+
+    if (showEntradaModal) {
+        EntradaSalidaModal(
+            titulo = "Entrada de Efectivo",
+            onDismiss = { showEntradaModal = false },
+            onConfirm = { monto, descripcion -> registrarEntrada(monto, descripcion) }
+        )
+    }
+
+    if (showSalidaModal) {
+        EntradaSalidaModal(
+            titulo = "Salida de Efectivo",
+            onDismiss = { showSalidaModal = false },
+            onConfirm = { monto, descripcion -> registrarSalida(monto, descripcion) }
+        )
+    }
+
+    if (showHistorialModal) {
+        HistorialVentasModal(
+            onDismiss = { showHistorialModal = false }
         )
     }
 }
@@ -2428,6 +2584,213 @@ fun CobroModal(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancelar", color = colors.textSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+fun GramajeCalculatorModal(
+    producto: Product,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    val colors = MaterialTheme.zeldaColors
+    var gramos by remember { mutableStateOf("100") }
+    val precioPorGramo = producto.precioFinal / 1000.0
+    val totalGramos = gramos.toIntOrNull() ?: 0
+    val precioTotal = totalGramos * precioPorGramo
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.secondaryBackground,
+        title = {
+            Text("Calcular Gramaje", color = colors.primary, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(producto.nombre, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text("Precio por kg: $${String.format("%.2f", producto.precioFinal)}", color = colors.textSecondary)
+                
+                OutlinedTextField(
+                    value = gramos,
+                    onValueChange = { gramos = it.filter { c -> c.isDigit() } },
+                    label = { Text("Gramos") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.primary,
+                        cursorColor = colors.primary
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(100, 250, 500, 1000).forEach { g ->
+                        Surface(
+                            onClick = { gramos = g.toString() },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (gramos == g.toString()) colors.primary else colors.secondaryBackground
+                        ) {
+                            Text(
+                                "${g}g",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = if (gramos == g.toString()) colors.background else colors.textPrimary
+                            )
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colors.primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Total", color = colors.textSecondary)
+                        Text("$${String.format("%.2f", precioTotal)}", color = colors.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(totalGramos) },
+                enabled = totalGramos > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+            ) {
+                Text("Agregar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = colors.textSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+fun EntradaSalidaModal(
+    titulo: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, String) -> Unit
+) {
+    val colors = MaterialTheme.zeldaColors
+    var monto by remember { mutableStateOf("") }
+    var descripcion by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.secondaryBackground,
+        title = {
+            Text(titulo, color = colors.primary, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = monto,
+                    onValueChange = { monto = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Monto") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null, tint = colors.primary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.primary,
+                        cursorColor = colors.primary
+                    )
+                )
+                OutlinedTextField(
+                    value = descripcion,
+                    onValueChange = { descripcion = it },
+                    label = { Text("Descripción") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, tint = colors.primary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.primary,
+                        cursorColor = colors.primary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(monto.toDoubleOrNull() ?: 0.0, descripcion) },
+                enabled = monto.toDoubleOrNull() != null && monto.toDoubleOrNull()!! > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+            ) {
+                Text("Registrar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = colors.textSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+fun HistorialVentasModal(
+    onDismiss: () -> Unit
+) {
+    val colors = MaterialTheme.zeldaColors
+    val context = LocalContext.current
+    var ventas by remember { mutableStateOf<List<Any>>(emptyList()) }
+    var totalVentas by remember { mutableStateOf(0.0) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val fechaHoy = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val resp = RetrofitClient.apiService.getVentasPorDia(fechaHoy)
+            if (resp.codigo == 200 && resp.datos != null) {
+                val datos = resp.datos
+                totalVentas = (datos as? Map<*, *>)?.get("cobroTotal")?.toString()?.toDoubleOrNull() ?: 0.0
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isLoading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.secondaryBackground,
+        title = {
+            Text("Historial de Ventas", color = colors.primary, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colors.primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Total del día", color = colors.textSecondary)
+                        Text("$${String.format("%.2f", totalVentas)}", color = colors.success, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+                    }
+                }
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = colors.primary)
+                    }
+                } else {
+                    Text("No hay ventas registradas hoy", color = colors.textSecondary)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+            ) {
+                Text("Cerrar")
             }
         }
     )
