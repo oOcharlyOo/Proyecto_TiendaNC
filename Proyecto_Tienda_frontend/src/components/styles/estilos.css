@@ -190,8 +190,8 @@ textarea:focus {
 
 /* Scroll global con estilo Zelda clasico */
 * {
-  scrollbar-width: thin;
   scrollbar-color: var(--accent-color) var(--border-color);
+  scrollbar-width: none;
 }
 
 *::-webkit-scrollbar {

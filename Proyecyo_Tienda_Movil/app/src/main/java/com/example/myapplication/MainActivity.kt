@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +26,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,13 +62,17 @@ class MainActivity : ComponentActivity() {
             var currentTheme by remember { mutableStateOf(ZeldaThemeVariant.MercadoLibre) }
             var currentScreen by remember { mutableStateOf(Screen.Home) }
             var isLoggedIn by remember { mutableStateOf(false) }
+            var usuarioNombre by remember { mutableStateOf("Cajero") }
 
             val windowSizeClass = calculateWindowSizeClass(this)
 
             ZeldaTheme(variant = currentTheme) {
                 if (!isLoggedIn) {
                     MLLoginScreen(
-                        onLoginSuccess = { isLoggedIn = true },
+                        onLoginSuccess = { nombre -> 
+                            usuarioNombre = nombre
+                            isLoggedIn = true 
+                        },
                         onThemeChange = {
                             val nextOrdinal = (currentTheme.ordinal + 1) % ZeldaThemeVariant.values().size
                             currentTheme = ZeldaThemeVariant.values()[nextOrdinal]
@@ -82,7 +88,7 @@ class MainActivity : ComponentActivity() {
                             Screen.Home -> MLHomeScreen(
                                 onNavigate = { currentScreen = it }
                             )
-                            Screen.Ventas -> VentasScreen()
+                            Screen.Ventas -> VentasScreen(usuarioActual = usuarioNombre)
                             Screen.Productos -> ProductosScreen()
                             Screen.Inventario -> InventarioScreen()
                             Screen.Corte -> CorteScreen()
@@ -98,7 +104,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MLLoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (String) -> Unit,
     onThemeChange: () -> Unit
 ) {
     val colors = MaterialTheme.zeldaColors
@@ -241,7 +247,8 @@ fun MLLoginScreen(
                                         )
                                         val response = RetrofitClient.apiService.login(loginRequest)
                                         if (response.codigo == 200 && response.datos != null) {
-                                            onLoginSuccess()
+                                            val nombreAMostrar = if (!response.datos.nombre.isNullOrBlank()) response.datos.nombre else response.datos.usuario
+                                            onLoginSuccess(nombreAMostrar)
                                         } else {
                                             Toast.makeText(context, response.mensaje ?: "Error de autenticación", Toast.LENGTH_SHORT).show()
                                         }
@@ -1090,16 +1097,18 @@ fun ProductosScreen() {
 
 @Composable
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.WindowSizeClass? = null) {
+fun VentasScreen(
+    usuarioActual: String = "Cajero",
+    windowSizeClass: androidx.compose.material3.windowsizeclass.WindowSizeClass? = null
+) {
     val colors = MaterialTheme.zeldaColors
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val isCompact = configuration.screenWidthDp < 600
-
-    var activeTicketIndex by remember { mutableStateOf(0) }
-    var tickets by remember { mutableStateOf(listOf(mutableListOf<SaleItemInternal>())) }
     
+    // Estado de la lógica de negocio usando SnapshotStateList para reactividad profunda
+    var activeTicketIndex by remember { mutableStateOf(0) }
+    val tickets = remember { mutableStateListOf(mutableStateListOf<SaleItemInternal>()) }
     var searchQuery by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<Product>>(emptyList()) }
     var allProducts by remember { mutableStateOf<List<Product>>(emptyList()) }
@@ -1111,18 +1120,18 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
     var showHistorialModal by remember { mutableStateOf(false) }
     var gramajeProducto by remember { mutableStateOf<Product?>(null) }
     var currentVentaId by remember { mutableStateOf<Long?>(null) }
-    var cajeroNombre by remember { mutableStateOf("Cajero") }
+    var cajeroNombre by remember { mutableStateOf(usuarioActual) }
 
+    // Funciones de lógica
     fun loadPendingTickets() {
         scope.launch {
             try {
                 val resp = RetrofitClient.apiService.getVentasPendientes()
                 if (resp.codigo == 200 && resp.datos != null && resp.datos.isNotEmpty()) {
-                    val newTickets = mutableListOf<MutableList<SaleItemInternal>>()
+                    tickets.clear()
                     for (venta in resp.datos) {
-                        newTickets.add(mutableListOf())
+                        tickets.add(mutableStateListOf())
                     }
-                    tickets = newTickets
                     currentVentaId = resp.datos.firstOrNull()?.id_venta
                 }
             } catch (e: Exception) {
@@ -1142,9 +1151,7 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                 val resp = RetrofitClient.apiService.addVenta(nuevaVenta)
                 if (resp.codigo == 200 && resp.datos != null) {
                     currentVentaId = resp.datos.id_venta
-                    val newTickets = tickets.toMutableList()
-                    newTickets.add(mutableListOf())
-                    tickets = newTickets
+                    tickets.add(mutableStateListOf())
                     activeTicketIndex = tickets.size - 1
                     Toast.makeText(context, "Ticket #${tickets.size} creado", Toast.LENGTH_SHORT).show()
                 }
@@ -1164,13 +1171,18 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
 
     LaunchedEffect(searchQuery) {
         suggestions = if (searchQuery.length >= 2) {
-            allProducts.filter { it.nombre.contains(searchQuery, ignoreCase = true) || it.codigoBarras?.contains(searchQuery) == true }.take(5)
+            allProducts.filter { 
+                it.nombre.contains(searchQuery, ignoreCase = true) || 
+                it.codigoBarras?.contains(searchQuery) == true ||
+                it.codigoBarrasAlt?.contains(searchQuery) == true
+            }.take(5)
         } else {
             emptyList()
         }
     }
 
-    val currentCart = tickets.getOrElse(activeTicketIndex) { mutableListOf() }
+    val currentCart = if (tickets.isNotEmpty() && activeTicketIndex < tickets.size) tickets[activeTicketIndex] else remember { mutableStateListOf<SaleItemInternal>() }
+    
     val total = currentCart.sumOf { 
         val precioUnitario = if (it.product.isGramaje) it.product.precioFinal / 1000.0 else it.product.precioFinal
         kotlin.math.round(precioUnitario * it.quantity * 100) / 100
@@ -1190,7 +1202,6 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
         } else {
             currentCart.add(SaleItemInternal(product, cantidad))
         }
-        tickets = tickets.toList()
         searchQuery = ""
     }
 
@@ -1203,7 +1214,6 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
         } else {
             currentCart.add(SaleItemInternal(producto, gramos))
         }
-        tickets = tickets.toList()
         showGramajeModal = false
         gramajeProducto = null
     }
@@ -1254,7 +1264,6 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                         Toast.LENGTH_LONG
                     ).show()
                     currentCart.clear()
-                    tickets = tickets.toList()
                 } else {
                     Toast.makeText(context, "Error: ${respVenta.mensaje}", Toast.LENGTH_LONG).show()
                 }
@@ -1304,299 +1313,247 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // Header con cajero y acciones
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8F9FA))
+    ) {
+        // 1. Sección de Usuario y Turno
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Cajero:", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                Text(cajeroNombre, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Cajero: $cajeroNombre",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF444444)
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    onClick = { showEntradaModal = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = colors.success.copy(alpha = 0.2f)
-                ) {
-                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = colors.success, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Entrada", color = colors.success, style = MaterialTheme.typography.bodySmall)
-                    }
+            
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Botón Entrada
+                IconButton(onClick = { showEntradaModal = true }) {
+                    Icon(Icons.Default.AddCircle, contentDescription = "Entrada", tint = Color(0xFF2E7D32))
                 }
-                Surface(
-                    onClick = { showSalidaModal = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = colors.error.copy(alpha = 0.2f)
-                ) {
-                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Remove, contentDescription = null, tint = colors.error, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Salida", color = colors.error, style = MaterialTheme.typography.bodySmall)
-                    }
+                // Botón Salida
+                IconButton(onClick = { showSalidaModal = true }) {
+                    Icon(Icons.Default.RemoveCircle, contentDescription = "Salida", tint = Color(0xFFC62828))
                 }
-                Surface(
-                    onClick = { showHistorialModal = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = colors.primary.copy(alpha = 0.2f)
-                ) {
-                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.History, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Historial", color = colors.primary, style = MaterialTheme.typography.bodySmall)
-                    }
+                // Botón Historial
+                IconButton(onClick = { showHistorialModal = true }) {
+                    Icon(Icons.Default.History, contentDescription = "Historial", tint = colors.primary)
                 }
             }
         }
 
-        // Selector de tickets
+        // 2. Selector de Tickets (Estilo Chips)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             tickets.forEachIndexed { index, _ ->
                 val isActive = activeTicketIndex == index
-                Surface(
+                FilterChip(
+                    selected = isActive,
                     onClick = { activeTicketIndex = index },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isActive) colors.primary else colors.secondaryBackground,
-                    border = if (!isActive) androidx.compose.foundation.BorderStroke(1.dp, colors.border) else null
-                ) {
-                    Text(
-                        text = "TICKET ${index + 1}",
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        color = if (isActive) colors.background else colors.textPrimary,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
+                    label = { Text("Ticket ${index + 1}") },
+                    enabled = true,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = colors.primary,
+                        selectedLabelColor = Color.White,
+                        containerColor = Color.White,
+                        labelColor = Color.Gray
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isActive,
+                        borderColor = if (isActive) colors.primary else Color.LightGray,
+                        borderWidth = 1.dp,
+                        selectedBorderColor = colors.primary
                     )
-                }
-            }
-            Surface(
-                onClick = { createNewTicket() },
-                shape = RoundedCornerShape(12.dp),
-                color = colors.primary.copy(alpha = 0.1f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.primary)
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Nuevo ticket",
-                    tint = colors.primary,
-                    modifier = Modifier.padding(12.dp).size(24.dp)
                 )
+            }
+            
+            IconButton(
+                onClick = { createNewTicket() },
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White, RoundedCornerShape(20.dp))
+                    .border(1.dp, Color.LightGray, RoundedCornerShape(20.dp))
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Nuevo Ticket", tint = colors.primary)
             }
         }
 
-        // Buscador de productos
-        ProfessionalCard(title = "BUSCAR PRODUCTO") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Escribe nombre o código...", color = colors.textSecondary.copy(0.5f)) },
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = colors.border, 
-                        focusedBorderColor = colors.primary,
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary,
-                        cursorColor = colors.primary
-                    ),
-                    singleLine = true,
-                    leadingIcon = { 
-                        Icon(Icons.Default.Search, contentDescription = null, tint = colors.primary) 
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Limpiar", tint = colors.textSecondary)
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp)
-                )
-                
-                // Botón escáner de código de barras
-                Surface(
-                    onClick = {
-                        Toast.makeText(context, "Escáner: Busca código de barras...", Toast.LENGTH_SHORT).show()
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    color = colors.primary,
-                    modifier = Modifier.size(56.dp)
+        // 3. Buscador de Productos
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.padding(12.dp).size(24.dp)
+                    )
+                    
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Buscar por nombre o código...") },
+                        modifier = Modifier.weight(1f),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = colors.primary
+                        ),
+                        singleLine = true
+                    )
+                    
+                    IconButton(onClick = { 
+                        Toast.makeText(context, "Escaneando...", Toast.LENGTH_SHORT).show()
+                    }) {
                         Icon(
                             Icons.Default.QrCodeScanner,
-                            contentDescription = "Escanear código",
-                            tint = colors.background,
-                            modifier = Modifier.size(28.dp)
+                            contentDescription = "Scanner",
+                            tint = colors.primary
                         )
                     }
                 }
-            }
 
-            if (suggestions.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Column {
+                if (suggestions.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.LightGray.copy(alpha = 0.3f))
                     suggestions.forEach { product ->
-                        Surface(
-                            onClick = { addToCart(product) },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = colors.background.copy(alpha = 0.5f)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { addToCart(product) }
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        product.nombre, 
-                                        color = colors.textPrimary, 
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        "Código: ${product.codigoBarras ?: "N/A"}",
-                                        color = colors.textSecondary,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-                                Text(
-                                    "$${String.format("%.2f", if (product.isGramaje) product.precioFinal / 1000.0 else product.precioFinal)}${if (product.isGramaje) "/g" else ""}", 
-                                    color = colors.primary, 
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                            Column {
+                                Text(product.nombre, fontWeight = FontWeight.Medium)
+                                Text("Stock: ${product.stock}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
+                            Text(
+                                "$${String.format("%.2f", product.precioFinal)}",
+                                color = colors.primary,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                        HorizontalDivider(color = colors.border.copy(alpha = 0.3f))
                     }
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Carrito de compras
-        ProfessionalCard(
-            title = "CARRITO - TICKET ${activeTicketIndex + 1}", 
-            modifier = Modifier.weight(1f)
+
+        // 4. Contenedor del Carrito (Lista de productos)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(12.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             if (currentCart.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.ShoppingCart, 
-                            contentDescription = null, 
-                            tint = colors.textSecondary.copy(0.5f),
-                            modifier = Modifier.size(48.dp)
+                            Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            modifier = Modifier.size(80.dp),
+                            tint = Color.LightGray.copy(alpha = 0.5f)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Carrito vacío", 
-                            style = MaterialTheme.typography.bodyLarge, 
-                            color = colors.textSecondary
+                            "El carrito está vacío",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(currentCart) { item: SaleItemInternal ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = colors.background.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(8.dp)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(currentCart) { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF1F3F4), RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        item.product.nombre, 
-                                        color = colors.textPrimary, 
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Text(
-                                        "$${String.format("%.2f", if (item.product.isGramaje) item.product.precioFinal / 1000.0 else item.product.precioFinal)} ${if (item.product.isGramaje) "g" else "pza"}", 
-                                        fontSize = 12.sp, 
-                                        color = colors.textSecondary
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.product.nombre, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "$${String.format("%.2f", if (item.product.isGramaje) item.product.precioFinal / 1000.0 else item.product.precioFinal)} x ${item.quantity}${if (item.product.isGramaje) "g" else " pza"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        val idx = currentCart.indexOfFirst { it.product.productoId == item.product.productoId }
+                                        if (idx != -1) {
+                                            if (currentCart[idx].quantity > 1) {
+                                                currentCart[idx] = currentCart[idx].copy(quantity = currentCart[idx].quantity - 1)
+                                            } else {
+                                                currentCart.removeAt(idx)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Surface(
-                                        onClick = {
-                                            val productId = item.product.productoId
-                                            val mutableList = tickets.toMutableList()
-                                            val cart = mutableList.getOrElse(activeTicketIndex) { mutableListOf() }
-                                            val idx = cart.indexOfFirst { it.product.productoId == productId }
-                                            if (idx != -1) {
-                                                val currentItem = cart[idx]
-                                                if (currentItem.quantity > 1) {
-                                                    cart[idx] = currentItem.copy(quantity = currentItem.quantity - 1)
-                                                } else {
-                                                    cart.removeAt(idx)
-                                                }
-                                                tickets = mutableList.toList()
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = colors.error.copy(alpha = 0.2f)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Remove, 
-                                            contentDescription = "Disminuir", 
-                                            tint = colors.error,
-                                            modifier = Modifier.padding(4.dp).size(20.dp)
-                                        )
-                                    }
-                                    Text(
-                                        "${item.quantity}", 
-                                        color = colors.textPrimary, 
-                                        modifier = Modifier.padding(horizontal = 12.dp),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Surface(
-                                        onClick = {
-                                            val productId = item.product.productoId
-                                            val mutableList = tickets.toMutableList()
-                                            val cart = mutableList.getOrElse(activeTicketIndex) { mutableListOf() }
-                                            val idx = cart.indexOfFirst { it.product.productoId == productId }
-                                            if (idx != -1) {
-                                                val currentItem = cart[idx]
-                                                cart[idx] = currentItem.copy(quantity = currentItem.quantity + 1)
-                                                tickets = mutableList.toList()
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = colors.success.copy(alpha = 0.2f)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add, 
-                                            contentDescription = "Aumentar", 
-                                            tint = colors.success,
-                                            modifier = Modifier.padding(4.dp).size(20.dp)
-                                        )
-                                    }
+                                    Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Menos", tint = Color.Red)
+                                }
+                                
+                                Text(
+                                    "${item.quantity}",
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                IconButton(
+                                    onClick = {
+                                        val idx = currentCart.indexOfFirst { it.product.productoId == item.product.productoId }
+                                        if (idx != -1) {
+                                            currentCart[idx] = currentCart[idx].copy(quantity = currentCart[idx].quantity + 1)
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.AddCircleOutline, contentDescription = "Más", tint = colors.primary)
                                 }
                             }
                         }
@@ -1604,40 +1561,57 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Total y botón de pago
-        ProfessionalCard {
+
+        // 5. Sección de Pago y Total
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shadowElevation = 16.dp
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
                         "TOTAL A PAGAR",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.textSecondary
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray,
+                        letterSpacing = 0.1.sp
                     )
                     Text(
                         "$${String.format("%.2f", total)}",
                         style = MaterialTheme.typography.headlineMedium,
-                        color = colors.success,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2E7D32)
                     )
                 }
-                ZeldaButton(
-                    text = if(isProcessing) "PROCESANDO..." else "COBRAR",
-                    icon = Icons.Default.Payment, 
-                    onClick = { processVenta() }, 
-                    modifier = Modifier.width(160.dp).height(56.dp),
-                    enabled = !isProcessing && currentCart.isNotEmpty()
-                )
+                
+                Button(
+                    onClick = { processVenta() },
+                    modifier = Modifier
+                        .height(60.dp)
+                        .width(160.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                    enabled = currentCart.isNotEmpty() && !isProcessing
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Payments, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("COBRAR", fontSize = 16.sp)
+                    }
+                }
             }
         }
     }
 
+    // Modales (Se mantienen igual para no romper la lógica de negocio)
     if (showCobroModal) {
         CobroModal(
             total = total,
@@ -1681,6 +1655,7 @@ fun VentasScreen(windowSizeClass: androidx.compose.material3.windowsizeclass.Win
         )
     }
 }
+
 
 @Composable
 fun InventarioScreen() {
@@ -2739,7 +2714,7 @@ fun HistorialVentasModal(
 ) {
     val colors = MaterialTheme.zeldaColors
     val context = LocalContext.current
-    var ventas by remember { mutableStateOf<List<Any>>(emptyList()) }
+    var ventas by remember { mutableStateOf<List<VentasDTO>>(emptyList()) }
     var totalVentas by remember { mutableStateOf(0.0) }
     var isLoading by remember { mutableStateOf(true) }
 
@@ -2748,8 +2723,8 @@ fun HistorialVentasModal(
             val fechaHoy = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
             val resp = RetrofitClient.apiService.getVentasPorDia(fechaHoy)
             if (resp.codigo == 200 && resp.datos != null) {
-                val datos = resp.datos
-                totalVentas = (datos as? Map<*, *>)?.get("cobroTotal")?.toString()?.toDoubleOrNull() ?: 0.0
+                totalVentas = resp.datos.cobroTotal
+                ventas = resp.datos.ventas ?: emptyList()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -2762,26 +2737,55 @@ fun HistorialVentasModal(
         onDismissRequest = onDismiss,
         containerColor = colors.secondaryBackground,
         title = {
-            Text("Historial de Ventas", color = colors.primary, fontWeight = FontWeight.Bold)
+            Text("Ventas de Hoy", color = colors.primary, fontWeight = FontWeight.Bold)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = colors.primary.copy(alpha = 0.1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Total del día", color = colors.textSecondary)
-                        Text("$${String.format("%.2f", totalVentas)}", color = colors.success, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+                    Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Total Vendido", color = colors.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        Text("$${String.format("%.2f", totalVentas)}", color = colors.success, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                     }
                 }
+                
                 if (isLoading) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = colors.primary)
                     }
+                } else if (ventas.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        Text("No hay ventas registradas hoy", color = colors.textSecondary)
+                    }
                 } else {
-                    Text("No hay ventas registradas hoy", color = colors.textSecondary)
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(ventas) { venta ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = colors.background.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Ticket #${venta.id_venta ?: venta.idVenta}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(venta.metodo_pago, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                                    }
+                                    Text("$${String.format("%.2f", venta.monto_total)}", color = colors.primary, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },

@@ -121,35 +121,45 @@ onMounted(async () => {
     </div>
     <div class="stats-row" style="grid-area: stats;">
       <div class="stat-card">
-        <span class="stat-icon">📦</span>
+        <div class="stat-icon-wrap">
+          <span class="stat-icon">📦</span>
+        </div>
         <div class="stat-info">
           <p>Total Productos</p>
           <strong>{{ productos.length }}</strong>
         </div>
       </div>
       <div class="stat-card warning">
-        <span class="stat-icon">⚠️</span>
+        <div class="stat-icon-wrap">
+          <span class="stat-icon">⚠️</span>
+        </div>
         <div class="stat-info">
           <p>Bajo Stock</p>
           <strong>{{ bajoStock.length }}</strong>
         </div>
       </div>
       <div class="stat-card danger">
-        <span class="stat-icon">❌</span>
+        <div class="stat-icon-wrap">
+          <span class="stat-icon">❌</span>
+        </div>
         <div class="stat-info">
           <p>Agotados</p>
           <strong>{{ productosAgotados.length }}</strong>
         </div>
       </div>
       <div class="stat-card gold">
-        <span class="stat-icon">💰</span>
+        <div class="stat-icon-wrap">
+          <span class="stat-icon">💰</span>
+        </div>
         <div class="stat-info">
           <p>Costo Total</p>
           <strong>{{ formatoMoneda(costoTotalInventario) }}</strong>
         </div>
       </div>
       <div class="stat-card success">
-        <span class="stat-icon">💎</span>
+        <div class="stat-icon-wrap">
+          <span class="stat-icon">💎</span>
+        </div>
         <div class="stat-info">
           <p>Valor Venta</p>
           <strong>{{ formatoMoneda(valorTotalVenta) }}</strong>
@@ -159,27 +169,38 @@ onMounted(async () => {
 
     <section class="panel panel-bajo-stock" style="grid-area: bajo;">
       <header class="panel-header danger">
-        <h2>⚠️ Aviso: Bajo Stock ({{ bajoStock.length }})</h2>
+        <div class="header-content">
+          <h2>⚠️ Bajo Stock ({{ bajoStock.length }})</h2>
+        </div>
       </header>
 
       <div class="tabla-wrap">
-        <p v-if="cargando" class="estado">🔄 Cargando datos...</p>
-        <p v-else-if="bajoStock.length === 0" class="estado ok">✨ Inventario OK. No hay productos debajo del mínimo.</p>
+        <div v-if="cargando" class="estado loading">
+          <div class="loading-spinner"></div>
+          <span>Cargando datos...</span>
+        </div>
+        <p v-else-if="bajoStock.length === 0" class="estado ok">
+          <span class="estado-icon">✨</span>
+          Inventario OK. No hay productos debajo del mínimo.
+        </p>
 
         <table v-else>
           <thead>
             <tr>
-              <th>🆔 ID</th>
-              <th>📝 Producto</th>
-              <th>📉 Mín</th>
-              <th>📊 Stock</th>
+              <th>ID</th>
+              <th>Producto</th>
+              <th>Mín</th>
+              <th>Stock</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in bajoStock" :key="`low-${p.idProducto}`" class="row-danger">
               <td><span class="id-badge">{{ p.idProducto }}</span></td>
-              <td><span class="emoji-item">{{ obtenerEmojiInventario(p.idProducto) }}</span> {{ p.nombre }}</td>
-              <td>{{ p.cantidad_min }}{{ p.is_gramaje ? 'g' : '' }}</td>
+              <td>
+                <span class="emoji-item">{{ obtenerEmojiInventario(p.idProducto) }}</span>
+                <span class="product-name">{{ p.nombre }}</span>
+              </td>
+              <td class="min-cell">{{ p.cantidad_min }}{{ p.is_gramaje ? 'g' : '' }}</td>
               <td class="stock-cell">{{ p.stock }}{{ p.is_gramaje ? 'g' : '' }}</td>
             </tr>
           </tbody>
@@ -189,27 +210,39 @@ onMounted(async () => {
 
     <section class="panel panel-catalogo" style="grid-area: catalog;">
       <header class="panel-header">
-        <h2>📦 Catálogo de Inventario ({{ productos.length }})</h2>
+        <div class="header-content">
+          <h2>📦 Catálogo de Inventario ({{ productos.length }})</h2>
+        </div>
         <button class="btn-refresh" @click="cargarInventario" :disabled="cargando">
-          {{ cargando ? '⏳' : '🔄' }} Actualizar
+          <span>{{ cargando ? '⏳' : '🔄' }}</span>
+          <span>Actualizar</span>
         </button>
       </header>
 
-      <p v-if="mensaje" class="estado error">⚠️ {{ mensaje }}</p>
+      <p v-if="mensaje" class="estado error">
+        <span class="estado-icon">⚠️</span>
+        {{ mensaje }}
+      </p>
 
       <div class="tabla-wrap">
-        <p v-if="cargando" class="estado">🔄 Cargando productos del servidor...</p>
-        <p v-else-if="productos.length === 0" class="estado">📭 No hay productos en el catálogo.</p>
+        <div v-if="cargando" class="estado loading">
+          <div class="loading-spinner"></div>
+          <span>Cargando productos del servidor...</span>
+        </div>
+        <p v-else-if="productos.length === 0" class="estado">
+          <span class="estado-icon">📭</span>
+          No hay productos en el catálogo.
+        </p>
 
         <table v-else>
           <thead>
             <tr>
-              <th>🆔 ID</th>
-              <th>📝 Producto</th>
-              <th>💵 Costo</th>
-              <th>💰 Venta</th>
-              <th>📉 Mín</th>
-              <th>📊 Stock</th>
+              <th>ID</th>
+              <th>Producto</th>
+              <th>Costo</th>
+              <th>Venta</th>
+              <th>Mín</th>
+              <th>Stock</th>
             </tr>
           </thead>
           <tbody>
@@ -219,10 +252,13 @@ onMounted(async () => {
               :class="{ low: Number(p.stock || 0) < Number(p.cantidad_min || 0), empty: Number(p.stock || 0) === 0 }"
             >
               <td><span class="id-badge">{{ p.idProducto }}</span></td>
-              <td><span class="emoji-item">{{ obtenerEmojiInventario(p.idProducto) }}</span> {{ p.nombre }}</td>
-              <td>{{ formatoMoneda(Number(p.precio_costo || 0)) }}</td>
+              <td>
+                <span class="emoji-item">{{ obtenerEmojiInventario(p.idProducto) }}</span>
+                <span class="product-name">{{ p.nombre }}</span>
+              </td>
+              <td class="costo-cell">{{ formatoMoneda(Number(p.precio_costo || 0)) }}</td>
               <td class="venta-cell">{{ formatoMoneda(Number(p.precio_venta || 0)) }}</td>
-              <td>{{ p.cantidad_min }}{{ p.is_gramaje ? 'g' : '' }}</td>
+              <td class="min-cell">{{ p.cantidad_min }}{{ p.is_gramaje ? 'g' : '' }}</td>
               <td class="stock-cell">{{ p.stock }}{{ p.is_gramaje ? 'g' : '' }}</td>
             </tr>
           </tbody>
@@ -248,6 +284,10 @@ onMounted(async () => {
   50% { background: color-mix(in srgb, var(--error-color) 32%, transparent); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .inventario-layout {
   height: 90vh;
   min-height: 0;
@@ -266,55 +306,125 @@ onMounted(async () => {
   overflow: hidden;
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
 }
 
 .stats-row {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 0.6rem;
+  gap: 0.8rem;
   animation: fadeSlideIn 300ms ease-out;
   grid-area: stats;
   z-index: 1;
 }
 
+.stat-card {
+  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
+  border: var(--border-width) solid #2a1807;
+  border-radius: 12px;
+  padding: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.stat-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  flex-shrink: 0;
+}
+
 .stat-icon {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+}
+
+
+.stat-card.warning .stat-icon {
+  font-size: 1.4rem;
+}
+
+.stat-card.danger .stat-icon {
+  font-size: 1.4rem;
+}
+
+
+.stat-card.gold .stat-icon {
+  font-size: 1.4rem;
+}
+
+.stat-card.success .stat-icon {
+  font-size: 1.4rem;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .stat-info p {
   margin: 0;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-family: "Courier New", monospace;
+  color: #f6f2de;
+  text-shadow: 1px 1px 0 var(--border-color);
+  opacity: 0.8;
 }
 
 .stat-info strong {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-family: "Courier New", monospace;
-  color: var(--pixel-forest);
+  color: var(--accent-color);
+  text-shadow: 1px 1px 0 var(--border-color);
+  font-weight: 800;
+}
+
+.stat-card.warning strong {
+  color: var(--accent-color);
+  text-shadow: 1px 1px 0 var(--border-color);
+}
+
+.stat-card.danger strong {
+  color: var(--error-color);
+  text-shadow: 1px 1px 0 var(--border-color);
+}
+
+.stat-card.gold strong {
+  color: var(--accent-color);
+  text-shadow: 1px 1px 0 var(--border-color);
+}
+
+.stat-card.success strong {
+  color: var(--success-color);
+  text-shadow: 1px 1px 0 var(--border-color);
 }
 
 .panel {
   min-height: 0;
-  padding: 0.8rem;
+  padding: 1rem;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 0.7rem;
+  gap: 0.8rem;
   position: relative;
   overflow: hidden;
-  background: var(--bg-secondary);
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
   border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 8px;
-}
-
-.panel::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  pointer-events: none;
-  border-radius: 6px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 20%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px var(--shadow-color);
 }
 
 .panel-catalogo {
@@ -323,24 +433,29 @@ onMounted(async () => {
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.4rem 0.6rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
   position: relative;
   z-index: 1;
 }
 
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .panel-header h2 {
   margin: 0;
-  font-size: clamp(0.9rem, 2.4vw, 1.1rem);
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
   color: var(--accent-color);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 800;
-  text-shadow: 1px 1px 0 var(--border-color);
+  letter-spacing: 0.06em;
+  font-weight: 900;
   font-family: "Courier New", monospace;
 }
 
@@ -349,27 +464,31 @@ onMounted(async () => {
 }
 
 .btn-refresh {
-  border: 2px solid var(--border-color);
-  padding: 0.4rem 0.7rem;
-  font-size: 0.72rem;
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: "Courier New", monospace;
   cursor: pointer;
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
   color: var(--btn-text, var(--bg-primary));
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white), 0 2px 0 var(--border-color);
-  transition: transform 80ms steps(2), filter 80ms linear;
+  box-shadow: 0 4px 15px var(--shadow-color);
+  transition: all 0.2s;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
 }
 
 .btn-refresh:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
 .btn-refresh:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white);
+  transform: translateY(0);
 }
 
 .btn-refresh:disabled {
@@ -382,19 +501,56 @@ onMounted(async () => {
   border: var(--border-width) solid var(--border-color);
   background: var(--bg-primary);
   color: var(--text-primary);
-  border-radius: 6px;
-  box-shadow: var(--shadow-inner) var(--bg-panel);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
   position: relative;
   height: 100%;
   max-height: calc(100vh - 250px);
 }
 
+.tabla-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tabla-wrap::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+  border-radius: 4px;
+}
+
+.tabla-wrap::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
+}
+
 .estado {
-  padding: 1rem;
+  padding: 1.5rem;
   font-size: 0.85rem;
   text-align: center;
   font-family: "Courier New", monospace;
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+.estado.loading {
+  flex-direction: column;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.estado-icon {
+  font-size: 1.5rem;
 }
 
 .estado.error {
@@ -412,10 +568,10 @@ table {
 
 th,
 td {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.7rem;
   border-bottom: 1px solid var(--bg-panel);
   text-align: left;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-family: "Courier New", monospace;
   color: var(--text-primary);
   background: transparent;
@@ -424,30 +580,46 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: var(--bg-panel);
+  background: var(--bg-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-weight: 700;
-  z-index: 1;
+  z-index: 2;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
 }
 
 .id-badge {
-  background: var(--border-color);
+  background: var(--bg-secondary);
   color: var(--accent-color);
-  padding: 0.15rem 0.4rem;
-  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
   font-size: 0.7rem;
   font-weight: 700;
+  display: inline-block;
 }
 
 .emoji-item {
-  font-size: 1rem;
-  margin-right: 0.2rem;
+  font-size: 1.1rem;
+  margin-right: 0.25rem;
+}
+
+.product-name {
+  font-weight: 500;
+}
+
+.costo-cell {
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .venta-cell {
   color: var(--success-color);
   font-weight: 700;
+}
+
+.min-cell {
+  color: var(--text-secondary);
 }
 
 .stock-cell {
@@ -459,37 +631,39 @@ th {
   background: color-mix(in srgb, var(--error-color) 10%, transparent);
 }
 
+.row-danger:hover td {
+  background: color-mix(in srgb, var(--error-color) 18%, transparent);
+}
+
 .row-danger .stock-cell {
   color: var(--error-color);
+  font-weight: 800;
 }
 
 tr.low td {
   background: color-mix(in srgb, var(--accent-color) 5%, transparent);
 }
 
+tr.low:hover td {
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+
 tr.empty td {
-  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+  background: color-mix(in srgb, var(--error-color) 12%, transparent);
+}
+
+tr.empty:hover td {
+  background: color-mix(in srgb, var(--error-color) 20%, transparent);
 }
 
 tbody tr:hover td {
-  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 8%, transparent);
 }
 
-.bg-fog {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: 
-    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.1) 0%, transparent 50%);
-  animation: bgFogDrift 10s ease-in-out infinite;
-}
-
-@keyframes bgFogDrift {
-  0% { transform: translateX(-2%) translateY(0); }
-  50% { transform: translateX(2%) translateY(-5px); }
-  100% { transform: translateX(-2%) translateY(0); }
+@media (max-width: 1024px) {
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
@@ -501,10 +675,59 @@ tbody tr:hover td {
       "catalog";
     height: auto;
     overflow: auto;
+    padding: 0.8rem;
   }
   
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  
+  .stat-card {
+    padding: 0.6rem;
+    gap: 0.5rem;
+  }
+  
+  .stat-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .stat-icon {
+    font-size: 1.3rem;
+  }
+  
+  .stat-info strong {
+    font-size: 0.9rem;
+  }
+  
+  .panel {
+    padding: 0.8rem;
+  }
+  
+  .panel-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  
+  .btn-refresh {
+    justify-content: center;
+  }
+  
+  th, td {
+    padding: 0.5rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .stat-card:last-child {
+    grid-column: span 2;
   }
 }
 </style>

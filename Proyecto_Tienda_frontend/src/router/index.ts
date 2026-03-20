@@ -44,7 +44,7 @@ const routes = [
     path: '/usuarios',
     name: 'Usuarios',
     component: Usuarios,
-    meta: { requiresAuth: true, adminOnly: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/finanzas',

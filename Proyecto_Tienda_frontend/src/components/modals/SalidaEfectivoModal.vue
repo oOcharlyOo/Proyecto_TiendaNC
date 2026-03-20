@@ -36,13 +36,21 @@ function confirmar() {
 <template>
   <div v-if="open" class="modal-overlay" @click.self="emit('close')">
     <section class="modal-card panel">
+      <div class="modal-corner tl"></div>
+      <div class="modal-corner tr"></div>
+      <div class="modal-corner bl"></div>
+      <div class="modal-corner br"></div>
+      
       <header class="modal-header">
         <h3>Salida de Efectivo</h3>
       </header>
 
       <div class="modal-body">
         <label>Monto</label>
-        <input v-model="monto" type="number" step="0.01" min="0" placeholder="0.00">
+        <div class="input-wrapper">
+          <span class="input-icon">💸</span>
+          <input v-model="monto" type="number" step="0.01" min="0" placeholder="0.00">
+        </div>
 
         <label>Descripcion</label>
         <textarea v-model="descripcion" rows="3" placeholder="Motivo de la salida"></textarea>
@@ -68,130 +76,192 @@ function confirmar() {
   inset: 0;
   z-index: 90;
   background: rgba(2, 4, 2, 0.92);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   padding: 1rem;
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-card {
-  width: min(100%, 420px);
-  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
-  border: 4px solid #f8d667;
+  width: min(100%, 400px);
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 3px solid var(--accent-color);
   box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
+    0 0 0 4px var(--border-color),
+    0 14px 0 var(--border-color),
     0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.3rem;
+  padding: 1.25rem;
   display: grid;
   gap: 0.8rem;
   position: relative;
-  animation: popIn 150ms steps(4);
+  animation: popIn 200ms ease-out;
+  border-radius: 16px;
 }
 
 @keyframes popIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+.modal-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.modal-corner::before,
+.modal-corner::after {
+  content: '';
+  position: absolute;
+  background: var(--accent-color);
+}
+
+.modal-corner.tl { top: 8px; left: 8px; }
+.modal-corner.tl::before { width: 20px; height: 3px; top: 0; left: 0; border-radius: 2px; }
+.modal-corner.tl::after { width: 3px; height: 20px; top: 0; left: 0; border-radius: 2px; }
+
+.modal-corner.tr { top: 8px; right: 8px; }
+.modal-corner.tr::before { width: 20px; height: 3px; top: 0; right: 0; border-radius: 2px; }
+.modal-corner.tr::after { width: 3px; height: 20px; top: 0; right: 0; border-radius: 2px; }
+
+.modal-corner.bl { bottom: 8px; left: 8px; }
+.modal-corner.bl::before { width: 20px; height: 3px; bottom: 0; left: 0; border-radius: 2px; }
+.modal-corner.bl::after { width: 3px; height: 20px; bottom: 0; left: 0; border-radius: 2px; }
+
+.modal-corner.br { bottom: 8px; right: 8px; }
+.modal-corner.br::before { width: 20px; height: 3px; bottom: 0; right: 0; border-radius: 2px; }
+.modal-corner.br::after { width: 3px; height: 20px; bottom: 0; right: 0; border-radius: 2px; }
 
 .modal-card::before {
   content: "";
   position: absolute;
   inset: 10px;
-  border: 2px dashed rgba(248, 214, 103, 0.4);
+  border: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
   pointer-events: none;
+  border-radius: 12px;
 }
 
 .modal-header {
   position: relative;
-  border-bottom: 2px solid rgba(248, 214, 103, 0.3);
-  padding-bottom: 0.5rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  padding-bottom: 0.6rem;
+  text-align: center;
 }
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.05rem;
-  color: #f8d667;
+  font-size: 1.1rem;
+  color: var(--accent-color);
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
-}
-
-.modal-header h3::before {
-  content: "💸 ";
+  text-shadow: 2px 2px 0 var(--border-color);
 }
 
 .modal-body {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.8rem;
   position: relative;
 }
 
 .modal-body label {
   font-size: 0.72rem;
-  color: #f6f2de;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-family: "Courier New", monospace;
+  font-weight: 600;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 1.2rem;
+  z-index: 1;
 }
 
 .modal-body input,
 .modal-body textarea {
   width: 100%;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.7rem;
-  color: #1d1606;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.7rem 0.8rem;
+  padding-left: 2.5rem;
+  color: var(--text-primary);
   font-family: "Courier New", monospace;
-  font-size: 0.95rem;
+  font-size: 1rem;
   outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
+  transition: all 0.2s;
+  border-radius: 10px;
 }
 
 .modal-body input:focus,
 .modal-body textarea:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 3px #f8d667;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
 }
 
 .modal-body input::placeholder,
 .modal-body textarea::placeholder {
-  color: #8a7a4a;
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .modal-body textarea {
   resize: none;
+  min-height: 80px;
+  padding-left: 0.8rem;
 }
 
 .modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  gap: 0.6rem;
   position: relative;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+  padding-top: 0.8rem;
+  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .modal-actions button {
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.75rem;
+  border: 2px solid var(--border-color);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-family: "Courier New", monospace;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 80ms steps(2), filter 80ms linear;
+  box-shadow: 0 4px 15px var(--shadow-color);
+  transition: all 0.2s;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
-.modal-actions button:first-child {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
+.modal-actions .btn-secondary {
+  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
 }
 
-.modal-actions button:last-child {
-  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
-  color: #fff;
+.modal-actions .btn-danger {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: white;
 }
 
 .modal-actions button:hover {
@@ -200,7 +270,32 @@ function confirmar() {
 }
 
 .modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+  transform: translateY(0);
+}
+
+.btn-icono {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 480px) {
+  .modal-card {
+    padding: 1rem;
+  }
+  
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-actions button {
+    width: 100%;
+  }
+
+  .btn-texto {
+    display: none;
+  }
+  
+  .btn-icono {
+    font-size: 1.3rem;
+  }
 }
 </style>

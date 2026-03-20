@@ -47,7 +47,7 @@ const links = computed(() => {
   const linksBase = [
     { to: '/ventas', label: 'Ventas', adminOnly: false },
     { to: '/productos', label: 'Productos', adminOnly: false },
-    { to: '/usuarios', label: 'Usuarios', adminOnly: true },
+    { to: '/usuarios', label: 'Usuarios', adminOnly: false },
     { to: '/inventario', label: 'Inventario', adminOnly: true },
     { to: '/corte', label: 'Corte', adminOnly: false },
     { to: '/finanzas', label: 'Finanzas', adminOnly: true }
@@ -268,7 +268,8 @@ function cerrarSesion() {
   text-align: center;
   border: var(--border-width) solid var(--border-color);
   padding: 0.45rem 0.7rem;
-  color: var(--btn-text, var(--bg-primary));
+  color: var(--text-primary);
+  text-shadow: 1px 1px 0 var(--border-color);
   background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
   text-transform: uppercase;
   letter-spacing: 0.05em;

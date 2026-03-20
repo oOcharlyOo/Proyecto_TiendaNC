@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
+    "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "vue": "^3.4.27",
     "vue-chartjs": "^5.3.3",

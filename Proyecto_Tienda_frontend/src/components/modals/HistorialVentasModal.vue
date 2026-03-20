@@ -35,11 +35,32 @@ function formatoFecha(fecha?: string) {
   if (Number.isNaN(parsed.getTime())) return 'N/D';
   return parsed.toLocaleString('es-MX');
 }
+
+function getMetodoClase(metodo?: string): string {
+  if (!metodo) return 'efectivo';
+  const m = metodo.toUpperCase();
+  if (m === 'TRANSFERENCIA') return 'transferencia';
+  if (m === 'TARJETA') return 'tarjeta';
+  return 'efectivo';
+}
+
+function getMetodoIcono(metodo?: string): string {
+  if (!metodo) return '💵';
+  const m = metodo.toUpperCase();
+  if (m === 'TRANSFERENCIA') return '📱';
+  if (m === 'TARJETA') return '💳';
+  return '💵';
+}
 </script>
 
 <template>
   <div v-if="open" class="modal-overlay" @click.self="emit('close')">
     <section class="modal-card panel">
+      <div class="modal-corner tl"></div>
+      <div class="modal-corner tr"></div>
+      <div class="modal-corner bl"></div>
+      <div class="modal-corner br"></div>
+      
       <button type="button" class="btn-cerrar-modal" @click="emit('close')" title="Cerrar">
         ✕
       </button>
@@ -59,7 +80,7 @@ function formatoFecha(fecha?: string) {
             <strong>{{ formatoMoneda(cobroTotal) }}</strong>
           </div>
         </article>
-        <article class="total-card">
+        <article class="total-card profit">
           <div class="card-icon">💰</div>
           <div class="card-content">
             <p>Ganancia Total</p>
@@ -69,7 +90,7 @@ function formatoFecha(fecha?: string) {
       </div>
 
       <div class="tabla-wrap">
-        <p v-if="loading" class="estado">📡 Cargando historial...</p>
+        <p v-if="loading" class="estado loading">📡 Cargando historial...</p>
         <p v-else-if="ventas.length === 0" class="estado">📭 No hay ventas para hoy.</p>
 
         <table v-else>
@@ -88,8 +109,8 @@ function formatoFecha(fecha?: string) {
               <td class="ticket-cell">#{{ venta.numeroTicket ?? venta.idVenta }}</td>
               <td class="monto-cell">{{ formatoMoneda(Number(venta.montoTotal ?? 0)) }}</td>
               <td>
-                <span class="metodo-badge" :class="venta.metodoPago?.toLowerCase()">
-                  {{ venta.metodoPago === 'TRANSFERENCIA' ? '📱' : '💵' }} {{ venta.metodoPago || 'N/D' }}
+                <span class="metodo-badge" :class="getMetodoClase(venta.metodoPago)">
+                  {{ getMetodoIcono(venta.metodoPago) }} {{ venta.metodoPago || 'N/D' }}
                 </span>
               </td>
               <td>
@@ -115,7 +136,7 @@ function formatoFecha(fecha?: string) {
                     class="btn-ver"
                     @click="emit('ver-detalle', venta)"
                   >
-                    👁️ Ver
+                    👁️
                   </button>
                 </div>
               </td>
@@ -126,7 +147,8 @@ function formatoFecha(fecha?: string) {
 
       <footer class="modal-actions">
         <button type="button" class="btn-cerrar" @click="emit('close')">
-          👋 Cerrar
+          <span class="btn-icono">👋</span>
+          <span class="btn-texto">Cerrar</span>
         </button>
       </footer>
     </section>
@@ -139,6 +161,7 @@ function formatoFecha(fecha?: string) {
   inset: 0;
   z-index: 90;
   background: rgba(2, 4, 2, 0.92);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -154,17 +177,17 @@ function formatoFecha(fecha?: string) {
   width: min(100%, 920px);
   max-height: 90vh;
   background: linear-gradient(var(--bg-primary));
-  border: 4px solid #f8d667;
+  border: 4px solid var(--accent-color);
   box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
+    0 0 0 4px var(--border-color),
+    0 14px 0 var(--border-color),
     0 20px 28px rgba(0, 0, 0, 0.5);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   animation: popIn 200ms ease-out;
 }
 
@@ -173,11 +196,42 @@ function formatoFecha(fecha?: string) {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+.modal-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.modal-corner::before,
+.modal-corner::after {
+  content: '';
+  position: absolute;
+  background: var(--accent-color);
+}
+
+.modal-corner.tl { top: 8px; left: 8px; }
+.modal-corner.tl::before { width: 20px; height: 3px; top: 0; left: 0; border-radius: 2px; }
+.modal-corner.tl::after { width: 3px; height: 20px; top: 0; left: 0; border-radius: 2px; }
+
+.modal-corner.tr { top: 8px; right: 8px; }
+.modal-corner.tr::before { width: 20px; height: 3px; top: 0; right: 0; border-radius: 2px; }
+.modal-corner.tr::after { width: 3px; height: 20px; top: 0; right: 0; border-radius: 2px; }
+
+.modal-corner.bl { bottom: 8px; left: 8px; }
+.modal-corner.bl::before { width: 20px; height: 3px; bottom: 0; left: 0; border-radius: 2px; }
+.modal-corner.bl::after { width: 3px; height: 20px; bottom: 0; left: 0; border-radius: 2px; }
+
+.modal-corner.br { bottom: -2px; right: -2px; }
+.modal-corner.br::before { width: 20px; height: 3px; bottom: 0; right: 0; border-radius: 2px; }
+.modal-corner.br::after { width: 3px; height: 20px; bottom: 0; right: 0; border-radius: 2px; }
+
 .modal-card::before {
   content: "";
   position: absolute;
   inset: 12px;
-  border: 2px dashed rgba(248, 214, 103, 0.3);
+  border: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
   pointer-events: none;
   border-radius: 8px;
 }
@@ -188,31 +242,32 @@ function formatoFecha(fecha?: string) {
   right: 12px;
   width: 36px;
   height: 36px;
-  border: none;
-  background: rgba(0, 0, 0, 0.4);
-  color: #f8d667;
-  font-size: 1.2rem;
+  border: 2px solid var(--accent-color);
+  background: var(--bg-secondary);
+  color: var(--accent-color);
+  font-size: 1rem;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 150ms;
-  z-index: 10;
+  transition: all 0.25s ease;
+  z-index: 20;
 }
 
 .btn-cerrar-modal:hover {
-  background: #ef4444;
-  color: white;
-  transform: rotate(90deg);
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  transform: rotate(90deg) scale(1.1);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-color) 50%, transparent);
 }
 
 .modal-header {
-  border-bottom: 2px solid rgba(248, 214, 103, 0.3);
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
   padding-bottom: 0.5rem;
 }
 
-.Titulo-header {
+.titulo-header {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -221,16 +276,17 @@ function formatoFecha(fecha?: string) {
 
 .emoji {
   font-size: 1.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 1.3rem;
-  color: #f8d667;
+  color: var(--accent-color);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
+  text-shadow: 2px 2px 0 var(--border-color);
 }
 
 .totales-wrap {
@@ -240,14 +296,28 @@ function formatoFecha(fecha?: string) {
 }
 
 .total-card {
-  border: var(--border-width-thick, 3px) solid var(--border-color, #2a1807);
-  background: var(--bg-secondary, #fdfbf3);
-  color: var(--text-primary, #1d1606);
+  border: 3px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   padding: 1rem;
-  box-shadow: inset 0 0 0 2px var(--bg-panel, rgba(255, 255, 255, 0.5)), 0 4px 0 var(--border-color, #1a1005);
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 12px;
+}
+
+.total-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+
+.total-card.profit {
+  border-color: var(--success-color);
+}
+
+.total-card.profit .card-icon {
+  font-size: 2rem;
 }
 
 .card-icon {
@@ -260,31 +330,40 @@ function formatoFecha(fecha?: string) {
   margin: 0 0 0.25rem;
   font-weight: 600;
   letter-spacing: 0.05em;
+  color: var(--text-secondary);
 }
 
 .card-content strong {
   font-size: 1.2rem;
   font-family: "Courier New", monospace;
-  color: var(--success-color, #2a1807);
+  color: var(--success-color);
 }
 
 .tabla-wrap {
   flex: 1;
   overflow: auto;
-  border: var(--border-width-thick, 3px) solid var(--border-color, #2a1807);
-  background: var(--bg-secondary, #f2e8bf);
-  color: var(--text-primary, #1d1606);
+  border: 3px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   min-height: 200px;
-  box-shadow: inset 0 0 0 3px var(--bg-panel, #d4c27e);
-  position: relative;
+  border-radius: 12px;
 }
 
 .estado {
   padding: 2rem;
   text-align: center;
-  color: var(--text-secondary, #5a4a2a);
+  color: var(--text-secondary);
   font-family: "Courier New", monospace;
   font-size: 1rem;
+}
+
+.estado.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 table {
@@ -299,7 +378,7 @@ td {
   align-content: center;
   text-align: center;
   padding: 0.6rem 0.4rem;
-  border-bottom: 1px solid var(--bg-panel, #baa15c);
+  border-bottom: 1px solid var(--border-color);
   font-size: 0.8rem;
   font-family: "Courier New", monospace;
 }
@@ -307,8 +386,8 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: var(--bg-panel, #e8d790);
-  color: var(--text-primary, #1a1401);
+  background: var(--bg-primary);
+  color: var(--accent-color);
   text-transform: uppercase;
   font-weight: 700;
   white-space: nowrap;
@@ -317,6 +396,7 @@ th {
 .clickable-row {
   cursor: pointer;
   animation: slideIn 200ms ease-out backwards;
+  transition: background 0.2s;
 }
 
 @keyframes slideIn {
@@ -325,7 +405,7 @@ th {
 }
 
 .clickable-row:hover td {
-  background: color-mix(in srgb, var(--accent-color, #f8d667) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
 
 .ticket-cell {
@@ -333,7 +413,7 @@ th {
 }
 
 .monto-cell {
-  color: var(--success-color, #1f5b35);
+  color: var(--success-color);
   font-weight: 600;
 }
 
@@ -348,13 +428,18 @@ th {
 }
 
 .metodo-badge.efectivo {
-  background: color-mix(in srgb, var(--success-color, #22c55e) 20%, transparent);
-  color: var(--success-color, #166534);
+  background: color-mix(in srgb, var(--success-color) 20%, transparent);
+  color: var(--success-color);
 }
 
 .metodo-badge.transferencia {
-  background: color-mix(in srgb, var(--accent-color, #3b82f6) 20%, transparent);
-  color: var(--accent-color, #1d4ed8);
+  background: color-mix(in srgb, #3b82f6 20%, transparent);
+  color: #3b82f6;
+}
+
+.metodo-badge.tarjeta {
+  background: color-mix(in srgb, #ec4899 20%, transparent);
+  color: #ec4899;
 }
 
 .estatus-badge {
@@ -364,25 +449,22 @@ th {
   font-size: 0.75rem;
 }
 
-.estatus-badge.C {
-  color: var(--success-color, #16a34a);
-}
-
+.estatus-badge.C,
 .estatus-badge.F {
-  color: var(--accent-color, #2563eb);
+  color: var(--success-color);
 }
 
 .estatus-badge.P {
-  color: var(--accent-color, #ca8a04);
+  color: #ca8a04;
 }
 
 .estatus-badge.I {
-  color: var(--error-color, #dc2626);
+  color: var(--error-color);
 }
 
 .fecha-cell {
   font-size: 0.7rem;
-  color: var(--text-secondary, #5a4a2a);
+  color: var(--text-secondary);
 }
 
 .acciones-cell {
@@ -393,76 +475,99 @@ th {
 
 .btn-cancelar,
 .btn-ver {
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
-  border: 2px solid var(--border-color, #2a1807);
-  border-radius: 40%;
-  margin: 5px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 150ms;
   white-space: nowrap;
 }
 
 .btn-cancelar {
-  background: linear-gradient(180deg, var(--error-color, #fca5a5) 0%, var(--error-color, #ef4444) 100%);
-  color: #fff;
-  white-space: nowrap;
-}
-
-.btn-ver {
-  background: linear-gradient(180deg, var(--accent-color, #f8d667) 0%, var(--accent-color, #e2b84f) 100%);
-  color: var(--border-color, #1a1401);
-}
-
-.btn-cancelar {
-  background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%);
-  color: #fff;
-  white-space: nowrap;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: white;
 }
 
 .btn-cancelar:hover {
   filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
 .btn-ver {
   background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
-  color: #fff;
+  color: white;
 }
 
 .btn-ver:hover {
   filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
 .modal-actions {
   display: flex;
   justify-content: center;
   padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .btn-cerrar {
-  background: linear-gradient(180deg, #f8d667 0%, #c79634 100%);
-  color: #1a1401;
-  border: none;
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
+  color: var(--bg-primary);
+  border: 2px solid color-mix(in srgb, var(--accent-color) 60%, transparent);
+  padding: 0.8rem 2rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 150ms;
-  box-shadow: 0 4px 0 #8b6914;
+  transition: all 0.25s ease;
+  box-shadow: 
+    0 4px 0 color-mix(in srgb, var(--accent-color) 50%, black),
+    0 6px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-cerrar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.4s ease;
+}
+
+.btn-cerrar:hover::before {
+  left: 100%;
 }
 
 .btn-cerrar:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 0 #8b6914;
+  box-shadow: 
+    0 6px 0 color-mix(in srgb, var(--accent-color) 50%, black),
+    0 10px 20px rgba(0, 0, 0, 0.25);
+  filter: brightness(1.1);
 }
 
 .btn-cerrar:active {
   transform: translateY(2px);
-  box-shadow: 0 2px 0 #8b6914;
+  box-shadow: 
+    0 2px 0 color-mix(in srgb, var(--accent-color) 50%, black),
+    0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+.btn-icono {
+  font-size: 1.2rem;
 }
 
 @media (max-width: 700px) {
@@ -502,6 +607,20 @@ th {
   
   .card-content strong {
     font-size: 1rem;
+  }
+
+  .btn-cerrar .btn-texto {
+    display: none;
+  }
+  
+  .btn-cerrar {
+    padding: 0.6rem 1.2rem;
+    width: auto;
+    height: auto;
+  }
+  
+  .btn-cerrar:hover {
+    transform: scale(1.05);
   }
 }
 

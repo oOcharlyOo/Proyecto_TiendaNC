@@ -190,45 +190,115 @@ onMounted(() => cargarProductos());
     </div>
 <section class="panel productos-panel">
       <header class="toolbar">
-        <div>
+        <div class="toolbar-title">
           <h2>🍬 Catálogo de Productos</h2>
-          <p>Administra altas, cambios y bajas del catálogo.</p>
+          <p class="toolbar-subtitle">Administra altas, cambios y bajas del catálogo.</p>
+          <span class="product-count" v-if="!cargando && productosFiltrados.length > 0">
+            {{ productosFiltrados.length }} producto{{ productosFiltrados.length !== 1 ? 's' : '' }}
+            <span v-if="terminoBusqueda.trim()" class="search-active">(filtrado)</span>
+          </span>
         </div>
         <div class="toolbar-actions">
-          <input v-model="terminoBusqueda" type="text" placeholder="Buscar por nombre o código">
-          <button type="button" class="btn-secondary" @click="abrirModalNuevoProducto">
+          <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input 
+              v-model="terminoBusqueda" 
+              type="text" 
+              placeholder="Buscar por nombre o código..."
+              class="search-input"
+            >
+            <button 
+              v-if="terminoBusqueda" 
+              type="button" 
+              class="search-clear"
+              @click="terminoBusqueda = ''"
+            >✕</button>
+          </div>
+          <button type="button" class="btn-primary" @click="abrirModalNuevoProducto">
             <span class="btn-icono">➕</span>
             <span class="btn-texto">Nuevo Producto</span>
           </button>
         </div>
       </header>
 
-      <p v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">{{ mensaje }}</p>
+      <div v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">
+        <span class="estado-icono">{{ mensajeTipo === 'ok' ? '✓' : mensajeTipo === 'error' ? '⚠' : 'ℹ' }}</span>
+        {{ mensaje }}
+      </div>
 
-        <div class="product-grid">
-          <p v-if="cargando" class="estado-tabla">Cargando productos...</p>
-          <p v-else-if="productosFiltrados.length === 0" class="estado-tabla">No hay productos para mostrar.</p>
+        <div class="product-grid" :class="{ 'has-results': productosFiltrados.length > 0 && !cargando }">
+          <div v-if="cargando" class="estado-tabla loading">
+            <div class="loading-spinner"></div>
+            <span>Cargando productos...</span>
+          </div>
+          <div v-else-if="productosFiltrados.length === 0" class="estado-tabla empty">
+            <span class="empty-icon">{{ terminoBusqueda.trim() ? '🔍' : '📦' }}</span>
+            <span>{{ terminoBusqueda.trim() ? 'No se encontraron productos' : 'No hay productos registrados' }}</span>
+            <button v-if="!terminoBusqueda.trim()" type="button" class="btn-primary btn-sm" @click="abrirModalNuevoProducto">
+              Agregar primer producto
+            </button>
+          </div>
           <div v-else class="grid-layout">
             <article
               v-for="producto in productosFiltrados"
               :key="producto.idProducto"
               class="product-card"
-              :class="{ low: Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) }"
+              :class="{ 
+                'low-stock': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0),
+                'out-of-stock': Number(producto.stock || 0) === 0,
+                'is-gramaje': producto.is_gramaje
+              }"
             >
-              <div class="card-banner">
-                <span>#{{ producto.idProducto }}</span>
-                <span>{{ producto.codigoBarras || 'Sin código' }}</span>
+              <div class="card-header">
+                <div class="card-badge" v-if="producto.is_gramaje">⚖️ Gramaje</div>
+                <div class="card-id">#{{ producto.idProducto }}</div>
               </div>
-              <h3><span class="product-emoji">{{ obtenerEmojiDulce(producto.idProducto) }}</span> {{ producto.nombre }}</h3>
-              <p class="price">{{ formatoMoneda(Number(producto.precio_venta || 0)) }}</p>
-              <p class="meta">Mayoreo: {{ producto.precio_mayoreo ? formatoMoneda(Number(producto.precio_mayoreo)) : '-' }}</p>
-              <p class="meta">Stock: {{ producto.stock || 0 }}{{ producto.is_gramaje ? 'g' : '' }}</p>
+              
+              <div class="card-body">
+                <h3 class="product-name">
+                  <span class="product-emoji">{{ obtenerEmojiDulce(producto.idProducto) }}</span>
+                  <span class="name-text">{{ producto.nombre }}</span>
+                </h3>
+                
+                <p class="product-code" v-if="producto.codigoBarras">
+                  📋 {{ producto.codigoBarras }}
+                </p>
+                <p class="product-code empty" v-else>📋 Sin código</p>
+                
+                <div class="price-section">
+                  <div class="price-main">
+                    <span class="price-label">Venta</span>
+                    <span class="price-value">{{ formatoMoneda(Number(producto.precio_venta || 0)) }}</span>
+                  </div>
+                  <div class="price-secondary" v-if="producto.precio_mayoreo">
+                    <span class="price-label">Mayoreo</span>
+                    <span class="price-value">{{ formatoMoneda(Number(producto.precio_mayoreo)) }}</span>
+                  </div>
+                  <div class="price-secondary cost">
+                    <span class="price-label">Costo</span>
+                    <span class="price-value">{{ formatoMoneda(Number(producto.precio_costo || 0)) }}</span>
+                  </div>
+                </div>
+                
+                <div class="stock-section">
+                  <div class="stock-info" :class="{ 'critical': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) }">
+                    <span class="stock-icon">{{ Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) ? '⚠️' : '📦' }}</span>
+                    <span class="stock-current">{{ producto.stock || 0 }}{{ producto.is_gramaje ? 'g' : 'u' }}</span>
+                  </div>
+                  <div class="stock-range">
+                    <span class="stock-min">Min: {{ producto.cantidad_min || 0 }}</span>
+                    <span class="stock-divider">|</span>
+                    <span class="stock-max">Max: {{ producto.cantidad_max || 0 }}</span>
+                  </div>
+                </div>
+              </div>
+              
               <div class="card-actions">
-                <button type="button" class="btn-secondary btn-sm" @click="abrirModalEditarProducto(producto)">
+                <button type="button" class="btn-action btn-edit" @click="abrirModalEditarProducto(producto)">
                   <span class="btn-icono">✏️</span>
                   <span class="btn-texto">Editar</span>
                 </button>
-                <button type="button" class="btn-danger btn-sm" @click="handleDeleteProducto(producto)">
+                <button type="button" class="btn-action btn-delete" @click="handleDeleteProducto(producto)">
                   <span class="btn-icono">🗑️</span>
                   <span class="btn-texto">Eliminar</span>
                 </button>
@@ -266,7 +336,7 @@ onMounted(() => cargarProductos());
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   position: relative;
   z-index: 1;
@@ -280,77 +350,179 @@ onMounted(() => cargarProductos());
   grid-template-rows: auto auto 1fr;
   gap: 0.8rem;
   position: relative;
-  background: var(--bg-secondary);
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
   border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 8px;
-}
-
-.productos-panel::before {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 28%, transparent);
-  pointer-events: none;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px var(--shadow-color);
 }
 
 .toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.9rem;
+  align-items: center;
+  gap: 1rem;
   position: relative;
   z-index: 1;
+  flex-wrap: wrap;
+}
+
+.toolbar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .toolbar h2 {
-  font-size: clamp(1.1rem, 2.8vw, 1.5rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+  letter-spacing: 0.04em;
   color: var(--accent-color);
   text-transform: uppercase;
   font-weight: 900;
-  text-shadow: 2px 2px 0 var(--border-color);
+  margin: 0;
 }
 
-.toolbar p {
+.toolbar-subtitle {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.product-count {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  width: fit-content;
+}
+
+.search-active {
+  color: var(--accent-color);
 }
 
 .toolbar-actions {
   display: flex;
-  gap: 0.55rem;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
   align-items: center;
 }
 
-.toolbar-actions input {
-  background: var(--bg-primary);
-  border: var(--border-width) solid var(--border-color);
-  padding: 0.5rem 0.8rem;
-  color: var(--text-primary);
-  border-radius: 4px;
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 0.9rem;
+  pointer-events: none;
 }
 
-.toolbar-actions button {
+.search-input {
+  background: var(--bg-primary);
   border: var(--border-width) solid var(--border-color);
-  padding: 0.5rem 0.8rem;
+  padding: 0.6rem 2rem 0.6rem 2rem;
+  color: var(--text-primary);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  width: min(220px, 45vw);
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.search-clear {
+  position: absolute;
+  right: 0.6rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.3rem;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.search-clear:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-primary {
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.6rem 1.1rem;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-family: "Courier New", monospace;
   color: var(--btn-text, var(--bg-primary));
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white), 0 3px 0 var(--border-color);
-  transition: transform 80ms steps(2), filter 80ms linear;
+  box-shadow: 0 4px 15px var(--shadow-color);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .estado {
   font-size: 0.8rem;
   text-transform: uppercase;
   color: var(--text-secondary);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.estado-icono {
+  font-size: 1.1rem;
+}
+
+.estado-ok {
+  background: color-mix(in srgb, var(--success-color) 15%, transparent);
+  color: var(--success-color);
+  border: 2px solid color-mix(in srgb, var(--success-color) 40%, transparent);
+}
+
+.estado-error {
+  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+  color: var(--error-color);
+  border: 2px solid color-mix(in srgb, var(--error-color) 40%, transparent);
+}
+
+.estado-info {
+  background: color-mix(in srgb, var(--infoBlueColor) 15%, transparent);
+  color: var(--infoBlueColor);
+  border: 2px solid color-mix(in srgb, var(--infoBlueColor) 40%, transparent);
 }
 
 .product-grid {
@@ -361,129 +533,342 @@ onMounted(() => cargarProductos());
   overflow-y: auto;
   border: var(--border-width) solid var(--border-color);
   background: var(--bg-primary);
-  border-radius: 6px;
-  box-shadow: var(--shadow-inner) var(--bg-panel);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.product-grid.has-results {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.estado-tabla.loading,
+.estado-tabla.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+.empty button {
+  margin-top: 0.5rem;
 }
 
 .grid-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 0.8rem;
 }
 
 .product-card {
-  background: var(--bg-secondary);
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
   border: var(--border-width) solid var(--border-color);
-  padding: 0.7rem;
+  border-radius: 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 160px;
-  box-shadow: 0 4px 0 var(--border-color);
-  transition: transform 100ms steps(2);
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.product-card.low {
+.card-glow {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle at center, var(--accent-color), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--accent-color);
+  box-shadow: 0 8px 20px var(--shadow-color), inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
+.product-card:hover .card-glow {
+  opacity: 0.08;
+}
+
+.product-card.low-stock {
   border-color: var(--error-color);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--error-color) 70%, black);
 }
 
-.card-banner {
+.product-card.low-stock:hover {
+  box-shadow: 0 8px 20px var(--shadow-color), inset 0 0 0 2px color-mix(in srgb, var(--error-color) 30%, transparent);
+}
+
+.product-card.out-of-stock {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 10%, var(--bg-secondary));
+}
+
+.card-header {
   display: flex;
   justify-content: space-between;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  margin-bottom: 0.35rem;
-  font-family: "Courier New", monospace;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--border-color);
 }
 
-.product-card h3 {
+.card-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.card-id {
+  font-size: 0.7rem;
+  font-family: "Courier New", monospace;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.card-body {
+  padding: 0.8rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  text-align: center;
+}
+
+.product-name {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   color: var(--text-primary);
   font-weight: 800;
   text-transform: uppercase;
   display: flex;
   align-items: center;
+  gap: 0.4rem;
+  line-height: 1.3;
+}
+
+.product-emoji {
+  font-size: 1.8rem;
+}
+
+.name-text {
+  word-break: break-word;
+}
+
+.product-code {
+  font-size: 0.7rem;
+  font-family: "Courier New", monospace;
+  color: var(--text-secondary);
+  margin: 0;
+  display: flex;
+  align-items: center;
   gap: 0.3rem;
 }
 
-.price {
-  font-size: 1.15rem;
+.product-code.empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.price-section {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.price-main,
+.price-secondary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.price-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.price-value {
+  font-size: 0.9rem;
   font-weight: 900;
-  color: var(--success-color);
-  margin: 0.25rem 0;
   font-family: "Courier New", monospace;
 }
 
-.meta {
-  font-size: 0.7rem;
+.price-main .price-value {
+  color: var(--success-color);
+}
+
+.price-secondary .price-value {
+  color: var(--accent-color);
+}
+
+.price-secondary.cost .price-value {
   color: var(--text-secondary);
-  margin: 0;
+}
+
+.stock-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stock-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.stock-info.critical {
+  color: var(--error-color);
+}
+
+.stock-icon {
+  font-size: 1rem;
+}
+
+.stock-current {
+  font-size: 1rem;
+  font-weight: 900;
   font-family: "Courier New", monospace;
+}
+
+.stock-range {
+  font-size: 0.6rem;
+  font-family: "Courier New", monospace;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 0.3rem;
+}
+
+.stock-divider {
+  opacity: 0.5;
 }
 
 .card-actions {
-  margin-top: 0.6rem;
+  margin-top: auto;
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  background: var(--bg-primary);
+  border-top: 2px solid var(--border-color);
 }
 
-.card-actions button {
+.btn-action {
   flex: 1;
-  border: 1px solid var(--border-color);
-  padding: 0.35rem 0.5rem;
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.5rem 0.4rem;
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  transition: all 0.2s;
+  border-radius: 8px;
 }
 
-.card-actions button:first-child {
-  background: var(--success-color);
-  color: var(--bg-primary);
-}
-
-.card-actions button:last-child {
-  background: var(--error-color);
+.btn-edit {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
   color: var(--text-primary);
 }
 
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  background: var(--shadow-color);
-  backdrop-filter: blur(4px);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
+.btn-edit:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
-.bg-fog {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: 
-    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.1) 0%, transparent 50%);
-  animation: bgFogDrift 10s ease-in-out infinite;
+.btn-delete {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: var(--text-primary);
 }
 
-@keyframes bgFogDrift {
-  0% { transform: translateX(-2%) translateY(0); }
-  50% { transform: translateX(2%) translateY(-5px); }
-  100% { transform: translateX(-2%) translateY(0); }
+.btn-delete:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
-@media (max-width: 600px) {
-  .toolbar { flex-direction: column; }
-  .toolbar-actions { width: 100%; flex-direction: column; }
-  .toolbar-actions input { width: 100%; }
-  .toolbar-actions button { width: 100%; }
-  .grid-layout { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .toolbar { 
+    flex-direction: column; 
+    align-items: stretch;
+  }
+  .toolbar-title {
+    text-align: center;
+  }
+  .product-count {
+    margin: 0 auto;
+  }
+  .toolbar-actions { 
+    width: 100%; 
+    justify-content: center;
+  }
+  .search-wrapper {
+    flex: 1;
+  }
+  .search-input { 
+    width: 100%;
+    min-width: unset;
+  }
+  .toolbar-actions button { 
+    white-space: nowrap;
+  }
+  .grid-layout { 
+    grid-template-columns: 1fr; 
+  }
+  .product-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar-actions {
+    flex-direction: column;
+  }
+  .search-wrapper {
+    width: 100%;
+  }
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

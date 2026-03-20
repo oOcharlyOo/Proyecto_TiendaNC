@@ -113,11 +113,13 @@ async function iniciarSesion() {
       if (usuario?.datos?.idUsuario) {
         const userId = usuario.datos.idUsuario;
         localStorage.setItem(AUTH_USER_ID_KEY, String(userId));
-        localStorage.setItem('nombreUsuario', name.value);
+        const nombreCompleto = `${usuario.datos.nombre || ''} ${usuario.datos.apellido_p || ''}`.trim();
+        localStorage.setItem('nombreUsuario', nombreCompleto || 'Usuario');
         localStorage.setItem('tipoUsuario', String(usuario.datos.id_tipo_usuario || 2));
         if (usuario.datos.avatar) {
           localStorage.setItem('avatarUsuario', usuario.datos.avatar);
         }
+        localStorage.setItem('horaInicioSesion', new Date().toISOString());
         idUsuarioActual.value = userId;
         
         await verificarCajaActiva(userId);

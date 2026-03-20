@@ -95,55 +95,91 @@ function handleSubmit() {
     nombre: form.value.nombre.trim()
   });
 }
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value || 0));
+}
 </script>
 
 <template>
   <div v-if="open" class="modal-overlay" @click.self="emit('close')">
     <section class="modal-card">
       <header class="modal-header">
-        <h3>{{ props.data?.idProducto ? `Modificar Producto #${props.data.idProducto}` : 'Agregar Nuevo Producto' }}</h3>
-        <p>Completa la ficha y guarda el registro.</p>
+        <h3>{{ props.data?.idProducto ? `✏️ Editar Producto #${props.data.idProducto}` : '➕ Nuevo Producto' }}</h3>
+        <p>{{ props.data?.idProducto ? 'Modifica los datos del producto' : 'Completa la información del nuevo producto' }}</p>
       </header>
 
       <div class="modal-scroll">
-        <div class="modal-grid">
-          <label>Código de Barras / PIN</label>
-          <div class="barcode-row">
-            <input v-model="form.codigoBarras" type="text" placeholder="750000000001">
-            <button type="button" class="btn-secondary" @click="emit('scan')">📷 Escanear</button>
+        <div class="form-section">
+          <h4 class="section-title">📋 Identificación</h4>
+          <div class="modal-grid">
+            <label>Código de Barras / PIN</label>
+            <div class="barcode-row">
+              <input v-model="form.codigoBarras" type="text" placeholder="750000000001" class="input-field">
+              <button type="button" class="btn-scan" @click="emit('scan')">
+                <span>📷</span>
+                <span>Escanear</span>
+              </button>
+            </div>
+
+            <label>Nombre del producto <span class="required">*</span></label>
+            <input v-model="form.nombre" type="text" required placeholder="Ej: Chocolate Ferrero" class="input-field">
           </div>
+        </div>
 
-          <label>Nombre</label>
-          <input v-model="form.nombre" type="text" required>
+        <div class="form-section">
+          <h4 class="section-title">💰 Precios</h4>
+          <div class="modal-grid prices-grid">
+            <div class="price-field">
+              <label>{{ form.is_gramaje ? 'Precio venta (kg)' : 'Precio venta ($)' }} <span class="required">*</span></label>
+              <input v-model.number="form.precio_venta" type="number" step="0.01" min="0" required class="input-field">
+            </div>
+            <div class="price-field">
+              <label>Precio mayoreo ($)</label>
+              <input v-model.number="form.precio_mayoreo" type="number" step="0.01" min="0" placeholder="Opcional" class="input-field">
+            </div>
+            <div class="price-field">
+              <label>{{ form.is_gramaje ? 'Precio costo (kg)' : 'Precio costo ($)' }} <span class="required">*</span></label>
+              <input v-model.number="form.precio_costo" type="number" step="0.01" min="0" required class="input-field">
+            </div>
+            <div class="price-field highlight">
+              <label>Ganancia unitaria</label>
+              <span class="calculated-value" :class="{ positive: (form.precio_venta - form.precio_costo) > 0, negative: (form.precio_venta - form.precio_costo) < 0 }">
+                {{ formatCurrency(form.precio_venta - form.precio_costo) }}
+              </span>
+            </div>
+          </div>
+        </div>
 
-          <label>{{ form.is_gramaje ? 'Precio de venta (kg)' : 'Precio de venta ($)' }}</label>
-          <input v-model.number="form.precio_venta" type="number" step="0.01" min="0" required>
-
-          <label>Precio de mayoreo</label>
-          <input v-model.number="form.precio_mayoreo" type="number" step="0.01" min="0">
-
-          <label>{{ form.is_gramaje ? 'Precio de costo (kg)' : 'Precio de costo ($)' }}</label>
-          <input v-model.number="form.precio_costo" type="number" step="0.01" min="0" required>
-
-          <label>{{ form.is_gramaje ? 'Stock (gramos)' : 'Stock' }}</label>
-          <input v-model.number="form.stock" type="number" min="0" required>
-
-          <label>Cantidad mínima</label>
-          <input v-model.number="form.cantidad_min" type="number" min="0" required>
-
-          <label>Cantidad máxima</label>
-          <input v-model.number="form.cantidad_max" type="number" min="0" required>
-
-          <label class="check-row">
-            <input v-model="form.is_gramaje" type="checkbox">
-            Usa gramaje
-          </label>
+        <div class="form-section">
+          <h4 class="section-title">📦 Inventario</h4>
+          <div class="modal-grid inventory-grid">
+            <div class="stock-field">
+              <label>{{ form.is_gramaje ? 'Stock actual (gramos)' : 'Stock actual (unidades)' }} <span class="required">*</span></label>
+              <input v-model.number="form.stock" type="number" min="0" required class="input-field stock-input">
+            </div>
+            <div class="stock-field">
+              <label>Cantidad mínima <span class="required">*</span></label>
+              <input v-model.number="form.cantidad_min" type="number" min="0" required class="input-field">
+            </div>
+            <div class="stock-field">
+              <label>Cantidad máxima <span class="required">*</span></label>
+              <input v-model.number="form.cantidad_max" type="number" min="0" required class="input-field">
+            </div>
+            <div class="stock-field checkbox-field">
+              <label class="check-row">
+                <input v-model="form.is_gramaje" type="checkbox" class="checkbox-input">
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-label">Usa gramaje <span class="hint">(peso en gramos)</span></span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
       <footer class="modal-actions">
-        <button type="button" :disabled="props.loading" @click="handleSubmit">
-          <span class="btn-icono">💾</span>
+        <button type="button" class="btn-primary" :disabled="props.loading" @click="handleSubmit">
+          <span class="btn-icono">{{ props.loading ? '⏳' : '💾' }}</span>
           <span class="btn-texto">{{ props.loading ? 'Guardando...' : props.data?.idProducto ? 'Actualizar' : 'Guardar' }}</span>
         </button>
         <button v-if="props.data?.idProducto" type="button" class="btn-danger" @click="$emit('delete')">
@@ -160,6 +196,25 @@ function handleSubmit() {
 </template>
 
 <style scoped>
+.form-section {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.75rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .modal-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -169,27 +224,40 @@ function handleSubmit() {
 .modal-grid label {
   grid-column: span 2;
   text-transform: uppercase;
-  font-size: 0.72rem;
-  color: var(--pixel-paper);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
   letter-spacing: 0.1em;
   font-family: "Courier New", monospace;
+  display: flex;
+  align-items: baseline;
 }
 
-.modal-grid input[type="text"],
-.modal-grid input[type="number"] {
+.required {
+  color: var(--error-color);
+  margin-left: 0.2rem;
+}
+
+.input-field {
   grid-column: span 2;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.55rem 0.65rem;
-  color: #1d1606;
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.6rem 0.7rem;
+  color: var(--text-primary);
   font-family: "Courier New", monospace;
   font-size: 0.9rem;
   outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
+  transition: all 0.2s;
+  border-radius: 8px;
 }
 
-.modal-grid input:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 2px var(--pixel-gold);
+.input-field:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.input-field::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .barcode-row {
@@ -199,89 +267,214 @@ function handleSubmit() {
   gap: 0.5rem;
 }
 
-.barcode-row button {
-  border: 2px solid #2a1807;
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: var(--pixel-ink);
+.btn-scan {
+  border: var(--border-width) solid var(--border-color);
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 2px 0 #6f4b1c;
-  padding: 0.5rem 0.7rem;
+  box-shadow: 0 3px 10px var(--shadow-color);
+  padding: 0.55rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s;
+  border-radius: 8px;
 }
 
-.barcode-row button:hover {
-  filter: brightness(1.08);
+.btn-scan:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
-.barcode-row button:active {
-  transform: translateY(1px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+.btn-scan:active {
+  transform: translateY(0);
+}
+
+.prices-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.price-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.price-field label {
+  grid-column: span 1;
+}
+
+.price-field .input-field {
+  grid-column: span 1;
+}
+
+.price-field.highlight {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.calculated-value {
+  font-size: 1rem;
+  font-weight: 900;
+  font-family: "Courier New", monospace;
+  text-align: center;
+}
+
+.calculated-value.positive {
+  color: var(--success-color);
+}
+
+.calculated-value.negative {
+  color: var(--error-color);
+}
+
+.inventory-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.stock-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.stock-field label {
+  grid-column: span 1;
+}
+
+.stock-field .input-field {
+  grid-column: span 1;
+}
+
+.stock-input {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.checkbox-field {
+  grid-column: span 2;
 }
 
 .check-row {
   grid-column: span 2;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--pixel-paper);
+  gap: 0.6rem;
+  color: var(--text-primary);
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
+  cursor: pointer;
+  padding: 0.6rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  transition: background 0.2s;
 }
 
-.check-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--pixel-gold);
+.check-row:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.checkbox-input {
+  display: none;
+}
+
+.checkbox-custom {
+  width: 22px;
+  height: 22px;
+  border: var(--border-width) solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.checkbox-input:checked + .checkbox-custom {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.checkbox-input:checked + .checkbox-custom::after {
+  content: '✓';
+  color: var(--bg-primary);
+  font-weight: 900;
+  font-size: 0.85rem;
+}
+
+.checkbox-label .hint {
+  font-size: 0.6rem;
+  opacity: 0.7;
+  text-transform: none;
 }
 
 .modal-actions {
-  grid-column: span 2;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.6rem;
   justify-content: flex-end;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  flex-wrap: wrap;
 }
 
 .modal-actions button {
-  border: 3px solid #2a1807;
-  padding: 0.6rem 1rem;
-  font-size: 0.78rem;
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.65rem 1rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   font-family: "Courier New", monospace;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 15px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s;
+  border-radius: 10px;
 }
 
-.modal-actions button:first-child {
-  background: linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
-  color: var(--pixel-ink);
+.btn-primary {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  color: var(--btn-text, var(--bg-primary));
 }
 
-.modal-actions button.btn-danger {
-  background: linear-gradient(180deg, #e88b8b 0%, #c94f4f 50%, #a32d2d 100%);
-  color: #fff;
-  box-shadow: inset 0 0 0 2px #ffb4b4, 0 3px 0 #6f2025, 0 5px 8px rgba(0, 0, 0, 0.3);
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
 }
 
-.modal-actions button.btn-secondary {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: var(--pixel-ink);
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
-.modal-actions button:hover {
-  filter: brightness(1.08);
+.btn-danger {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: var(--text-primary);
 }
 
-.modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+.btn-danger:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  filter: brightness(1.1);
 }
 
 .modal-actions button:disabled {
@@ -294,73 +487,113 @@ function handleSubmit() {
   inset: 0;
   z-index: 90;
   background: rgba(2, 4, 2, 0.92);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   padding: 1rem;
 }
 
 .modal-card {
-  width: min(100%, 640px);
-  background: linear-gradient(180deg, var(--pixel-forest) 0%, var(--pixel-forest-dark) 100%);
-  border: 4px solid var(--pixel-gold);
-  box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.5rem;
-  max-height: 86vh;
+  width: min(100%, 560px);
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: var(--border-width-thick) solid var(--accent-color);
+  box-shadow: 0 8px 30px var(--shadow-color);
+  padding: 1.25rem;
+  max-height: 88vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border-radius: 16px;
+  animation: popIn 150ms steps(4);
 }
 
-.modal-card::before {
-  content: '';
-  position: absolute;
-  inset: 12px;
-  border: 2px dashed rgba(250, 217, 103, 0.5);
-  pointer-events: none;
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .modal-scroll {
-  overflow: auto;
-  padding-right: 0.2rem;
-  display: grid;
-  gap: 0.65rem;
+  overflow-y: auto;
+  padding-right: 0.3rem;
+  flex: 1;
+}
+
+.modal-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
 }
 
 .modal-card .modal-header {
   position: relative;
-  padding-bottom: 0.4rem;
-  margin-bottom: 0.8rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .modal-card .modal-header h3 {
   margin: 0;
-  font-size: 1.15rem;
-  color: var(--pixel-gold);
+  font-size: 1.05rem;
+  color: var(--accent-color);
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
 }
 
 .modal-card .modal-header p {
-  margin: 0.2rem 0 0;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  margin: 0.3rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
 }
 
 @media (max-width: 600px) {
-  .modal-grid {
+  .modal-card {
+    max-height: 95vh;
+    padding: 1rem;
+    border-radius: 12px;
+  }
+  
+  .modal-grid,
+  .prices-grid,
+  .inventory-grid {
     grid-template-columns: 1fr;
   }
+  
   .modal-grid label,
-  .modal-grid input,
-  .barcode-row {
+  .modal-grid .input-field,
+  .barcode-row,
+  .price-field label,
+  .price-field .input-field,
+  .stock-field label,
+  .stock-field .input-field,
+  .checkbox-field {
     grid-column: span 1;
+  }
+  
+  .barcode-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-scan {
+    justify-content: center;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions button {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

@@ -10,6 +10,7 @@ const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'confirmar-efectivo', payload: { montoRecibido: number }): void;
   (event: 'confirmar-transferencia'): void;
+  (event: 'confirmar-tarjeta'): void;
 }>();
 
 const montoRecibido = ref<number | null>(null);
@@ -43,220 +44,490 @@ function confirmarEfectivo() {
 </script>
 
 <template>
-  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
-    <section class="modal-card panel">
-      <header class="modal-header">
-        <h3>Cobro de Venta</h3>
-      </header>
-
-      <div class="modal-body">
-        <div class="result-card">
-          <p>Total a pagar</p>
-          <strong>{{ formatoMoneda(total) }}</strong>
+  <Transition name="modal-fade">
+    <div v-if="open" class="modal-overlay" @click.self="emit('close')">
+      <div class="pergamino">
+        <div class="corner-decor corner-tl">
+          <div class="ornament"></div>
         </div>
+        <div class="corner-decor corner-tr">
+          <div class="ornament"></div>
+        </div>
+        <div class="corner-decor corner-bl">
+          <div class="ornament"></div>
+        </div>
+        <div class="corner-decor corner-br">
+          <div class="ornament"></div>
+        </div>
+        
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">⚜</span>
+            </div>
+            <h2>Cobro de Venta</h2>
+            <div class="header-line"></div>
+          </header>
 
-        <label>Monto recibido</label>
-        <input v-model.number="montoRecibido" class="input-lg" type="number" step="0.01" min="0" placeholder="0.00">
+          <div class="modal-body">
+            <div class="total-parchment">
+              <span class="parchment-label">Total a pagar</span>
+              <span class="parchment-amount">{{ formatoMoneda(total) }}</span>
+            </div>
 
-        <div class="result-card">
-          <p>Cambio</p>
-          <strong>{{ formatoMoneda(cambio) }}</strong>
+            <div class="input-parchment">
+              <label>Monto recibido</label>
+              <div class="input-container">
+                <span class="coin-icon">🪙</span>
+                <input 
+                  v-model.number="montoRecibido" 
+                  type="number" 
+                  step="0.01" 
+                  min="0" 
+                  placeholder="0.00"
+                  autofocus
+                >
+              </div>
+            </div>
+
+            <div class="cambio-parchment" :class="{ active: cambio > 0 }">
+              <span class="cambio-label">Cambio</span>
+              <span class="cambio-amount">{{ formatoMoneda(cambio) }}</span>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <div class="payment-buttons">
+              <button class="pay-btn efectivo" @click="confirmarEfectivo">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Efectivo</span>
+                <span class="btn-rune">◈</span>
+              </button>
+              
+              <button class="pay-btn transferencia" @click="emit('confirmar-transferencia')">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Transferencia</span>
+                <span class="btn-rune">◈</span>
+              </button>
+              
+              <button class="pay-btn tarjeta" @click="emit('confirmar-tarjeta')">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Tarjeta</span>
+                <span class="btn-rune">◈</span>
+              </button>
+            </div>
+            
+            <button class="cancel-btn" @click="emit('close')">
+              Cancelar
+            </button>
+          </footer>
         </div>
       </div>
-
-      <footer class="modal-actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">
-          <span class="btn-icono">✕</span>
-          <span class="btn-texto">Cancelar</span>
-        </button>
-        <button type="button" @click="confirmarEfectivo">
-          <span class="btn-icono">💵</span>
-          <span class="btn-texto">Efectivo</span>
-        </button>
-        <button type="button" @click="emit('confirmar-transferencia')">
-          <span class="btn-icono">📱</span>
-          <span class="btn-texto">Transferencia</span>
-        </button>
-      </footer>
-    </section>
-  </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
-  background: rgba(2, 4, 2, 0.92);
-  display: grid;
-  place-items: center;
+  z-index: 100;
+  background: rgba(20, 15, 10, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 1rem;
 }
 
-.modal-card {
-  width: min(100%, 480px);
-  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
-  border: 4px solid #f8d667;
-  box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.3rem;
-  display: grid;
-  gap: 0.8rem;
+.pergamino {
+  width: min(100%, 420px);
+  background: 
+    linear-gradient(135deg, #d4c4a8 0%, #c9b896 20%, #d9c9a8 40%, #c4b492 60%, #d4c4a8 80%, #bea87a 100%);
+  border-radius: 4px;
   position: relative;
-  animation: popIn 150ms steps(4);
+  box-shadow: 
+    0 0 0 3px #5c4a2a,
+    0 0 0 6px #8b7355,
+    0 8px 0 #3d2f1f,
+    0 12px 20px rgba(0, 0, 0, 0.6),
+    inset 0 0 60px rgba(139, 115, 85, 0.3);
 }
 
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.modal-card::before {
-  content: "";
+.pergamino::before {
+  content: '';
   position: absolute;
-  inset: 10px;
-  border: 2px dashed rgba(248, 214, 103, 0.4);
+  inset: 3px;
+  border: 2px solid #8b7355;
+  border-radius: 2px;
   pointer-events: none;
 }
 
-.modal-header {
+.pergamino-inner {
+  padding: 1.5rem;
   position: relative;
-  border-bottom: 2px solid rgba(248, 214, 103, 0.3);
-  padding-bottom: 0.5rem;
 }
 
-.modal-header h3 {
+.corner-decor {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  z-index: 1;
+}
+
+.ornament {
+  width: 100%;
+  height: 100%;
+  border: 2px solid #5c4a2a;
+  position: relative;
+}
+
+.ornament::before,
+.ornament::after {
+  content: '';
+  position: absolute;
+  background: #5c4a2a;
+}
+
+.corner-tl {
+  top: -8px;
+  left: -8px;
+}
+
+.corner-tl .ornament {
+  border-right: none;
+  border-bottom: none;
+  border-radius: 8px 0 0 0;
+}
+
+.corner-tr {
+  top: -8px;
+  right: -8px;
+}
+
+.corner-tr .ornament {
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 8px 0 0;
+}
+
+.corner-bl {
+  bottom: -8px;
+  left: -8px;
+}
+
+.corner-bl .ornament {
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 8px;
+}
+
+.corner-br {
+  bottom: -8px;
+  right: -8px;
+}
+
+.corner-br .ornament {
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 8px 0;
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #8b7355;
+  position: relative;
+}
+
+.header-emblem {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(180deg, #c4b492 0%, #a08050 100%);
+  border: 2px solid #5c4a2a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emblem-icon {
+  color: #5c4a2a;
+  font-size: 1rem;
+}
+
+.modal-header h2 {
   margin: 0;
-  font-size: 1.1rem;
-  color: #f8d667;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.4rem;
+  color: #3d2f1f;
   text-transform: uppercase;
   letter-spacing: 0.15em;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #d4c4a8;
 }
 
-.modal-header h3::before {
-  content: "💎 ";
+.header-line {
+  margin-top: 0.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8b7355 20%, #8b7355 80%, transparent);
 }
 
 .modal-body {
-  display: grid;
-  gap: 0.6rem;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.modal-body label {
-  font-size: 0.72rem;
-  color: #f6f2de;
+.total-parchment {
+  background: linear-gradient(180deg, #3d2f1f 0%, #2a1f15 100%);
+  border: 3px solid #5c4a2a;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.4),
+    0 2px 0 #1a120a;
+}
+
+.parchment-label {
+  display: block;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.75rem;
+  color: #c4b492;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-family: "Courier New", monospace;
+  margin-bottom: 0.25rem;
 }
 
-.modal-body input {
-  width: 100%;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.7rem 0.8rem;
-  color: #1d1606;
-  font-family: "Courier New", monospace;
-  font-size: 1.15rem;
-  font-weight: 700;
-  outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
+.parchment-amount {
+  display: block;
+  font-family: 'Courier New', monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #f4e8c1;
+  text-shadow: 0 0 10px rgba(244, 232, 193, 0.3);
 }
 
-.modal-body input:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 3px #f8d667;
+.input-parchment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.modal-body input::placeholder {
-  color: #8a7a4a;
-}
-
-.result-card {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #ffe48b 0%, #f8d667 50%, #e2b84f 100%);
-  color: #1a1401;
-  padding: 0.7rem;
-  display: grid;
-  gap: 0.15rem;
-  box-shadow: inset 0 0 0 3px #ffeeb4, 0 4px 0 #6f4b1c;
-}
-
-.result-card p {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  margin: 0;
+.input-parchment label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  color: #5c4a2a;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.coin-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 1rem;
+  z-index: 1;
+}
+
+.input-container input {
+  width: 100%;
+  background: 
+    linear-gradient(180deg, #f4e8d4 0%, #e8d9be 100%);
+  border: 2px solid #8b7355;
+  border-radius: 6px;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  font-family: 'Courier New', monospace;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #3d2f1f;
+  outline: none;
+  box-shadow: 
+    inset 0 1px 3px rgba(0, 0, 0, 0.15),
+    0 1px 0 #d4c4a8;
+  transition: all 0.2s;
+}
+
+.input-container input:focus {
+  border-color: #5c4a2a;
+  box-shadow: 
+    inset 0 1px 3px rgba(0, 0, 0, 0.15),
+    0 0 0 3px rgba(139, 115, 85, 0.3);
+}
+
+.input-container input::placeholder {
+  color: #a08060;
+}
+
+.cambio-parchment {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: 
+    linear-gradient(180deg, #c9b896 0%, #bea87a 100%);
+  border: 2px solid #8b7355;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  transition: all 0.3s;
+}
+
+.cambio-parchment.active {
+  background: linear-gradient(180deg, #6b8e4e 0%, #4a6b32 100%);
+  border-color: #3d5a2a;
+}
+
+.cambio-label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.85rem;
+  color: #5c4a2a;
+  font-weight: 600;
+}
+
+.cambio-parchment.active .cambio-label {
+  color: #d4e8c1;
+}
+
+.cambio-amount {
+  font-family: 'Courier New', monospace;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #3d2f1f;
+  transition: all 0.3s;
+}
+
+.cambio-parchment.active .cambio-amount {
+  color: #f4e8c1;
+}
+
+.modal-footer {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.payment-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.pay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.6rem 0.4rem;
+  border: 2px solid #5c4a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+}
+
+.pay-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.pay-btn:active {
+  transform: translateY(0);
+}
+
+.btn-rune {
+  font-size: 0.6rem;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.btn-label {
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.result-card strong {
-  font-size: 1.35rem;
-  font-family: "Courier New", monospace;
+.efectivo {
+  background: linear-gradient(180deg, #7fa86b 0%, #5a7a45 100%);
+  color: #1a2a0f;
 }
 
-.result-card:first-of-type strong::before {
-  content: "💰 ";
+.efectivo:hover {
+  background: linear-gradient(180deg, #8fb87a 0%, #6a8a55 100%);
 }
 
-.result-card:last-of-type strong::before {
-  content: "🪙 ";
+.transferencia {
+  background: linear-gradient(180deg, #6b8cb4 0%, #4a6a8a 100%);
+  color: #1a2a3f;
 }
 
-.modal-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.5rem;
-  position: relative;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
+.transferencia:hover {
+  background: linear-gradient(180deg, #7b9cc4 0%, #5a7a9a 100%);
 }
 
-.modal-actions button {
-  border: 3px solid #2a1807;
-  padding: 0.55rem 0.6rem;
-  font-size: 0.68rem;
-  font-weight: 700;
+.tarjeta {
+  background: linear-gradient(180deg, #b47a6b 0%, #8a5a4a 100%);
+  color: #3f1a1a;
+}
+
+.tarjeta:hover {
+  background: linear-gradient(180deg, #c48a7b 0%, #9a6a5a 100%);
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 0.6rem;
+  background: 
+    linear-gradient(180deg, #c9b896 0%, #a08050 100%);
+  border: 2px solid #5c4a2a;
+  border-radius: 6px;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #3d2f1f;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-family: "Courier New", monospace;
+  letter-spacing: 0.1em;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 80ms steps(2), filter 80ms linear;
+  transition: all 0.2s;
 }
 
-.modal-actions button:first-child {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
+.cancel-btn:hover {
+  background: linear-gradient(180deg, #d9c8a8 0%, #b09060 100%);
 }
 
-.modal-actions button:nth-child(2) {
-  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
-  color: #0a2008;
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: all 0.3s ease;
 }
 
-.modal-actions button:nth-child(3) {
-  background: linear-gradient(180deg, #8bcfff 0%, #4a9ed4 50%, #2d7aa8 100%);
-  color: #fff;
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 
-.modal-actions button:hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
+.modal-fade-enter-from .pergamino,
+.modal-fade-leave-to .pergamino {
+  transform: scale(0.9) rotateX(10deg);
 }
 
-.modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
-}
-
-@media (max-width: 760px) {
-  .modal-actions {
+@media (max-width: 480px) {
+  .payment-buttons {
     grid-template-columns: 1fr;
+  }
+  
+  .pergamino-amount {
+    font-size: 1.6rem;
   }
 }
 </style>
