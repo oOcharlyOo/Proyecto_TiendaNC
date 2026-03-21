@@ -2821,7 +2821,6 @@ async function processVoiceCommand(comando: string) {
 
 .product-card {
   background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: var(--border-width) solid var(--border-color);
   border-radius: 12px;
   padding: 0.8rem;
   display: flex;

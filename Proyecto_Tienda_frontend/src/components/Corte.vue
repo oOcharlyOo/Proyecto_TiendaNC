@@ -343,6 +343,7 @@ const fechaRangoFin = ref(new Date().toISOString().slice(0, 10));
 const corteActual = ref<CorteDTO | null>(null);
 const montoInicialCajaActiva = ref<number>(0);
 const ventasEfectivo = ref(0);
+const ventasTarjeta = ref(0);
 const ventasTransferencia = ref(0);
 const totalTicketsDia = ref(0);
 const horaInicioCaja = ref<string | null>(null);
@@ -663,6 +664,10 @@ async function generarReporteDiario() {
 
     ventasEfectivo.value = ventas
       .filter((v) => ['EFECTIVO', 'Efectivo'].includes(String(v.metodoPago || '')))
+      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
+
+    ventasTarjeta.value = ventas
+      .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TARJETA')
       .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
 
     ventasTransferencia.value = ventas
@@ -2071,6 +2076,7 @@ onMounted(() => {
           <article class="card-metric"><p>Horas Trabajadas</p><strong>{{ corteActual.horasTrabajadas || horasTrabajadas }}</strong></article>
           <article class="card-metric"><p>Monto Inicial</p><strong>{{ formatoMoneda(corteActual.montoInicial) }}</strong></article>
           <article class="card-metric"><p>Ventas Efectivo</p><strong>{{ formatoMoneda(ventasEfectivo) }}</strong></article>
+          <article class="card-metric"><p>Ventas Tarjeta</p><strong>{{ formatoMoneda(ventasTarjeta) }}</strong></article>
           <article class="card-metric"><p>Ventas Transferencia</p><strong>{{ formatoMoneda(ventasTransferencia) }}</strong></article>
           <article class="card-metric"><p>Tickets Dia</p><strong>{{ totalTicketsDia }}</strong></article>
           <article class="card-metric"><p>Total Ventas</p><strong>{{ formatoMoneda(corteActual.totalVentas) }}</strong></article>
@@ -3039,11 +3045,11 @@ onMounted(() => {
   margin-bottom: 1rem;
   position: relative;
   z-index: 2;
+  text-shadow: 2px 2px black;
 }
 
 .summary-item {
   flex: 1;
-  min-width: 120px;
   background: var(--bg-primary);
   border: 2px solid var(--border-color);
   border-radius: 10px;
@@ -3133,18 +3139,24 @@ onMounted(() => {
   background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
   color: var(--text-primary) !important;
   border: 2px solid color-mix(in srgb, var(--success-color) 60%, black);
+  width: max-content !important;
+  font-size: 1rem !important;
 }
 
-.method-badge.transferencia {
-  background: linear-gradient(180deg, var(--accent-color) 0%, var(--gradient-btn-end) 100%);
-  color: var(--btn-text, var(--bg-primary)) !important;
-  border: 2px solid color-mix(in srgb, var(--accent-color) 60%, black);
+.method-badge.transfer {
+  background: linear-gradient(180deg, skyblue 0%, var(--infoBlueColor) 100%) !important;
+  color: var(--text-primary) !important;
+  border: 2px solid color-mix(in srgb, var(--infoBlueColor) 60%, black);
+  width: max-content !important;
+  font-size: 1rem !important;
 }
 
 .method-badge.tarjeta {
   background: linear-gradient(180deg, #ec4899 0%, #db2777 100%);
+  width: max-content !important;
   color: #ffffff !important;
   border: 2px solid #be185d;
+  font-size: 1rem !important;
 }
 
 .detail-table-wrap {
@@ -3608,7 +3620,6 @@ onMounted(() => {
   overflow-y: auto !important;
   padding: 24px !important;
   position: relative !important;
-  z-index: 2 !important;
 }
 
 .modal-content-scroll::-webkit-scrollbar {
@@ -4358,7 +4369,6 @@ onMounted(() => {
 
 .summary-value {
   display: block !important;
-  font-size: 1.25rem !important;
   font-weight: bold !important;
   color: var(--text-primary) !important;
 }
