@@ -2151,6 +2151,7 @@ onMounted(() => {
         <div class="modal-corner bl"></div>
         <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalDiarioAbierto = false">✕</button>
+        <div class="modal-content-scroll">
         <div class="modal-header">
           <span class="modal-icon">📅</span>
           <h3>Reporte por Día</h3>
@@ -2169,6 +2170,7 @@ onMounted(() => {
             <span class="btn-icono">📊</span>
             <span class="btn-texto">Generar Reporte</span>
           </button>
+        </div>
         </div>
       </section>
     </div>
@@ -2313,6 +2315,7 @@ onMounted(() => {
         <div class="modal-corner bl"></div>
         <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalHistorialAbierto = false">✕</button>
+        <div class="modal-content-scroll">
         <div class="modal-header">
           <span class="modal-icon">📜</span>
           <h3>Historial de Ventas</h3>
@@ -2358,6 +2361,7 @@ onMounted(() => {
             </div>
           </article>
         </div>
+        </div>
       </section>
     </div>
 
@@ -2368,6 +2372,7 @@ onMounted(() => {
         <div class="modal-corner bl"></div>
         <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalDetalleAbierto = false">✕</button>
+        <div class="modal-content-scroll">
         <div class="modal-header">
           <span class="modal-icon">🔎</span>
           <h3>Detalle Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h3>
@@ -2421,12 +2426,18 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
+        </div>
       </section>
     </div>
 
     <div v-if="modalEgresosAbierto" class="modal-overlay" @click.self="modalEgresosAbierto = false">
       <section class="modal-card panel history-modal">
+        <div class="modal-corner tl"></div>
+        <div class="modal-corner tr"></div>
+        <div class="modal-corner bl"></div>
+        <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalEgresosAbierto = false">✕</button>
+        <div class="modal-content-scroll">
         <div class="modal-header-with-action">
           <h3>📉 Egresos del Día</h3>
           <button v-if="esAdministrador" class="btn-nueva-salida" @click="modalSalidaAbierto = true">➕ Nueva Salida</button>
@@ -2453,6 +2464,7 @@ onMounted(() => {
           <span>Total Egresos:</span>
           <strong>{{ formatoMoneda(egresosDia.reduce((sum, e) => sum + Number(e.monto || 0), 0)) }}</strong>
         </div>
+        </div>
       </section>
     </div>
 
@@ -2465,6 +2477,7 @@ onMounted(() => {
         <div class="modal-corner bl"></div>
         <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalApartadosAbierto = false">✕</button>
+        <div class="modal-content-scroll">
         <div class="modal-header">
           <span class="modal-icon">🏦</span>
           <h3>Apartados para Inversiones</h3>
@@ -2586,13 +2599,18 @@ onMounted(() => {
             <button class="btn-cerrar-historial" @click="mostrarHistorialCompletados = false">Cerrar</button>
           </div>
         </div>
+        </div>
       </section>
     </div>
 
     <div v-if="modalAnualAbierto" class="modal-overlay" @click.self="modalAnualAbierto = false">
       <section class="modal-card panel annual-modal">
+        <div class="modal-corner tl"></div>
+        <div class="modal-corner tr"></div>
+        <div class="modal-corner bl"></div>
+        <div class="modal-corner br"></div>
         <button type="button" class="btn-cerrar-modal" @click="modalAnualAbierto = false">✕</button>
-        
+        <div class="modal-content-scroll">
         <div class="annual-header-modern">
           <div class="annual-title-block">
             <h2 class="annual-title">📊 Reporte Anual</h2>
@@ -2729,6 +2747,7 @@ onMounted(() => {
         <div v-else class="annual-loading-modern">
           <div class="loading-spinner"></div>
           <p>Cargando datos del reporte...</p>
+        </div>
         </div>
       </section>
     </div>
@@ -3422,137 +3441,212 @@ onMounted(() => {
   place-items: center;
   padding: 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
+/* =========================================
+   MODAL CARD - ESTILO PAPIRO/PERGAMINO
+   ========================================= */
 .modal-card {
-  width: min(100%, 520px);
+  width: min(100%, 600px);
   max-height: none;
-  background: var(--bg-panel);
-  border: var(--border-width-thick) solid var(--accent-color);
-  box-shadow:
-    0 0 0 4px var(--border-color),
-    0 14px 0 var(--border-color),
-    0 20px 28px var(--shadow-color);
-  padding: 1.5rem;
-  gap: 1rem;
-  overflow-x: visible;
-  overflow-y: visible;
-  animation: fadeSlideIn 200ms ease-out;
+  background: var(--bg-panel) !important;
+  border: none !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  overflow: visible;
+  animation: fadeSlideIn 200ms ease-out !important;
   position: relative;
-  margin: 2rem 0;
+  margin: 1rem auto;
+  box-shadow: none !important;
 }
 
+/* Marco decorativo exterior */
+.modal-card::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  border: 4px solid var(--accent-color) !important;
+  border-radius: 16px !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  box-shadow: 
+    inset 0 0 0 2px var(--border-color),
+    inset 0 0 0 6px var(--bg-panel),
+    inset 0 0 0 8px color-mix(in srgb, var(--accent-color) 60%, transparent),
+    0 8px 32px var(--shadow-color),
+    0 0 0 1px var(--border-color) !important;
+}
+
+/* Marco decorativo interior punteado */
+.modal-card::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 12px !important;
+  border: 2px dashed var(--border-color) !important;
+  border-radius: 8px !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  opacity: 0.5 !important;
+}
+
+/* Esquinas decorativas */
 .modal-corner {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  pointer-events: none;
-  z-index: 100;
+  position: absolute !important;
+  width: 40px !important;
+  height: 40px !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
 }
 
 .modal-corner::before,
 .modal-corner::after {
-  content: '';
-  position: absolute;
-  background: #f8d667;
+  content: '' !important;
+  position: absolute !important;
+  background: var(--accent-color) !important;
+  border-radius: 2px !important;
 }
 
 .modal-corner.tl {
-  top: 8px;
-  left: 8px;
+  top: 16px !important;
+  left: 16px !important;
 }
-
 .modal-corner.tl::before {
-  width: 25px;
-  height: 3px;
-  top: 0;
-  left: 0;
-  border-radius: 2px;
+  width: 25px !important;
+  height: 3px !important;
+  top: 0 !important;
+  left: 0 !important;
 }
-
 .modal-corner.tl::after {
-  width: 3px;
-  height: 25px;
-  top: 0;
-  left: 0;
-  border-radius: 2px;
+  width: 3px !important;
+  height: 25px !important;
+  top: 0 !important;
+  left: 0 !important;
 }
 
 .modal-corner.tr {
-  top: 8px;
-  right: 8px;
+  top: 16px !important;
+  right: 16px !important;
 }
-
 .modal-corner.tr::before {
-  width: 25px;
-  height: 3px;
-  top: 0;
-  right: 0;
-  border-radius: 2px;
+  width: 25px !important;
+  height: 3px !important;
+  top: 0 !important;
+  right: 0 !important;
 }
-
 .modal-corner.tr::after {
-  width: 3px;
-  height: 25px;
-  top: 0;
-  right: 0;
-  border-radius: 2px;
+  width: 3px !important;
+  height: 25px !important;
+  top: 0 !important;
+  right: 0 !important;
 }
 
 .modal-corner.bl {
-  bottom: 8px;
-  left: 8px;
+  bottom: 16px !important;
+  left: 16px !important;
 }
-
 .modal-corner.bl::before {
-  width: 25px;
-  height: 3px;
-  bottom: 0;
-  left: 0;
-  border-radius: 2px;
+  width: 25px !important;
+  height: 3px !important;
+  bottom: 0 !important;
+  left: 0 !important;
 }
-
 .modal-corner.bl::after {
-  width: 3px;
-  height: 25px;
-  bottom: 0;
-  left: 0;
-  border-radius: 2px;
+  width: 3px !important;
+  height: 25px !important;
+  bottom: 0 !important;
+  left: 0 !important;
 }
 
 .modal-corner.br {
-  bottom: 8px;
-  right: 8px;
+  bottom: 16px !important;
+  right: 16px !important;
 }
-
 .modal-corner.br::before {
-  width: 25px;
-  height: 3px;
-  bottom: 0;
-  right: 0;
-  border-radius: 2px;
+  width: 25px !important;
+  height: 3px !important;
+  bottom: 0 !important;
+  right: 0 !important;
 }
-
 .modal-corner.br::after {
-  width: 3px;
-  height: 25px;
-  bottom: 0;
-  right: 0;
-  border-radius: 2px;
+  width: 3px !important;
+  height: 25px !important;
+  bottom: 0 !important;
+  right: 0 !important;
 }
 
+/* Botón cerrar */
+.btn-cerrar-modal {
+  position: absolute !important;
+  top: 20px !important;
+  right: 20px !important;
+  z-index: 20 !important;
+  width: 36px !important;
+  height: 36px !important;
+  background: var(--bg-secondary) !important;
+  border: 2px solid var(--border-color) !important;
+  border-radius: 50% !important;
+  color: var(--text-primary) !important;
+  font-size: 1.2rem !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+}
+
+.btn-cerrar-modal:hover {
+  background: var(--error-color) !important;
+  border-color: var(--error-color) !important;
+  color: white !important;
+  transform: scale(1.1) !important;
+}
+
+/* Contenedor scroll interno */
+.modal-content-scroll {
+  max-height: calc(85vh - 32px) !important;
+  overflow-y: auto !important;
+  padding: 24px !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.modal-content-scroll::-webkit-scrollbar {
+  width: 10px !important;
+}
+
+.modal-content-scroll::-webkit-scrollbar-track {
+  background: var(--bg-secondary) !important;
+  border-radius: 5px !important;
+}
+
+.modal-content-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-color) !important;
+  border-radius: 5px !important;
+  border: 2px solid var(--bg-secondary) !important;
+}
+
+/* Header del modal */
 .modal-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  padding: 1rem 1.25rem;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border-bottom: 3px solid var(--accent-color);
-  border-radius: 8px 8px 0 0;
-  position: relative;
-  z-index: 2;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--border-color) 50%, transparent);
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  margin-bottom: 1rem !important;
+  padding-bottom: 1rem !important;
+  border-bottom: 3px double var(--border-color) !important;
+  position: relative !important;
+}
+
+.modal-header::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: -10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 80px !important;
+  height: 4px !important;
+  background: var(--accent-color) !important;
+  border-radius: 2px !important;
 }
 
 .modal-icon {
@@ -3978,7 +4072,6 @@ onMounted(() => {
   max-height: calc(85vh - 24px) !important;
   overflow-y: auto !important;
   padding: 24px !important;
-  scrollbar-color: var(--accent-color) var(--bg-secondary) !important;
 }
 
 .monthly-modal .modal-content-scroll::-webkit-scrollbar {
@@ -6146,6 +6239,422 @@ th {
 
   .card-metric.total {
     grid-column: span 2;
+  }
+}
+
+/* =========================================
+   RESPONSIVE MODALS - MOBILE
+   ========================================= */
+@media (max-width: 768px) {
+  /* Overlay - ensure it doesn't overflow */
+  .modal-overlay {
+    padding: 0.5rem !important;
+    overflow: hidden !important;
+    align-content: center !important;
+  }
+
+  /* All modals - fully contained */
+  .modal-card.panel {
+    width: 100% !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 95vh !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  .modal-card.panel::before {
+    border-radius: 12px !important;
+  }
+
+  .modal-card.panel::after {
+    inset: 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .modal-corner {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .modal-corner.tl,
+  .modal-corner.tr { top: 10px !important; }
+  .modal-corner.bl,
+  .modal-corner.br { bottom: 10px !important; }
+  .modal-corner.tl,
+  .modal-corner.bl { left: 10px !important; }
+  .modal-corner.tr,
+  .modal-corner.br { right: 10px !important; }
+
+  .modal-corner::before { width: 18px !important; height: 2px !important; }
+  .modal-corner::after { width: 2px !important; height: 18px !important; }
+
+  .btn-cerrar-modal {
+    width: 32px !important;
+    height: 32px !important;
+    top: 12px !important;
+    right: 12px !important;
+    font-size: 1rem !important;
+  }
+
+  .modal-content-scroll {
+    max-height: calc(95vh - 60px) !important;
+    padding: 16px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Modal headers */
+  .modal-header {
+    padding: 0.75rem 0.5rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .modal-header h3 {
+    font-size: 1.1rem !important;
+  }
+
+  .modal-icon {
+    font-size: 1.2rem !important;
+  }
+
+  /* History Modal */
+  .history-modal {
+    width: min(100%, 95vw) !important;
+  }
+
+  .history-filters {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .filter-total {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0.5rem 0 !important;
+  }
+
+  .history-list {
+    max-height: 50vh !important;
+    min-height: 200px !important;
+  }
+
+  .history-item {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .history-item-left,
+  .history-item-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .metodo-badge {
+    font-size: 0.7rem !important;
+  }
+
+  /* Detail Modal */
+  .detail-modal {
+    width: min(100%, 95vw) !important;
+  }
+
+  .detail-summary {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .summary-item {
+    min-width: unset !important;
+    padding: 0.6rem !important;
+  }
+
+  .summary-icon {
+    font-size: 1.1rem !important;
+  }
+
+  .summary-label {
+    font-size: 0.65rem !important;
+  }
+
+  .summary-value {
+    font-size: 0.8rem !important;
+  }
+
+  .total-item {
+    grid-column: span 2 !important;
+  }
+
+  .detail-table-wrap {
+    max-height: 50vh !important;
+    overflow-x: auto !important;
+  }
+
+  .detail-table-wrap table {
+    font-size: 0.8rem !important;
+  }
+
+  .detail-table-wrap th,
+  .detail-table-wrap td {
+    padding: 0.5rem 0.3rem !important;
+  }
+
+  .col-producto {
+    max-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* Daily/Monthly Modal */
+  .daily-modal,
+  .monthly-modal {
+    width: min(100%, 95vw) !important;
+  }
+
+  .modal-body {
+    padding: 0.5rem !important;
+  }
+
+  .input-group {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .btn-generate {
+    width: 100% !important;
+    padding: 1rem !important;
+    font-size: 0.95rem !important;
+  }
+
+  .btn-generate .btn-icono {
+    font-size: 1.3rem !important;
+  }
+
+  .btn-generate .btn-texto {
+    font-size: 0.9rem !important;
+  }
+
+  /* Monthly Results */
+  .results-summary {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .summary-card.total {
+    grid-column: span 2 !important;
+  }
+
+  .weekly-cards {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .week-card {
+    padding: 0.75rem !important;
+  }
+
+  .week-header {
+    font-size: 0.85rem !important;
+  }
+
+  .week-dates {
+    font-size: 0.7rem !important;
+  }
+
+  .week-stat {
+    font-size: 0.75rem !important;
+  }
+
+  .products-toggle {
+    flex-wrap: wrap !important;
+  }
+
+  .products-toggle button {
+    flex: 1 !important;
+    min-width: 45% !important;
+    padding: 0.5rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .product-row {
+    padding: 0.5rem !important;
+    gap: 0.3rem !important;
+  }
+
+  .product-rank {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .product-name {
+    font-size: 0.75rem !important;
+  }
+
+  .product-qty,
+  .product-amount {
+    font-size: 0.7rem !important;
+  }
+
+  /* Annual Modal */
+  .annual-modal {
+    width: min(100%, 95vw) !important;
+    max-height: 92vh !important;
+  }
+
+  .annual-header-modern {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .annual-title-block {
+    text-align: center !important;
+  }
+
+  .annual-title {
+    font-size: 1.1rem !important;
+  }
+
+  .annual-subtitle {
+    font-size: 0.7rem !important;
+  }
+
+  .annual-actions {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .annual-kpis {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .kpi-card {
+    padding: 0.75rem !important;
+  }
+
+  .kpi-icon-wrapper {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .kpi-icon {
+    font-size: 1.1rem !important;
+  }
+
+  .kpi-label {
+    font-size: 0.7rem !important;
+  }
+
+  .kpi-value {
+    font-size: 1rem !important;
+  }
+
+  .monthly-chart-section {
+    padding: 0.75rem !important;
+  }
+
+  .horarios-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .horario-card {
+    padding: 0.75rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0 !important;
+  }
+
+  .modal-card.panel {
+    width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    max-width: 100vw !important;
+  }
+
+  .modal-card.panel::before {
+    border-radius: 0 !important;
+  }
+
+  .modal-corner {
+    display: none !important;
+  }
+
+  .btn-cerrar-modal {
+    top: 8px !important;
+    right: 8px !important;
+  }
+
+  .modal-content-scroll {
+    padding: 12px !important;
+  }
+
+  .modal-header h3 {
+    font-size: 1rem !important;
+    padding-right: 30px !important;
+  }
+
+  .history-filters {
+    padding: 0.5rem !important;
+  }
+
+  .modern-select {
+    font-size: 0.75rem !important;
+    padding: 0.4rem 0.5rem !important;
+  }
+
+  .filter-total strong {
+    font-size: 0.95rem !important;
+  }
+
+  .history-item {
+    padding: 0.6rem !important;
+  }
+
+  .ticket-badge {
+    font-size: 0.75rem !important;
+  }
+
+  .history-date {
+    font-size: 0.7rem !important;
+  }
+
+  .history-amount {
+    font-size: 0.9rem !important;
+  }
+
+  .summary-card {
+    padding: 0.5rem !important;
+  }
+
+  .summary-value {
+    font-size: 0.75rem !important;
+  }
+
+  .week-card {
+    padding: 0.5rem !important;
+  }
+
+  .products-toggle button {
+    min-width: 100% !important;
+  }
+
+  .chart-container,
+  .chart-container-weekly {
+    max-height: 200px !important;
+    padding: 0.5rem !important;
+  }
+
+  .annual-content {
+    max-height: calc(92vh - 100px) !important;
+    overflow-y: auto !important;
   }
 }
 </style>
