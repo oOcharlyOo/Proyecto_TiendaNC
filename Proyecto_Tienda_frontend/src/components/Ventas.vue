@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, markRaw } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, markRaw } from 'vue';
 import Quagga from '@ericblade/quagga2';
 import { useProductosCache } from '@/composables/useProductCache';
 import EntradaEfectivoModal from './modals/EntradaEfectivoModal.vue';
@@ -7,6 +7,44 @@ import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import HistorialVentasModal from './modals/HistorialVentasModal.vue';
 import CalculadoraGramajeModal from './modals/CalculadoraGramajeModal.vue';
 import CobroModal from './modals/CobroModal.vue';
+
+let isResizing = false;
+let startY = 0;
+let startHeight = 0;
+
+function startResize(e: MouseEvent | TouchEvent) {
+  isResizing = true;
+  startY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+  const container = document.querySelector('.pos-right');
+  if (container) {
+    startHeight = parseFloat(getComputedStyle(container).height);
+  }
+  document.documentElement.style.cursor = 'row-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+}
+
+function doResize(e: MouseEvent | TouchEvent) {
+  if (!isResizing) return;
+  const currentY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+  const diff = currentY - startY;
+  let newHeight = startHeight - diff;
+  const maxHeight = window.innerHeight * 0.9;
+  const minHeight = 200;
+  if (newHeight > maxHeight) newHeight = maxHeight;
+  if (newHeight < minHeight) newHeight = minHeight;
+  const container = document.querySelector('.pos-right');
+  if (container) {
+    (container as HTMLElement).style.height = newHeight + 'px';
+  }
+  e.preventDefault();
+}
+
+function stopResize() {
+  isResizing = false;
+  document.documentElement.style.cursor = '';
+  document.body.style.userSelect = '';
+}
 
 const audioContext = typeof window !== 'undefined' ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
 
@@ -353,6 +391,11 @@ function handleResize() {
 onMounted(() => {
   window.addEventListener('resize', handleResize);
   
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+  document.addEventListener('touchmove', doResize, { passive: false });
+  document.addEventListener('touchend', stopResize);
+  
   window.addEventListener('focusin', (e) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       isKeyboardVisible.value = true;
@@ -363,6 +406,13 @@ onMounted(() => {
   window.addEventListener('focusout', () => {
     isKeyboardVisible.value = false;
   });
+});
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', doResize);
+  document.removeEventListener('mouseup', stopResize);
+  document.removeEventListener('touchmove', doResize);
+  document.removeEventListener('touchend', stopResize);
 });
 
 const ticketActual = computed(() => {
@@ -1536,9 +1586,12 @@ async function processVoiceCommand(comando: string) {
     </section>
 
     <!-- PANEL DERECHO: TICKET Y COBRO -->
-    <aside class="pos-right checkout-section animate-slide-in-right" :class="{ 'is-open': ticketVisibleMobile }">
-      <!-- Activador para móviles -->
+    <aside class="pos-right checkout-section animate-slide-in-right resize-trigger-active" :class="{ 'is-open': ticketVisibleMobile }">
+      <!-- Activador para móviles con resize handle -->
       <div class="mobile-ticket-trigger" @click="ticketVisibleMobile = !ticketVisibleMobile">
+        <div class="resize-handle-trigger" @mousedown.stop="startResize" @touchstart.stop="startResize">
+          <span class="resize-dots">⋮⋮</span>
+        </div>
         <div class="trigger-info">
           <span class="icon">🛒</span>
           <span class="count">{{ ticketInfoText }}</span>
@@ -3948,5 +4001,58 @@ async function processVoiceCommand(comando: string) {
     font-size: 0.85rem;
     padding: 0.5rem 0;
   }
+}
+
+/* Resizable ticket panel */
+.resize-vertical {
+  overflow: hidden;
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  z-index: 10;
+  user-select: none;
+}
+
+.resize-dots {
+  color: var(--border-color);
+  font-size: 14px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.resize-handle-trigger {
+  display: none;
+}
+
+.resize-trigger-active .resize-handle-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+
+.resize-trigger-active .resize-handle-trigger .resize-dots {
+  font-size: 18px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.resize-trigger-active .resize-handle-trigger:active .resize-dots {
+  opacity: 1;
+  color: var(--accent-color);
 }
 </style>

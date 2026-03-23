@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Bar, Pie } from 'vue-chartjs';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
+import SueldoXHoraModal from './modals/SueldoXHoraModal.vue';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -98,7 +99,9 @@ type CorteDTO = {
   otrosIngresos: number;
   saldoFinalCalculado: number;
   gananciaTotal: number;
+  gananciaNeta: number;
   ventasEfectivo?: number;
+  ventasTarjeta?: number;
   ventasTransferencia?: number;
   totalTickets?: number;
   horasTrabajadas?: string;
@@ -170,6 +173,8 @@ type ReporteAnualDTO = {
   meses: MesData[];
   ventasPorHorario: HorarioData[];
   productosPorHorario: ProductoHorarioData[];
+  topProductosGranel: ProductoTopData[];
+  topProductosUnitarios: ProductoTopData[];
 };
 
 type MesData = {
@@ -195,6 +200,14 @@ type ProductoHorarioData = {
   isGramaje: boolean;
 };
 
+type ProductoTopData = {
+  nombreProducto: string;
+  cantidadVendida: number;
+  totalVendido: number;
+  isGramaje: boolean;
+  posicion: number;
+};
+
 const reporteAnualData = ref<ReporteAnualDTO | null>(null);
 const cargandoAnual = ref(false);
 
@@ -210,7 +223,28 @@ function updateWidth() {
 onMounted(() => {
   window.addEventListener('resize', updateWidth);
   verificarCajaActiva();
+  cargarUsuariosConSueldo();
 });
+
+async function cargarUsuariosConSueldo() {
+  try {
+    const res = await fetch(`${API_BASE}/usuarios/listarUsuarios`);
+    const data = await res.json();
+    if (data.codigo === 200 && data.datos) {
+      usuariosConSueldo.value = data.datos.map((u: any) => ({
+        id: u.idUsuario,
+        nombre: u.nombre,
+        surname: u.apellido_p,
+        hora: u.sueldo_hora || 0,
+        diasSemana: u.dias_semana || 6,
+        horas: u.horas_trabajadas || 8
+      }));
+      console.log('Usuarios con sueldo cargados:', usuariosConSueldo.value);
+    }
+  } catch (e) {
+    console.error('Error al cargar usuarios con sueldo:', e);
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateWidth);
@@ -269,6 +303,32 @@ const modalEgresosAbierto = ref(false);
 const modalSalidaAbierto = ref(false);
 const modalApartadosAbierto = ref(false);
 const modalAnualAbierto = ref(false);
+const modalSueldoHoraAbierto = ref(false);
+
+const diasLaboradosSemana = ref(6);
+const usuariosConSueldo = ref<{id: number; nombre: string; surname: string; hora: number; diasSemana: number; horas: number}[]>([]);
+const usuariosQueTrabajaronElDia = ref<number[]>([]);
+
+const totalSueldoSemanal = computed(() => {
+  const horasDia = obtenerHorasTrabajadas();
+  const costoTotal = usuariosConSueldo.value
+    .filter(u => usuariosQueTrabajaronElDia.value.includes(u.id))
+    .reduce((sum, u) => {
+      const dias = u.diasSemana || 6;
+      return sum + ((u.hora || 0) * horasDia * dias);
+    }, 0);
+  return costoTotal;
+});
+
+function obtenerHorasTrabajadas(): number {
+  const horasStr = corteActual.value?.horasTrabajadas || horasTrabajadas.value || '8h';
+  const match = horasStr.match(/(\d+)/);
+  return match ? parseInt(match[1]) : 8;
+}
+const dineroApartarDiario = computed(() => {
+  const DIAS_PARA_JUNTAR = 7;
+  return totalSueldoSemanal.value / DIAS_PARA_JUNTAR;
+});
 
 const anioReporte = ref(new Date().getFullYear());
 
@@ -661,6 +721,7 @@ async function generarReporteDiario() {
     console.log('Data response:', data);
     const ventas = Array.isArray(data?.ventas) ? data.ventas : [];
     console.log('Ventas:', ventas);
+    console.log('Primera venta:', ventas[0]);
 
     ventasEfectivo.value = ventas
       .filter((v) => ['EFECTIVO', 'Efectivo'].includes(String(v.metodoPago || '')))
@@ -673,6 +734,37 @@ async function generarReporteDiario() {
     ventasTransferencia.value = ventas
       .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
       .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
+
+    // Obtener usuarios únicos que trabajaron ese día
+    const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
+    usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
+
+    // Calcular días trabajados en la semana actual
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    monday.setHours(0, 0, 0, 0);
+    
+    const diasSemanaMap = new Map<number, Set<string>>();
+    for (const v of ventas) {
+      if (v.idUsuario && v.fechaVenta) {
+        const fecha = v.fechaVenta.split('T')[0];
+        if (!diasSemanaMap.has(v.idUsuario)) {
+          diasSemanaMap.set(v.idUsuario, new Set());
+        }
+        diasSemanaMap.get(v.idUsuario)?.add(fecha);
+      }
+    }
+    
+    usuariosConSueldo.value = usuariosConSueldo.value.map(u => ({
+      ...u,
+      diasTrabajados: diasSemanaMap.get(u.id)?.size || 1
+    }));
+
+    console.log('Usuarios que trabajaron:', idsUsuariosUnicos);
+    console.log('Días trabajados:', Object.fromEntries(diasSemanaMap));
+    console.log('Dinero a apartar diario:', dineroApartarDiario.value);
 
     // Obtener datos de caja (monto inicial, ingresos, egresos) del día sin importar usuario
     let montoInicial = 0;
@@ -738,6 +830,9 @@ async function generarReporteDiario() {
       saldoFinal
     });
 
+    const gananciaBruta = Number(data?.gananciaTotal || 0);
+    const gananciaNeta = Math.max(0, gananciaBruta - dineroApartarDiario.value);
+
     corteActual.value = {
       fechaCorte: `${fechaDiaria.value}T00:00:00`,
       montoInicial: montoInicial,
@@ -745,7 +840,11 @@ async function generarReporteDiario() {
       totalEgresos: totalEgresos,
       otrosIngresos: otrosIngresos,
       saldoFinalCalculado: saldoFinal,
-      gananciaTotal: Number(data?.gananciaTotal || 0)
+      gananciaTotal: gananciaBruta,
+      gananciaNeta: gananciaNeta,
+      ventasTarjeta: Number(ventasTarjeta.value || 0),
+      ventasEfectivo: Number(ventasEfectivo.value || 0),
+      ventasTransferencia: Number(ventasTransferencia.value || 0)
     };
 
     // Obtener productos más vendidos del día
@@ -795,6 +894,13 @@ async function generarReporteDiario() {
     mostrarMensaje('Reporte diario generado con exito.', 'ok');
   } catch (error) {
     mostrarMensaje(`Error al generar reporte diario: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  }
+}
+
+function recalcularGananciaNeta() {
+  if (corteActual.value && corteActual.value.gananciaTotal) {
+    const gananciaNeta = Math.max(0, Number(corteActual.value.gananciaTotal) - dineroApartarDiario.value);
+    corteActual.value.gananciaNeta = gananciaNeta;
   }
 }
 
@@ -2083,7 +2189,9 @@ onMounted(() => {
           <article class="card-metric"><p>Otras Entradas</p><strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong></article>
           <article class="card-metric"><p>Total Egresos</p><strong class="clickable" @click="abrirModalEgresos">{{ formatoMoneda(corteActual.totalEgresos) }}</strong></article>
           <article class="card-metric"><p>Apartado ({{ nombreApartadoActivo }})</p><strong class="clickable" @click="abrirModalApartados">{{ formatoMoneda(totalApartarDiario) }}</strong></article>
-          <article class="card-metric"><p>Ganancia Total</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaTotal) }}</strong></article>
+          <article class="card-metric"><p>Ganancia Bruta</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaTotal) }}</strong></article>
+          <article class="card-metric"><p>💰 Apartar para Sueldo</p><strong>{{ formatoMonedaRedonda(dineroApartarDiario) }}</strong></article>
+          <article class="card-metric highlight"><p>Ganancia Neta</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaNeta) }}</strong></article>
           <article class="card-metric total"><p>Saldo Final Calculado</p><strong>{{ formatoMoneda(corteActual.saldoFinalCalculado) }}</strong></article>
         </div>
 
@@ -2315,166 +2423,179 @@ onMounted(() => {
     </div>
 
     <div v-if="modalHistorialAbierto" class="modal-overlay" @click.self="modalHistorialAbierto = false">
-      <section class="modal-card panel history-modal">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        <button type="button" class="btn-cerrar-modal" @click="modalHistorialAbierto = false">✕</button>
-        <div class="modal-content-scroll">
-        <div class="modal-header">
-          <span class="modal-icon">📜</span>
-          <h3>Historial de Ventas</h3>
-        </div>
-
-        <div class="history-filters">
-          <div class="filter-group">
-            <label>Mes</label>
-            <select v-model="filtroMesHistorial" class="modern-select">
-              <option value="all">lunas</option>
-              <option v-for="m in historialMeses" :key="`m-${m}`" :value="m">Mes {{ Number(m) + 1 }}</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
-            <label>Día</label>
-            <select v-model="filtroDiaHistorial" class="modern-select">
-              <option value="all">sol</option>
-              <option v-for="d in historialDias" :key="`d-${d}`" :value="d">Dia {{ d }}</option>
-            </select>
-          </div>
-
-          <div class="filter-total">
-            <span>Total:</span>
-            <strong>{{ formatoMoneda(historialTotalFiltrado) }}</strong>
-          </div>
-        </div>
-
-        <div class="history-list">
-          <p v-if="cargandoHistorial" class="empty loading">📡 Cargando historial...</p>
-          <p v-else-if="historialFiltrado.length === 0" class="empty">📭 No hay ventas con el filtro actual.</p>
-
-          <article v-else v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="history-item" @click="abrirDetalleVenta(v.venta.idVenta)">
-            <div class="history-item-left">
-              <span class="ticket-badge">🎫 #{{ historialFiltrado.length - index }}</span>
-              <p class="history-date">{{ formatoFecha(v.venta.fechaVenta) }}</p>
+      <div class="pergamino history-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">📜</span>
             </div>
-            <div class="history-item-right">
-              <strong class="history-amount">{{ formatoMoneda(Number(v.venta.montoTotal || 0)) }}</strong>
-              <span class="metodo-badge" :class="getMetodoClase(v.venta.metodoPago)">
-                {{ getMetodoIcono(v.venta.metodoPago) }} {{ v.venta.metodoPago || 'N/D' }}
-              </span>
+            <h2>Historial de Ventas</h2>
+            <div class="header-line"></div>
+            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalHistorialAbierto = false">✕</button>
+          </header>
+
+          <div class="modal-body">
+            <div class="filter-section">
+              <div class="filter-row">
+                <div class="filter-select-wrap">
+                  <label>Luna</label>
+                  <select v-model="filtroMesHistorial" class="papiro-select">
+                    <option value="all">Todas</option>
+                    <option v-for="m in historialMeses" :key="`m-${m}`" :value="m">Mes {{ Number(m) + 1 }}</option>
+                  </select>
+                </div>
+                <div class="filter-select-wrap">
+                  <label>Sol</label>
+                  <select v-model="filtroDiaHistorial" class="papiro-select">
+                    <option value="all">Todos</option>
+                    <option v-for="d in historialDias" :key="`d-${d}`" :value="d">Día {{ d }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="total-scroll-bar">
+                <span class="scroll-bar-label">⚜ Total del Período ⚜</span>
+                <span class="scroll-bar-amount">{{ formatoMoneda(historialTotalFiltrado) }}</span>
+              </div>
             </div>
-          </article>
+
+            <div class="entries-scroll">
+              <p v-if="cargandoHistorial" class="empty-text">📡 Cargando pergamino antiguo...</p>
+              <p v-else-if="historialFiltrado.length === 0" class="empty-text">📭 No hay ventas con el filtro actual.</p>
+
+              <div v-else class="scroll-entries">
+                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" @click="abrirDetalleVenta(v.venta.idVenta)">
+                  <div class="entry-left">
+                    <span class="entry-number">{{ historialFiltrado.length - index }}</span>
+                    <div class="entry-info">
+                      <span class="entry-date">{{ formatoFecha(v.venta.fechaVenta) }}</span>
+                      <span class="metodo-scroll-pill" :class="getMetodoClase(v.venta.metodoPago)">
+                        {{ getMetodoIcono(v.venta.metodoPago) }} {{ v.venta.metodoPago || 'N/D' }}
+                      </span>
+                    </div>
+                  </div>
+                  <span class="entry-amount">{{ formatoMoneda(Number(v.venta.montoTotal || 0)) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        </div>
-      </section>
+      </div>
     </div>
 
     <div v-if="modalDetalleAbierto && ventaDetalleSeleccionada" class="modal-overlay" @click.self="modalDetalleAbierto = false">
-      <section class="modal-card panel detail-modal">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        <button type="button" class="btn-cerrar-modal" @click="modalDetalleAbierto = false">✕</button>
-        <div class="modal-content-scroll">
-        <div class="modal-header">
-          <span class="modal-icon">🔎</span>
-          <h3>Detalle Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h3>
-        </div>
+      <div class="pergamino detail-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">🧾</span>
+            </div>
+            <h2>Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h2>
+            <div class="header-line"></div>
+            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalDetalleAbierto = false">✕</button>
+          </header>
 
-        <div class="detail-summary">
-          <div class="summary-item">
-            <span class="summary-icon">💳</span>
-            <div class="summary-content">
-              <span class="summary-label">Método</span>
-              <span class="summary-value method-badge" :class="getMetodoClase(ventaDetalleSeleccionada.metodoPago)">
-                {{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}
-              </span>
+          <div class="modal-body">
+            <div class="meta-badges">
+              <div class="meta-pill" :class="getMetodoClase(ventaDetalleSeleccionada.metodoPago)">
+                <span class="pill-rune">◈</span>
+                <span class="pill-icon">💳</span>
+                <span class="pill-text">{{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}</span>
+              </div>
+              <div class="meta-pill date-pill">
+                <span class="pill-rune">◈</span>
+                <span class="pill-icon">📅</span>
+                <span class="pill-text">{{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</span>
+              </div>
             </div>
-          </div>
-          <div class="summary-item">
-            <span class="summary-icon">📅</span>
-            <div class="summary-content">
-              <span class="summary-label">Fecha</span>
-              <span class="summary-value">{{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</span>
-            </div>
-          </div>
-          <div class="summary-item total-item">
-            <span class="summary-icon">💰</span>
-            <div class="summary-content">
-              <span class="summary-label">Total</span>
-              <span class="summary-value total-value">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="tabla-wrap detail-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-producto">🛒 Producto</th>
-                <th class="col-cant">📦 Cant</th>
-                <th class="col-unit">💵 P.Unit</th>
-                <th class="col-importe">💳 Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in ventaDetalleItems" :key="d.idVentaDetalle">
-                <td class="col-producto cell-producto" :title="d.productoNombre || 'Producto eliminado'">
-                  {{ d.productoNombre || 'Producto eliminado' }}
-                </td>
-                <td class="col-cant">{{ d.cantidad }}{{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : 'pza' }}</td>
-                <td class="col-unit">{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0)) }}</td>
-                <td class="col-importe importe">{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</td>
-              </tr>
-            </tbody>
-          </table>
+            <div class="section-title">⚜ Detalle de Productos ⚜</div>
+            
+            <div class="items-scroll">
+              <div v-for="d in ventaDetalleItems" :key="d.idVentaDetalle" class="item-card">
+                <div class="item-left">
+                  <span class="item-bullet">◆</span>
+                  <div class="item-info">
+                    <span class="item-name">{{ d.productoNombre || 'Producto eliminado' }}</span>
+                    <span class="item-calc">
+                      {{ d.cantidad }} {{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'gramos' : 'pzas' }}
+                    </span>
+                  </div>
+                </div>
+                <span class="item-price">{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</span>
+              </div>
+            </div>
+
+            <div class="total-bar">
+              <span class="total-bar-label">Total a Pagar</span>
+              <span class="total-bar-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+            </div>
+          </div>
         </div>
-        </div>
-      </section>
+      </div>
     </div>
 
     <div v-if="modalEgresosAbierto" class="modal-overlay" @click.self="modalEgresosAbierto = false">
-      <section class="modal-card panel history-modal">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        <button type="button" class="btn-cerrar-modal" @click="modalEgresosAbierto = false">✕</button>
-        <div class="modal-content-scroll">
-        <div class="modal-header-with-action">
-          <h3>📉 Egresos del Día</h3>
-          <button v-if="esAdministrador" class="btn-nueva-salida" @click="modalSalidaAbierto = true">➕ Nueva Salida</button>
-        </div>
-
-        <div v-if="cargandoEgresos" class="empty">📡 Cargando egresos...</div>
-        <div v-else-if="egresosDia.length === 0" class="empty">📭 No hay egresos para este día.</div>
+      <div class="pergamino egresos-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
         
-        <div v-else class="history-list">
-          <article v-for="(egreso, index) in egresosDia" :key="egreso.idCaja" class="history-item">
-            <div>
-              <h4>📉 Egreso #{{ index + 1 }}</h4>
-              <p>{{ formatoFecha(egreso.fechaMovimiento) }}</p>
-              <p class="descripcion">{{ egreso.descripcion || 'Sin descripción' }}</p>
-              <p class="usuario-egreso" v-if="egreso.usuario">👤 {{ egreso.usuario.nombre }} {{ egreso.usuario.apellido_p }}</p>
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">📉</span>
             </div>
-            <div>
-              <strong class="monto-egreso">{{ formatoMoneda(Number(egreso.monto || 0)) }}</strong>
-            </div>
-          </article>
-        </div>
+            <h2>Egresos del Día</h2>
+            <div class="header-line"></div>
+            <button v-if="esAdministrador" class="btn-nueva-salida-pergamino" @click="modalSalidaAbierto = true">➕ Nueva Salida</button>
+            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalEgresosAbierto = false">✕</button>
+          </header>
 
-        <div class="egresos-total">
-          <span>Total Egresos:</span>
-          <strong>{{ formatoMoneda(egresosDia.reduce((sum, e) => sum + Number(e.monto || 0), 0)) }}</strong>
+          <div class="modal-body">
+            <div v-if="cargandoEgresos" class="empty-text">📡 Cargando pergamino...</div>
+            <div v-else-if="egresosDia.length === 0" class="empty-text">📭 No hay egresos para este día.</div>
+
+            <div v-else class="egresos-scroll">
+              <div v-for="(egreso, index) in egresosDia" :key="egreso.idCaja" class="egreso-card">
+                <div class="egreso-left">
+                  <span class="egreso-number">{{ index + 1 }}</span>
+                  <div class="egreso-info">
+                    <span class="egreso-date">{{ formatoFecha(egreso.fechaMovimiento) }}</span>
+                    <span class="egreso-desc">{{ egreso.descripcion || 'Sin descripción' }}</span>
+                    <span class="egreso-user" v-if="egreso.usuario">👤 {{ egreso.usuario.nombre }} {{ egreso.usuario.apellido_p }}</span>
+                  </div>
+                </div>
+                <span class="egreso-amount">{{ formatoMoneda(Number(egreso.monto || 0)) }}</span>
+              </div>
+            </div>
+
+            <div class="total-egresos-bar" v-if="egresosDia.length > 0">
+              <span class="total-egresos-label">⚜ Total Egresos ⚜</span>
+              <span class="total-egresos-amount">{{ formatoMoneda(egresosDia.reduce((sum, e) => sum + Number(e.monto || 0), 0)) }}</span>
+            </div>
+          </div>
         </div>
-        </div>
-      </section>
+      </div>
     </div>
 
     <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalida" />
+
+    <SueldoXHoraModal 
+      :open="modalSueldoHoraAbierto" 
+      @close="modalSueldoHoraAbierto = false" 
+      @save="(usuarios) => { cargarUsuariosConSueldo(); recalcularGananciaNeta(); }"
+    />
 
     <div v-if="modalApartadosAbierto" class="modal-overlay" @click.self="modalApartadosAbierto = false">
       <section class="modal-card panel history-modal">
@@ -2610,27 +2731,29 @@ onMounted(() => {
     </div>
 
     <div v-if="modalAnualAbierto" class="modal-overlay" @click.self="modalAnualAbierto = false">
-      <section class="modal-card panel annual-modal">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        <button type="button" class="btn-cerrar-modal" @click="modalAnualAbierto = false">✕</button>
-        <div class="modal-content-scroll">
-        <div class="annual-header-modern">
-          <div class="annual-title-block">
-            <h2 class="annual-title">📊 Reporte Anual</h2>
-            <p class="annual-subtitle">Resumen de métricas y rendimiento del año {{ anioReporte }}</p>
-          </div>
-          <div class="annual-actions">
-            <select v-model="anioReporte" class="annual-year-select">
-              <option v-for="year in [2024, 2025, 2026, 2027]" :key="year" :value="year">{{ year }}</option>
-            </select>
-            <button type="button" @click="generarReporteAnual" class="annual-btn-refresh">🔄</button>
-          </div>
-        </div>
+      <div class="pergamino annual-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        
+        <div class="pergamino-inner annual-inner">
+          <header class="annual-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">📜</span>
+            </div>
+            <h2>Reporte Anual del Año {{ anioReporte }}</h2>
+            <div class="header-line"></div>
+            <div class="annual-actions-row">
+              <select v-model="anioReporte" class="papiro-select">
+                <option v-for="year in [2024, 2025, 2026, 2027]" :key="year" :value="year">{{ year }}</option>
+              </select>
+              <button type="button" @click="generarReporteAnual" class="refresh-btn">🔄</button>
+            </div>
+            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalAnualAbierto = false">✕</button>
+          </header>
 
-        <div v-if="reporteAnualData" class="annual-content">
+          <div v-if="reporteAnualData" class="annual-content-scroll">
           <div class="annual-kpis">
             <div class="kpi-card kpi-main">
               <div class="kpi-icon-wrapper success">
@@ -2734,11 +2857,11 @@ onMounted(() => {
 
           <div class="annual-products-section" v-if="reporteAnualData.productosPorHorario && reporteAnualData.productosPorHorario.length > 0">
             <div class="table-header">
-              <h3 class="table-title">🏆 Top Productos por Horario</h3>
+              <h3 class="table-title">⚔️ Top Productos por Horario</h3>
             </div>
             <div class="products-grid">
               <div v-for="horario in uniqueHorarios" :key="horario" class="product-group">
-                <h4 class="product-group-title">{{ horario }}</h4>
+                <h4 class="product-group-title">🕐 {{ horario }}</h4>
                 <div class="product-list-modern">
                   <div v-for="(prod, idx) in getProductosPorHorario(horario)" :key="prod.nombreProducto" class="product-row">
                     <span class="product-rank">{{ idx + 1 }}</span>
@@ -2749,13 +2872,51 @@ onMounted(() => {
               </div>
             </div>
           </div>
+
+          <div class="annual-top-products-section" v-if="reporteAnualData.topProductosGranel?.length || reporteAnualData.topProductosUnitarios?.length">
+            <div class="top-products-header">
+              <div class="triforce-divider">⏣</div>
+              <h3 class="top-products-title">🏆 Heroes of the Realm - Top 5</h3>
+              <div class="triforce-divider">⏣</div>
+            </div>
+            
+            <div class="top-products-grid">
+              <div class="top-products-card granel" v-if="reporteAnualData.topProductosGranel?.length">
+                <div class="card-emblem">⚖️</div>
+                <h4 class="card-title">🥇 Granel Masters</h4>
+                <p class="card-subtitle">Los guerreros del peso</p>
+                <div class="top-list">
+                  <div v-for="(prod, idx) in reporteAnualData.topProductosGranel" :key="prod.nombreProducto" class="top-item">
+                    <span class="top-rank" :class="`rank-${idx + 1}`">{{ ['①','②','③','④','⑤'][idx] }}</span>
+                    <span class="top-name">{{ prod.nombreProducto }}</span>
+                    <span class="top-qty">{{ formatearCantidad(prod.cantidadVendida, true) }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="top-products-card unitarios" v-if="reporteAnualData.topProductosUnitarios?.length">
+                <div class="card-emblem">🗡️</div>
+                <h4 class="card-title">🏹 Unit Heroes</h4>
+                <p class="card-subtitle">Los defensores de unidades</p>
+                <div class="top-list">
+                  <div v-for="(prod, idx) in reporteAnualData.topProductosUnitarios" :key="prod.nombreProducto" class="top-item">
+                    <span class="top-rank" :class="`rank-${idx + 1}`">{{ ['①','②','③','④','⑤'][idx] }}</span>
+                    <span class="top-name">{{ prod.nombreProducto }}</span>
+                    <span class="top-qty">{{ formatearCantidad(prod.cantidadVendida, false) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="triforce-footer">🛡️ 🗡️ 🛡️</div>
+          </div>
         </div>
         <div v-else class="annual-loading-modern">
           <div class="loading-spinner"></div>
-          <p>Cargando datos del reporte...</p>
+          <p>Cargando datos del pergamino...</p>
         </div>
         </div>
-      </section>
+      </div>
     </div>
   </main>
 </template>
@@ -3011,334 +3172,367 @@ onMounted(() => {
   }
 }
 
-.detail-modal {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 50%, var(--bg-secondary) 100%);
-  border: 4px solid var(--accent-color);
-  border-radius: 12px;
-  width: min(100%, 700px);
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 
-    0 0 0 2px var(--border-color),
-    0 0 0 4px var(--accent-color),
-    0 8px 0 var(--border-color),
-    0 12px 0 color-mix(in srgb, var(--border-color) 80%, black),
-    0 16px 30px var(--shadow-color),
-    inset 0 0 60px color-mix(in srgb, var(--accent-color) 10%, transparent);
+.pergamino {
+  background: 
+    linear-gradient(135deg, 
+      color-mix(in srgb, var(--accent-color) 15%, var(--bg-secondary)) 0%, 
+      color-mix(in srgb, var(--accent-color) 10%, var(--bg-panel)) 25%, 
+      color-mix(in srgb, var(--accent-color) 18%, var(--bg-secondary)) 50%, 
+      color-mix(in srgb, var(--accent-color) 8%, var(--bg-panel)) 75%, 
+      color-mix(in srgb, var(--accent-color) 12%, var(--bg-secondary)) 100%);
+  border-radius: 4px;
   position: relative;
+  box-shadow: 
+    0 0 0 3px var(--border-color),
+    0 0 0 6px var(--bg-panel),
+    0 8px 0 var(--border-color),
+    0 12px 24px var(--shadow-color),
+    inset 0 0 40px color-mix(in srgb, var(--accent-color) 10%, transparent);
 }
 
-.detail-modal::before {
+.pergamino::before {
   content: '';
   position: absolute;
-  inset: 8px;
-  border: 2px dashed rgba(201, 146, 52, 0.4);
-  border-radius: 6px;
+  inset: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 1px;
   pointer-events: none;
-  z-index: 1;
+  opacity: 0.6;
 }
 
-.detail-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+.pergamino-inner {
   position: relative;
-  z-index: 2;
-  text-shadow: 2px 2px black;
+  padding: 1.75rem;
 }
 
-.summary-item {
-  flex: 1;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
-  padding: 1rem 0.75rem;
+.corner-decor {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.ornament {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.ornament::before {
+  content: '❧';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  color: var(--accent-color);
+  text-shadow: 0 0 3px var(--border-color);
+  opacity: 0.8;
+}
+
+.ornament::after {
+  display: none;
+}
+
+.corner-tl {
+  top: -16px;
+  left: -16px;
+}
+
+.corner-tr {
+  top: -16px;
+  right: -16px;
+}
+
+.corner-bl {
+  bottom: -16px;
+  left: -16px;
+}
+
+.corner-br {
+  bottom: -16px;
+  right: -16px;
+}
+
+.detail-pergamino {
+  width: min(100%, 460px);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.detail-pergamino .pergamino-inner {
+  padding: 1.25rem;
+}
+
+.detail-pergamino .modal-header {
+  text-align: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--bg-panel);
+  position: relative;
+}
+
+.detail-pergamino .header-emblem {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.detail-pergamino .emblem-icon {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 1px 1px var(--border-color));
+}
+
+.detail-pergamino .modal-header h2 {
+  margin: 0;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.2rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+.detail-pergamino .header-line {
+  margin-top: 0.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
+}
+
+.detail-pergamino .pergamino-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
-  box-shadow: 
-    inset 0 0 0 2px rgba(201, 146, 52, 0.15),
-    0 3px 0 var(--border-color);
+  box-shadow: 0 2px 4px var(--shadow-color);
 }
 
-.summary-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 25%, transparent),
-    0 5px 0 var(--border-color),
-    0 8px 15px var(--shadow-color);
+.detail-pergamino .pergamino-close:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
 }
 
-.summary-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  filter: drop-shadow(1px 1px 0 var(--border-color));
-}
-
-.summary-content {
+.detail-pergamino .modal-body {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-  flex: 1;
+  gap: 1rem;
 }
 
-.summary-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  white-space: nowrap;
+.meta-badges {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
-.summary-value {
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  font-family: "Courier New", monospace;
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.total-item {
-  background: linear-gradient(135deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  border-color: var(--success-color);
-  flex: 1.5;
-  box-shadow: 
-    inset 0 0 0 2px color-mix(in srgb, var(--success-color) 30%, white),
-    0 3px 0 color-mix(in srgb, var(--success-color) 50%, black);
-}
-
-.total-item .summary-label,
-.total-item .summary-value {
-  color: var(--text-primary);
-}
-
-.total-value {
-  font-size: 1.15rem !important;
-  text-shadow: 1px 1px 0 color-mix(in srgb, var(--success-color) 50%, black);
-}
-
-.method-badge {
-  display: inline-block;
-  padding: 0.3rem 0.7rem;
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
   border-radius: 20px;
-  font-size: 0.75rem !important;
-  font-weight: 800 !important;
-  text-transform: uppercase;
-  white-space: nowrap;
-  letter-spacing: 0.05em;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.2);
-}
-
-.method-badge.efectivo {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  color: var(--text-primary) !important;
-  border: 2px solid color-mix(in srgb, var(--success-color) 60%, black);
-  width: max-content !important;
-  font-size: 1rem !important;
-}
-
-.method-badge.transfer {
-  background: linear-gradient(180deg, skyblue 0%, var(--infoBlueColor) 100%) !important;
-  color: var(--text-primary) !important;
-  border: 2px solid color-mix(in srgb, var(--infoBlueColor) 60%, black);
-  width: max-content !important;
-  font-size: 1rem !important;
-}
-
-.method-badge.tarjeta {
-  background: linear-gradient(180deg, #ec4899 0%, #db2777 100%);
-  width: max-content !important;
-  color: #ffffff !important;
-  border: 2px solid #be185d;
-  font-size: 1rem !important;
-}
-
-.detail-table-wrap {
-  position: relative;
-  z-index: 2;
-  overflow: auto;
-  border: 3px solid var(--accent-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  max-height: calc(90vh - 220px);
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 2px var(--border-color);
-}
-
-.detail-table-wrap table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 400px;
-}
-
-.detail-table-wrap th,
-.detail-table-wrap td {
-  padding: 0.7rem 0.6rem;
-  border-bottom: 1px solid var(--border-color);
-  text-align: left;
-  font-size: 0.85rem;
-  font-family: "Courier New", monospace;
-}
-
-.detail-table-wrap th {
-  position: sticky;
-  top: 0;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  color: var(--accent-color);
   font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 800;
-  border-bottom: 2px solid var(--accent-color);
+  letter-spacing: 0.05em;
+  border: 2px solid;
 }
 
-.col-producto {
-  width: auto;
-  min-width: 150px;
+.pill-rune {
+  font-size: 0.5rem;
+  opacity: 0.7;
 }
 
-.col-cant,
-.col-unit,
-.col-importe {
-  width: 90px;
-  text-align: right !important;
+.pill-icon {
+  font-size: 0.85rem;
 }
 
-.cell-producto {
-  max-width: 200px;
+.meta-pill.efectivo {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.meta-pill.transfer {
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
+  color: var(--border-color);
+  border-color: var(--border-color);
+}
+
+.meta-pill.tarjeta {
+  background: linear-gradient(180deg, #c71585 0%, #8a1055 100%);
+  color: var(--text-primary);
+  border-color: #5a0a35;
+}
+
+.meta-pill.date-pill {
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.section-title {
+  text-align: center;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.5rem;
+  border-top: 1px solid var(--bg-panel);
+  border-bottom: 1px solid var(--bg-panel);
+}
+
+.items-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.items-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.items-scroll::-webkit-scrollbar-track {
+  background: #d4c4a8;
+  border-radius: 3px;
+}
+
+.items-scroll::-webkit-scrollbar-thumb {
+  background: var(--bg-panel);
+  border-radius: 3px;
+}
+
+.item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.item-card:hover {
+  border-color: var(--accent-color);
+  transform: translateX(3px);
+  box-shadow: 3px 3px 0 var(--border-color);
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.item-bullet {
+  color: var(--accent-color);
+  font-size: 0.6rem;
+}
+
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.item-name {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 600;
 }
 
-.importe {
+.item-calc {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-family: "Courier New", monospace;
+}
+
+.item-price {
+  font-size: 0.9rem;
+  font-weight: bold;
   color: var(--success-color);
-  font-weight: 800;
+  font-family: "Courier New", monospace;
+  white-space: nowrap;
+  margin-left: 0.75rem;
 }
 
-@media (max-width: 768px) {
-  .detail-modal {
-    width: min(100%, 95vw) !important;
-    max-height: 92vh;
-    border-radius: 10px;
-  }
-  
-  .detail-summary {
-    gap: 0.6rem;
-  }
-  
-  .summary-item {
-    min-width: 100px;
-    padding: 0.8rem 0.6rem;
-  }
-  
-  .summary-icon {
-    font-size: 1.3rem;
-  }
-  
-  .summary-label {
-    font-size: 0.7rem;
-  }
-  
-  .summary-value {
-    font-size: 0.85rem;
-  }
-  
-  .total-item {
-    flex-basis: 100%;
-  }
-  
-  .total-value {
-    font-size: 1rem !important;
-  }
-  
-  .detail-table-wrap {
-    max-height: calc(90vh - 200px);
-    font-size: 0.75rem;
-  }
-  
-  .detail-table-wrap th,
-  .detail-table-wrap td {
-    padding: 0.5rem 0.4rem;
-    font-size: 0.75rem;
-  }
-  
-  .col-producto {
-    min-width: 120px;
-  }
-  
-  .col-cant,
-  .col-unit,
-  .col-importe {
-    width: 70px;
-  }
-  
-  .method-badge {
-    font-size: 0.7rem !important;
-    padding: 0.25rem 0.5rem;
-  }
+.total-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
+  border: 3px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 0 0 2px var(--bg-primary),
+    0 4px 0 var(--border-color);
+}
+
+.total-bar-label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  color: var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+}
+
+.total-bar-amount {
+  font-family: 'Courier New', monospace;
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--border-color);
+  text-shadow: 1px 1px 0 var(--bg-primary);
 }
 
 @media (max-width: 480px) {
-  .detail-modal {
-    width: 100vw !important;
-    max-width: 100vw;
-    max-height: 100vh;
-    border-radius: 0;
-    margin: 0;
-    border-width: 3px;
+  .detail-pergamino {
+    width: min(100%, 95vw);
   }
   
-  .detail-modal::before {
-    display: none;
+  .items-scroll {
+    max-height: 250px;
   }
   
-  .detail-summary {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  .summary-item {
-    flex-basis: 100%;
-    padding: 0.75rem;
-  }
-  
-  .total-item {
-    flex-basis: 100%;
-  }
-  
-  .detail-table-wrap {
-    max-height: calc(100vh - 280px);
-    font-size: 0.7rem;
-    border-width: 2px;
-  }
-  
-  .detail-table-wrap th,
-  .detail-table-wrap td {
-    padding: 0.4rem 0.3rem;
-    font-size: 0.7rem;
-  }
-  
-  .col-producto {
-    min-width: 100px;
-  }
-  
-  .col-cant,
-  .col-unit,
-  .col-importe {
-    width: 60px;
-  }
-  
-  .method-badge {
-    font-size: 0.65rem !important;
-    padding: 0.2rem 0.4rem;
+  .total-bar-amount {
+    font-size: 1.3rem;
   }
 }
 
@@ -3399,6 +3593,100 @@ onMounted(() => {
 .card-metric.total p,
 .card-metric.total strong {
   color: var(--bg-primary);
+}
+
+.card-metric.highlight {
+  background: linear-gradient(135deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
+  border: 2px solid var(--zelda-gold);
+}
+
+.card-metric.highlight p,
+.card-metric.highlight strong {
+  color: var(--text-primary);
+}
+
+.salary-config {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.config-header h4 {
+  margin: 0;
+  color: var(--accent-color);
+  font-size: 1rem;
+}
+
+.btn-config {
+  padding: 0.5rem 1rem;
+  background: var(--accent-color);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.btn-config:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.config-row label {
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.config-row input {
+  width: 60px;
+  padding: 0.4rem;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.config-row input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.config-info {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.debug-info {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .btn-cerrar {
@@ -3896,9 +4184,7 @@ onMounted(() => {
 }
 
 .monthly-modal,
-.annual-modal,
-.detail-modal,
-.history-modal {
+.annual-modal {
   width: min(100%, 800px) !important;
   max-height: 85vh !important;
   max-width: 100% !important;
@@ -3908,18 +4194,158 @@ onMounted(() => {
   box-shadow: 0 8px 32px var(--shadow-color) !important;
 }
 
-.annual-modal {
-  width: min(100%, 1100px) !important;
-  max-height: 90vh !important;
-  padding: 1.5rem !important;
+.annual-pergamino {
+  width: min(100%, 1100px);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.detail-modal {
-  width: min(100%, 700px) !important;
+.annual-pergamino .pergamino-inner {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
-.history-modal {
-  width: min(100%, 900px) !important;
+.annual-pergamino .annual-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.annual-header {
+  text-align: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--bg-panel);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.annual-header .header-emblem {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.annual-header .emblem-icon {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 1px 1px var(--border-color));
+}
+
+.annual-header h2 {
+  margin: 0;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.4rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+.annual-header .header-line {
+  margin-top: 0.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
+}
+
+.annual-actions-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.annual-pergamino .papiro-select {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.annual-pergamino .papiro-select:hover {
+  border-color: var(--accent-color);
+}
+
+.refresh-btn {
+  padding: 0.4rem 0.6rem;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  transform: scale(1.1);
+}
+
+.annual-pergamino .pergamino-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.annual-pergamino .pergamino-close:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+}
+
+.annual-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.25rem;
+}
+
+.annual-content-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.annual-content-scroll::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.annual-content-scroll::-webkit-scrollbar-thumb {
+  background: var(--bg-panel);
+  border-radius: 4px;
 }
 
 /* =========================================
@@ -4635,6 +5061,18 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
+@media (max-width: 900px) {
+  .annual-kpis {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .annual-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .kpi-card {
   background: var(--bg-primary);
   border: 2px solid var(--border-color);
@@ -4736,6 +5174,7 @@ onMounted(() => {
 }
 
 .annual-charts-grid {
+  display: grid;
   gap: 1rem;
 }
 
@@ -4745,12 +5184,19 @@ onMounted(() => {
   }
 }
 
+@media (max-width: 600px) {
+  .annual-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chart-card {
   background: var(--bg-primary);
   border: 2px solid var(--border-color);
   border-radius: 12px;
   padding: 1.25rem;
   box-shadow: 0 4px 6px var(--shadow-color);
+  margin-bottom: 0.5rem;
 }
 
 .chart-full {
@@ -4821,7 +5267,6 @@ onMounted(() => {
   background: var(--bg-primary);
   border: 2px solid var(--border-color);
   border-radius: 12px;
-  overflow: hidden;
   box-shadow: 0 4px 6px var(--shadow-color);
 }
 
@@ -4987,6 +5432,174 @@ onMounted(() => {
   gap: 1rem;
 }
 
+.annual-top-products-section {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  box-shadow: 
+    inset 0 0 0 2px var(--border-color),
+    0 6px 0 var(--border-color),
+    0 8px 20px var(--shadow-color);
+}
+
+.top-products-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.triforce-divider {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+.top-products-title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  text-shadow: 2px 2px 0 var(--border-color);
+  font-weight: 800;
+}
+
+.top-products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.top-products-card {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.top-products-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.top-products-card.granel::before {
+  background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+}
+
+.top-products-card.unitarios::before {
+  background: linear-gradient(90deg, #c71585, var(--accent-color));
+}
+
+.card-emblem {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 2px 4px var(--shadow-color));
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.card-subtitle {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+}
+
+.top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.top-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-panel);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.top-item:hover {
+  border-color: var(--accent-color);
+  transform: translateX(2px);
+}
+
+.top-rank {
+  font-size: 1rem;
+  width: 24px;
+  text-align: center;
+}
+
+.top-rank.rank-1 {
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  font-size: 1.2rem;
+}
+
+.top-rank.rank-2 {
+  color: #c0c0c0;
+  font-size: 1.1rem;
+}
+
+.top-rank.rank-3 {
+  color: #cd7f32;
+}
+
+.top-name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-qty {
+  font-size: 0.75rem;
+  color: var(--success-color);
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+}
+
+.triforce-footer {
+  text-align: center;
+  font-size: 1.2rem;
+  margin-top: 1rem;
+  color: var(--accent-color);
+  letter-spacing: 0.5em;
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+@media (max-width: 768px) {
+  .top-products-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .loading-spinner {
   width: 48px;
   height: 48px;
@@ -5050,8 +5663,54 @@ onMounted(() => {
 
 @media (max-width: 600px) {
   .annual-modal {
-    padding: 0.75rem;
-    max-height: 95vh;
+    padding: 0.5rem;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  .annual-modal .modal-content-scroll {
+    max-height: calc(100vh - 60px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .annual-kpis {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .annual-kpis .kpi-card {
+    flex: 1 1 calc(50% - 0.25rem) !important;
+    min-width: 120px !important;
+  }
+
+  .annual-charts-grid {
+    overflow-x: hidden !important;
+  }
+
+  .chart-card {
+    overflow: hidden !important;
+    min-width: 0 !important;
+  }
+
+  .annual-table-section,
+  .annual-products-section {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .months-table-modern {
+    min-width: 300px !important;
+  }
+
+  .products-grid {
+    min-width: 0 !important;
+  }
+  
+  .annual-modal .modal-content-scroll {
+    max-height: calc(100vh - 60px) !important;
   }
   
   .annual-header-modern {
@@ -5833,86 +6492,750 @@ onMounted(() => {
   font-size: 1.1rem;
 }
 
-.history-list {
-  border: var(--border-width-thick) solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  min-height: 260px;
-  max-height: 420px;
-  overflow: auto;
-  box-shadow: var(--shadow-inner) var(--bg-panel);
-  border-radius: 12px;
+.history-pergamino {
+  width: min(100%, 580px);
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.history-item {
-  padding: 0.8rem 1rem;
-  border-bottom: 1px solid var(--border-color);
+.history-pergamino .pergamino-inner {
+  padding: 1.25rem;
   display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.history-pergamino .modal-header {
+  text-align: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--bg-panel);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.history-pergamino .header-emblem {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.history-pergamino .emblem-icon {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 1px 1px var(--border-color));
+}
+
+.history-pergamino .modal-header h2 {
+  margin: 0;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.1rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+.history-pergamino .header-line {
+  margin-top: 0.4rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
+}
+
+.history-pergamino .pergamino-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.history-pergamino .pergamino-close:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+}
+
+.history-pergamino .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.filter-section {
+  flex-shrink: 0;
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.filter-select-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.filter-select-wrap label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.papiro-select {
+  padding: 0.4rem 0.55rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.history-item:hover {
-  background: linear-gradient(90deg, rgba(201, 146, 52, 0.15) 0%, transparent 100%);
+.papiro-select:hover {
+  border-color: var(--accent-color);
 }
 
-.history-item:last-child {
-  border-bottom: none;
+.papiro-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
-.history-item-left {
+.total-scroll-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.7rem;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 var(--border-color);
+}
+
+.scroll-bar-label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.7rem;
+  color: var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: bold;
+}
+
+.scroll-bar-amount {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--border-color);
+  text-shadow: 1px 1px 0 var(--bg-primary);
+}
+
+.entries-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.25rem;
+}
+
+.entries-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.entries-scroll::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.entries-scroll::-webkit-scrollbar-thumb {
+  background: var(--bg-panel);
+  border-radius: 4px;
+}
+
+.empty-text {
+  text-align: center;
+  padding: 2rem;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.scroll-entries {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.scroll-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scroll-entry:hover {
+  border-color: var(--accent-color);
+  transform: translateX(4px);
+  box-shadow: 3px 3px 0 var(--border-color);
+}
+
+.scroll-entry .entry-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.scroll-entry .entry-number {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--border-color);
+}
+
+.scroll-entry .entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.scroll-entry .entry-date {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.metodo-scroll-pill {
+  display: inline-flex;
+  align-items: center;
   gap: 0.2rem;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  width: fit-content;
 }
 
-.ticket-badge {
+.metodo-scroll-pill.efectivo {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
+  color: var(--text-primary);
+}
+
+.metodo-scroll-pill.transfer {
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
+  color: var(--border-color);
+}
+
+.metodo-scroll-pill.tarjeta {
+  background: linear-gradient(180deg, #c71585 0%, #8a1055 100%);
+  color: var(--text-primary);
+}
+
+.scroll-entry .entry-amount {
+  font-family: 'Courier New', monospace;
   font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--accent-color);
+  font-weight: bold;
+  color: var(--success-color);
 }
 
-.history-date {
-  font-size: 0.75rem;
+@media (max-width: 600px) {
+  .history-pergamino {
+    width: min(100%, 95vw);
+    max-height: 90vh;
+  }
+  
+  .filter-row {
+    flex-direction: column;
+  }
+}
+
+.egresos-pergamino {
+  width: min(100%, 520px);
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.egresos-pergamino .pergamino-inner {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.egresos-pergamino .modal-header {
+  text-align: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--bg-panel);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.egresos-pergamino .header-emblem {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 60%, black) 100%);
+  border: 3px solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.egresos-pergamino .emblem-icon {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 1px 1px var(--border-color));
+}
+
+.egresos-pergamino .modal-header h2 {
   margin: 0;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.1rem;
+  color: var(--error-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+.egresos-pergamino .header-line {
+  margin-top: 0.4rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--error-color) 20%, var(--error-color) 80%, transparent);
+}
+
+.egresos-pergamino .pergamino-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.egresos-pergamino .pergamino-close:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+}
+
+.btn-nueva-salida-pergamino {
+  position: absolute;
+  top: 50%;
+  right: 45px;
+  transform: translateY(-50%);
+  padding: 0.3rem 0.7rem;
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 3px 0 var(--border-color);
+}
+
+.btn-nueva-salida-pergamino:hover {
+  filter: brightness(1.15);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.egresos-pergamino .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.egresos-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.25rem;
+}
+
+.egresos-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.egresos-scroll::-webkit-scrollbar-track {
+  background: #d4c4a8;
+  border-radius: 4px;
+}
+
+.egresos-scroll::-webkit-scrollbar-thumb {
+  background: var(--bg-panel);
+  border-radius: 4px;
+}
+
+.egreso-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.egreso-card:hover {
+  border-color: var(--error-color);
+  transform: translateX(4px);
+  box-shadow: 3px 3px 0 var(--border-color);
+}
+
+.egreso-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.egreso-number {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 60%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.egreso-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.egreso-date {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.egreso-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.egreso-user {
+  font-size: 0.65rem;
   color: var(--text-secondary);
 }
 
-.history-item-right {
+.egreso-amount {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--error-color);
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.total-egresos-bar {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.3rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 60%, black) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 3px 0 var(--border-color);
 }
 
-.history-amount {
-  color: var(--success-color);
-  font-family: "Courier New", monospace;
+.total-egresos-label {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: bold;
+}
+
+.total-egresos-amount {
+  font-family: 'Courier New', monospace;
   font-size: 1rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.metodo-badge {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-weight: 600;
+@media (max-width: 520px) {
+  .egresos-pergamino {
+    width: min(100%, 95vw);
+    max-height: 90vh;
+  }
+  
+  .btn-nueva-salida-pergamino {
+    position: static;
+    transform: none;
+    margin-top: 0.5rem;
+    width: 100%;
+  }
 }
 
-.metodo-badge.efectivo {
-  background: color-mix(in srgb, var(--success-color) 20%, transparent);
-  color: var(--success-color);
+.empty {
+  padding: 2rem;
+  text-align: center;
+  font-family: "Courier New", monospace;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
-.metodo-badge.transfer {
-  background: color-mix(in srgb, #54a0ff 20%, transparent);
-  color: #54a0ff;
+@media (max-width: 768px) {
+  .history-modal {
+    width: min(100%, 95vw);
+    max-height: 90vh;
+  }
+  
+  .history-header {
+    padding: 0.85rem 1rem;
+  }
+  
+  .history-title-row h3 {
+    font-size: 1rem;
+  }
+  
+  .history-icon {
+    font-size: 1.3rem;
+  }
+  
+  .history-filters {
+    padding: 0.85rem 1rem;
+  }
+  
+  .filter-row {
+    gap: 0.75rem;
+  }
+  
+  .papiro-select {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .history-scroll {
+    padding: 0.75rem 1rem;
+    max-height: calc(90vh - 165px);
+  }
+  
+  .history-entry {
+    padding: 0.75rem;
+  }
+  
+  .entry-number {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+  
+  .entry-amount {
+    font-size: 0.95rem;
+  }
 }
 
-.metodo-badge.tarjeta {
-  background: color-mix(in srgb, #ec4899 20%, transparent);
-  color: #ec4899;
+@media (max-width: 480px) {
+  .history-modal {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .history-header {
+    padding: 0.75rem;
+  }
+  
+  .history-title-row {
+    gap: 0.4rem;
+  }
+  
+  .history-icon {
+    font-size: 1.2rem;
+  }
+  
+  .history-title-row h3 {
+    font-size: 0.95rem;
+  }
+  
+  .history-filters {
+    padding: 0.75rem;
+  }
+  
+  .filter-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .filter-select-wrap {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .filter-select-wrap label {
+    min-width: 50px;
+    font-size: 0.7rem;
+  }
+  
+  .papiro-select {
+    flex: 1;
+  }
+  
+  .filter-total-papiro {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .total-label {
+    font-size: 0.75rem;
+  }
+  
+  .total-value {
+    font-size: 1rem;
+  }
+  
+  .history-scroll {
+    padding: 0.6rem 0.75rem;
+    max-height: calc(100vh - 170px);
+  }
+  
+  .history-entry {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.65rem;
+  }
+  
+  .entry-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .entry-amount {
+    width: 100%;
+    text-align: right;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .history-header {
+    padding: 0.6rem 0.75rem;
+  }
+  
+  .history-title-row h3 {
+    font-size: 0.85rem;
+  }
+  
+  .filter-total-papiro {
+    padding: 0.4rem 0.6rem;
+  }
+  
+  .total-label {
+    font-size: 0.7rem;
+  }
+  
+  .total-value {
+    font-size: 0.9rem;
+  }
+  
+  .history-entry {
+    padding: 0.55rem;
+  }
+  
+  .entry-number {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+  }
+  
+  .entry-date {
+    font-size: 0.8rem;
+  }
+  
+  .metodo-pill {
+    font-size: 0.65rem;
+  }
+  
+  .entry-amount {
+    font-size: 0.9rem;
+  }
 }
 
 .empty {
@@ -5986,11 +7309,7 @@ th {
   color: var(--text-primary);
 }
 
-.history-item .descripcion {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  margin-top: 0.2rem;
-}
+
 
 .monto-egreso {
   color: var(--error-color) !important;
@@ -6663,8 +7982,23 @@ th {
   }
 
   .annual-content {
-    max-height: calc(92vh - 100px) !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .annual-table-section,
+  .annual-products-section {
+    min-width: 0 !important;
+    overflow-x: auto !important;
+  }
+
+  .months-table-modern {
+    overflow-x: auto !important;
+    min-width: 280px !important;
+  }
+
+  .products-grid {
+    overflow-x: hidden !important;
   }
 }
 </style>

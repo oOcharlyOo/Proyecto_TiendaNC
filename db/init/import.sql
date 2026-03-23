@@ -28,8 +28,11 @@ CREATE TABLE tiendadb.usuarios (
     nombre VARCHAR(255) NOT NULL,
     apellido_p VARCHAR(255) NOT NULL,
     apellido_m VARCHAR(255) NOT NULL,
+    usuario VARCHAR(100) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     id_tipo_usuario INTEGER NOT NULL,
+    avatar TEXT,
+    sueldo_hora DECIMAL(10, 2) DEFAULT 0.00,
 
     CONSTRAINT fk_tipo_usuario
         FOREIGN KEY(id_tipo_usuario) 

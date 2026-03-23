@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import confetti from 'canvas-confetti';
+import SueldoXHoraModal from './modals/SueldoXHoraModal.vue';
 
 type Usuario = {
   idUsuario: number;
@@ -10,6 +11,7 @@ type Usuario = {
   apellido_m: string;
   avatar: string | null;
   id_tipo_usuario: number;
+  sueldo_hora?: number;
 };
 
 type UsuarioForm = {
@@ -73,6 +75,7 @@ const usuarios = ref<Usuario[]>([]);
 const cargando = ref(false);
 const modalAbierto = ref(false);
 const editando = ref(false);
+const modalSueldoAbierto = ref(false);
 
 const seccionActiva = ref<'usuarios' | 'ventas' | 'asistencias'>('usuarios');
 const ventasPorUsuario = ref<UsuarioVentas[]>([]);
@@ -555,6 +558,9 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
         <button class="btn-primary" @click="abrirModalNuevo">
           + Nuevo Usuario
         </button>
+        <button class="btn-secondary" @click="modalSueldoAbierto = true">
+          💰 Sueldos por Hora
+        </button>
       </div>
 
       <div v-if="cargando" class="loading">
@@ -925,6 +931,12 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
       </div>
     </Transition>
   </div>
+
+  <SueldoXHoraModal 
+    :open="modalSueldoAbierto" 
+    @close="modalSueldoAbierto = false"
+    @save="(usuarios) => { cargarUsuarios(); modalSueldoAbierto = false; }"
+  />
 </template>
 
 <style scoped>
