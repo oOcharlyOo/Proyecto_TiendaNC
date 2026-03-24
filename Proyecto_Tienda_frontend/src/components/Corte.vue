@@ -5059,6 +5059,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 @media (max-width: 900px) {
@@ -5174,7 +5175,6 @@ onMounted(() => {
 }
 
 .annual-charts-grid {
-  display: grid;
   gap: 1rem;
 }
 

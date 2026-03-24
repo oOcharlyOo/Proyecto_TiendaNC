@@ -372,6 +372,7 @@ const modalSalidaAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
 const modalGramajeAbierto = ref(false);
 const modalProductoGramaje = ref<Producto | null>(null);
+const gramajeItemEditando = ref<TicketItem | null>(null);
 const modalCobroAbierto = ref(false);
 const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
@@ -1098,6 +1099,24 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   const gramos = Math.max(1, Math.round(payload.gramos));
   const precioUnitario = payload.precioTotal / gramos;
   const items = ticketActual.value!.items;
+
+  if (gramajeItemEditando.value) {
+    const existente = gramajeItemEditando.value;
+    existente.cantidad = gramos;
+    existente.precio = Number.isFinite(precioUnitario) ? precioUnitario : existente.precio;
+    try {
+      await crearDetalleVenta(ticketActual.value.id, existente);
+    } catch (e) {
+      throw e;
+    }
+    gramajeItemEditando.value = null;
+    modalGramajeAbierto.value = false;
+    modalProductoGramaje.value = null;
+    mostrarMensaje(`Actualizado ${gramos}g de ${producto.nombre}.`, 'ok');
+    playSound('add');
+    return;
+  }
+
   const existente = items.find((item) => item.id === producto.id);
 
   if (existente) {
@@ -1131,6 +1150,19 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   playSound('add');
 }
 
+function editarGramajeItem(item: TicketItem) {
+  gramajeItemEditando.value = item;
+  modalProductoGramaje.value = {
+    id: item.id,
+    nombre: item.nombre,
+    precio: item.precio * 1000,
+    codigo_barras: item.codigo_barras ?? null,
+    dto: item.dto,
+    is_gramaje: item.is_gramaje
+  };
+  modalGramajeAbierto.value = true;
+}
+
 function formatoMoneda(valor: number) {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -1158,6 +1190,9 @@ function getMetodoClase(metodo: string | undefined): string {
 function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info') {
   mensaje.value = texto;
   mensajeTipo.value = tipo;
+  setTimeout(() => {
+    mensaje.value = '';
+  }, 1000);
 }
 
 function ocultarSugerencias() {
@@ -1524,6 +1559,14 @@ async function processVoiceCommand(comando: string) {
               {{ formatoMoneda(t.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0)) }}
             </span>
             <span class="chip-status" v-else>vacío</span>
+            <button 
+              v-if="t.items.length === 0 && tickets.length > 1" 
+              type="button" 
+              class="btn-delete-ticket-chip"
+              @click.stop="eliminarTicket(t.id)"
+            >
+              ×
+            </button>
           </div>
         </div>
       </div>
@@ -1552,10 +1595,6 @@ async function processVoiceCommand(comando: string) {
 
         <!-- ÁREA DE PRODUCTOS RÁPIDOS / RESULTADOS -->
       <div class="catalog-grid custom-scrollbar">
-        <div v-if="mensaje" class="pos-alert" :class="`alert-${mensajeTipo}`">
-          {{ mensaje }}
-        </div>
-
         <div class="catalog-items-container">
           <!-- Mostrar todos los productos disponibles -->
           <div v-if="productosParaMostrar.length > 0" class="products-grid">
@@ -1626,9 +1665,13 @@ async function processVoiceCommand(comando: string) {
                 </div>
                 
                 <div class="item-actions">
-                  <div class="qty-control">
+                  <div class="qty-control" v-if="item.is_gramaje">
+                    <button class="qty-btn calc-btn" @click="editarGramajeItem(item)" title="Editar cantidad">🧮</button>
+                    <span class="qty-val">{{ item.cantidad }}g</span>
+                  </div>
+                  <div class="qty-control" v-else>
                     <button class="qty-btn" @click="disminuirCantidad(item)">-</button>
-                    <span class="qty-val">{{ item.cantidad }}{{ item.is_gramaje ? 'g' : '' }}</span>
+                    <span class="qty-val">{{ item.cantidad }}</span>
                     <button class="qty-btn" @click="aumentarCantidad(item)">+</button>
                   </div>
                   <div class="item-subtotal">
@@ -1733,6 +1776,15 @@ async function processVoiceCommand(comando: string) {
 
     <CalculadoraGramajeModal :open="modalGramajeAbierto" :producto="modalProductoGramaje ? { ...modalProductoGramaje, codigo_barras: modalProductoGramaje.codigo_barras ?? '' } : null" @close="modalGramajeAbierto = false; modalProductoGramaje = null" @add="agregarProductoGramaje" />
     <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" />
+
+    <Transition name="toast">
+      <div v-if="mensaje" class="toast-overlay">
+        <div class="toast-card" :class="`toast-${mensajeTipo}`">
+          <span class="toast-icon">{{ mensajeTipo === 'ok' ? '✓' : mensajeTipo === 'error' ? '✕' : 'ℹ' }}</span>
+          <span class="toast-text">{{ mensaje }}</span>
+        </div>
+      </div>
+    </Transition>
 
     <div v-if="scannerActivo" class="scanner-full-overlay">
       <div class="scanner-frame">
@@ -2004,6 +2056,30 @@ async function processVoiceCommand(comando: string) {
     text-transform: uppercase;
   }
   
+  .btn-delete-ticket-chip {
+    width: 12px !important;
+    height: 12px !important;
+    min-width: 12px !important;
+    min-height: 12px !important;
+    padding: 0 !important;
+    background: var(--error-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 50% !important;
+    border: 1px solid var(--border-color) !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: 2px;
+    flex-shrink: 0;
+  }
+  
+  .btn-delete-ticket-chip:active {
+    transform: scale(0.9);
+  }
+  
   .pos-right {
     position: fixed;
     bottom: 0;
@@ -2032,6 +2108,8 @@ async function processVoiceCommand(comando: string) {
   }
   
   .pos-right .checkout-container {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -2181,11 +2259,10 @@ async function processVoiceCommand(comando: string) {
   
   .ticket-items-list {
     flex: 1;
+    min-height: 50px;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    min-height: 30px;
-    max-height: 100px;
     gap: 0.3rem;
   }
   
@@ -3165,6 +3242,16 @@ async function processVoiceCommand(comando: string) {
   color: var(--border-color);
 }
 
+.calc-btn {
+  font-size: 0.9rem;
+  width: 32px;
+}
+
+.calc-btn:hover {
+  background: color-mix(in srgb, var(--success-color) 25%, transparent);
+  color: var(--success-color);
+}
+
 .qty-val { 
   width: 45px; 
   text-align: center; 
@@ -4054,5 +4141,82 @@ async function processVoiceCommand(comando: string) {
 .resize-trigger-active .resize-handle-trigger:active .resize-dots {
   opacity: 1;
   color: var(--accent-color);
+}
+
+.toast-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+}
+
+.toast-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 2px solid;
+  animation: toastPop 0.3s ease-out;
+}
+
+.toast-ok {
+  background: linear-gradient(135deg, #1a4d2e 0%, #2d7a46 100%);
+  color: #ffffff;
+  border-color: #4ade80;
+}
+
+.toast-error {
+  background: linear-gradient(135deg, #4d1a1a 0%, #7a2d2d 100%);
+  color: #ffffff;
+  border-color: #f87171;
+}
+
+.toast-info {
+  background: linear-gradient(135deg, #1a2f4d 0%, #2d4a7a 100%);
+  color: #ffffff;
+  border-color: #60a5fa;
+}
+
+.toast-icon {
+  font-size: 1.2rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+.toast-text {
+  max-width: 300px;
+  text-align: center;
+}
+
+@keyframes toastPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.toast-enter-active {
+  animation: toastPop 0.3s ease-out;
+}
+
+.toast-leave-active {
+  animation: toastPop 0.2s ease-in reverse;
 }
 </style>
