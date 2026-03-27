@@ -1,0 +1,517 @@
+/* ================================================
+   ESTILOS GLOBALES - Inventario.vue
+   Necesita variables CSS de temas
+   ================================================ */
+
+@font-face {
+  font-family: 'HyliaSerif';
+  src: url('/src/assets/fonts/HyliaSerifBeta-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ========== BASE STYLES ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--bg-primary);
+}
+
+body {
+  font-family: 'HyliaSerif', 'Palatino Linotype', 'Book Antiqua', Palatino, 'Courier New', serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+a:hover {
+  filter: brightness(1.08);
+}
+
+button, .btn {
+  border: var(--border-width) solid var(--border-color);
+  padding: 0.7rem 1rem;
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  font-family: 'Courier New', monospace;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  color: var(--btn-text, var(--bg-primary));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white), 0 4px 0 var(--border-color), 0 8px 16px var(--shadow-color);
+  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
+}
+
+button:hover, .btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+}
+
+button:active, .btn:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white), 0 2px 0 var(--border-color);
+}
+
+input, select, textarea {
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-color);
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-hover);
+}
+
+.panel {
+  border: var(--border-width-thick) solid var(--accent-color);
+  box-shadow: inset 0 0 0 2px var(--border-color), 0 4px 0 var(--border-color), 0 8px 12px var(--shadow-color);
+}
+
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.modal-card {
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: var(--border-width-thick) solid var(--accent-color);
+  box-shadow: 0 10px 40px var(--shadow-color);
+}
+
+.modal-header {
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.modal-header h3 {
+  color: var(--accent-color);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th {
+  background: var(--bg-secondary);
+  color: var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
+  font-family: 'HyliaSerif', 'Palatino Linotype', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem;
+}
+
+td {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem;
+}
+
+tr:hover td {
+  background: var(--chart-item-bg);
+}
+
+.badge, .tag {
+  background: var(--accent-color);
+  color: var(--btn-text, var(--bg-primary));
+}
+
+/* ========== STAT CARDS ========== */
+.inventario-layout .stat-card {
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+}
+
+.inventario-layout .stat-card:hover {
+  box-shadow: 0 10px 30px var(--shadow-color);
+}
+
+.inventario-layout .stat-card.warning {
+  border-color: var(--warning-color);
+}
+
+.inventario-layout .stat-card.danger {
+  border-color: var(--error-color);
+}
+
+.inventario-layout .stat-card.gold,
+.inventario-layout .stat-card.success {
+  border-color: var(--accent-color);
+}
+
+.inventario-layout .stat-card.success {
+  border-color: var(--success-color);
+}
+
+.inventario-layout .stat-glow {
+  background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+}
+
+.inventario-layout .stat-value {
+  color: var(--accent-color);
+}
+
+.inventario-layout .stat-card.warning .stat-value { 
+  color: var(--warning-color); 
+}
+
+.inventario-layout .stat-card.danger .stat-value { 
+  color: var(--error-color); 
+}
+
+.inventario-layout .stat-card.gold .stat-value { 
+  color: var(--accent-color); 
+}
+
+.inventario-layout .stat-card.success .stat-value { 
+  color: var(--success-color); 
+}
+
+/* ========== HERO SECTION ========== */
+.inventario-layout .hero-section {
+  background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .hero-title,
+.inventario-layout .hero-decoration {
+  color: var(--accent-color);
+}
+
+.inventario-layout .hero-subtitle {
+  color: var(--text-secondary);
+}
+
+/* ========== ALERT PANELS ========== */
+.inventario-layout .alert-panel {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .alert-header.danger {
+  background: linear-gradient(90deg, var(--error-color) 0%, var(--bg-panel) 100%);
+  border-color: var(--error-color);
+}
+
+.inventario-layout .alert-header.warning {
+  background: linear-gradient(90deg, var(--warning-color) 0%, var(--bg-panel) 100%);
+  border-color: var(--warning-color);
+}
+
+.inventario-layout .alert-header h3 {
+  color: var(--text-primary);
+}
+
+.inventario-layout .alert-header.danger h3 {
+  color: var(--error-color);
+}
+
+.inventario-layout .alert-header.warning h3 {
+  color: var(--warning-color);
+}
+
+.inventario-layout .alert-item.agotado {
+  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+}
+
+.inventario-layout .alert-item.agotado .item-name {
+  color: var(--error-color);
+}
+
+.inventario-layout .alert-item.bajo {
+  background: color-mix(in srgb, var(--warning-color) 12%, transparent);
+}
+
+.inventario-layout .alert-item.bajo .item-name {
+  color: var(--warning-color);
+}
+
+.inventario-layout .item-stock {
+  color: var(--warning-color);
+}
+
+/* ========== CATALOG SECTION ========== */
+.inventario-layout .catalog-section {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .catalog-header {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .catalog-title {
+  color: var(--accent-color);
+}
+
+.inventario-layout .item-count {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .search-input {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.inventario-layout .search-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px var(--accent-color);
+}
+
+.inventario-layout .search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .search-clear:hover {
+  background: var(--error-color);
+  color: var(--text-primary);
+}
+
+.inventario-layout .filter-select {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.inventario-layout .filter-select:focus {
+  border-color: var(--accent-color);
+}
+
+.inventario-layout .toggle-slider {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .toggle-label {
+  color: var(--text-secondary);
+}
+
+/* ========== ITEM CARDS ========== */
+.inventario-layout .item-card {
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .item-card:hover {
+  box-shadow: 0 10px 30px var(--shadow-color);
+}
+
+.inventario-layout .item-card::before {
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+}
+
+.inventario-layout .item-card.bajo {
+  border-color: var(--warning-color);
+}
+
+.inventario-layout .item-card.bajo::before {
+  background: linear-gradient(90deg, transparent, var(--warning-color), transparent);
+}
+
+.inventario-layout .item-card.agotado {
+  border-color: var(--error-color);
+}
+
+.inventario-layout .item-card.agotado::before {
+  background: linear-gradient(90deg, transparent, var(--error-color), transparent);
+}
+
+.inventario-layout .item-card.abundante {
+  border-color: var(--success-color);
+}
+
+.inventario-layout .item-card.abundante::before {
+  background: linear-gradient(90deg, transparent, var(--success-color), transparent);
+}
+
+.inventario-layout .item-id {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.inventario-layout .item-icon-large {
+  background: var(--bg-primary);
+}
+
+.inventario-layout .item-name {
+  color: var(--accent-color);
+}
+
+.inventario-layout .item-stats {
+  background: var(--bg-primary);
+}
+
+.inventario-layout .stat-label {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .stat-value.costo {
+  color: var(--accent-color);
+}
+
+.inventario-layout .stat-value.venta {
+  color: var(--success-color);
+}
+
+.inventario-layout .stat-value.stock.bajo {
+  color: var(--warning-color);
+}
+
+.inventario-layout .stat-value.stock.agotado {
+  color: var(--error-color);
+}
+
+.inventario-layout .stat-value.stock.normal,
+.inventario-layout .stat-value.stock.abundante {
+  color: var(--success-color);
+}
+
+.inventario-layout .stat-value.min {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .stat-divider {
+  background: var(--border-color);
+}
+
+.inventario-layout .stock-row {
+  border-color: var(--border-color);
+}
+
+.inventario-layout .progress-bar {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .progress-fill {
+  background: linear-gradient(90deg, var(--warning-color), var(--accent-color));
+}
+
+.inventario-layout .progress-fill.bajo {
+  background: linear-gradient(90deg, var(--error-color), var(--accent-color));
+}
+
+.inventario-layout .progress-fill.agotado {
+  background: var(--error-color);
+}
+
+.inventario-layout .progress-fill.abundante {
+  background: linear-gradient(90deg, var(--success-color), var(--accent-color));
+}
+
+.inventario-layout .progress-label {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .status-badge.bajo {
+  background: var(--warning-color);
+  color: var(--btn-text, var(--bg-primary));
+}
+
+.inventario-layout .status-badge.agotado {
+  background: var(--error-color);
+  color: var(--text-primary);
+}
+
+.inventario-layout .btn-edit-card {
+  background: var(--accent-color);
+  color: var(--btn-text, var(--bg-primary));
+}
+
+.inventario-layout .btn-edit-card:hover {
+  background: var(--accent-hover);
+}
+
+/* ========== LOADING/EMPTY STATES ========== */
+.inventario-layout .loading-state,
+.inventario-layout .error-state,
+.inventario-layout .empty-state {
+  color: var(--text-secondary);
+}
+
+.inventario-layout .loading-orb {
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+  box-shadow: 0 0 30px var(--accent-color);
+}
+
+/* ========== INFO PANEL ========== */
+.inventario-layout .info-panel {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-color: var(--border-color);
+}
+
+.inventario-layout .info-panel p {
+  color: var(--text-primary);
+}
+
+.inventario-layout .info-detail {
+  color: var(--text-secondary) !important;
+}
+
+/* ========== FOOTER ========== */
+.inventario-layout .inventario-footer {
+  background: linear-gradient(90deg, transparent, var(--bg-secondary), transparent);
+}
+
+.inventario-layout .footer-decoration {
+  color: var(--accent-color);
+}
+
+.inventario-layout .footer-text {
+  color: var(--text-secondary);
+}
+
+/* ========== ALERT MORE ========== */
+.inventario-layout .alert-more {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}

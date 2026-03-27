@@ -1,10 +1,10 @@
 // src/main.ts
 import { createApp } from 'vue';
-import './components/styles/estilos.css';
 import './components/styles/themes.css';
+import './components/styles/inventario.css';
 import App from './App.vue';
-import router from './router'; // Import the router instance
+import router from './router';
 
-const app = createApp(App); // Create the app instance
-app.use(router); // Tell the app to use the router
-app.mount('#app'); // Mount the app
+const app = createApp(App);
+app.use(router);
+app.mount('#app');

@@ -15,3 +15,22 @@ const showNavbar = computed(() => route.name !== 'Login');
     </main>
   </div>
 </template>
+
+<style>
+.app-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.view-shell {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.view-shell > * {
+  height: 100%;
+}
+</style>

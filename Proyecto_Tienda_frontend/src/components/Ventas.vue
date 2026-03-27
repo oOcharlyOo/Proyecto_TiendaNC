@@ -7,6 +7,8 @@ import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import HistorialVentasModal from './modals/HistorialVentasModal.vue';
 import CalculadoraGramajeModal from './modals/CalculadoraGramajeModal.vue';
 import CobroModal from './modals/CobroModal.vue';
+import CarruselPromociones from './modals/CarruselPromociones.vue';
+import CrudPromociones from './modals/CrudPromociones.vue';
 
 let isResizing = false;
 let startY = 0;
@@ -156,16 +158,63 @@ type TicketItem = Producto & {
   cantidad: number;
   idVentaDetalle?: number;
   is_mayoreo?: boolean;
+  is_promocion?: false;
+  promocion?: never;
+};
+
+type TicketItemPromocion = {
+  id: number;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  is_promocion: true;
+  promocion: PromocionDTO;
+  idVentaDetalle?: number;
 };
 
 type Ticket = {
   id: number;
   numero: number;
-  items: TicketItem[];
+  items: (TicketItem | TicketItemPromocion)[];
   estado: 'pendiente' | 'completado';
   creadoEn: number;
   desdeBackend?: boolean;
 };
+
+type PromocionDetalleDTO = {
+  id_detalle: number;
+  id_producto: number;
+  nombre_producto: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+};
+
+type PromocionDTO = {
+  id_promocion: number;
+  nombre: string;
+  descripcion: string;
+  precio_original: number;
+  precio_promocion: number;
+  imagen_url: string | null;
+  detalles: PromocionDetalleDTO[];
+  activa: boolean;
+};
+
+type CrearPromocionDTO = {
+  nombre: string;
+  descripcion: string;
+  precio_promocion: number;
+  imagen_url: string | null;
+  activa: boolean;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  productos: { id_producto: number; cantidad: number }[];
+};
+
+function asAny(item: TicketItem | TicketItemPromocion): any {
+  return item;
+}
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const AUTH_USER_ID_KEY = 'idUsuario';
@@ -384,6 +433,48 @@ const historialVentaSeleccionada = ref<VentaDTO | { idVenta: number; numeroTicke
 const modalDetalleVentaAbierto = ref(false);
 const ticketVisibleMobile = ref(false); 
 const isKeyboardVisible = ref(false);
+const promocionesActivas = ref<PromocionDTO[]>([]);
+const modalPromocionesAbierto = ref(false);
+
+async function cargarPromocionesActivas() {
+  try {
+    promocionesActivas.value = await apiListarPromocionesActivas();
+  } catch (e) {
+    console.error('Error al cargar promociones activas:', e);
+  }
+}
+
+function agregarPromocionAlTicket(promocion: PromocionDTO) {
+  if (!ticketActual.value) {
+    crearNuevoTicket();
+  }
+
+  if (!ticketActual.value) {
+    mostrarMensaje('No se pudo crear el ticket', 'error');
+    return;
+  }
+
+  const items = ticketActual.value.items;
+
+  const promoItem: TicketItemPromocion = {
+    id: -(promocion.id_promocion || Date.now()),
+    nombre: promocion.nombre,
+    precio: Number(promocion.precio_promocion) || 0,
+    cantidad: 1,
+    is_promocion: true,
+    promocion: promocion
+  };
+
+  const existente = items.find(item => (item as any).is_promocion && item.id === promoItem.id);
+  if (existente) {
+    existente.cantidad += 1;
+    mostrarMensaje(`Combo "${promocion.nombre}" agregado al ticket`, 'ok');
+  } else {
+    items.push(promoItem);
+    mostrarMensaje(`Combo "${promocion.nombre}" agregado al ticket`, 'ok');
+  }
+  playSound('add');
+}
 
 function handleResize() {
   isKeyboardVisible.value = window.innerWidth < 768 && window.innerHeight < 500;
@@ -422,7 +513,7 @@ const ticketActual = computed(() => {
 });
 
 const ticket = computed(() => {
-  return ticketActual.value?.items ?? [];
+  return (ticketActual.value?.items ?? []) as (TicketItem | TicketItemPromocion)[];
 });
 
 const totalVenta = computed(() => {
@@ -434,17 +525,17 @@ const totalArticulos = computed(() => {
 });
 
 const tieneProductosGranel = computed(() => {
-  return ticket.value.some(item => item.is_gramaje || item.cantidad > 100);
+  return ticket.value.some(item => (item as any).is_gramaje || item.cantidad > 100);
 });
 
 const tieneProductosUnitarios = computed(() => {
-  return ticket.value.some(item => !item.is_gramaje && item.cantidad <= 100);
+  return ticket.value.some(item => !(item as any).is_gramaje && item.cantidad <= 100);
 });
 
 const totalGramos = computed(() => {
   if (!tieneProductosGranel.value) return 0;
   return ticket.value.reduce((acumulado, item) => {
-    if (item.is_gramaje || item.cantidad > 100) {
+    if ((item as any).is_gramaje || item.cantidad > 100) {
       return acumulado + item.cantidad;
     }
     return acumulado;
@@ -454,7 +545,7 @@ const totalGramos = computed(() => {
 const totalUnitarios = computed(() => {
   if (!tieneProductosUnitarios.value) return 0;
   return ticket.value.reduce((acumulado, item) => {
-    if (!item.is_gramaje && item.cantidad <= 100) {
+    if (!(item as any).is_gramaje && item.cantidad <= 100) {
       return acumulado + item.cantidad;
     }
     return acumulado;
@@ -510,6 +601,7 @@ const sugerenciasPorNombre = computed(() => {
 onMounted(async () => {
   await cargarProductos();
   await cargarTicketsDesdeBackend();
+  await cargarPromocionesActivas();
 });
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -526,6 +618,65 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   return respuesta.json() as Promise<T>;
+}
+
+async function apiListarPromociones(): Promise<PromocionDTO[]> {
+  const response = await getJson<ApiRespuesta<PromocionDTO[]>>(`${API_BASE}/promociones/listarPromociones`);
+  return response?.datos ?? [];
+}
+
+async function apiListarPromocionesActivas(): Promise<PromocionDTO[]> {
+  const response = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/promociones/listarActivas`);
+  const datos = response?.datos ?? [];
+  return datos.map((p: any) => ({
+    id_promocion: p.idPromocion,
+    nombre: p.nombre || '',
+    descripcion: p.descripcion || '',
+    precio_original: Number(p['precio_original']) || 0,
+    precio_promocion: Number(p['precio_promocion']) || 0,
+    imagen_url: p['imagen_url'] || null,
+    activa: p.activa ?? true,
+    fecha_inicio: p.fechaInicio,
+    fecha_fin: p.fechaFin,
+    detalles: (p.detalles || []).map((d: any) => ({
+      id_detalle: d.idDetalle,
+      id_producto: d['id_producto'],
+      nombre_producto: d.nombreProducto || '',
+      cantidad: Number(d.cantidad) || 0,
+      precio_unitario: Number(d.precioUnitario) || 0,
+      subtotal: Number(d.subtotal) || 0
+    }))
+  }));
+}
+
+async function apiCrearPromocion(dto: CrearPromocionDTO): Promise<PromocionDTO | null> {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/crear`, {
+    method: 'POST',
+    body: JSON.stringify(dto)
+  });
+  return response?.datos ?? null;
+}
+
+async function apiActualizarPromocion(id: number, dto: CrearPromocionDTO): Promise<PromocionDTO | null> {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/actualizar/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(dto)
+  });
+  return response?.datos ?? null;
+}
+
+async function apiEliminarPromocion(id: number): Promise<boolean> {
+  const response = await getJson<ApiRespuesta<null>>(`${API_BASE}/promociones/eliminar/${id}`, {
+    method: 'DELETE'
+  });
+  return response?.codigo === 200;
+}
+
+async function apiTogglePromocionActiva(id: number): Promise<PromocionDTO | null> {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/toggleActiva/${id}`, {
+    method: 'PATCH'
+  });
+  return response?.datos ?? null;
 }
 
 function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[] {
@@ -826,7 +977,7 @@ async function crearVenta(idUsuario: number): Promise<VentaDTO> {
   return data.datos;
 }
 
-async function crearDetalleVenta(ventaId: number, item: TicketItem) {
+async function crearDetalleVenta(ventaId: number, item: any) {
   const payload = {
     Venta: { idVenta: ventaId },
     Producto: item.dto,
@@ -894,8 +1045,41 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA
     const montoCobrado = totalVenta.value;
     const ventaId = ticketActual.value.id;
     const numeroTicket = ticketActual.value.numero;
+    const precioPromocionTotal = montoCobrado;
+    const subtotalOriginal = ticketActual.value.items.reduce((sum, item) => {
+      if (item.is_promocion) {
+        return sum + item.promocion.detalles.reduce((s, d) => s + (Number(d.subtotal) || 0), 0);
+      }
+      return sum + (item.precio * item.cantidad);
+    }, 0);
     
-    await Promise.all(ticketActual.value.items.map((item) => crearDetalleVenta(ventaId, item)));
+    const detallesParaGuardar: any[] = [];
+    
+    for (const item of ticketActual.value.items as (TicketItem | TicketItemPromocion)[]) {
+      if ((item as any).is_promocion && (item as any).promocion) {
+        const promo = (item as any).promocion;
+        for (const detalle of promo.detalles) {
+          const cantidad = Number(detalle.cantidad) || 0;
+          const subtotalDetalle = Number(detalle.subtotal) || 0;
+          const precioUnitario = cantidad > 0 ? subtotalDetalle / cantidad : 0;
+          const proporcion = subtotalOriginal > 0 ? subtotalDetalle / subtotalOriginal : 0;
+          const precioAjustado = Math.round((precioPromocionTotal * proporcion / cantidad) * 100) / 100;
+          
+          detallesParaGuardar.push({
+            id: detalle.id_producto,
+            nombre: detalle.nombre_producto || '',
+            dto: { idProducto: detalle.id_producto, nombre: '', precio_venta: Number(detalle.precio_unitario) || 0, codigoBarras: '' },
+            cantidad: cantidad,
+            precio: precioAjustado,
+            is_gramaje: cantidad < 1000
+          });
+        }
+      } else {
+        detallesParaGuardar.push(item);
+      }
+    }
+    
+    await Promise.all(detallesParaGuardar.map((item) => crearDetalleVenta(ventaId, item)));
     await completarVenta(ventaId, metodoPago, montoCobrado);
     const numeroTicketVenta = numeroTicket ? ` Ticket #${numeroTicket}.` : '';
     
@@ -1586,6 +1770,7 @@ async function processVoiceCommand(comando: string) {
               @keydown.enter.prevent="agregarDesdeBuscador"
             >
             <div class="action-tools">
+              <button class="tool-btn btn-promo" @click="modalPromocionesAbierto = true" title="Gestionar Promociones">⚔</button>
               <button class="tool-btn btn-scan" @click="startScanner" title="Escanear">📷</button>
               <button class="tool-btn btn-mic" :class="{ 'is-recording': isRecording }" @mousedown.prevent="startVoiceCommand">🎤</button>
             </div>
@@ -1596,6 +1781,12 @@ async function processVoiceCommand(comando: string) {
         <!-- ÁREA DE PRODUCTOS RÁPIDOS / RESULTADOS -->
       <div class="catalog-grid custom-scrollbar">
         <div class="catalog-items-container">
+          <div class="carousel-wrapper" v-if="promocionesActivas.length > 0 && !terminoBusqueda">
+            <CarruselPromociones
+              :promociones="promocionesActivas"
+              @agregar="agregarPromocionAlTicket"
+            />
+          </div>
           <!-- Mostrar todos los productos disponibles -->
           <div v-if="productosParaMostrar.length > 0" class="products-grid">
             <article 
@@ -1651,30 +1842,41 @@ async function processVoiceCommand(comando: string) {
         <!-- LISTA DE ITEMS EN EL TICKET -->
         <div class="ticket-items-list custom-scrollbar">
           <TransitionGroup name="list">
-            <article v-for="item in ticket" :key="item.id" class="ticket-item-row">
+            <article v-for="item in ticket" :key="item.id" class="ticket-item-row" :class="{ 'is-promo': asAny(item).is_promocion }">
               <div class="item-main">
                 <div class="item-info">
-                  <h4 class="item-name">{{ item.nombre }}</h4>
-                  <div class="item-meta">
+                  <h4 class="item-name">
+                    <span v-if="asAny(item).is_promocion" class="promo-badge">❧</span>
+                    {{ item.nombre }}
+                  </h4>
+                  <div class="item-meta" v-if="asAny(item).is_promocion">
+                    <span class="promo-contents">{{ asAny(item).promocion.detalles.map((d: any) => `${d.cantidad >= 1000 ? (d.cantidad / 1000) + 'kg' : d.cantidad + 'pza'} ${d.nombre_producto}`).join(', ') }}</span>
+                  </div>
+                  <div class="item-meta" v-else>
                     <span class="unit-price">{{ formatoMoneda(item.precio) }}</span>
-                    <label v-if="item.precio_mayoreo && item.precio_mayoreo > 0" class="mayoreo-toggle">
-                      <input type="checkbox" :checked="item.is_mayoreo" @change="toggleMayoreo(item)">
+                    <label v-if="asAny(item).precio_mayoreo && asAny(item).precio_mayoreo > 0" class="mayoreo-toggle">
+                      <input type="checkbox" :checked="asAny(item).is_mayoreo" @change="toggleMayoreo(asAny(item))">
                       <span>Mayoreo</span>
                     </label>
                   </div>
                 </div>
                 
                 <div class="item-actions">
-                  <div class="qty-control" v-if="item.is_gramaje">
-                    <button class="qty-btn calc-btn" @click="editarGramajeItem(item)" title="Editar cantidad">🧮</button>
+                  <div class="qty-control" v-if="asAny(item).is_gramaje">
+                    <button class="qty-btn calc-btn" @click="editarGramajeItem(asAny(item))" title="Editar cantidad">🧮</button>
                     <span class="qty-val">{{ item.cantidad }}g</span>
                   </div>
-                  <div class="qty-control" v-else>
-                    <button class="qty-btn" @click="disminuirCantidad(item)">-</button>
+                  <div class="qty-control" v-else-if="!asAny(item).is_promocion">
+                    <button class="qty-btn" @click="disminuirCantidad(asAny(item))">-</button>
                     <span class="qty-val">{{ item.cantidad }}</span>
-                    <button class="qty-btn" @click="aumentarCantidad(item)">+</button>
+                    <button class="qty-btn" @click="aumentarCantidad(asAny(item))">+</button>
                   </div>
-                  <div class="item-subtotal">
+                  <div v-else class="qty-control promo-qty">
+                    <button class="qty-btn" @click="disminuirCantidad(asAny(item))">-</button>
+                    <span class="qty-val">{{ item.cantidad }}</span>
+                    <button class="qty-btn" @click="aumentarCantidad(asAny(item))">+</button>
+                  </div>
+                  <div class="item-subtotal" :class="{ 'promo-price': asAny(item).is_promocion }">
                     {{ formatoMoneda(item.precio * item.cantidad) }}
                   </div>
                 </div>
@@ -1776,6 +1978,7 @@ async function processVoiceCommand(comando: string) {
 
     <CalculadoraGramajeModal :open="modalGramajeAbierto" :producto="modalProductoGramaje ? { ...modalProductoGramaje, codigo_barras: modalProductoGramaje.codigo_barras ?? '' } : null" @close="modalGramajeAbierto = false; modalProductoGramaje = null" @add="agregarProductoGramaje" />
     <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" />
+    <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />
 
     <Transition name="toast">
       <div v-if="mensaje" class="toast-overlay">
@@ -2166,24 +2369,37 @@ async function processVoiceCommand(comando: string) {
   }
   
   .input-wrapper {
-    padding: 0.25rem 0.4rem;
-    gap: 0.25rem;
+    padding: 0.25rem 0.35rem;
+    gap: 0.2rem;
     border-radius: 6px;
+    flex-wrap: nowrap;
+    overflow: hidden;
   }
   
   .input-wrapper input {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+    min-width: 0;
+    flex: 1;
   }
   
   .search-icon {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+  
+  .action-tools {
+    display: flex;
+    gap: 0.15rem;
+    flex-shrink: 0;
   }
   
   .tool-btn {
-    width: 28px;
-    height: 28px;
-    font-size: 0.8rem;
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
     border-radius: 5px;
+    border-width: 1px;
+    flex-shrink: 0;
   }
   
   /* Grid de productos - 2 columnas compactas */
@@ -2338,6 +2554,473 @@ async function processVoiceCommand(comando: string) {
   .cashier-badge {
     font-size: 0.5rem;
     padding-top: 0.2rem;
+  }
+}
+
+/* =========================================
+   PANTALLAS MUY PEQUEÑAS (iPhone SE - 375x667)
+   ========================================= */
+@media (max-width: 375px) {
+  .pos-container {
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+   
+  /* Barra de tickets compacta */
+  .tickets-bar-mobile {
+    padding: 0.2rem 0.15rem;
+    min-height: 36px;
+  }
+  
+  .tickets-bar-scroll {
+    gap: 0.2rem;
+  }
+  
+  .btn-add-ticket-mini {
+    min-width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+  }
+  
+  .ticket-chip {
+    min-width: 32px;
+    height: 30px;
+    padding: 0.15rem 0.3rem;
+    border-radius: 5px;
+  }
+  
+  .chip-num {
+    font-size: 0.55rem;
+  }
+  
+  .chip-total, .chip-status {
+    font-size: 0.35rem;
+  }
+  
+  /* Catalog header ultra pequeño */
+  .catalog-header {
+    padding: 0.3rem;
+  }
+  
+  .input-wrapper {
+    padding: 0.2rem 0.3rem;
+    gap: 0.15rem;
+    border-radius: 6px;
+    border-width: 1px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  
+  .input-wrapper input {
+    font-size: 0.7rem;
+    min-width: 0;
+    flex: 1;
+  }
+  
+  .input-wrapper input::placeholder {
+    font-size: 0.55rem;
+  }
+  
+  .search-icon {
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+  
+  .action-tools {
+    display: flex;
+    gap: 0.1rem;
+    flex-shrink: 0;
+  }
+  
+  .tool-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border-width: 1px;
+    flex-shrink: 0;
+  }
+  
+  /* Grid de productos - columnas compactas */
+  .catalog-grid {
+    padding: 0.3rem;
+  }
+  
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.25rem;
+  }
+  
+  .product-card {
+    padding: 0.25rem;
+    border-radius: 6px;
+    gap: 0.15rem;
+    border-width: 1px;
+  }
+  
+  .product-icon {
+    font-size: 1.2rem;
+  }
+  
+  .product-name {
+    font-size: 0.55rem;
+    height: auto;
+    line-height: 1.1;
+  }
+  
+  .product-price-tag {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 6px;
+    border-width: 1px;
+  }
+  
+  .stock-badge {
+    font-size: 0.4rem;
+    padding: 0.05rem 0.15rem;
+  }
+  
+  /* Panel derecho ultra compacto */
+  .pos-right {
+    height: 50dvh;
+  }
+  
+  .mobile-ticket-trigger {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    min-height: 32px;
+  }
+  
+  .trigger-info {
+    gap: 0.25rem;
+  }
+  
+  .trigger-info .icon {
+    font-size: 0.75rem;
+  }
+  
+  .trigger-total {
+    font-size: 0.85rem;
+  }
+  
+  .chevron {
+    font-size: 0.7rem;
+  }
+  
+  /* Checkout container */
+  .checkout-container {
+    padding: 0.4rem;
+  }
+  
+  .checkout-header {
+    padding: 0.2rem;
+    margin-bottom: 0.2rem;
+  }
+  
+  .header-title h3 {
+    font-size: 0.7rem;
+  }
+  
+  .header-title .icon {
+    font-size: 0.8rem;
+  }
+  
+  .header-title {
+    gap: 0.2rem;
+  }
+  
+  .btn-clear-all {
+    font-size: 0.5rem;
+    padding: 0.1rem 0.3rem;
+    border-width: 1px;
+  }
+  
+  /* Ticket items ultra compactos */
+  .ticket-items-list {
+    flex: 1;
+    min-height: 40px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.2rem;
+    padding-right: 0.2rem;
+  }
+  
+  .ticket-item-row {
+    padding: 0.25rem;
+    border-width: 1px;
+    border-radius: 6px;
+  }
+  
+  .item-name {
+    font-size: 0.6rem;
+    padding-right: 1.2rem;
+  }
+  
+  .item-meta {
+    font-size: 0.5rem;
+    gap: 0.2rem;
+  }
+  
+  .unit-price {
+    font-size: 0.5rem;
+  }
+  
+  .mayoreo-toggle {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.3rem;
+    gap: 0.2rem;
+  }
+  
+  .qty-control {
+    transform: scale(0.55);
+    border-width: 1px;
+  }
+  
+  .qty-btn {
+    width: 20px;
+    height: 20px;
+    font-size: 0.8rem;
+  }
+  
+  .qty-val {
+    width: 30px;
+    font-size: 0.7rem;
+  }
+  
+  .item-subtotal {
+    font-size: 0.6rem;
+  }
+  
+  .btn-remove-item {
+    width: 16px;
+    height: 16px;
+    font-size: 0.8rem;
+    top: 4px;
+    right: 4px;
+  }
+  
+  .promo-contents {
+    font-size: 0.5rem;
+    max-width: 120px;
+  }
+  
+  /* Checkout footer */
+  .checkout-footer {
+    padding-top: 0.3rem;
+    gap: 0.3rem;
+  }
+  
+  .summary-row {
+    font-size: 0.55rem;
+  }
+  
+  .summary-row.total {
+    font-size: 0.9rem;
+    padding-top: 0.2rem;
+    margin-top: 0.2rem;
+  }
+  
+  .total-amount {
+    font-size: 0.9rem;
+  }
+  
+  .checkout-actions-scroll {
+    padding: 0.2rem 0.1rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary {
+    height: 32px;
+    font-size: 0.6rem;
+    min-width: 90px;
+    border-radius: 5px;
+    padding: 0 0.4rem;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--border-color);
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary .icon {
+    font-size: 0.7rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary .text {
+    display: none;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary::after {
+    content: 'Cobrar';
+    font-size: 0.6rem;
+  }
+  
+  .checkout-actions-scroll .extra-actions {
+    gap: 0.2rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.secondary {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--border-color);
+  }
+  
+  .cashier-badge {
+    font-size: 0.45rem;
+    padding: 0.15rem 0.4rem;
+    margin-top: 0.2rem;
+  }
+  
+  /* Carrusel de promociones ultra compacto */
+  .promo-carousel {
+    padding: 0.4rem;
+    margin: 0.25rem;
+    border-width: 2px;
+    border-radius: 10px;
+  }
+  
+  .hero-section {
+    gap: 0.4rem;
+  }
+  
+  .hero-icon {
+    font-size: 1rem;
+  }
+  
+  .hero-title {
+    font-size: 0.75rem;
+  }
+  
+  .hero-subtitle {
+    display: none;
+  }
+  
+  .hero-decor {
+    font-size: 0.8rem;
+  }
+  
+  .card-inner {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .card-image {
+    width: 70px;
+  }
+  
+  .image-placeholder {
+    font-size: 1.5rem;
+  }
+  
+  .placeholder-text {
+    display: none;
+  }
+  
+  .promo-name {
+    font-size: 0.8rem;
+  }
+  
+  .promo-description {
+    display: none;
+  }
+  
+  .products-title {
+    font-size: 0.6rem;
+  }
+  
+  .products-list {
+    gap: 0.15rem;
+  }
+  
+  .product-item {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.3rem;
+    gap: 0.3rem;
+  }
+  
+  .product-qty {
+    min-width: 30px;
+    font-size: 0.55rem;
+  }
+  
+  .price-original {
+    display: none;
+  }
+  
+  .price-promo-container {
+    padding: 0.2rem 0.5rem;
+  }
+  
+  .price-promo {
+    font-size: 0.9rem;
+  }
+  
+  .btn-agregar {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.6rem;
+    gap: 0.25rem;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--border-color);
+  }
+  
+  .btn-icon {
+    font-size: 0.8rem;
+  }
+  
+  .btn-text {
+    display: none;
+  }
+  
+  .btn-agregar::after {
+    content: 'Agregar';
+  }
+  
+  .btn-decor {
+    display: none;
+  }
+  
+  .carousel-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .carousel-btn.prev {
+    left: -4px;
+  }
+  
+  .carousel-btn.next {
+    right: -4px;
+  }
+  
+  .card-badge-container {
+    top: -6px;
+    right: -6px;
+  }
+  
+  .card-badge {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.55rem;
+    border-width: 2px;
+  }
+  
+  .carousel-footer {
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+  }
+  
+  .carousel-dots {
+    gap: 0.3rem;
+  }
+  
+  .dot {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .carousel-counter {
+    font-size: 0.6rem;
   }
 }
 
@@ -2499,33 +3182,70 @@ async function processVoiceCommand(comando: string) {
   gap: 0.5rem;
   margin-bottom: 1.5rem;
   text-align: center;
+  position: relative;
+}
+
+.sidebar-header::before {
+  content: '❧';
+  position: absolute;
+  top: -10px;
+  font-size: 1.2rem;
+  color: var(--accent-color);
+  opacity: 0.4;
+  animation: float 3s ease-in-out infinite;
 }
 
 .sidebar-header h3 { 
   font-size: 0.7rem; 
   text-transform: uppercase; 
-  color: var(--text-secondary); 
+  color: var(--accent-color);
+  font-family: 'HyliaSerifBeta', serif;
+  letter-spacing: 0.1em;
+  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 .btn-add-ticket {
   width: 50px;
   height: 50px;
   border-radius: 12px;
-  border: var(--border-width) solid var(--accent-color);
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
-  color: var(--border-color);
+  border: 3px solid var(--accent-color);
+  background: linear-gradient(180deg, var(--accent-color) 0%, #92400e 100%);
+  color: var(--bg-primary);
   font-size: 1.6rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  box-shadow: var(--shadow-outer) var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-add-ticket::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.btn-add-ticket:hover::before {
+  left: 100%;
 }
 
 .btn-add-ticket:hover { 
-  transform: scale(1.1); 
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 var(--border-color);
   filter: brightness(1.1);
+}
+
+.btn-add-ticket:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--border-color);
 }
 
 .tickets-list {
@@ -2649,7 +3369,75 @@ async function processVoiceCommand(comando: string) {
 }
 
 .catalog-header {
-  padding: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(to bottom, var(--bg-secondary), var(--bg-primary));
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.pos-hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.pos-hero-section::after {
+  content: '❧';
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2rem;
+  color: var(--accent-color);
+  opacity: 0.3;
+}
+
+.hero-decorations {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.deco-left, .deco-right {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  opacity: 0.5;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.deco-center {
+  font-size: 2rem;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px var(--accent-color)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 15px var(--accent-color)); transform: scale(1.05); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.catalog-header {
+  padding: 1rem 1.5rem;
   background: linear-gradient(to bottom, var(--bg-secondary), var(--bg-primary));
   border-bottom: var(--border-width) solid var(--border-color);
 }
@@ -2732,6 +3520,12 @@ async function processVoiceCommand(comando: string) {
   background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%); 
   color: var(--text-primary);
   animation: pulse 1.5s infinite; 
+}
+
+.btn-promo:hover {
+  background: linear-gradient(135deg, var(--accent-color) 0%, #92400e 100%);
+  border-color: var(--accent-color);
+  color: var(--bg-primary);
 }
 
 @keyframes pulse {
@@ -2962,6 +3756,7 @@ async function processVoiceCommand(comando: string) {
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
   box-sizing: border-box;
+  border: 2px solid var(--border-color);
 }
 
 @media (max-width: 767px) {
@@ -2975,11 +3770,14 @@ async function processVoiceCommand(comando: string) {
 .product-card:hover {
   transform: translateY(-5px);
   border-color: var(--accent-color);
-  box-shadow: 0 8px 20px var(--shadow-color), var(--shadow-inner) var(--accent-color);
+  box-shadow: 
+    0 8px 20px var(--shadow-color),
+    0 0 30px color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .product-card:active {
   transform: translateY(-2px);
+  box-shadow: 0 4px 10px var(--shadow-color);
 }
 
 .card-glow {
@@ -2991,9 +3789,23 @@ async function processVoiceCommand(comando: string) {
   pointer-events: none;
 }
 
-.product-card:hover .card-glow { opacity: 0.08; }
+.product-card:hover .card-glow { opacity: 0.15; }
 
-.product-icon { font-size: 2.5rem; }
+.product-icon { 
+  font-size: 2.5rem; 
+  filter: drop-shadow(2px 2px 0 var(--shadow-color));
+  transition: transform 0.2s;
+}
+
+.product-card:hover .product-icon {
+  transform: scale(1.1);
+  animation: bounce-icon 0.5s ease;
+}
+
+@keyframes bounce-icon {
+  0%, 100% { transform: scale(1.1) translateY(0); }
+  50% { transform: scale(1.1) translateY(-5px); }
+}
 
 .product-name { 
   font-size: 0.9rem; 
@@ -3001,16 +3813,21 @@ async function processVoiceCommand(comando: string) {
   line-height: 1.2; 
   height: 2.2rem; 
   overflow: hidden;
+  color: var(--text-primary);
+  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 .product-price-tag {
-  background: color-mix(in srgb, var(--success-color) 20%, transparent);
-  color: var(--success-color);
+  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  color: white;
   padding: 0.3rem 0.9rem;
   border-radius: 20px;
   font-weight: bold;
   font-size: 1rem;
-  border: 2px solid var(--success-color);
+  border: 2px solid #4ade80;
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+  font-family: "Courier New", monospace;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .stock-badge {
@@ -3019,8 +3836,8 @@ async function processVoiceCommand(comando: string) {
   border-radius: 4px;
   font-weight: bold;
 }
-.in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--success-color); }
-.low-stock { background: color-mix(in srgb, var(--error-color) 20%, transparent); color: var(--error-color); }
+.in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--success-color); border: 1px solid var(--success-color); }
+.low-stock { background: color-mix(in srgb, var(--error-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
 
 /* =========================================
    RIGHT PANEL: CHECKOUT
@@ -3101,14 +3918,29 @@ async function processVoiceCommand(comando: string) {
   padding-bottom: 0.6rem;
   border-bottom: 2px dashed var(--border-color);
   flex-shrink: 0;
+  position: relative;
+}
+
+.checkout-header::before {
+  content: '❧';
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  color: var(--accent-color);
+  opacity: 0.4;
+  background: var(--bg-secondary);
+  padding: 0 0.5rem;
 }
 
 .header-title { display: flex; align-items: center; gap: 0.4rem; }
 .header-title h3 { 
-  font-family: 'HyliaSerif', serif; 
+  font-family: 'HyliaSerifBeta', serif; 
   color: var(--accent-color); 
   font-size: 1.1rem;
   text-shadow: 2px 2px 0 var(--border-color);
+  letter-spacing: 0.05em;
 }
 
 @media (max-width: 991px) {
@@ -3124,17 +3956,26 @@ async function processVoiceCommand(comando: string) {
 .btn-clear-all {
   font-size: 0.7rem;
   font-weight: bold;
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  background: linear-gradient(180deg, var(--error-color) 0%, #991b1b 100%);
   border: 2px solid var(--border-color);
-  color: var(--text-primary);
+  color: white;
   padding: 0.3rem 0.7rem;
   border-radius: 6px;
   cursor: pointer;
   text-transform: uppercase;
+  box-shadow: 0 3px 0 var(--border-color);
+  transition: all 0.2s;
 }
 
 .btn-clear-all:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--border-color);
   filter: brightness(1.1);
+}
+
+.btn-clear-all:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .ticket-items-list {
@@ -3149,8 +3990,8 @@ async function processVoiceCommand(comando: string) {
 }
 
 .ticket-item-row {
-  background: var(--bg-primary);
-  border: var(--border-width) solid var(--border-color);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border: 2px solid var(--border-color);
   border-radius: 10px;
   padding: 0.7rem;
   position: relative;
@@ -3160,7 +4001,45 @@ async function processVoiceCommand(comando: string) {
 
 .ticket-item-row:hover { 
   border-color: var(--accent-color); 
-  box-shadow: var(--shadow-inner) color-mix(in srgb, var(--accent-color) 30%, transparent);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-color) 20%, transparent);
+  transform: translateX(3px);
+}
+
+.ticket-item-row.is-promo {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)) 100%);
+  border-color: var(--accent-color);
+  border-width: 2px;
+}
+
+.ticket-item-row.is-promo .item-name {
+  color: var(--accent-color);
+}
+
+.promo-badge {
+  margin-right: 0.3rem;
+  font-size: 1rem;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.promo-contents {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+.promo-qty {
+  opacity: 0.7;
+}
+
+.promo-price {
+  color: var(--success-color);
+  font-weight: bold;
+  font-family: "Courier New", monospace;
 }
 
 .item-main { 
@@ -3177,6 +4056,7 @@ async function processVoiceCommand(comando: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 .item-meta { 
   display: flex; 
@@ -3185,7 +4065,7 @@ async function processVoiceCommand(comando: string) {
   font-size: 0.75rem; 
   flex-wrap: wrap;
 }
-.unit-price { color: var(--text-secondary); font-size: 0.7rem; }
+.unit-price { color: var(--text-secondary); font-size: 0.7rem; font-family: "Courier New", monospace; }
 
 .mayoreo-toggle {
   display: flex;
@@ -3198,6 +4078,12 @@ async function processVoiceCommand(comando: string) {
   background: color-mix(in srgb, var(--accent-color) 15%, transparent);
   padding: 0.2rem 0.6rem;
   border-radius: 4px;
+  border: 1px solid var(--accent-color);
+  transition: all 0.2s;
+}
+
+.mayoreo-toggle:hover {
+  background: color-mix(in srgb, var(--accent-color) 25%, transparent);
 }
 
 .mayoreo-toggle input {
@@ -3218,6 +4104,7 @@ async function processVoiceCommand(comando: string) {
   border-radius: 6px;
   overflow: hidden;
   border: 2px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--shadow-color);
 }
 
 .qty-btn {
@@ -3239,7 +4126,8 @@ async function processVoiceCommand(comando: string) {
 
 .qty-btn:active {
   background: var(--accent-color);
-  color: var(--border-color);
+  color: var(--bg-primary);
+  transform: scale(0.95);
 }
 
 .calc-btn {
@@ -3256,13 +4144,16 @@ async function processVoiceCommand(comando: string) {
   width: 45px; 
   text-align: center; 
   font-size: 0.85rem; 
-  font-weight: bold; 
+  font-weight: bold;
+  font-family: "Courier New", monospace;
 }
 
 .item-subtotal { 
   font-weight: 900; 
   color: var(--success-color); 
-  font-size: 0.95rem; 
+  font-size: 0.95rem;
+  font-family: "Courier New", monospace;
+  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 /* Media queries para items del ticket en panel derecho */
@@ -3360,6 +4251,63 @@ async function processVoiceCommand(comando: string) {
   flex-direction: column;
   gap: 0.8rem;
   flex-shrink: 0;
+  position: relative;
+}
+
+.checkout-footer::before {
+  content: '⚔';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9rem;
+  color: var(--accent-color);
+  opacity: 0.4;
+  background: var(--bg-secondary);
+  padding: 0 0.75rem;
+}
+
+.empty-ticket-msg {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.empty-ticket-msg p {
+  margin: 0;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.empty-ticket-icon {
+  font-size: 3rem;
+  opacity: 0.4;
+  animation: float 3s ease-in-out infinite;
+}
+
+.empty-catalog {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.empty-catalog p {
+  margin: 0;
+  font-style: italic;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  opacity: 0.3;
+  animation: float 3s ease-in-out infinite;
 }
 
 .summary-table { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -3367,6 +4315,7 @@ async function processVoiceCommand(comando: string) {
   display: flex; 
   justify-content: space-between; 
   font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 .summary-row.total {
   font-size: 1.4rem;
@@ -3374,12 +4323,28 @@ async function processVoiceCommand(comando: string) {
   border-top: 2px solid var(--border-color);
   padding-top: 0.4rem;
   margin-top: 0.3rem;
+  position: relative;
 }
+
+.summary-row.total::before {
+  content: '❧';
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  opacity: 0.5;
+  background: var(--bg-secondary);
+  padding: 0 0.5rem;
+}
+
 .total-amount { 
-  font-family: 'HyliaSerif', monospace; 
+  font-family: 'HyliaSerifBeta', serif; 
   font-weight: 900; 
   color: var(--success-color);
-  text-shadow: 1px 1px 0 var(--border-color);
+  text-shadow: 2px 2px 0 var(--border-color);
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 991px) {
@@ -3411,11 +4376,68 @@ async function processVoiceCommand(comando: string) {
   min-width: 140px;
   height: 42px;
   white-space: nowrap;
+  background: linear-gradient(180deg, var(--success-color) 0%, #166534 100%);
+  border: 3px solid #4ade80;
+  box-shadow: 0 4px 0 var(--border-color);
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.checkout-actions-scroll .btn-checkout.primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.checkout-actions-scroll .btn-checkout.primary:hover::before {
+  left: 100%;
+}
+
+.checkout-actions-scroll .btn-checkout.primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 var(--border-color);
+  filter: brightness(1.1);
+}
+
+.checkout-actions-scroll .btn-checkout.primary:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--border-color);
+}
+
+.checkout-actions-scroll .btn-checkout.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .checkout-actions-scroll .extra-actions {
   display: flex;
   gap: 0.4rem;
+}
+
+.checkout-actions-scroll .extra-actions .btn-checkout.secondary {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 3px 0 var(--border-color);
+  transition: all 0.2s;
+}
+
+.checkout-actions-scroll .extra-actions .btn-checkout.secondary:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--border-color);
+}
+
+.checkout-actions-scroll .extra-actions .btn-checkout.secondary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .checkout-actions-scroll .btn-checkout.secondary {
@@ -3513,7 +4535,7 @@ async function processVoiceCommand(comando: string) {
 }
 
 .cashier-badge {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -3521,6 +4543,10 @@ async function processVoiceCommand(comando: string) {
   gap: 0.4rem;
   margin-top: 0.5rem;
   font-weight: bold;
+  background: var(--bg-primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
 }
 .cashier-badge .dot { 
   width: 8px; 
@@ -3528,6 +4554,12 @@ async function processVoiceCommand(comando: string) {
   background: var(--success-color);
   border-radius: 50%;
   box-shadow: 0 0 8px var(--success-color);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
 }
 
 /* =========================================

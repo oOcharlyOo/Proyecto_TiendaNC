@@ -1305,16 +1305,16 @@ function getChartOptions(productosList: ProductoVendido[]) {
     },
     plugins: {
       legend: {
-        display: !isSmall,
-        position: 'top' as const,
-        labels: {
-          color: textColor,
-          font: { size: fontSize }
-        }
+        display: false
       },
       tooltip: {
         titleFont: { size: fontSize + 1 },
         bodyFont: { size: fontSize },
+        backgroundColor: 'rgba(30, 30, 40, 0.95)',
+        borderColor: 'var(--accent-color)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
         callbacks: {
           label: (context: any) => {
             const producto = productosList[context.dataIndex];
@@ -1331,7 +1331,7 @@ function getChartOptions(productosList: ProductoVendido[]) {
       x: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(255, 255, 255, 0.05)'
+          color: 'rgba(255, 255, 255, 0.08)'
         },
         ticks: {
           color: textColor,
@@ -1601,19 +1601,19 @@ const cortePieChartOptions = computed(() => {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    cutout: '55%',
     plugins: {
       legend: {
-        position: isSmall ? 'bottom' as const : 'right' as const,
-        labels: {
-          color: textColor,
-          padding: isSmall ? 8 : isMedium ? 12 : 18,
-          font: { size: fontSize },
-          boxWidth: isSmall ? 10 : isMedium ? 12 : 18
-        }
+        display: false
       },
       tooltip: {
         titleFont: { size: fontSize + 1 },
         bodyFont: { size: fontSize },
+        backgroundColor: 'rgba(30, 30, 40, 0.95)',
+        borderColor: 'var(--accent-color)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
         callbacks: {
           label: (context: any) => {
             const label = context.label || '';
@@ -2113,6 +2113,18 @@ async function cancelarApartado(id: number) {
   }
 }
 
+function getRankIcon(index: number): string {
+  const icons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
+  return icons[index] || (index + 1).toString();
+}
+
+function getRankClass(index: number): string {
+  if (index === 0) return 'gold';
+  if (index === 1) return 'silver';
+  if (index === 2) return 'bronze';
+  return '';
+}
+
 onMounted(() => {
   if (idUsuario.value <= 0) {
     mostrarMensaje('No se encontro idUsuario en sesion. Algunas acciones pueden fallar.', 'info');
@@ -2124,138 +2136,264 @@ onMounted(() => {
   <main class="corte-layout">
     <div class="bg-fog"></div>
     <div class="bg-scanlines"></div>
-    <div class="bg-stars" aria-hidden="true">
-      <span class="bg-star"></span>
-      <span class="bg-star"></span>
-      <span class="bg-star"></span>
-      <span class="bg-star"></span>
-      <span class="bg-star"></span>
-      <span class="bg-star"></span>
-    </div>
-    <div class="bg-particles" aria-hidden="true">
-      <span class="bg-particle"></span>
-      <span class="bg-particle"></span>
-      <span class="bg-particle"></span>
-      <span class="bg-particle"></span>
-    </div>
-    <section class="panel panel-main">
-      <header class="header-corte">
-        <h1> Corte de Caja 💰  </h1>
-        <p>Genera reporte del corte, consulta dia, mes e historial de ventas.</p>
-      </header>
+    
+    <header class="hero-section">
+      <div class="hero-decoration left">❧</div>
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="title-icon">💰</span>
+          Corte de Caja
+          <span class="title-icon">⚔</span>
+        </h1>
+        <p class="hero-subtitle">Gestión de tesoro y cierre del día</p>
+      </div>
+      <div class="hero-decoration right">❧</div>
+    </header>
 
-      <p v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">{{ mensaje }}</p>
+    <p v-if="mensaje" class="estado" :class="`estado-${mensajeTipo}`">{{ mensaje }}</p>
 
-      <div class="sign-grid" :class="{ 'solo-corte': !esAdministrador }">
-        <button class="wood-sign btn-icono-only" :disabled="cargandoCorte" @click="generarCorte">
-          <span class="btn-icono">🧾</span>
-          <span class="btn-texto">{{ cargandoCorte ? 'Calculando...' : 'Corte de Caja' }}</span>
+    <section class="stats-section">
+      <div class="stat-card-wrapper" v-for="(stat, index) in [
+        { label: 'Total Ventas', value: corteActual ? formatoMoneda(corteActual.totalVentas) : '$0.00', icon: '💵', clase: 'gold' },
+        { label: 'Efectivo', value: formatoMoneda(ventasEfectivo), icon: '💰', clase: 'success' },
+        { label: 'Transferencia', value: formatoMoneda(ventasTransferencia), icon: '📱', clase: '' },
+        { label: 'Tarjeta', value: formatoMoneda(ventasTarjeta), icon: '💳', clase: '' },
+        { label: 'Tickets', value: totalTicketsDia, icon: '🧾', clase: '' }
+      ]" :key="index" :class="['stat-card', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
+        <div class="stat-glow"></div>
+        <div class="stat-icon-wrapper">
+          <span class="stat-icon">{{ stat.icon }}</span>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">{{ stat.label }}</span>
+          <span class="stat-value">{{ stat.value }}</span>
+        </div>
+        <div class="stat-decoration">✦</div>
+      </div>
+    </section>
+
+    <section class="actions-section">
+      <h2 class="section-title">
+        <span>⚔</span> Acciones del Reino <span>⚔</span>
+      </h2>
+      <div class="actions-grid" :class="{ 'solo-corte': !esAdministrador }">
+        <button class="action-btn primary" :disabled="cargandoCorte" @click="generarCorte">
+          <span class="action-icon">🧾</span>
+          <span class="action-text">{{ cargandoCorte ? 'Calculando...' : 'Corte de Caja' }}</span>
         </button>
-        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="modalDiarioAbierto = true">
-          <span class="btn-icono">📅</span>
-          <span class="btn-texto">Reporte Diario</span>
+        <button v-if="esAdministrador" class="action-btn" @click="modalDiarioAbierto = true">
+          <span class="action-icon">📅</span>
+          <span class="action-text">Reporte Diario</span>
         </button>
-        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="modalMensualAbierto = true">
-          <span class="btn-icono">🌙</span>
-          <span class="btn-texto">Reporte Mensual</span>
+        <button v-if="esAdministrador" class="action-btn" @click="modalMensualAbierto = true">
+          <span class="action-icon">🌙</span>
+          <span class="action-text">Reporte Mensual</span>
         </button>
-        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="abrirHistorialVentas">
-          <span class="btn-icono">📜</span>
-          <span class="btn-texto">Historial</span>
+        <button v-if="esAdministrador" class="action-btn" @click="abrirHistorialVentas">
+          <span class="action-icon">📜</span>
+          <span class="action-text">Historial</span>
         </button>
-        <button v-if="esAdministrador" class="wood-sign btn-icono-only" @click="abrirModalApartados">
-          <span class="btn-icono">🏦</span>
-          <span class="btn-texto">Apartados</span>
+        <button v-if="esAdministrador" class="action-btn" @click="abrirModalApartados">
+          <span class="action-icon">🏦</span>
+          <span class="action-text">Apartados</span>
         </button>
-        <button v-if="esAdministrador" class="wood-sign btn-icono-only" :disabled="cargandoAnual" @click="generarReporteAnual">
-          <span class="btn-icono">🧮</span>
-          <span class="btn-texto">{{ cargandoAnual ? 'Cargando...' : 'Reporte Anual' }}</span>
+        <button v-if="esAdministrador" class="action-btn" :disabled="cargandoAnual" @click="generarReporteAnual">
+          <span class="action-icon">🧮</span>
+          <span class="action-text">{{ cargandoAnual ? 'Cargando...' : 'Reporte Anual' }}</span>
         </button>
       </div>
+    </section>
 
-      <section v-if="mostrarReporte && corteActual" class="reporte-wrap">
-        <h2>{{ reporteTitulo }}</h2>
+    <section v-if="mostrarReporte && corteActual" class="reporte-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span>📊</span> {{ reporteTitulo }} <span>📊</span>
+        </h2>
+      </div>
 
-        <div class="cards-grid">
-          <article class="card-metric"><p>Fecha</p><strong>{{ formatoFecha(corteActual.fechaCorte) }}</strong></article>
-          <article class="card-metric"><p>Cajero</p><strong>{{ nombreUsuario }}</strong></article>
-          <article class="card-metric"><p>Horas Trabajadas</p><strong>{{ corteActual.horasTrabajadas || horasTrabajadas }}</strong></article>
-          <article class="card-metric"><p>Monto Inicial</p><strong>{{ formatoMoneda(corteActual.montoInicial) }}</strong></article>
-          <article class="card-metric"><p>Ventas Efectivo</p><strong>{{ formatoMoneda(ventasEfectivo) }}</strong></article>
-          <article class="card-metric"><p>Ventas Tarjeta</p><strong>{{ formatoMoneda(ventasTarjeta) }}</strong></article>
-          <article class="card-metric"><p>Ventas Transferencia</p><strong>{{ formatoMoneda(ventasTransferencia) }}</strong></article>
-          <article class="card-metric"><p>Tickets Dia</p><strong>{{ totalTicketsDia }}</strong></article>
-          <article class="card-metric"><p>Total Ventas</p><strong>{{ formatoMoneda(corteActual.totalVentas) }}</strong></article>
-          <article class="card-metric"><p>Otras Entradas</p><strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong></article>
-          <article class="card-metric"><p>Total Egresos</p><strong class="clickable" @click="abrirModalEgresos">{{ formatoMoneda(corteActual.totalEgresos) }}</strong></article>
-          <article class="card-metric"><p>Apartado ({{ nombreApartadoActivo }})</p><strong class="clickable" @click="abrirModalApartados">{{ formatoMoneda(totalApartarDiario) }}</strong></article>
-          <article class="card-metric"><p>Ganancia Bruta</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaTotal) }}</strong></article>
-          <article class="card-metric"><p>💰 Apartar para Sueldo</p><strong>{{ formatoMonedaRedonda(dineroApartarDiario) }}</strong></article>
-          <article class="card-metric highlight"><p>Ganancia Neta</p><strong>{{ formatoMonedaRedonda(corteActual.gananciaNeta) }}</strong></article>
-          <article class="card-metric total"><p>Saldo Final Calculado</p><strong>{{ formatoMoneda(corteActual.saldoFinalCalculado) }}</strong></article>
-        </div>
-
-        <div class="corte-pie-chart" v-if="cortePieChartData.labels && cortePieChartData.labels.length > 0">
-          <h4>Distribución del Día</h4>
-          <div class="pie-chart-container">
-            <Pie :data="cortePieChartData" :options="cortePieChartOptions" />
+      <div class="reporte-grid">
+        <div class="reporte-card main-card">
+          <div class="card-header">
+            <span class="card-icon">💎</span>
+            <h3>Ganancia Neta</h3>
           </div>
-        </div>
-
-        <div v-if="productosUnitariosDiario.length > 0 || productosGranelDiario.length > 0" class="top-products-chart">
-          <div class="chart-header-toggle">
-            <h4>🏆 Top Productos</h4>
-            <div class="toggle-buttons-Zelda">
-              <button 
-                :class="{ active: tipoGraficaDiaria === 'unitario' }" 
-                @click="tipoGraficaDiaria = 'unitario'"
-              >📦 Unitarios</button>
-              <button 
-                :class="{ active: tipoGraficaDiaria === 'gramaje' }" 
-                @click="tipoGraficaDiaria = 'gramaje'"
-              >⚖️ Granel</button>
-            </div>
+          <div class="card-value highlight">
+            {{ formatoMonedaRedonda(corteActual.gananciaNeta) }}
           </div>
-
-          <div v-if="tipoGraficaDiaria === 'unitario'">
-            <div v-if="productosUnitariosDiario.length > 0">
-              <div class="chart-container">
-                <Bar :data="chartDataDiarioUnitarios" :options="chartOptionsDiarioUnitarios" />
-              </div>
-              <div class="product-summary">
-                <div v-for="(producto, index) in productosUnitariosDiario" :key="`diario-u-${producto.nombre}`" class="product-summary-item">
-                  <span class="summary-rank">{{ index + 1 }}</span>
-                  <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
-                  <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-                  <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
-                </div>
-              </div>
+          <div class="card-details">
+            <div class="detail-row">
+              <span>Ganancia Bruta:</span>
+              <strong>{{ formatoMonedaRedonda(corteActual.gananciaTotal) }}</strong>
             </div>
-            <div v-else class="empty">Sin productos unitarios vendidos en este día.</div>
-          </div>
-
-          <div v-if="tipoGraficaDiaria === 'gramaje'">
-            <div v-if="productosGranelDiario.length > 0">
-              <div class="chart-container">
-                <Bar :data="chartDataDiarioGranel" :options="chartOptionsDiarioGranel" />
-              </div>
-              <div class="product-summary">
-                <div v-for="(producto, index) in productosGranelDiario" :key="`diario-g-${producto.nombre}`" class="product-summary-item">
-                  <span class="summary-rank">{{ index + 1 }}</span>
-                  <span class="summary-name" :title="producto.nombre">{{ producto.nombre }}</span>
-                  <span class="summary-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-                  <span class="summary-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
-                </div>
-              </div>
+            <div class="detail-row">
+              <span>Apartar Sueldo:</span>
+              <strong class="warning">{{ formatoMonedaRedonda(dineroApartarDiario) }}</strong>
             </div>
-            <div v-else class="empty">Sin productos a granel vendidos en este día.</div>
           </div>
         </div>
 
-        <button v-if="mostrarCerrarTurno" class="btn-cerrar" type="button" :disabled="cargandoCerrarTurno" @click="cerrarTurno">
-          {{ cargandoCerrarTurno ? 'Cerrando...' : '🔒 Cerrar Turno' }}
+        <div class="reporte-card">
+          <div class="card-header">
+            <span class="card-icon">🏦</span>
+            <h3>Saldo Final</h3>
+          </div>
+          <div class="card-value">
+            {{ formatoMoneda(corteActual.saldoFinalCalculado) }}
+          </div>
+          <div class="card-details">
+            <div class="detail-row">
+              <span>Monto Inicial:</span>
+              <strong>{{ formatoMoneda(corteActual.montoInicial) }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>Otras Entradas:</span>
+              <strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="reporte-card clickable" @click="abrirModalEgresos">
+          <div class="card-header">
+            <span class="card-icon">📉</span>
+            <h3>Egresos</h3>
+          </div>
+          <div class="card-value danger">
+            {{ formatoMoneda(corteActual.totalEgresos) }}
+          </div>
+          <div class="card-details">
+            <span class="click-hint">Toca para ver detalles</span>
+          </div>
+        </div>
+
+        <div class="reporte-card" v-if="nombreApartadoActivo" @click="abrirModalApartados">
+          <div class="card-header">
+            <span class="card-icon">🏪</span>
+            <h3>{{ nombreApartadoActivo }}</h3>
+          </div>
+          <div class="card-value">
+            {{ formatoMoneda(totalApartarDiario) }}
+          </div>
+          <div class="card-details">
+            <span class="click-hint">Toca para ver apartados</span>
+          </div>
+        </div>
+
+        <div class="reporte-card">
+          <div class="card-header">
+            <span class="card-icon">👤</span>
+            <h3>Cajero</h3>
+          </div>
+          <div class="card-value">
+            {{ nombreUsuario }}
+          </div>
+          <div class="card-details">
+            <div class="detail-row">
+              <span>Horas:</span>
+              <strong>{{ corteActual.horasTrabajadas || horasTrabajadas }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-section" v-if="cortePieChartData.labels && cortePieChartData.labels.length > 0">
+        <div class="chart-panel">
+          <div class="panel-header">
+            <div class="panel-ornament left">❧</div>
+            <div class="panel-title">
+              <span class="panel-icon">📈</span>
+              <h3>Distribución del Día</h3>
+            </div>
+            <div class="panel-ornament right">❧</div>
+          </div>
+          
+          <div class="chart-content">
+            <div class="pie-wrapper">
+              <div class="pie-chart-container">
+                <Pie :data="cortePieChartData" :options="cortePieChartOptions" />
+              </div>
+              <div class="pie-center">
+                <span class="pie-center-icon">💎</span>
+                <span class="pie-center-label">Total</span>
+                <span class="pie-center-value">{{ formatoMoneda(corteActual?.totalVentas || 0) }}</span>
+              </div>
+            </div>
+            
+            <div class="chart-legend">
+              <div v-for="(label, index) in cortePieChartData.labels" :key="label" class="legend-item" :style="{ animationDelay: `${index * 0.1}s` }">
+                <div class="legend-color" :style="{ background: cortePieChartData.datasets[0].backgroundColor[index] }"></div>
+                <span class="legend-label">{{ label }}</span>
+                <span class="legend-value">{{ formatoMoneda(cortePieChartData.datasets[0].data[index]) }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="panel-footer">
+            <div class="footer-ornament">⏣</div>
+            <span class="footer-text">Datos del tesoro del día</span>
+            <div class="footer-ornament">⏣</div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="productosUnitariosDiario.length > 0 || productosGranelDiario.length > 0" class="products-section">
+        <div class="products-panel">
+          <div class="panel-header">
+            <div class="panel-ornament left">🏆</div>
+            <div class="panel-title">
+              <h3>Top Productos del Día</h3>
+            </div>
+            <div class="panel-ornament right">⚔</div>
+          </div>
+          
+          <div class="toggle-buttons">
+            <button :class="{ active: tipoGraficaDiaria === 'unitario' }" @click="tipoGraficaDiaria = 'unitario'">
+              📦 Unitarios
+            </button>
+            <button :class="{ active: tipoGraficaDiaria === 'gramaje' }" @click="tipoGraficaDiaria = 'gramaje'">
+              ⚖️ Granel
+            </button>
+          </div>
+
+          <div v-if="tipoGraficaDiaria === 'unitario' && productosUnitariosDiario.length > 0" class="chart-wrapper">
+            <div class="bar-chart-container">
+              <Bar :data="chartDataDiarioUnitarios" :options="chartOptionsDiarioUnitarios" />
+            </div>
+          </div>
+          <div v-if="tipoGraficaDiaria === 'gramaje' && productosGranelDiario.length > 0" class="chart-wrapper">
+            <div class="bar-chart-container">
+              <Bar :data="chartDataDiarioGranel" :options="chartOptionsDiarioGranel" />
+            </div>
+          </div>
+
+          <div class="products-list">
+            <div v-for="(producto, index) in (tipoGraficaDiaria === 'unitario' ? productosUnitariosDiario : productosGranelDiario)" :key="`prod-${producto.nombre}`" class="product-item">
+              <div class="product-rank" :class="getRankClass(index)">
+                {{ getRankIcon(index) }}
+              </div>
+              <div class="product-info">
+                <span class="product-name">{{ producto.nombre }}</span>
+                <span class="product-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+              </div>
+              <div class="product-amount">
+                {{ formatoMonedaRedondeada(producto.montoTotal) }}
+              </div>
+            </div>
+          </div>
+          
+          <div class="panel-footer">
+            <div class="footer-ornament">⏣</div>
+            <span class="footer-text">Ranking de heroes del día</span>
+            <div class="footer-ornament">⏣</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="close-shift-section" v-if="mostrarCerrarTurno">
+        <button class="btn-cerrar-turno" type="button" :disabled="cargandoCerrarTurno" @click="cerrarTurno">
+          <span class="btn-icon">🔒</span>
+          <span class="btn-text">{{ cargandoCerrarTurno ? 'Cerrando...' : 'Cerrar Turno' }}</span>
         </button>
-      </section>
+      </div>
     </section>
 
     <div v-if="modalDiarioAbierto" class="modal-overlay" @click.self="modalDiarioAbierto = false">
@@ -2928,71 +3066,73 @@ onMounted(() => {
   width: 100%;
   padding: 1rem;
   background: var(--bg-primary);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  position: relative;
-  z-index: 1;
-}
-
-.panel-main {
-  flex: 1;
-  min-height: 0;
-  padding: 1.25rem;
-  grid-template-rows: auto auto auto 1fr;
   gap: 1rem;
-  overflow: auto;
-  position: relative;
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: 0 8px 30px var(--shadow-color);
-  animation: fadeSlideIn 400ms ease-out;
-}
-
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(-15px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.panel-main::before {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 25%, transparent);
-  pointer-events: none;
-  border-radius: 12px;
-}
-
-.header-corte {
   position: relative;
   z-index: 1;
-  text-align: center;
-  padding-bottom: 0.5rem;
 }
 
-.header-corte h1 {
-  font-size: clamp(1.3rem, 4vw, 1.8rem);
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 900;
-  margin: 0 0 0.4rem 0;
+.hero-section {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
+  gap: 1rem;
+  padding: 1rem;
+  position: relative;
 }
 
-.header-corte h1::before {
-  content: "💰";
-  font-size: 1.4rem;
+.hero-decoration {
+  font-size: 2rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--accent-color);
+  animation: pulse 2s ease-in-out infinite;
 }
 
-.header-corte p {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+.hero-decoration.left {
+  transform: rotate(-15deg);
+}
+
+.hero-decoration.right {
+  transform: rotate(15deg);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.hero-decoration.left { animation-delay: 0s; }
+.hero-decoration.right { animation-delay: 0.5s; }
+
+.hero-content {
+  text-align: center;
+}
+
+.hero-title {
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  color: var(--accent-color);
+  text-shadow: 3px 3px 0 var(--border-color), 0 0 20px var(--accent-color);
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.title-icon {
+  font-size: 1.5em;
+}
+
+.hero-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  font-style: italic;
 }
 
 .estado { 
@@ -3004,6 +3144,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  text-align: center;
 }
 
 .estado-ok { 
@@ -3024,151 +3165,932 @@ onMounted(() => {
   border: 1px solid rgba(201, 146, 52, 0.4);
 }
 
-.sign-grid {
+.stats-section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  position: relative;
-  z-index: 1;
-  max-width: 600px;
-  margin: 0 auto;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 0 0.5rem;
 }
 
-.sign-grid.solo-corte {
+.stat-card-wrapper {
+  animation: fadeSlideIn 400ms ease-out backwards;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card {
+  position: relative;
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color), 0 6px 12px var(--shadow-color);
+  text-align: center;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--border-color), 0 8px 16px var(--shadow-color);
+}
+
+.stat-card.gold {
+  border-color: var(--accent-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-color) 20%, var(--bg-primary)) 100%);
+}
+
+.stat-card.success {
+  border-color: var(--success-color);
+}
+
+.stat-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.stat-card:hover .stat-glow {
+  opacity: 0.05;
+}
+
+.stat-icon-wrapper {
+  margin-bottom: 0.4rem;
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+  filter: drop-shadow(0 2px 4px var(--shadow-color));
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.stat-card.gold .stat-value {
+  color: var(--accent-color);
+}
+
+.stat-card.success .stat-value {
+  color: var(--success-color);
+}
+
+.stat-decoration {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.6rem;
+  color: var(--accent-color);
+  opacity: 0.5;
+}
+
+.actions-section {
+  padding: 0 0.5rem;
+}
+
+.section-title {
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: 1.1rem;
+  color: var(--accent-color);
+  text-align: center;
+  margin: 0 0 0.75rem 0;
+  text-shadow: 2px 2px 0 var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.actions-grid.solo-corte {
   grid-template-columns: 1fr;
   max-width: 300px;
   margin: 0 auto;
 }
 
-.wood-sign {
-  border: var(--border-width) solid var(--border-color);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.8rem 0.6rem;
-  box-shadow: 0 4px 15px var(--shadow-color);
-  transition: all 0.2s;
+.action-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  padding: 1rem 0.5rem;
   border-radius: 12px;
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color), 0 6px 12px var(--shadow-color);
+  cursor: pointer;
+  transition: all 0.2s;
   color: var(--text-primary);
 }
 
-.wood-sign:hover {
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 var(--border-color), 0 10px 20px var(--shadow-color);
+  border-color: var(--accent-color);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--border-color);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn.primary {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  border-color: var(--accent-color);
+}
+
+.action-icon {
+  font-size: 1.8rem;
+}
+
+.action-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .hero-decoration {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  
+  .action-btn {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .action-icon {
+    font-size: 1.5rem;
+  }
+  
+  .action-text {
+    font-size: 0.65rem;
+  }
+}
+
+.reporte-section {
+  padding: 0 0.5rem 1rem;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.reporte-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.reporte-card {
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color), 0 6px 12px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.reporte-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--border-color), 0 8px 16px var(--shadow-color);
+}
+
+.reporte-card.main-card {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-color) 15%, var(--bg-primary)) 100%);
+  border-color: var(--accent-color);
+}
+
+.reporte-card.clickable {
+  cursor: pointer;
+}
+
+.reporte-card.clickable:hover {
+  border-color: var(--accent-color);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-icon {
+  font-size: 1.2rem;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  margin-bottom: 0.5rem;
+}
+
+.card-value.highlight {
+  color: var(--accent-color);
+  font-size: 1.6rem;
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+.card-value.danger {
+  color: var(--error-color);
+}
+
+.card-details {
+  font-size: 0.75rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row span {
+  color: var(--text-secondary);
+}
+
+.detail-row strong {
+  color: var(--text-primary);
+}
+
+.detail-row strong.warning {
+  color: var(--warning-color);
+}
+
+.click-hint {
+  color: var(--accent-color);
+  font-style: italic;
+  font-size: 0.7rem;
+}
+
+.chart-section {
+  margin: 1rem 0;
+}
+
+.chart-panel {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 50%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 0 0 2px var(--border-color),
+    0 6px 0 var(--border-color),
+    0 10px 20px var(--shadow-color),
+    inset 0 0 30px color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 20%, var(--bg-secondary)) 0%, var(--bg-secondary) 100%);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.panel-ornament {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--accent-color);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.panel-ornament.left {
+  transform: rotate(-15deg);
+}
+
+.panel-ornament.right {
+  transform: rotate(15deg);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-icon {
+  font-size: 1.5rem;
+}
+
+.panel-title h3 {
+  margin: 0;
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: 1.3rem;
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chart-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1.5rem;
+}
+
+.pie-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pie-chart-container {
+  width: 280px;
+  height: 280px;
+  position: relative;
+  z-index: 1;
+}
+
+.pie-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 50%;
+  box-shadow: 
+    0 0 0 3px var(--border-color),
+    0 4px 8px var(--shadow-color),
+    inset 0 0 15px color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
+.pie-center-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.pie-center-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.pie-center-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  line-height: 1.1;
+  max-width: 95px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 180px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  transition: all 0.2s;
+  animation: fadeSlideIn 400ms ease-out backwards;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateX(-15px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.legend-item:hover {
+  transform: translateX(5px);
+  border-color: var(--accent-color);
+  box-shadow: 0 3px 0 var(--accent-color);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.legend-label {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.legend-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--success-color);
+  font-family: 'Courier New', monospace;
+}
+
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)) 100%);
+  border-top: 2px dashed var(--border-color);
+}
+
+.footer-ornament {
+  font-size: 1rem;
+  color: var(--accent-color);
+}
+
+.footer-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 600px) {
+  .chart-content {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem;
+  }
+  
+  .pie-chart-container {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .pie-center {
+    width: 85px;
+    height: 85px;
+  }
+  
+  .pie-center-icon {
+    font-size: 1.2rem;
+  }
+  
+  .pie-center-label {
+    font-size: 0.5rem;
+  }
+  
+  .pie-center-value {
+    font-size: 0.75rem;
+    max-width: 80px;
+  }
+  
+  .chart-legend {
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 400px) {
+  .panel-ornament {
+    display: none;
+  }
+  
+  .pie-chart-container {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .pie-center {
+    width: 75px;
+    height: 75px;
+  }
+  
+  .pie-center-icon {
+    font-size: 1rem;
+  }
+  
+  .pie-center-label {
+    font-size: 0.5rem;
+  }
+  
+  .pie-center-value {
+    font-size: 0.7rem;
+    max-width: 70px;
+  }
+}
+
+.products-section {
+  margin: 1rem 0;
+}
+
+.products-panel {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 50%, var(--bg-secondary) 100%);
+  border: 3px solid var(--accent-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 0 0 2px var(--border-color),
+    0 6px 0 var(--border-color),
+    0 10px 20px var(--shadow-color),
+    inset 0 0 30px color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.products-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 20%, var(--bg-secondary)) 0%, var(--bg-secondary) 100%);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.products-panel .panel-ornament {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--accent-color);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.products-panel .panel-title h3 {
+  margin: 0;
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: 1.3rem;
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.products-panel .toggle-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem;
+  justify-content: center;
+}
+
+.products-panel .toggle-buttons button {
+  padding: 0.6rem 1.5rem;
+  border-radius: 10px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+  font-size: 0.85rem;
+  box-shadow: 0 3px 0 var(--border-color);
+}
+
+.products-panel .toggle-buttons button.active {
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--accent-color) 50%, black);
+}
+
+.products-panel .toggle-buttons button:hover:not(.active) {
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+.chart-wrapper {
+  padding: 0 1rem;
+}
+
+.bar-chart-container {
+  height: 220px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  padding: 0.75rem;
+  box-shadow: inset 0 2px 8px var(--shadow-color);
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.products-panel .product-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.products-panel .product-item:hover {
+  border-color: var(--accent-color);
+  transform: translateX(5px);
+  box-shadow: 0 4px 0 var(--accent-color);
+}
+
+.products-panel .product-rank {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border: 2px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.products-panel .product-rank.gold {
+  background: linear-gradient(135deg, #ffd700, #ffb700);
+  color: #1a1a1a;
+  border-color: #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.products-panel .product-rank.silver {
+  background: linear-gradient(135deg, #c0c0c0, #a8a8a8);
+  color: #1a1a1a;
+  border-color: #c0c0c0;
+  box-shadow: 0 0 10px rgba(192, 192, 192, 0.4);
+}
+
+.products-panel .product-rank.bronze {
+  background: linear-gradient(135deg, #cd7f32, #a0522d);
+  color: #1a1a1a;
+  border-color: #cd7f32;
+  box-shadow: 0 0 8px rgba(205, 127, 50, 0.4);
+}
+
+.products-panel .product-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.products-panel .product-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.products-panel .product-qty {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.products-panel .product-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--success-color);
+  font-family: 'Courier New', monospace;
+  text-align: right;
+}
+
+.products-panel .panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)) 100%);
+  border-top: 2px dashed var(--border-color);
+}
+
+@media (max-width: 600px) {
+  .products-panel .panel-title h3 {
+    font-size: 1.1rem;
+  }
+  
+  .bar-chart-container {
+    height: 180px;
+  }
+  
+  .products-list {
+    max-height: 280px;
+  }
+  
+  .products-panel .product-item {
+    padding: 0.7rem;
+    gap: 0.75rem;
+  }
+  
+  .products-panel .product-rank {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+  
+  .products-panel .product-name {
+    font-size: 0.85rem;
+  }
+  
+  .products-panel .product-amount {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .products-panel .toggle-buttons button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+  
+  .bar-chart-container {
+    height: 160px;
+  }
+}
+
+.close-shift-section {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px dashed var(--border-color);
+}
+
+.btn-cerrar-turno {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  border: 3px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--border-color), 0 6px 12px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.btn-cerrar-turno:hover:not(:disabled) {
   filter: brightness(1.1);
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px var(--shadow-color);
+  box-shadow: 0 7px 0 var(--border-color), 0 10px 20px var(--shadow-color);
 }
 
-.wood-sign:active {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px var(--shadow-color);
+.btn-cerrar-turno:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--border-color);
 }
 
-.wood-sign:disabled {
+.btn-cerrar-turno:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-  transform: none;
 }
 
-.wood-sign .btn-icono {
+.btn-icon {
   font-size: 1.3rem;
 }
 
-.wood-sign .btn-texto {
-  font-size: 0.7rem;
-  font-family: "Courier New", monospace;
-}
-
-@media (min-width: 1024px) {
-  .wood-sign.btn-icono-only {
-    padding: 1.5rem 1.2rem;
-    min-height: 120px;
-    border-radius: 16px;
-  }
-
-  .wood-sign.btn-icono-only .btn-icono {
-    font-size: 2.8rem;
-  }
-
-  .wood-sign.btn-icono-only .btn-texto {
-    font-size: 0.85rem;
-    font-weight: 700;
-  }
-
-  .wood-sign.btn-icono-only:hover {
-    transform: translateY(-5px) scale(1.03);
-    box-shadow: 0 10px 30px var(--shadow-color);
-  }
-
-  .wood-sign.btn-icono-only:active {
-    transform: translateY(-2px) scale(0.98);
-  }
-}
-
-@media (min-width: 1400px) {
-  .wood-sign.btn-icono-only {
-    padding: 2rem 1.5rem;
-    min-height: 140px;
-    border-radius: 20px;
-  }
-
-  .wood-sign.btn-icono-only .btn-icono {
-    font-size: 3.2rem;
-  }
-
-  .wood-sign.btn-icono-only .btn-texto {
-    font-size: 0.95rem;
-  }
-}
-
-@media (max-width: 980px) {
-  .sign-grid {
+@media (max-width: 600px) {
+  .reporte-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  
+  .card-value {
+    font-size: 1.1rem;
+  }
+  
+  .card-value.highlight {
+    font-size: 1.3rem;
+  }
+  
+  .product-item {
+    grid-template-columns: 24px 1fr 60px 70px;
+    font-size: 0.85rem;
+  }
+  
+  .pie-chart-container {
+    height: 200px;
+  }
 }
 
-@media (max-width: 760px) {
-  .sign-grid {
+@media (max-width: 480px) {
+  .reporte-grid {
     grid-template-columns: 1fr 1fr;
-    max-width: 100%;
-    gap: 0.8rem;
-    padding: 0 0.5rem;
+    gap: 0.5rem;
   }
-
-  .wood-sign {
-    width: 100%;
-    padding: 1.2rem 1rem;
-    min-height: 80px;
-    border-radius: 14px;
-    flex-direction: row;
-    gap: 1rem;
+  
+  .reporte-card {
+    padding: 0.75rem;
   }
-
-  .wood-sign .btn-icono {
-    font-size: 2rem;
+  
+  .card-header h3 {
+    font-size: 0.7rem;
   }
-
-  .wood-sign .btn-texto {
+  
+  .card-value {
     font-size: 1rem;
   }
-
-  .wood-sign.btn-icono-only {
-    padding: 1.4rem 1.5rem;
-    min-height: 90px;
-    flex-direction: row;
+  
+  .card-value.highlight {
+    font-size: 1.2rem;
   }
-
-  .wood-sign.btn-icono-only .btn-icono {
-    font-size: 2.5rem;
+  
+  .chart-container {
+    height: 200px;
   }
-
-  .wood-sign.btn-icono-only .btn-texto {
-    font-size: 1.1rem;
-    font-weight: 700;
+  
+  .products-list {
+    max-height: 250px;
+  }
+  
+  .btn-cerrar-turno {
+    width: 100%;
+    padding: 0.85rem 1.5rem;
+    font-size: 0.9rem;
   }
 }
 

@@ -53,21 +53,36 @@ watch(() => props.open, (newVal) => {
 
 async function guardarCambios() {
   guardarCargando.value = true;
+  let errores = 0;
+  
   try {
     for (const usuario of usuarios.value) {
-      await fetch(`${API_BASE}/usuarios/sueldoHora/${usuario.idUsuario}`, {
+      const res = await fetch(`${API_BASE}/usuarios/sueldoHora/${usuario.idUsuario}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          sueldo_hora: usuario.sueldo_hora,
-          dias_semana: usuario.dias_semana
+          sueldo_hora: Number(usuario.sueldo_hora) || 0,
+          dias_semana: Number(usuario.dias_semana) || 6
         })
       });
+      
+      if (!res.ok) {
+        console.error(`Error al guardar usuario ${usuario.idUsuario}:`, res.status);
+        errores++;
+      }
     }
-    emit('save', usuarios.value);
-    emit('close');
+    
+    if (errores === 0) {
+      emit('save', usuarios.value);
+      emit('close');
+    } else {
+      alert(`Se guardaron ${usuarios.value.length - errores} de ${usuarios.value.length} usuarios. Revisa la consola.`);
+      emit('save', usuarios.value);
+      emit('close');
+    }
   } catch (e) {
     console.error('Error al guardar:', e);
+    alert('Error de conexión. Intenta de nuevo.');
   } finally {
     guardarCargando.value = false;
   }

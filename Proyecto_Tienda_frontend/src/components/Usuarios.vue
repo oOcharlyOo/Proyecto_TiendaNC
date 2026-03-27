@@ -53,6 +53,15 @@ type DiasCalendario = {
   [dia: number]: string;
 };
 
+type DiaDetalle = {
+  nombre: string;
+  horas: number;
+};
+
+type DiasCompletosDetallado = {
+  [dia: number]: DiaDetalle;
+};
+
 type UsuarioDiasData = {
   idUsuario: number;
   nombreUsuario: string;
@@ -60,6 +69,7 @@ type UsuarioDiasData = {
   totalDias: number;
   diasLaborados: number[];
   diasCompletos: DiasCalendario;
+  horasPorDia?: { [dia: number]: number };
 };
 
 type DiasTrabajadosData = {
@@ -187,12 +197,43 @@ async function cargarAsistencias() {
   
   cargandoAsistencias.value = true;
   try {
-    const res = await fetch(
-      `${API_BASE}/ventas/diasTrabajados?mes=${mes}&anio=${anio}`
-    );
-    const data = await res.json();
-    if (data.codigo === 200) {
-      diasTrabajados.value = data.datos;
+    const [diasRes, ventasRes] = await Promise.all([
+      fetch(`${API_BASE}/ventas/diasTrabajados?mes=${mes}&anio=${anio}`),
+      fetch(`${API_BASE}/ventas/ventasPorUsuario?mes=${mes}&anio=${anio}`)
+    ]);
+    
+    const diasData = await diasRes.json();
+    const ventasData = await ventasRes.json();
+    
+    if (diasData.codigo === 200) {
+      let datos = diasData.datos;
+      
+      if (datos?.usuarios && ventasData.codigo === 200) {
+        const ventasPorUsuarioData = ventasData.datos || [];
+        console.log('Ventas por usuario:', ventasPorUsuarioData);
+        
+        const horasPorUsuario: { [idUsuario: number]: { [dia: number]: number } } = {};
+        
+        for (const usuarioData of ventasPorUsuarioData) {
+          const usuarioId = usuarioData.usuario?.idUsuario || usuarioData.usuario?.id;
+          if (usuarioId) {
+            const ventasUsuario = usuarioData.ventas || [];
+            horasPorUsuario[usuarioId] = calcularHorasPorDiaUsuario(ventasUsuario);
+            console.log(`Horas del usuario ${usuarioId}:`, horasPorUsuario[usuarioId]);
+          }
+        }
+        
+        datos = {
+          ...datos,
+          usuarios: datos.usuarios.map((u: any) => ({
+            ...u,
+            horasPorDia: horasPorUsuario[u.idUsuario] || {}
+          }))
+        };
+      }
+      
+      diasTrabajados.value = datos;
+      console.log('Datos finales con horas:', diasTrabajados.value);
     }
   } catch (e) {
     console.error('Error al cargar asistencia:', e);
@@ -200,6 +241,43 @@ async function cargarAsistencias() {
     cargandoAsistencias.value = false;
   }
 }
+
+function calcularHorasPorDiaUsuario(ventas: any[]): { [dia: number]: number } {
+  const horasPorDia: { [dia: number]: number } = {};
+  
+  if (!ventas || ventas.length === 0) return horasPorDia;
+  
+  const ventasPorDia = new Map<number, { primera: Date; ultima: Date }>();
+  
+  for (const venta of ventas) {
+    if (!venta.fechaVenta) continue;
+    
+    const fecha = new Date(venta.fechaVenta);
+    const dia = fecha.getDate();
+    
+    if (!ventasPorDia.has(dia)) {
+      ventasPorDia.set(dia, { primera: fecha, ultima: fecha });
+    }
+    
+    const existente = ventasPorDia.get(dia)!;
+    if (fecha < existente.primera) existente.primera = fecha;
+    if (fecha > existente.ultima) existente.ultima = fecha;
+  }
+  
+  for (const [dia, horas] of ventasPorDia) {
+    const diffMs = horas.ultima.getTime() - horas.primera.getTime();
+    let horasTotales = diffMs / (1000 * 60 * 60);
+    
+    if (horasTotales < 0.5) horasTotales = 0.5;
+    if (horasTotales > 12) horasTotales = 12;
+    
+    horasPorDia[dia] = Math.round(horasTotales * 2) / 2;
+  }
+  
+  return horasPorDia;
+}
+
+
 
 function triggerConfetti() {
   const duration = 3000;
@@ -470,7 +548,28 @@ function getIniciales(nombre: string): string {
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
-function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trabajadores: string[]; esVacio: boolean}> {
+function getHorasTotales(usuario: UsuarioDiasData): number {
+  if (usuario.horasPorDia) {
+    return Object.values(usuario.horasPorDia).reduce((sum, h) => sum + h, 0);
+  }
+  return usuario.totalDias * 8;
+}
+
+function getHorasFormateadas(horas: number): string {
+  const h = Math.floor(horas);
+  const m = Math.round((horas - h) * 60);
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function getHorasDelDia(usuario: UsuarioDiasData, dia: number): number {
+  if (usuario.horasPorDia && usuario.horasPorDia[dia] !== undefined) {
+    return usuario.horasPorDia[dia];
+  }
+  return 8;
+}
+
+function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trabajadores: {nombre: string; horas: number}[]; esVacio: boolean; horasTotales: number}> {
   if (!diasTrabajados.value) return [];
   
   const { mes, anio, totalDiasMes, usuarios } = diasTrabajados.value;
@@ -481,33 +580,35 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   const diaSemanaInicio = primerDia.getDay();
   const offsetSemana = diaSemanaInicio === 0 ? 6 : diaSemanaInicio - 1;
   
-  const diasMap: Map<number, string[]> = new Map();
+  const diasMap: Map<number, {nombre: string; horas: number}[]> = new Map();
   usuarios.forEach(usuario => {
     Object.entries(usuario.diasCompletos).forEach(([diaStr, nombre]) => {
       const dia = parseInt(diaStr, 10);
+      const horas = getHorasDelDia(usuario, dia);
       if (!diasMap.has(dia)) {
         diasMap.set(dia, []);
       }
-      diasMap.get(dia)!.push(nombre);
+      diasMap.get(dia)!.push({ nombre, horas });
     });
   });
   
-  const dias: Array<{numero: number | null; esHoy: boolean; trabajadores: string[]; esVacio: boolean}> = [];
+  const dias: Array<{numero: number | null; esHoy: boolean; trabajadores: {nombre: string; horas: number}[]; esVacio: boolean; horasTotales: number}> = [];
   
   for (let i = 0; i < offsetSemana; i++) {
-    dias.push({ numero: null, esHoy: false, trabajadores: [], esVacio: true });
+    dias.push({ numero: null, esHoy: false, trabajadores: [], esVacio: true, horasTotales: 0 });
   }
   
   for (let dia = 1; dia <= totalDiasMes; dia++) {
-    const diaNumero = diasMap.get(dia) || [];
+    const trabajadoresDia = diasMap.get(dia) || [];
+    const horasTotales = trabajadoresDia.reduce((sum, t) => sum + t.horas, 0);
     const esDiaHoy = esMesActual && dia === hoy.getDate();
-    dias.push({ numero: dia, esHoy: esDiaHoy, trabajadores: diaNumero, esVacio: false });
+    dias.push({ numero: dia, esHoy: esDiaHoy, trabajadores: trabajadoresDia, esVacio: false, horasTotales });
   }
   
   const remainder = dias.length % 7;
   if (remainder !== 0) {
     for (let i = 0; i < 7 - remainder; i++) {
-      dias.push({ numero: null, esHoy: false, trabajadores: [], esVacio: true });
+      dias.push({ numero: null, esHoy: false, trabajadores: [], esVacio: true, horasTotales: 0 });
     }
   }
   
@@ -516,103 +617,139 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 </script>
 
 <template>
-  <div class="usuarios-page">
+  <main class="usuarios-layout">
     <div class="bg-fog"></div>
     <div class="bg-scanlines"></div>
     
-    <div class="page-header">
-      <h1 class="page-title">Gestión</h1>
-      <div class="submenu">
+    <header class="hero-section">
+      <div class="hero-decoration left">❧</div>
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="title-icon">👥</span>
+          Gestión de Héroes
+          <span class="title-icon">⚔</span>
+        </h1>
+        <p class="hero-subtitle">Administra los guerreros del reino</p>
+      </div>
+      <div class="hero-decoration right">❧</div>
+    </header>
+
+    <section class="tabs-section">
+      <div class="tabs-container">
         <button 
-          class="submenu-btn" 
+          class="tab-btn" 
           :class="{ active: seccionActiva === 'usuarios' }"
           @click="cambiarSeccion('usuarios')"
         >
-          <span class="submenu-icon">👥</span>
-          <span class="submenu-text">Usuarios</span>
+          <span class="tab-icon">👥</span>
+          <span class="tab-text">Héroes</span>
         </button>
         <button 
-          class="submenu-btn" 
+          class="tab-btn" 
           :class="{ active: seccionActiva === 'ventas' }"
           @click="cambiarSeccion('ventas')"
         >
-          <span class="submenu-icon">📊</span>
-          <span class="submenu-text">Ventas por Usuario</span>
-          <span class="submenu-badge">BETA</span>
+          <span class="tab-icon">📊</span>
+          <span class="tab-text">Desempeño</span>
+          <span class="tab-badge">BETA</span>
         </button>
         <button 
           v-if="esAdmin"
-          class="submenu-btn" 
+          class="tab-btn" 
           :class="{ active: seccionActiva === 'asistencias' }"
           @click="cambiarSeccion('asistencias')"
         >
-          <span class="submenu-icon">📅</span>
-          <span class="submenu-text">Asistencias</span>
+          <span class="tab-icon">📅</span>
+          <span class="tab-text">Asistencias</span>
         </button>
       </div>
-    </div>
+    </section>
+
+    <section class="stats-section" v-if="seccionActiva === 'usuarios'">
+      <template v-for="(stat, index) in [
+        { label: 'Total Héroes', value: usuarios.length, icon: '⚔', clase: '' },
+        { label: 'Administradores', value: usuarios.filter(u => u.id_tipo_usuario === 1).length, icon: '👑', clase: 'gold' },
+        { label: 'Usuarios', value: usuarios.filter(u => u.id_tipo_usuario === 2).length, icon: '🛡', clase: 'success' }
+      ]" :key="index">
+        <div :class="['stat-card-wrapper', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
+          <div class="stat-glow"></div>
+          <div class="stat-icon-wrapper">
+            <span class="stat-icon">{{ stat.icon }}</span>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">{{ stat.label }}</span>
+            <span class="stat-value">{{ stat.value }}</span>
+          </div>
+          <div class="stat-decoration">✦</div>
+        </div>
+      </template>
+    </section>
 
     <!-- Sección Gestión de Usuarios -->
     <div v-if="seccionActiva === 'usuarios'" class="seccion-usuarios">
       <div class="header-actions" v-if="esAdmin">
         <button class="btn-primary" @click="abrirModalNuevo">
-          + Nuevo Usuario
+          <span class="btn-icon">➕</span>
+          Nuevo Héroe
         </button>
         <button class="btn-secondary" @click="modalSueldoAbierto = true">
-          💰 Sueldos por Hora
+          <span class="btn-icon">💰</span>
+          Sueldos por Hora
         </button>
       </div>
 
       <div v-if="cargando" class="loading">
         <div class="loading-spinner"></div>
-        <span>Cargando usuarios...</span>
+        <span>Cargando héroes...</span>
       </div>
 
       <div v-else class="usuarios-grid">
-      <div 
-        v-for="(usuario, index) in usuarios" 
-        :key="usuario.idUsuario" 
-        class="usuario-card"
-        :style="{ animationDelay: `${index * 0.05}s` }"
-      >
-        <div class="avatar-container">
-          <img 
-            v-if="usuario.avatar" 
-            :src="formatAvatarUrl(usuario.avatar)" 
-            :alt="usuario.nombre"
-            class="avatar-img"
-          />
-          <div v-else class="avatar-placeholder">
-            {{ usuario.nombre?.charAt(0)?.toUpperCase() || '?' }}
+        <div 
+          v-for="(usuario, index) in usuarios" 
+          :key="usuario.idUsuario" 
+          class="usuario-card"
+          :style="{ animationDelay: `${index * 0.05}s` }"
+        >
+          <div class="avatar-container">
+            <img 
+              v-if="usuario.avatar" 
+              :src="formatAvatarUrl(usuario.avatar)" 
+              :alt="usuario.nombre"
+              class="avatar-img"
+            />
+            <div v-else class="avatar-placeholder">
+              {{ usuario.nombre?.charAt(0)?.toUpperCase() || '?' }}
+            </div>
+            <div class="avatar-ring"></div>
+          </div>
+          
+          <div class="usuario-info">
+            <h3 class="usuario-nombre">{{ usuario.nombre }} {{ usuario.apellido_p }}</h3>
+            <p class="usuario-user">@{{ usuario.usuario }}</p>
+            <span class="tipo-badge" :class="{ admin: usuario.id_tipo_usuario === 1 }">
+              <span class="badge-icon">{{ usuario.id_tipo_usuario === 1 ? '👑' : '🛡' }}</span>
+              {{ getTipoLabel(usuario.id_tipo_usuario) }}
+            </span>
+          </div>
+
+          <div v-if="esAdmin" class="usuario-actions">
+            <button class="btn-edit" @click="abrirModalEditar(usuario)">
+              <span class="btn-icon">✏️</span>
+            </button>
+            <button 
+              class="btn-delete" 
+              @click="eliminarUsuario(usuario.idUsuario)"
+              :disabled="usuario.idUsuario === tipoUsuarioActual"
+            >
+              <span class="btn-icon">🗑️</span>
+            </button>
+          </div>
+          <div v-else-if="puedeEditar(usuario.idUsuario)" class="usuario-actions">
+            <button class="btn-edit" @click="abrirModalEditar(usuario)">
+              <span class="btn-icon">✏️</span>
+            </button>
           </div>
         </div>
-        
-        <div class="usuario-info">
-          <h3 class="usuario-nombre">{{ usuario.nombre }} {{ usuario.apellido_p }}</h3>
-          <p class="usuario-user">@{{ usuario.usuario }}</p>
-          <span class="tipo-badge" :class="{ admin: usuario.id_tipo_usuario === 1 }">
-            {{ getTipoLabel(usuario.id_tipo_usuario) }}
-          </span>
-        </div>
-
-        <div v-if="esAdmin" class="usuario-actions">
-          <button class="btn-edit" @click="abrirModalEditar(usuario)">
-            <span class="btn-icon">✏️</span> Editar
-          </button>
-          <button 
-            class="btn-delete" 
-            @click="eliminarUsuario(usuario.idUsuario)"
-            :disabled="usuario.idUsuario === tipoUsuarioActual"
-          >
-            <span class="btn-icon">🗑️</span> Eliminar
-          </button>
-        </div>
-        <div v-else-if="puedeEditar(usuario.idUsuario)" class="usuario-actions">
-          <button class="btn-edit" @click="abrirModalEditar(usuario)">
-            <span class="btn-icon">✏️</span> Editar
-          </button>
-        </div>
-      </div>
       </div>
     </div>
 
@@ -780,17 +917,24 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
               >
                 <span v-if="dia.numero" class="dia-numero">{{ dia.numero }}</span>
                 <div v-if="dia.trabajadores.length > 0" class="dia-trabajadores">
-                  <span 
-                    v-for="(trabajador, idx) in dia.trabajadores" 
+                  <div 
+                    v-for="(trabajador, idx) in dia.trabajadores.slice(0, 3)" 
                     :key="idx"
                     class="trabajador-chip"
-                    :title="trabajador"
+                    :title="`${trabajador.nombre} - ${getHorasFormateadas(trabajador.horas)}`"
                   >
-                    {{ getIniciales(trabajador) }}
-                  </span>
+                    <span class="trabajador-inicial">{{ getIniciales(trabajador.nombre) }}</span>
+                    <span class="trabajador-horas">{{ getHorasFormateadas(trabajador.horas) }}</span>
+                  </div>
+                  <div v-if="dia.trabajadores.length > 3" class="trabajador-chip mas">
+                    +{{ dia.trabajadores.length - 3 }}
+                  </div>
                 </div>
                 <span v-else-if="dia.numero && !dia.esHoy" class="dia-vacio-text">-</span>
                 <span v-if="dia.esHoy && dia.trabajadores.length === 0" class="dia-hoy-text">Hoy</span>
+                <span v-if="dia.horasTotales > 0 && dia.numero" class="dia-total-horas">
+                  {{ getHorasFormateadas(dia.horasTotales) }}
+                </span>
               </div>
             </div>
           </div>
@@ -816,18 +960,28 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
                   </div>
                   <div class="usuario-asistencia-info">
                     <h4>{{ usuario.nombreUsuario }}</h4>
-                    <span class="usuario-dias-count">{{ usuario.totalDias }} días trabajados</span>
+                    <div class="usuario-stats-row">
+                      <span class="stat-badge">
+                        <span class="stat-icon-small">📅</span>
+                        {{ usuario.totalDias }} días
+                      </span>
+                      <span class="stat-badge highlight">
+                        <span class="stat-icon-small">⏱️</span>
+                        {{ getHorasFormateadas(getHorasTotales(usuario)) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div class="dias-laborados-mini">
-                  <span 
+                  <div 
                     v-for="dia in usuario.diasLaborados" 
                     :key="dia"
                     class="dia-chip"
-                    :title="`Día ${dia}`"
+                    :title="`Día ${dia} - ${getHorasFormateadas(getHorasDelDia(usuario, dia))}`"
                   >
-                    {{ dia }}
-                  </span>
+                    <span class="dia-num">{{ dia }}</span>
+                    <span class="dia-horas">{{ getHorasFormateadas(getHorasDelDia(usuario, dia)) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -837,153 +991,372 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 
     <Transition name="modal">
       <div v-if="modalAbierto" class="modal-overlay" @click.self="cerrarModal">
-        <div class="modal-card">
-          <div class="modal-header">
-            <h3>{{ editando ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
-            <button class="btn-cerrar-modal" @click="cerrarModal">&times;</button>
-          </div>
+        <div class="modal-card panel">
+          <div class="modal-corner tl"></div>
+          <div class="modal-corner tr"></div>
+          <div class="modal-corner bl"></div>
+          <div class="modal-corner br"></div>
+          <button class="btn-cerrar-modal" @click="cerrarModal">✕</button>
+          
+          <div class="modal-content-scroll">
+            <div class="modal-header-zelda">
+              <span class="modal-icon-zelda">{{ editando ? '✏️' : '⚔' }}</span>
+              <h3>{{ editando ? 'Editar Héroe' : 'Nuevo Héroe' }}</h3>
+            </div>
 
-          <div class="modal-body">
-            <div class="avatar-upload-section">
-              <label>Avatar</label>
-              <div 
-                class="avatar-dropzone"
-                :class="{ dragando }"
-                @dragover="handleDragOver"
-                @dragleave="handleDragLeave"
-                @drop="handleDrop"
-                @click="(($refs.fileInput as HTMLInputElement)?.click())"
-                @mousedown="handleMouseDown"
-                @wheel="handleWheel"
-              >
-                <input 
-                  ref="fileInput"
-                  type="file" 
-                  accept="image/*" 
-                  @change="handleFileSelect"
-                  style="display: none"
-                />
-                
+            <div class="modal-body-zelda">
+              <div class="avatar-upload-section">
                 <div 
-                  v-if="avatarPreview" 
-                  class="avatar-preview-container"
+                  class="avatar-dropzone"
+                  :class="{ dragando }"
+                  @dragover="handleDragOver"
+                  @dragleave="handleDragLeave"
+                  @drop="handleDrop"
+                  @click="(($refs.fileInput as HTMLInputElement)?.click())"
+                  @mousedown="handleMouseDown"
+                  @wheel="handleWheel"
                 >
-                  <img 
-                    ref="imgAvatar"
-                    :src="avatarPreview" 
-                    class="avatar-preview"
-                    :style="{
-                      transform: `translate(${posicionAvatar.x}px, ${posicionAvatar.y}px) scale(${escalaAvatar})`
-                    }"
-                    draggable="false"
+                  <input 
+                    ref="fileInput"
+                    type="file" 
+                    accept="image/*" 
+                    @change="handleFileSelect"
+                    style="display: none"
+                  />
+                  
+                  <div 
+                    v-if="avatarPreview" 
+                    class="avatar-preview-container"
+                  >
+                    <img 
+                      ref="imgAvatar"
+                      :src="avatarPreview" 
+                      class="avatar-preview"
+                      :style="{
+                        transform: `translate(${posicionAvatar.x}px, ${posicionAvatar.y}px) scale(${escalaAvatar})`
+                      }"
+                      draggable="false"
+                    />
+                  </div>
+                  <div v-else class="dropzone-placeholder">
+                    <span class="drop-icon">📁</span>
+                    <span>Arrastra imagen</span>
+                    <small>Scroll para zoom</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-grid-zelda">
+                <div class="form-group-zelda">
+                  <label>Usuario</label>
+                  <input v-model="form.usuario" type="text" required placeholder="Nombre de usuario" class="zelda-input" />
+                </div>
+                <div class="form-group-zelda">
+                  <label>Nombre</label>
+                  <input v-model="form.nombre" type="text" required placeholder="Nombre" class="zelda-input" />
+                </div>
+                <div class="form-group-zelda">
+                  <label>Apellido Paterno</label>
+                  <input v-model="form.apellido_p" type="text" placeholder="Apellido paterno" class="zelda-input" />
+                </div>
+                <div class="form-group-zelda">
+                  <label>Apellido Materno</label>
+                  <input v-model="form.apellido_m" type="text" placeholder="Apellido materno" class="zelda-input" />
+                </div>
+                <div class="form-group-zelda">
+                  <label>Password</label>
+                  <input 
+                    v-model="form.password_hash" 
+                    type="password" 
+                    :placeholder="editando ? 'Dejar vacio para mantener' : 'Contraseña'"
+                    class="zelda-input"
                   />
                 </div>
-                <div v-else class="dropzone-placeholder">
-                  <span class="drop-icon">📁</span>
-                  <span>Arrastra una imagen o haz clic</span>
-                  <small>Usa el mouse para mover, scroll para zoom</small>
+                <div class="form-group-zelda">
+                  <label>Tipo</label>
+                  <select v-model="form.id_tipo_usuario" :disabled="!esAdmin && esEdicionPerfilPropio" class="zelda-input zelda-select">
+                    <option :value="1">👑 Administrador</option>
+                    <option :value="2">🛡 Usuario</option>
+                  </select>
                 </div>
               </div>
             </div>
 
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Usuario</label>
-                <input v-model="form.usuario" type="text" required placeholder="Nombre de usuario" />
-              </div>
-              <div class="form-group">
-                <label>Nombre</label>
-                <input v-model="form.nombre" type="text" required placeholder="Nombre" />
-              </div>
-              <div class="form-group">
-                <label>Apellido Paterno</label>
-                <input v-model="form.apellido_p" type="text" placeholder="Apellido paterno" />
-              </div>
-              <div class="form-group">
-                <label>Apellido Materno</label>
-                <input v-model="form.apellido_m" type="text" placeholder="Apellido materno" />
-              </div>
-              <div class="form-group">
-                <label>Password</label>
-                <input 
-                  v-model="form.password_hash" 
-                  type="password" 
-                  :placeholder="editando ? 'Dejar vacio para mantener' : 'Contraseña'"
-                />
-              </div>
-              <div class="form-group">
-                <label>Tipo</label>
-                <select v-model="form.id_tipo_usuario" :disabled="!esAdmin && esEdicionPerfilPropio">
-                  <option :value="1">Administrador</option>
-                  <option :value="2">Usuario</option>
-                </select>
-              </div>
+            <div class="modal-actions-zelda">
+              <button class="btn-cancel-zelda" @click="cerrarModal">
+                <span>✕</span> Cancelar
+              </button>
+              <button class="btn-save-zelda" @click="guardarUsuario">
+                <span>⚔</span> {{ editando ? 'Actualizar' : 'Crear' }}
+              </button>
             </div>
-          </div>
-
-          <div class="modal-actions">
-            <button class="btn-cancel" @click="cerrarModal">Cancelar</button>
-            <button class="btn-save" @click="guardarUsuario">
-              {{ editando ? 'Actualizar' : 'Crear' }}
-            </button>
           </div>
         </div>
       </div>
     </Transition>
-  </div>
 
-  <SueldoXHoraModal 
-    :open="modalSueldoAbierto" 
-    @close="modalSueldoAbierto = false"
-    @save="(usuarios) => { cargarUsuarios(); modalSueldoAbierto = false; }"
-  />
+    <SueldoXHoraModal 
+      :open="modalSueldoAbierto" 
+      @close="modalSueldoAbierto = false"
+      @save="(usuarios) => { cargarUsuarios(); modalSueldoAbierto = false; }"
+    />
+  </main>
 </template>
 
 <style scoped>
-.usuarios-page {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+.usuarios-layout {
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  padding: 1rem;
   background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 90vh;
-  position: relative;
-  z-index: 1;
-}
-
-.page-header {
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 1rem;
   position: relative;
   z-index: 1;
 }
 
-.page-title {
-  font-size: 2rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent-color);
-  text-shadow: 2px 2px 0 var(--border-color);
+.hero-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  position: relative;
 }
 
-.btn-primary {
-  padding: 0.7rem 1.5rem;
+.hero-decoration {
+  font-size: 2rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--accent-color);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.hero-decoration.left { transform: rotate(-15deg); }
+.hero-decoration.right { transform: rotate(15deg); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.hero-decoration.left { animation-delay: 0s; }
+.hero-decoration.right { animation-delay: 0.5s; }
+
+.hero-content { text-align: center; }
+
+.hero-title {
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  color: var(--accent-color);
+  text-shadow: 3px 3px 0 var(--border-color), 0 0 20px var(--accent-color);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.title-icon { font-size: 1.5em; }
+
+.hero-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  font-style: italic;
+}
+
+.tabs-section { padding: 0 0.5rem; }
+
+.tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-secondary);
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.tab-btn.active {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.tab-icon { font-size: 1.1rem; }
+
+.tab-badge {
+  font-size: 0.55rem;
+  background: var(--error-color);
+  color: white;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.stat-card-wrapper {
+  animation: fadeSlideIn 400ms ease-out backwards;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card {
+  position: relative;
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color), 0 6px 12px var(--shadow-color);
+  text-align: center;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--border-color), 0 8px 16px var(--shadow-color);
+}
+
+.stat-card.gold {
+  border-color: var(--accent-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-color) 20%, var(--bg-primary)) 100%);
+}
+
+.stat-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.stat-card:hover .stat-glow { opacity: 0.05; }
+
+.stat-icon-wrapper { margin-bottom: 0.4rem; }
+
+.stat-icon {
+  font-size: 1.5rem;
+  filter: drop-shadow(0 2px 4px var(--shadow-color));
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.stat-card.gold .stat-value { color: var(--accent-color); }
+
+.stat-decoration {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.6rem;
+  color: var(--accent-color);
+  opacity: 0.5;
+}
+
+.seccion-usuarios { padding: 0 0.5rem; }
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 0.7rem 1.2rem;
   font-weight: 700;
   text-transform: uppercase;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
-  color: var(--btn-text, var(--bg-primary));
-  border: var(--border-width) solid var(--border-color);
+  font-size: 0.8rem;
+  border: 2px solid var(--border-color);
   box-shadow: 0 4px 0 var(--border-color);
+  transition: all 0.2s;
 }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  color: var(--btn-text, var(--bg-primary));
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-primary:hover, .btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--border-color);
+}
+
+.btn-primary:active, .btn-secondary:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--border-color);
+}
+
+.btn-icon { font-size: 1.1rem; }
 
 .loading {
   display: flex;
@@ -1003,67 +1376,67 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .usuarios-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-  position: relative;
-  z-index: 1;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+  padding-bottom: 1rem;
 }
 
 .usuario-card {
-  background: var(--bg-secondary);
-  border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 100%);
+  border: 3px solid var(--border-color);
+  border-radius: 16px;
   padding: 1.5rem;
   text-align: center;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: all 0.3s ease;
   animation: fadeInUp 0.5s ease forwards;
   opacity: 0;
-  box-shadow: 0 4px 0 var(--border-color);
+  box-shadow: 0 6px 0 var(--border-color), 0 8px 16px var(--shadow-color);
 }
 
 .usuario-card:hover {
-  transform: translateY(-8px);
-  filter: brightness(1.05);
+  transform: translateY(-8px) scale(1.02);
+  border-color: var(--accent-color);
+  box-shadow: 0 12px 0 var(--accent-color), 0 16px 30px var(--shadow-color);
 }
 
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .avatar-container {
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   margin: 0 auto 1rem;
   border-radius: 50%;
   overflow: hidden;
   border: 4px solid var(--accent-color);
   box-shadow: 0 4px 12px var(--shadow-color);
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
   background: var(--bg-primary);
+  position: relative;
 }
+
+.avatar-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px dashed var(--accent-color);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.usuario-card:hover .avatar-ring { opacity: 1; }
 
 .usuario-card:hover .avatar-container {
-  transform: scale(1.05);
+  transform: scale(1.1);
 }
 
-.avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.avatar-img { width: 100%; height: 100%; object-fit: cover; }
 
 .avatar-placeholder {
   width: 100%;
@@ -1071,26 +1444,31 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 900;
   color: var(--accent-color);
-  background: var(--bg-primary);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 }
 
+.usuario-info { margin-bottom: 0.5rem; }
+
 .usuario-nombre {
-  font-size: 1.2rem;
-  margin-bottom: 0.3rem;
+  font-size: 1.1rem;
+  margin-bottom: 0.2rem;
   color: var(--text-primary);
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
 }
 
 .usuario-user {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   margin-bottom: 0.5rem;
   color: var(--text-secondary);
 }
 
 .tipo-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   padding: 0.3rem 0.8rem;
   font-size: 0.75rem;
   border-radius: 20px;
@@ -1098,13 +1476,16 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   font-weight: 600;
   background: var(--bg-panel);
   color: var(--accent-color);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
 }
 
 .tipo-badge.admin {
-  background: var(--accent-color);
+  background: linear-gradient(135deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
   color: var(--bg-primary);
+  border-color: var(--accent-color);
 }
+
+.badge-icon { font-size: 0.9rem; }
 
 .usuario-actions {
   display: flex;
@@ -1114,158 +1495,41 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 }
 
 .btn-edit, .btn-delete {
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: center;
   transition: all 0.2s ease;
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
+  box-shadow: 0 3px 0 var(--border-color);
 }
 
 .btn-edit {
-  background: var(--success-color);
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
   color: var(--bg-primary);
 }
 
 .btn-delete {
-  background: var(--error-color);
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
   color: var(--text-primary);
 }
 
-.btn-delete:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-edit:hover, .btn-delete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--border-color);
 }
 
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  background: var(--shadow-color);
-  backdrop-filter: blur(4px);
-}
-
-.modal-card {
-  background: var(--bg-panel);
-  border: var(--border-width-thick) solid var(--accent-color);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px var(--shadow-color);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  border-bottom: 2px solid var(--border-color);
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.btn-cerrar-modal {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-color);
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.avatar-upload-section label {
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  font-size: 0.8rem;
-}
-
-.avatar-dropzone {
-  width: 160px;
-  height: 160px;
-  margin: 0 auto;
-  border: 3px dashed var(--border-color);
-  border-radius: 50%;
-  background: var(--bg-primary);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatar-preview-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.avatar-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.form-group label {
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  font-size: 0.75rem;
-}
-
-.form-group input,
-.form-group select {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: var(--border-width) solid var(--border-color);
-}
-
-.modal-actions {
-  border-top: 2px solid var(--border-color);
-}
-
-.btn-cancel {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-save {
-  background: var(--success-color);
-  color: var(--bg-primary);
-  border: var(--border-width) solid var(--border-color);
-}
+.btn-delete:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .bg-fog {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background: 
-    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.1) 0%, transparent 50%),
+  background: radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.1) 0%, transparent 50%),
     radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.1) 0%, transparent 50%);
   animation: bgFogDrift 10s ease-in-out infinite;
 }
@@ -1285,65 +1549,250 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.03) 2px 4px);
 }
 
-/* Submenu */
-.submenu {
-  display: flex;
-  gap: 0.5rem;
-  background: var(--bg-secondary);
-  padding: 0.3rem;
-  border-radius: 12px;
-  border: 2px solid var(--border-color);
-}
-
-.submenu-btn {
-  padding: 0.6rem 1.2rem;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 8px;
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0.5rem;
+  background: var(--shadow-color);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+}
+
+.modal-card.panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 95vh;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 100%);
+  border: 3px solid var(--accent-color);
+  box-shadow: 0 0 0 2px var(--border-color), 0 10px 30px var(--shadow-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  z-index: 10;
+}
+
+.modal-corner::before,
+.modal-corner::after {
+  content: '';
+  position: absolute;
+  background: var(--accent-color);
+}
+
+.modal-corner::before { width: 100%; height: 3px; }
+.modal-corner::after { width: 3px; height: 100%; }
+
+.modal-corner.tl { top: 10px; left: 10px; }
+.modal-corner.tl::before, .modal-corner.tl::after { top: 0; left: 0; }
+.modal-corner.tr { top: 10px; right: 10px; }
+.modal-corner.tr::before { top: 0; right: 0; }
+.modal-corner.tr::after { top: 0; right: 0; }
+.modal-corner.bl { bottom: 10px; left: 10px; }
+.modal-corner.bl::before { bottom: 0; left: 0; }
+.modal-corner.bl::after { bottom: 0; left: 0; }
+.modal-corner.br { bottom: 10px; right: 10px; }
+.modal-corner.br::before { bottom: 0; right: 0; }
+.modal-corner.br::after { bottom: 0; right: 0; }
+
+.btn-cerrar-modal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+  z-index: 20;
   transition: all 0.2s;
 }
 
-.submenu-btn:hover {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
-}
-
-.submenu-btn.active {
+.btn-cerrar-modal:hover {
   background: var(--accent-color);
   color: var(--bg-primary);
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent-color) 40%, transparent);
+  transform: rotate(90deg);
 }
 
-.submenu-icon {
-  font-size: 1.1rem;
+.modal-content-scroll {
+  max-height: 95vh;
+  padding: 1.5rem;
+  overflow-y: auto;
 }
 
-.submenu-badge {
-  font-size: 0.6rem;
-  background: var(--error-color);
-  color: white;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  font-weight: 700;
-}
-
-.header-actions {
+.modal-header-zelda {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px dashed var(--border-color);
 }
 
-/* Sección Ventas por Usuario */
-.seccion-ventas {
+.modal-icon-zelda { font-size: 1.8rem; }
+
+.modal-header-zelda h3 {
+  margin: 0;
+  font-family: 'HyliaSerifBeta', 'Palatino Linotype', serif;
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--border-color);
+  text-transform: uppercase;
+}
+
+.modal-body-zelda { margin-bottom: 1.5rem; }
+
+.avatar-upload-section { margin-bottom: 1.5rem; }
+
+.avatar-dropzone {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto;
+  border: 3px dashed var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.avatar-dropzone:hover, .avatar-dropzone.dragando {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+}
+
+.avatar-preview-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dropzone-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.drop-icon { font-size: 2rem; }
+
+.form-grid-zelda {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-group-zelda {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.form-group-zelda:first-child {
+  grid-column: span 2;
+}
+
+.form-group-zelda label {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.zelda-input {
+  padding: 0.7rem 1rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.zelda-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.zelda-select {
+  cursor: pointer;
+}
+
+.modal-actions-zelda {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 2px dashed var(--border-color);
+}
+
+.btn-cancel-zelda, .btn-save-zelda {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 4px 0 var(--border-color);
+  transition: all 0.2s;
+}
+
+.btn-cancel-zelda {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-save-zelda {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  color: var(--bg-primary);
+}
+
+.btn-cancel-zelda:hover, .btn-save-zelda:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--border-color);
+}
+
+/* Sección Ventas */
+.seccion-ventas, .seccion-asistencias {
   position: relative;
   z-index: 1;
+  padding: 0 0.5rem;
 }
 
 .ventas-filtros {
@@ -1352,12 +1801,17 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   border-radius: 12px;
   border: 2px solid var(--border-color);
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .filtro-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex: 1;
 }
 
 .filtro-group label {
@@ -1369,10 +1823,11 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 .filtro-fecha {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .filtro-fecha input {
-  padding: 0.5rem 0.8rem;
+  padding: 0.6rem 0.8rem;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
@@ -1381,7 +1836,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 }
 
 .btn-load {
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1rem;
   background: var(--accent-color);
   color: var(--bg-primary);
   border: 2px solid var(--border-color);
@@ -1389,18 +1844,16 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 3px 0 var(--border-color);
 }
 
 .btn-load:hover {
-  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--border-color);
 }
 
-.btn-load:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.btn-load:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
-/* Top Vendedor */
 .top-vendedor {
   background: linear-gradient(135deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
   border: 3px solid var(--border-color);
@@ -1413,19 +1866,14 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   box-shadow: 0 8px 30px color-mix(in srgb, var(--accent-color) 40%, transparent);
 }
 
-.top-badge {
-  font-size: 4rem;
-  animation: bounce 1s ease-in-out infinite;
-}
+.top-badge { font-size: 4rem; animation: bounce 1s ease-in-out infinite; }
 
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
 }
 
-.top-info {
-  flex: 1;
-}
+.top-info { flex: 1; }
 
 .top-label {
   font-size: 0.8rem;
@@ -1440,6 +1888,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   margin: 0.3rem 0;
   color: var(--text-primary);
   text-shadow: 2px 2px 0 var(--border-color);
+  font-family: 'HyliaSerifBeta', serif;
 }
 
 .top-stats {
@@ -1450,87 +1899,17 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   font-weight: 600;
 }
 
-/* Empty State */
 .empty-state {
   text-align: center;
   padding: 3rem;
   color: var(--text-secondary);
 }
 
-.empty-icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 1rem;
-}
+.empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
 
-/* Tabla de ventas */
-.ventas-tabla-container {
-  overflow-x: auto;
-}
-
-.ventas-tabla {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid var(--border-color);
-}
-
-.ventas-tabla th {
-  background: var(--accent-color);
-  color: white;
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-.ventas-tabla td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-.ventas-tabla tr:last-child td {
-  border-bottom: none;
-}
-
-.ventas-tabla tr:hover {
-  background: var(--bg-primary);
-}
-
-.ventas-tabla tr.top {
-  background: linear-gradient(90deg, rgba(196, 160, 53, 0.15), transparent);
-}
-
-.ventas-tabla tr.top td {
-  font-weight: 600;
-}
-
-.usuario-nombre {
-  font-weight: 500;
-}
-
-.text-center {
-  text-align: center;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.empty-state p {
-  font-size: 1rem;
-  margin: 0;
-}
-
-/* Usuarios Ventas Grid */
 .usuarios-ventas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
 }
 
@@ -1540,22 +1919,18 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   border-radius: 12px;
   padding: 1rem;
   animation: fadeSlideIn 0.3s ease-out backwards;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s;
 }
 
 .usuario-ventas-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 25px var(--shadow-color);
+  border-color: var(--accent-color);
 }
 
 .usuario-ventas-card.top {
   border-color: var(--accent-color);
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)) 0%, var(--bg-secondary) 100%);
-}
-
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .usuario-ventas-header {
@@ -1572,14 +1947,10 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   height: 45px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--accent-color);
 }
 
-.usuario-avatar-small img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.usuario-avatar-small img { width: 100%; height: 100%; object-fit: cover; }
 
 .avatar-placeholder-small {
   width: 100%;
@@ -1593,24 +1964,16 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   font-size: 1.2rem;
 }
 
-.usuario-ventas-info {
-  flex: 1;
-}
+.usuario-ventas-info { flex: 1; }
 
 .usuario-ventas-info h4 {
   margin: 0;
   font-size: 1rem;
   color: var(--text-primary);
+  font-family: 'HyliaSerifBeta', serif;
 }
 
-.usuario-user {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.usuario-ventas-total {
-  text-align: right;
-}
+.usuario-ventas-total { text-align: right; }
 
 .total-label {
   display: block;
@@ -1627,7 +1990,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
 
 .usuario-ventas-stats {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
@@ -1640,40 +2003,11 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   border: 1px solid var(--border-color);
 }
 
-.stat-item.total-estilo {
-  background: linear-gradient(135deg, var(--accent-color), #c4a035);
-  border: none;
-}
+.stat-icon { font-size: 1rem; display: block; margin-bottom: 0.2rem; }
+.stat-value { display: block; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
+.stat-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; }
 
-.stat-item.total-estilo .stat-value {
-  color: white;
-}
-
-.stat-item.total-estilo .stat-label {
-  color: rgba(255,255,255,0.9);
-}
-
-.stat-icon {
-  font-size: 1rem;
-  display: block;
-  margin-bottom: 0.2rem;
-}
-
-.stat-value {
-  display: block;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.stat-label {
-  font-size: 0.65rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-}
-
-.usuario-productos h5,
-.usuario-ventas-detalles h5 {
+.usuario-productos h5, .usuario-ventas-detalles h5 {
   font-size: 0.75rem;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -1681,61 +2015,16 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   letter-spacing: 0.05em;
 }
 
-.productos-list {
+.productos-list, .ventas-list {
   background: var(--bg-primary);
   border-radius: 8px;
   border: 1px solid var(--border-color);
   overflow: hidden;
 }
 
-.producto-item {
+.producto-item, .venta-item {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  gap: 0.5rem;
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.8rem;
-}
-
-.producto-item:last-child {
-  border-bottom: none;
-}
-
-.producto-nombre {
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.producto-qty {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.producto-monto {
-  color: var(--success-color);
-  font-weight: 600;
-  font-family: "Courier New", monospace;
-}
-
-.productos-more {
-  padding: 0.4rem 0.6rem;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-align: center;
-  background: var(--bg-secondary);
-}
-
-.ventas-list {
-  background: var(--bg-primary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
-
-.venta-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
   gap: 0.5rem;
   padding: 0.5rem 0.6rem;
   border-bottom: 1px solid var(--border-color);
@@ -1743,37 +2032,16 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   align-items: center;
 }
 
-.venta-item:last-child {
-  border-bottom: none;
-}
+.producto-item:last-child, .venta-item:last-child { border-bottom: none; }
+.producto-nombre { color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.producto-qty { color: var(--text-secondary); font-size: 0.75rem; }
+.producto-monto, .venta-monto { color: var(--success-color); font-weight: 600; font-family: "Courier New", monospace; }
+.productos-more { padding: 0.4rem 0.6rem; font-size: 0.7rem; color: var(--text-secondary); text-align: center; background: var(--bg-secondary); }
+.venta-ticket { font-weight: 700; color: var(--accent-color); }
+.venta-fecha { color: var(--text-secondary); font-size: 0.75rem; }
 
-.venta-ticket {
-  font-weight: 700;
-  color: var(--accent-color);
-}
-
-.venta-fecha {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.venta-monto {
-  color: var(--success-color);
-  font-weight: 600;
-  font-family: "Courier New", monospace;
-}
-
-/* Sección Asistencias */
-.seccion-asistencias {
-  position: relative;
-  z-index: 1;
-}
-
-.asistencias-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
+/* Asistencias */
+.asistencias-content { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .calendario-header {
   text-align: center;
@@ -1787,8 +2055,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   margin: 0;
   color: var(--accent-color);
   font-size: 1.2rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: 'HyliaSerifBeta', serif;
 }
 
 .calendario-grid {
@@ -1810,82 +2077,492 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   color: var(--text-secondary);
 }
 
-.calendario-dias {
+.calendario-dias { 
+  display: grid; 
+  grid-template-columns: repeat(7, 1fr); 
+  gap: 0.4rem; 
+}
+
+.calendario-grid {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+}
+
+.calendario-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.calendario-header h3 {
+  font-family: 'HyliaSerifBeta', serif;
+  color: var(--accent-color);
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.dias-semana {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 0.5rem;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.dias-semana span {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  padding: 0.3rem;
 }
 
 .dia-cell {
-  min-height: 70px;
+  min-height: 85px;
   background: var(--bg-primary);
   border-radius: 8px;
   border: 1px solid var(--border-color);
-  padding: 0.5rem;
+  padding: 0.4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.dia-cell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: transparent;
   transition: all 0.2s;
 }
 
-.dia-cell.dia-vacio {
-  background: transparent;
-  border: none;
+.dia-cell.dia-vacio { 
+  background: transparent; 
+  border: none; 
+  min-height: 40px;
 }
 
-.dia-cell.dia-hoy {
-  border-color: var(--accent-color);
+.dia-cell.dia-hoy { 
+  border-color: var(--accent-color); 
   background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
-.dia-cell.dia-trabajado {
-  background: color-mix(in srgb, var(--success-color) 8%, var(--bg-primary));
-  border-color: color-mix(in srgb, var(--success-color) 40%, var(--border-color));
+.dia-cell.dia-hoy::before {
+  background: linear-gradient(90deg, var(--accent-color), var(--accent-hover), var(--accent-color));
 }
 
-.dia-numero {
-  font-weight: 700;
-  font-size: 0.9rem;
+.dia-cell.dia-trabajado { 
+  background: linear-gradient(135deg, color-mix(in srgb, var(--success-color) 10%, var(--bg-primary)) 0%, var(--bg-primary) 100%);
+  border-color: color-mix(in srgb, var(--success-color) 50%, var(--border-color)); 
+}
+
+.dia-cell.dia-trabajado::before {
+  background: var(--success-color);
+}
+
+.dia-numero { 
+  font-weight: 700; 
+  font-size: 0.85rem; 
   color: var(--text-primary);
+  font-family: "Courier New", monospace;
 }
 
-.dia-cell.dia-hoy .dia-numero {
-  color: var(--accent-color);
-  font-size: 1rem;
+.dia-cell.dia-hoy .dia-numero { 
+  color: var(--accent-color); 
+  text-shadow: 0 0 8px var(--accent-color);
 }
 
-.dia-trabajadores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-  justify-content: center;
+.dia-cell.dia-trabajado .dia-numero {
+  color: var(--success-color);
 }
 
-.trabajador-chip {
+.dia-trabajadores { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 0.2rem; 
+  justify-content: center; 
+  max-width: 100%;
+  width: 100%;
+}
+
+.trabajador-chip { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  padding: 0.15rem 0.25rem; 
+  background: linear-gradient(135deg, var(--accent-color) 0%, #92400e 100%);
+  color: var(--bg-primary); 
+  border-radius: 4px; 
   font-size: 0.6rem;
-  font-weight: 700;
-  padding: 0.15rem 0.3rem;
-  background: var(--accent-color);
-  color: var(--bg-primary);
-  border-radius: 4px;
-  cursor: default;
+  min-width: 36px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px var(--shadow-color);
+  transition: all 0.2s;
 }
 
-.dia-vacio-text {
-  color: var(--text-secondary);
-  opacity: 0.3;
-  font-size: 0.8rem;
+.trabajador-chip:hover {
+  transform: scale(1.05);
+  box-shadow: 0 3px 8px var(--shadow-color);
 }
 
-.dia-hoy-text {
-  font-size: 0.6rem;
-  color: var(--accent-color);
+.trabajador-inicial { 
+  font-weight: 700; 
+  font-size: 0.55rem; 
+  line-height: 1.1;
+}
+
+.trabajador-horas { 
+  font-size: 0.65rem; 
   font-weight: 700;
+  opacity: 1; 
+  line-height: 1;
+  font-family: "Courier New", monospace;
+}
+
+.dia-vacio-text { 
+  color: var(--text-secondary); 
+  opacity: 0.3; 
+  font-size: 0.8rem; 
+}
+
+.dia-hoy-text { 
+  font-size: 0.55rem; 
+  color: var(--accent-color); 
+  font-weight: 700; 
   text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
 }
 
-/* Resumen por Usuario */
+.dia-total-horas {
+  font-size: 0.6rem;
+  color: var(--success-color);
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  background: color-mix(in srgb, var(--success-color) 15%, transparent);
+  padding: 0.1rem 0.25rem;
+  border-radius: 3px;
+  margin-top: auto;
+}
+
+.trabajador-chip.mas {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.5rem;
+  min-width: 20px;
+}
+
+@media (max-width: 600px) {
+  .trabajador-chip.mas {
+    font-size: 0.4rem;
+    min-width: 16px;
+  }
+}
+
+@media (max-width: 375px) {
+  .trabajador-chip.mas {
+    font-size: 0.35rem;
+    min-width: 14px;
+  }
+}
+
+/* Responsive Calendario */
+@media (max-width: 992px) {
+  .calendario-grid {
+    padding: 0.75rem;
+  }
+  
+  .calendario-header h3 {
+    font-size: 1rem;
+  }
+  
+  .dias-semana span {
+    font-size: 0.7rem;
+  }
+  
+  .dia-cell {
+    min-height: 75px;
+    padding: 0.35rem;
+  }
+  
+  .dia-numero {
+    font-size: 0.8rem;
+  }
+  
+  .trabajador-chip {
+    min-width: 32px;
+    padding: 0.1rem 0.2rem;
+  }
+  
+  .trabajador-inicial {
+    font-size: 0.5rem;
+  }
+  
+  .trabajador-horas {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .calendario-grid {
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .calendario-header h3 {
+    font-size: 0.9rem;
+  }
+  
+  .dias-semana {
+    gap: 0.25rem;
+  }
+  
+  .dias-semana span {
+    font-size: 0.6rem;
+    padding: 0.2rem;
+  }
+  
+  .calendario-dias {
+    gap: 0.3rem;
+  }
+  
+  .dia-cell {
+    min-height: 65px;
+    padding: 0.25rem;
+    border-radius: 6px;
+  }
+  
+  .dia-cell.dia-vacio {
+    min-height: 30px;
+  }
+  
+  .dia-numero {
+    font-size: 0.75rem;
+  }
+  
+  .dia-trabajadores {
+    gap: 0.15rem;
+  }
+  
+  .trabajador-chip {
+    min-width: 28px;
+    padding: 0.08rem 0.15rem;
+    font-size: 0.55rem;
+  }
+  
+  .trabajador-inicial {
+    font-size: 0.45rem;
+  }
+  
+  .trabajador-horas {
+    font-size: 0.55rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .calendario-grid {
+    padding: 0.4rem;
+  }
+  
+  .calendario-header {
+    margin-bottom: 0.75rem;
+  }
+  
+  .calendario-header h3 {
+    font-size: 0.85rem;
+  }
+  
+  .dias-semana {
+    gap: 0.2rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .dias-semana span {
+    font-size: 0.55rem;
+  }
+  
+  .calendario-dias {
+    gap: 0.25rem;
+  }
+  
+  .dia-cell {
+    min-height: 55px;
+    padding: 0.2rem;
+    border-radius: 5px;
+    border-width: 1px;
+  }
+  
+  .dia-cell.dia-vacio {
+    min-height: 25px;
+  }
+  
+  .dia-numero {
+    font-size: 0.7rem;
+  }
+  
+  .dia-trabajadores {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+  }
+  
+  .trabajador-chip {
+    min-width: 26px;
+    width: 100%;
+    padding: 0.05rem 0.1rem;
+  }
+  
+  .trabajador-inicial {
+    font-size: 0.4rem;
+  }
+  
+  .trabajador-horas {
+    font-size: 0.5rem;
+  }
+  
+  .dia-total-horas {
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendario-grid {
+    padding: 0.35rem;
+    border-width: 1px;
+  }
+  
+  .calendario-header h3 {
+    font-size: 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .dias-semana {
+    gap: 0.15rem;
+  }
+  
+  .dias-semana span {
+    font-size: 0.5rem;
+    padding: 0.15rem 0;
+  }
+  
+  .calendario-dias {
+    gap: 0.2rem;
+  }
+  
+  .dia-cell {
+    min-height: 48px;
+    padding: 0.15rem;
+    border-radius: 4px;
+  }
+  
+  .dia-cell.dia-vacio {
+    min-height: 20px;
+  }
+  
+  .dia-numero {
+    font-size: 0.65rem;
+  }
+  
+  .dia-trabajadores {
+    gap: 0.08rem;
+  }
+  
+  .trabajador-chip {
+    min-width: 22px;
+    padding: 0.05rem 0.1rem;
+    border-radius: 3px;
+  }
+  
+  .trabajador-inicial {
+    font-size: 0.35rem;
+  }
+  
+  .trabajador-horas {
+    font-size: 0.45rem;
+  }
+  
+  .dia-hoy-text {
+    font-size: 0.45rem;
+  }
+  
+  .dia-vacio-text {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 375px) {
+  .calendario-grid {
+    padding: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .calendario-header h3 {
+    font-size: 0.7rem;
+  }
+  
+  .dias-semana {
+    gap: 0.1rem;
+  }
+  
+  .dias-semana span {
+    font-size: 0.45rem;
+  }
+  
+  .calendario-dias {
+    gap: 0.15rem;
+  }
+  
+  .dia-cell {
+    min-height: 42px;
+    padding: 0.1rem;
+    border-width: 1px;
+  }
+  
+  .dia-cell.dia-vacio {
+    min-height: 18px;
+  }
+  
+  .dia-numero {
+    font-size: 0.6rem;
+    font-weight: 600;
+  }
+  
+  .dia-trabajadores {
+    gap: 0.05rem;
+  }
+  
+  .trabajador-chip {
+    min-width: 18px;
+    padding: 0.03rem 0.05rem;
+    border-radius: 2px;
+    border-width: 1px;
+  }
+  
+  .trabajador-inicial {
+    font-size: 0.3rem;
+  }
+  
+  .trabajador-horas {
+    font-size: 0.4rem;
+  }
+  
+  .dia-hoy-text {
+    font-size: 0.4rem;
+    padding: 0.05rem 0.15rem;
+  }
+}
+
 .usuarios-asistencia {
   background: var(--bg-secondary);
   border-radius: 12px;
@@ -1897,16 +2574,11 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   margin: 0 0 1rem 0;
   color: var(--accent-color);
   font-size: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: 'HyliaSerifBeta', serif;
   text-align: center;
 }
 
-.usuarios-asistencia-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
-}
+.usuarios-asistencia-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
 
 .usuario-asistencia-card {
   background: var(--bg-primary);
@@ -1916,95 +2588,334 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   transition: all 0.2s;
 }
 
-.usuario-asistencia-card:hover {
-  border-color: var(--accent-color);
-  transform: translateY(-2px);
-}
-
-.usuario-asistencia-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.usuario-asistencia-info {
-  flex: 1;
-}
-
-.usuario-asistencia-info h4 {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-}
-
-.usuario-dias-count {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-}
-
-.dias-laborados-mini {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.dia-chip {
-  font-size: 0.7rem;
-  font-weight: 600;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.usuario-asistencia-card:hover { border-color: var(--accent-color); transform: translateY(-2px); }
+.usuario-asistencia-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
+.usuario-asistencia-info { flex: 1; }
+.usuario-asistencia-info h4 { margin: 0 0 0.3rem 0; font-size: 0.9rem; color: var(--text-primary); }
+.usuario-stats-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.stat-badge { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 0.2rem; 
+  font-size: 0.7rem; 
+  color: var(--text-secondary); 
   background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
   border: 1px solid var(--border-color);
 }
+.stat-badge.highlight { 
+  background: color-mix(in srgb, var(--accent-color) 15%, var(--bg-secondary)); 
+  color: var(--accent-color); 
+  border-color: var(--accent-color);
+}
+.stat-icon-small { font-size: 0.7rem; }
+.dias-laborados-mini { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.dia-chip { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  padding: 0.25rem 0.4rem; 
+  background: var(--bg-secondary); 
+  color: var(--text-primary); 
+  border-radius: 6px; 
+  border: 1px solid var(--border-color); 
+  min-width: 36px;
+  cursor: help;
+}
+.dia-num { font-size: 0.75rem; font-weight: 700; line-height: 1; }
+.dia-horas { font-size: 0.55rem; color: var(--accent-color); line-height: 1; }
 
 /* Responsive */
+@media (max-width: 992px) {
+  .usuarios-asistencia-grid { 
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+    gap: 0.75rem;
+  }
+  
+  .usuario-asistencia-card {
+    padding: 0.75rem;
+  }
+  
+  .usuario-asistencia-header {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  
+  .usuario-asistencia-info h4 {
+    font-size: 0.85rem;
+  }
+}
+
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .tabs-container { width: 100%; }
+  .tab-text { display: none; }
+  .top-vendedor { flex-direction: column; text-align: center; }
+  .top-stats { justify-content: center; flex-wrap: wrap; }
+  .usuarios-ventas-grid { grid-template-columns: 1fr; }
+  .usuarios-asistencia-grid { grid-template-columns: 1fr; }
+  .usuarios-asistencia {
+    padding: 0.75rem;
+  }
+  .usuarios-asistencia h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  .form-grid-zelda { grid-template-columns: 1fr; }
+  .form-group-zelda:first-child { grid-column: span 1; }
+  .modal-content-scroll { padding: 1rem; }
+  
+  .usuario-asistencia-card {
+    padding: 0.6rem;
   }
   
-  .submenu {
-    width: 100%;
-    justify-content: center;
+  .usuario-asistencia-header {
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
   }
   
-  .submenu-text {
-    display: none;
+  .usuario-avatar-small {
+    width: 40px;
+    height: 40px;
   }
   
-  .top-vendedor {
-    flex-direction: column;
-    text-align: center;
+  .avatar-placeholder-small {
+    font-size: 1rem;
   }
   
-  .top-stats {
-    justify-content: center;
+  .usuario-asistencia-info h4 {
+    font-size: 0.8rem;
   }
   
-  .usuarios-ventas-grid {
+  .stat-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .dias-laborados-mini {
+    gap: 0.2rem;
+  }
+  
+  .dia-chip {
+    padding: 0.2rem 0.3rem;
+    min-width: 30px;
+  }
+  
+  .dia-num {
+    font-size: 0.65rem;
+  }
+  
+  .dia-horas {
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .usuarios-asistencia-grid {
     grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .usuarios-asistencia {
+    padding: 0.5rem;
+  }
+  
+  .usuarios-asistencia h3 {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .usuario-asistencia-card {
+    padding: 0.5rem;
+  }
+  
+  .usuario-asistencia-header {
+    gap: 0.4rem;
+  }
+  
+  .usuario-avatar-small {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .avatar-placeholder-small {
+    font-size: 0.9rem;
+  }
+  
+  .usuario-asistencia-info h4 {
+    font-size: 0.75rem;
+    margin-bottom: 0.2rem;
+  }
+  
+  .usuario-stats-row {
+    gap: 0.3rem;
+  }
+  
+  .stat-badge {
+    font-size: 0.55rem;
+    padding: 0.08rem 0.25rem;
+  }
+  
+  .stat-icon-small {
+    font-size: 0.6rem;
+  }
+  
+  .dias-laborados-mini {
+    gap: 0.15rem;
+  }
+  
+  .dia-chip {
+    padding: 0.15rem 0.25rem;
+    min-width: 26px;
+    border-radius: 4px;
+  }
+  
+  .dia-num {
+    font-size: 0.6rem;
+  }
+  
+  .dia-horas {
+    font-size: 0.45rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-section { grid-template-columns: repeat(3, 1fr); }
+  .stat-card { padding: 0.6rem; }
+  .stat-icon { font-size: 1.2rem; }
+  .stat-value { font-size: 0.8rem; }
+  .usuarios-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .usuario-card { padding: 1rem; }
+  .avatar-container { width: 70px; height: 70px; }
+  .avatar-placeholder { font-size: 1.8rem; }
+  .usuario-nombre { font-size: 0.9rem; }
+  .header-actions { flex-direction: column; }
+  .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+  
+  .usuarios-asistencia {
+    padding: 0.4rem;
+    border-radius: 8px;
+  }
+  
+  .usuarios-asistencia h3 {
+    font-size: 0.8rem;
+  }
+  
+  .usuario-asistencia-card {
+    padding: 0.4rem;
+  }
+  
+  .usuario-asistencia-header {
+    flex-wrap: wrap;
+  }
+  
+  .usuario-avatar-small {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .avatar-placeholder-small {
+    font-size: 0.8rem;
+  }
+  
+  .usuario-asistencia-info h4 {
+    font-size: 0.7rem;
+  }
+  
+  .stat-badge {
+    font-size: 0.5rem;
+    padding: 0.05rem 0.2rem;
+  }
+  
+  .dias-laborados-mini {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+  
+  .dia-chip {
+    flex-shrink: 0;
+    padding: 0.12rem 0.2rem;
+    min-width: 24px;
+  }
+  
+  .dia-num {
+    font-size: 0.55rem;
+  }
+  
+  .dia-horas {
+    font-size: 0.4rem;
+  }
+}
+
+@media (max-width: 375px) {
+  .usuarios-asistencia {
+    padding: 0.35rem;
+    border-width: 1px;
+  }
+  
+  .usuarios-asistencia h3 {
+    font-size: 0.75rem;
+    margin-bottom: 0.4rem;
   }
   
   .usuarios-asistencia-grid {
-    grid-template-columns: 1fr;
+    gap: 0.4rem;
   }
   
-  .calendario-dias {
-    gap: 0.25rem;
+  .usuario-asistencia-card {
+    padding: 0.35rem;
   }
   
-  .dia-cell {
-    min-height: 50px;
-    padding: 0.3rem;
+  .usuario-asistencia-header {
+    gap: 0.3rem;
+  }
+  
+  .usuario-avatar-small {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .avatar-placeholder-small {
+    font-size: 0.7rem;
+  }
+  
+  .usuario-asistencia-info h4 {
+    font-size: 0.65rem;
+  }
+  
+  .usuario-stats-row {
+    gap: 0.2rem;
+    flex-wrap: wrap;
+  }
+  
+  .stat-badge {
+    font-size: 0.45rem;
+    padding: 0.05rem 0.15rem;
+  }
+  
+  .stat-icon-small {
+    font-size: 0.5rem;
+  }
+  
+  .dias-laborados-mini {
+    gap: 0.1rem;
+  }
+  
+  .dia-chip {
+    padding: 0.1rem 0.15rem;
+    min-width: 22px;
+    border-radius: 3px;
+  }
+  
+  .dia-num {
+    font-size: 0.5rem;
+  }
+  
+  .dia-horas {
+    font-size: 0.35rem;
   }
 }
 </style>

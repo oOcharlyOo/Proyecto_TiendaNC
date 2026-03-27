@@ -33,30 +33,42 @@
 }
 
 :root {
-  /* Variables base (tema Zelda classic por defecto) */
-  --bg-primary: #07150d;
-  --bg-secondary: #133523;
-  --bg-panel: #1f5b35;
-  --text-primary: #f6f2de;
-  --text-secondary: #a3a380;
-  --border-color: #2a1807;
-  --accent-color: #f8d667;
-  --accent-hover: #ffe48b;
-  --success-color: #14b033;
-  --error-color: #b7393f;
-  --shadow-color: rgba(0, 0, 0, 0.45);
+  /* Variables base - sobrescritas por themes.css según el tema activo */
+  --bg-primary: #0a1510;
+  --bg-secondary: #1a2f20;
+  --bg-panel: #2a4030;
+  --text-primary: #e8e0d0;
+  --text-secondary: #b0a890;
+  --border-color: #4a3520;
+  --accent-color: #d4a84b;
+  --accent-hover: #e8c06a;
+  --success-color: #5cb85c;
+  --error-color: #c75a5a;
+  --warning-color: #e8a83c;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  
+  --gradient-btn-start: #e8c06a;
+  --gradient-btn-mid: #c9a045;
+  --gradient-btn-end: #9a7530;
+  --gradient-panel-start: #2a4030;
+  --gradient-panel-end: #1a2f20;
+  --gradient-bg-start: #1a2f20;
+  --gradient-bg-mid: #0f1a12;
   
   /* Aliases para compatibilidad */
   --zelda-gold: var(--accent-color);
-  --zelda-amber: #c79634;
+  --zelda-amber: var(--accent-hover);
   --zelda-forest: var(--bg-panel);
   --zelda-forest-dark: var(--bg-secondary);
   --zelda-bg: var(--bg-primary);
   --zelda-paper: var(--text-primary);
   --zelda-ink: var(--border-color);
+  --btn-text: var(--bg-primary);
   
-  --border-width: 2px;
-  --border-width-thick: 3px;
+  --border-width: 3px;
+  --border-width-thick: 4px;
+  --shadow-outer: 0 4px 0;
+  --shadow-inner: inset 0 0 0 2px;
 }
 
 html,

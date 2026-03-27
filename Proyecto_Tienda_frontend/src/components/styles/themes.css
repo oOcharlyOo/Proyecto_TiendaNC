@@ -1,310 +1,338 @@
 /* ================================================
-   TEMAS - Sistema de temas con variables CSS
+   TEMAS - Sistema de variables CSS para The Legend of Zelda
    ================================================ */
 
-/* ---------- Variables base para todos los temas ---------- */
+/* ---------- Variables base (fallback) ---------- */
 :root {
-  /* Variables globales por defecto (Zelda classic) */
-  --bg-primary: #07150d;
-  --bg-secondary: #133523;
-  --bg-panel: #1f5b35;
-  --text-primary: #f6f2de;
-  --infoBlueColor: #6e96b8;
-  --hystorybtn: purple;
-  --text-secondary: #a3a380;
-  --border-color: #2a1807;
-  --accent-color: #f8d667;
-  --accent-hover: #ffe48b;
-  --success-color: #14b033;
-  --error-color: #b7393f;
-  --shadow-color: rgba(0, 0, 0, 0.45);
+  --bg-primary: #0a1510;
+  --bg-secondary: #1a2f20;
+  --bg-panel: #2a4030;
+  --text-primary: #e8e0d0;
+  --infoBlueColor: #5090d0;
+  --hystorybtn: #9a7530;
+  --text-secondary: #b0a890;
+  --border-color: #4a3520;
+  --accent-color: #d4a84b;
+  --accent-hover: #e8c06a;
+  --success-color: #5cb85c;
+  --error-color: #c75a5a;
+  --warning-color: #e8a83c;
+  --shadow-color: rgba(0, 0, 0, 0.5);
   
-  /* Colores de gradiente */
-  --gradient-btn-start: #ffe48b;
-  --gradient-btn-mid: #e2b84f;
-  --gradient-btn-end: #c99234;
-  --gradient-panel-start: #1f5b35;
-  --gradient-panel-end: #133523;
-  --gradient-bg-start: #11261b;
-  --gradient-bg-mid: #0a1912;
+  --gradient-btn-start: #e8c06a;
+  --gradient-btn-mid: #c9a045;
+  --gradient-btn-end: #9a7530;
+  --gradient-panel-start: #2a4030;
+  --gradient-panel-end: #1a2f20;
+  --gradient-bg-start: #1a2f20;
+  --gradient-bg-mid: #0f1a12;
   
-  /* Variables para gráficos */
-  --chart-border: #2a1807;
-  --chart-border-light: #d8c37c;
-  --chart-bg: #133523;
-  --chart-text: #f6f2de;
-  --chart-item-bg: rgba(255,255,255,0.1);
-  --chart-qty: #a3a380;
-  --chart-amount: #14b033;
-  --zelda-gold: #c99234;
+  --chart-border: #4a3520;
+  --chart-border-light: #d4a84b;
+  --chart-bg: #1a2f20;
+  --chart-text: #e8e0d0;
+  --chart-item-bg: rgba(212, 168, 75, 0.1);
+  --chart-qty: #b0a890;
+  --chart-amount: #5cb85c;
+  --zelda-gold: #d4a84b;
   
-  /* Bordes y sombras */
   --border-width: 3px;
   --border-width-thick: 4px;
   --shadow-outer: 0 4px 0;
   --shadow-inner: inset 0 0 0 2px;
 }
 
+/* ---------- TEMA: HYRULE CLÁSICO ---------- */
 [data-theme="zelda"] {
-  --bg-primary: #0e2d1d;
-  --bg-secondary: #133523;
-  --bg-panel: #1f5b35;
-  --text-primary: #f6f2de;
-  --text-secondary: #a3a380;
-  --border-color: #2a1807;
-  --accent-color: #c99234;
-  --accent-hover: #ffe48b;
-  --success-color: #14b033;
-  --error-color: #b7393f;
-  --shadow-color: rgba(0, 0, 0, 0.45);
+  --bg-primary: #0a1510;
+  --bg-secondary: #1a2f20;
+  --bg-panel: #2a4030;
+  --text-primary: #e8e0d0;
+  --text-secondary: #b0a890;
+  --border-color: #4a3520;
+  --accent-color: #d4a84b;
+  --accent-hover: #e8c06a;
+  --success-color: #5cb85c;
+  --error-color: #c75a5a;
+  --warning-color: #e8a83c;
+  --shadow-color: rgba(0, 0, 0, 0.5);
   
-  --gradient-btn-start: #ffe48b;
-  --gradient-btn-mid: #e2b84f;
-  --gradient-btn-end: #c99234;
-  --gradient-panel-start: #1f5b35;
-  --gradient-panel-end: #133523;
-  --gradient-bg-start: #11261b;
-  --gradient-bg-mid: #0a1912;
+  --gradient-btn-start: #e8c06a;
+  --gradient-btn-mid: #c9a045;
+  --gradient-btn-end: #9a7530;
+  --gradient-panel-start: #2a4030;
+  --gradient-panel-end: #1a2f20;
+  --gradient-bg-start: #1a2f20;
+  --gradient-bg-mid: #0f1a12;
   
-  --btn-text: var(--border-color);
+  --btn-text: #1a1510;
   
-  /* Variables para gráficos */
-  --chart-border: #2a1807;
-  --chart-border-light: #d8c37c;
-  --chart-bg: #133523;
-  --chart-text: #f6f2de;
-  --chart-item-bg: rgba(255,255,255,0.1);
-  --chart-qty: #a3a380;
-  --chart-amount: #14b033;
-  --zelda-gold: #c99234;
+  --chart-border: #4a3520;
+  --chart-border-light: #d4a84b;
+  --chart-bg: #1a2f20;
+  --chart-text: #e8e0d0;
+  --chart-item-bg: rgba(212, 168, 75, 0.1);
+  --chart-qty: #b0a890;
+  --chart-amount: #5cb85c;
+  --zelda-gold: #d4a84b;
+  --hystorybtn: #9a7530;
 }
 
-/* ---------- TEMA: DEATH MOUNTAIN ---------- */
+/* ---------- TEMA: DEATH MOUNTAIN (Volcán) ---------- */
 [data-theme="deathmountain"] {
-  --bg-primary: #2a0a0a;
-  --bg-secondary: #4a1a1a;
-  --bg-panel: #6b2a2a;
-  --text-primary: #f5e6c8;
-  --text-secondary: #d4a8a8;
-  --border-color: #2a0a0a;
-  --accent-color: #ff6b35;
-  --accent-hover: #ff8c5a;
-  --success-color: #4e8a4e;
-  --error-color: #ff4444;
-  --shadow-color: rgba(0, 0, 0, 0.5);
+  --bg-primary: #1a0808;
+  --bg-secondary: #3a1515;
+  --bg-panel: #5a2525;
+  --text-primary: #f0e8e0;
+  --text-secondary: #c8a8a8;
+  --border-color: #4a2020;
+  --accent-color: #e86a3a;
+  --accent-hover: #ff8855;
+  --success-color: #7ab87a;
+  --error-color: #e85555;
+  --warning-color: #e8a03a;
+  --shadow-color: rgba(20, 0, 0, 0.6);
   
-  --gradient-btn-start: #ff6b35;
-  --gradient-btn-mid: #cc4a1a;
-  --gradient-btn-end: #8b3010;
-  --gradient-panel-start: #8b3a3a;
-  --gradient-panel-end: #6b2a2a;
-  --gradient-bg-start: #8b2a2a;
-  --gradient-bg-mid: #4a1515;
+  --gradient-btn-start: #ff8855;
+  --gradient-btn-mid: #d86a35;
+  --gradient-btn-end: #a84a20;
+  --gradient-panel-start: #5a2525;
+  --gradient-panel-end: #3a1515;
+  --gradient-bg-start: #4a1a1a;
+  --gradient-bg-mid: #1a0808;
   
-  --btn-text: var(--text-primary);
+  --btn-text: #1a0808;
   
-  /* Variables para gráficos */
-  --chart-border: #ff6b35;
-  --chart-border-light: #ff8c5a;
-  --chart-bg: linear-gradient(180deg, #4a1a1a 0%, #2a0a0a 100%);
-  --chart-text: #f5e6c8;
-  --chart-item-bg: #2a0a0a;
-  --chart-qty: #d4a8a8;
-  --chart-amount: #4e8a4e;
-  --zelda-gold: #ff6b35;
+  --chart-border: #4a2020;
+  --chart-border-light: #e86a3a;
+  --chart-bg: #3a1515;
+  --chart-text: #f0e8e0;
+  --chart-item-bg: rgba(232, 106, 58, 0.1);
+  --chart-qty: #c8a8a8;
+  --chart-amount: #7ab87a;
+  --zelda-gold: #e86a3a;
+  --hystorybtn: #a84a20;
 }
 
-/* ---------- TEMA: SKYWARD SWORD ---------- */
+/* ---------- TEMA: SKYWARD SWORD (Cielo) ---------- */
 [data-theme="skyward"] {
-  --bg-primary: #0d2840;
-  --bg-secondary: #1a3a5c;
-  --bg-panel: #2a5a8c;
-  --text-primary: #f0f8ff;
-  --text-secondary: #b8d4e8;
-  --border-color: #0d2840;
-  --accent-color: #ffd700;
-  --accent-hover: #ffed4a;
-  --success-color: #4ecd85;
-  --error-color: #ff6b6b;
-  --shadow-color: rgba(0, 0, 0, 0.3);
+  --bg-primary: #0a1828;
+  --bg-secondary: #1a3060;
+  --bg-panel: #2a4890;
+  --text-primary: #e8f0ff;
+  --text-secondary: #90b0d8;
+  --border-color: #1a2840;
+  --accent-color: #f0d040;
+  --accent-hover: #ffe060;
+  --success-color: #60c8a0;
+  --error-color: #e87070;
+  --warning-color: #e8b030;
+  --shadow-color: rgba(10, 20, 40, 0.5);
   
-  --gradient-btn-start: #a58d00;
-  --gradient-btn-mid: #ffb700;
-  --gradient-btn-end: #ff9500;
-  --gradient-panel-start: #3a7ab8;
-  --gradient-panel-end: #2a5a8c;
-  --gradient-bg-start: #5ac8fa;
-  --gradient-bg-mid: #87ceeb;
+  --gradient-btn-start: #ffe060;
+  --gradient-btn-mid: #d8b840;
+  --gradient-btn-end: #a88820;
+  --gradient-panel-start: #2a4888;
+  --gradient-panel-end: #1a3060;
+  --gradient-bg-start: #1a3870;
+  --gradient-bg-mid: #0a1828;
   
-  --btn-text: var(--border-color);
+  --btn-text: #0a1828;
   
-  /* Variables para gráficos */
-  --chart-border: #ffd700;
-  --chart-border-light: #ffed4a;
-  --chart-bg: linear-gradient(180deg, #1a3a5c 0%, #0d2840 100%);
-  --chart-text: #f0f8ff;
-  --chart-item-bg: #0d2840;
-  --chart-qty: #b8d4e8;
-  --chart-amount: #4ecdc4;
-  --zelda-gold: #ffd700;
+  --chart-border: #1a2840;
+  --chart-border-light: #f0d040;
+  --chart-bg: #1a3060;
+  --chart-text: #e8f0ff;
+  --chart-item-bg: rgba(240, 208, 64, 0.1);
+  --chart-qty: #90b0d8;
+  --chart-amount: #60c8a0;
+  --zelda-gold: #f0d040;
+  --hystorybtn: #a88820;
 }
 
-/* ---------- TEMA: ALFORJA ---------- */
+/* ---------- TEMA: ALFORJA (Pergamino Antiguo) ---------- */
 [data-theme="alforja"] {
-  --bg-primary: #21140f;
-  --bg-secondary: #4a3728;
-  --bg-panel: #5c4433;
-  --text-primary: #f5e6c8;
-  --text-secondary: #d4c4a8;
-  --border-color: #3d2a1f;
-  --accent-color: #c9a45c;
-  --accent-hover: #d4b46c;
-  --success-color: #6b8e4e;
-  --error-color: #a64b4b;
-  --shadow-color: rgba(0, 0, 0, 0.4);
+  --bg-primary: #18100a;
+  --bg-secondary: #3a2820;
+  --bg-panel: #5a4030;
+  --text-primary: #f0e8d8;
+  --text-secondary: #b8a890;
+  --border-color: #3a2818;
+  --accent-color: #c9a050;
+  --accent-hover: #ddb868;
+  --success-color: #78a858;
+  --error-color: #c06060;
+  --warning-color: #d8a040;
+  --shadow-color: rgba(20, 12, 8, 0.5);
   
-  --gradient-btn-start: #c9a45c;
-  --gradient-btn-mid: #a68542;
-  --gradient-btn-end: #8b7035;
-  --gradient-panel-start: #6b4f3a;
-  --gradient-panel-end: #5c4433;
-  --gradient-bg-start: #4a3728;
-  --gradient-bg-mid: #2a1a12;
+  --gradient-btn-start: #ddb868;
+  --gradient-btn-mid: #b89048;
+  --gradient-btn-end: #886828;
+  --gradient-panel-start: #5a4030;
+  --gradient-panel-end: #3a2820;
+  --gradient-bg-start: #4a3525;
+  --gradient-bg-mid: #18100a;
   
-  --btn-text: #1a1008;
+  --btn-text: #18100a;
   
-  /* Variables para gráficos */
-  --chart-border: #c9a45c;
-  --chart-border-light: #d4b46c;
-  --chart-bg: linear-gradient(180deg, #4a3728 0%, #21140f 100%);
-  --chart-text: #f5e6c8;
-  --chart-item-bg: #21140f;
-  --chart-qty: #d4c4a8;
-  --chart-amount: #6b8e4e;
-  --zelda-gold: #c9a45c;
+  --chart-border: #3a2818;
+  --chart-border-light: #c9a050;
+  --chart-bg: #3a2820;
+  --chart-text: #f0e8d8;
+  --chart-item-bg: rgba(201, 160, 80, 0.1);
+  --chart-qty: #b8a890;
+  --chart-amount: #78a858;
+  --zelda-gold: #c9a050;
+  --hystorybtn: #886828;
 }
 
-/* ---------- TEMAS DARK ---------- */
-
-/* Dark Forest */
+/* ---------- TEMA: DARK FOREST (Bosque Oscuro) ---------- */
 [data-theme="darkforest"] {
-  --bg-primary: #0d1a12;
-  --bg-secondary: #152a1f;
-  --bg-panel: #1f3d2e;
-  --text-primary: #e8f5e9;
-  --text-secondary: rgba(232, 245, 233, 0.7);
-  --border-color: #2e4d3b;
-  --accent-color: #81c784;
-  --accent-hover: #a5d6a7;
-  --success-color: #81c784;
-  --error-color: #e57373;
-  --shadow-color: rgba(0, 0, 0, 0.5);
+  --bg-primary: #0a120a;
+  --bg-secondary: #152515;
+  --bg-panel: #1f3820;
+  --text-primary: #d8e8d0;
+  --text-secondary: #88a888;
+  --border-color: #1a3018;
+  --accent-color: #50c878;
+  --accent-hover: #70e098;
+  --success-color: #50c878;
+  --error-color: #d86868;
+  --warning-color: #d8a840;
+  --shadow-color: rgba(0, 10, 0, 0.6);
   
-  --gradient-btn-start: #81c784;
-  --gradient-btn-mid: #66bb6a;
-  --gradient-btn-end: #4caf50;
-  --btn-text: var(--bg-primary);
+  --gradient-btn-start: #70e098;
+  --gradient-btn-mid: #50b868;
+  --gradient-btn-end: #308848;
+  --gradient-panel-start: #1f3820;
+  --gradient-panel-end: #152515;
+  --gradient-bg-start: #182a18;
+  --gradient-bg-mid: #0a120a;
   
-  --chart-border: #81c784;
-  --chart-border-light: #a5d6a7;
-  --chart-bg: #152a1f;
-  --chart-text: #e8f5e9;
-  --chart-item-bg: rgba(255,255,255,0.05);
-  --chart-qty: rgba(232, 245, 233, 0.6);
-  --chart-amount: #81c784;
-  --zelda-gold: #81c784;
-  --hystorybtn: #4caf50;
+  --btn-text: #0a120a;
+  
+  --chart-border: #1a3018;
+  --chart-border-light: #50c878;
+  --chart-bg: #152515;
+  --chart-text: #d8e8d0;
+  --chart-item-bg: rgba(80, 200, 120, 0.1);
+  --chart-qty: #88a888;
+  --chart-amount: #50c878;
+  --zelda-gold: #50c878;
+  --hystorybtn: #308848;
 }
 
-/* Dark Mountain */
+/* ---------- TEMA: DARK MOUNTAIN (Montaña Oscura) ---------- */
 [data-theme="darkmountain"] {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --bg-panel: #3d3d3d;
+  --bg-primary: #121212;
+  --bg-secondary: #282828;
+  --bg-panel: #3a3a3a;
   --text-primary: #e0e0e0;
-  --text-secondary: rgba(224, 224, 224, 0.7);
-  --border-color: #4d4d4d;
-  --accent-color: #bdbdbd;
-  --accent-hover: #eeeeee;
-  --success-color: #81c784;
-  --error-color: #e57373;
-  --shadow-color: rgba(0, 0, 0, 0.6);
+  --text-secondary: #a0a0a0;
+  --border-color: #383838;
+  --accent-color: #a0a0b0;
+  --accent-hover: #c0c0d0;
+  --success-color: #70b870;
+  --error-color: #d07070;
+  --warning-color: #d0b060;
+  --shadow-color: rgba(0, 0, 0, 0.7);
   
-  --gradient-btn-start: #bdbdbd;
-  --gradient-btn-mid: #9e9e9e;
-  --gradient-btn-end: #757575;
-  --btn-text: var(--bg-primary);
+  --gradient-btn-start: #c0c0d0;
+  --gradient-btn-mid: #909098;
+  --gradient-btn-end: #686870;
+  --gradient-panel-start: #3a3a3a;
+  --gradient-panel-end: #282828;
+  --gradient-bg-start: #303030;
+  --gradient-bg-mid: #121212;
   
-  --chart-border: #bdbdbd;
-  --chart-border-light: #eeeeee;
-  --chart-bg: #2d2d2d;
+  --btn-text: #121212;
+  
+  --chart-border: #383838;
+  --chart-border-light: #a0a0b0;
+  --chart-bg: #282828;
   --chart-text: #e0e0e0;
-  --chart-item-bg: rgba(255,255,255,0.03);
-  --chart-qty: rgba(224, 224, 224, 0.6);
-  --chart-amount: #81c784;
-  --zelda-gold: #bdbdbd;
-  --hystorybtn: #757575;
+  --chart-item-bg: rgba(160, 160, 176, 0.1);
+  --chart-qty: #a0a0a0;
+  --chart-amount: #70b870;
+  --zelda-gold: #a0a0b0;
+  --hystorybtn: #686870;
 }
 
-/* Dark Skyward */
+/* ---------- TEMA: DARK SKYWARD (Cielo Nocturno) ---------- */
 [data-theme="darkskyward"] {
-  --bg-primary: #0a1929;
-  --bg-secondary: #132f4c;
-  --bg-panel: #173451;
-  --text-primary: #e3f2fd;
-  --text-secondary: rgba(227, 242, 253, 0.7);
-  --border-color: #1e4976;
-  --accent-color: #64b5f6;
-  --accent-hover: #90caf9;
-  --success-color: #81c784;
-  --error-color: #e57373;
-  --shadow-color: rgba(0, 0, 0, 0.5);
+  --bg-primary: #080a12;
+  --bg-secondary: #101828;
+  --bg-panel: #182540;
+  --text-primary: #d0e0f0;
+  --text-secondary: #8090a8;
+  --border-color: #182030;
+  --accent-color: #5090d0;
+  --accent-hover: #70b0f0;
+  --success-color: #60b890;
+  --error-color: #d07070;
+  --warning-color: #d0a050;
+  --shadow-color: rgba(0, 5, 15, 0.6);
   
-  --gradient-btn-start: #64b5f6;
-  --gradient-btn-mid: #42a5f5;
-  --gradient-btn-end: #2196f3;
-  --btn-text: var(--bg-primary);
+  --gradient-btn-start: #70b0f0;
+  --gradient-btn-mid: #4888c8;
+  --gradient-btn-end: #3060a0;
+  --gradient-panel-start: #182540;
+  --gradient-panel-end: #101828;
+  --gradient-bg-start: #142030;
+  --gradient-bg-mid: #080a12;
   
-  --chart-border: #64b5f6;
-  --chart-border-light: #90caf9;
-  --chart-bg: #132f4c;
-  --chart-text: #e3f2fd;
-  --chart-item-bg: rgba(255,255,255,0.03);
-  --chart-qty: rgba(227, 242, 253, 0.6);
-  --chart-amount: #81c784;
-  --zelda-gold: #64b5f6;
-  --hystorybtn: #2196f3;
+  --btn-text: #080a12;
+  
+  --chart-border: #182030;
+  --chart-border-light: #5090d0;
+  --chart-bg: #101828;
+  --chart-text: #d0e0f0;
+  --chart-item-bg: rgba(80, 144, 208, 0.1);
+  --chart-qty: #8090a8;
+  --chart-amount: #60b890;
+  --zelda-gold: #5090d0;
+  --hystorybtn: #3060a0;
 }
 
-/* Dark Night */
+/* ---------- TEMA: DARK NIGHT (Noche Estrellada) ---------- */
 [data-theme="darknight"] {
   --bg-primary: #000000;
-  --bg-secondary: #121212;
-  --bg-panel: #1e1e1e;
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: #333333;
-  --accent-color: #ffd700;
-  --accent-hover: #ffea00;
-  --success-color: #00e676;
-  --error-color: #ff5252;
-  --shadow-color: rgba(0, 0, 0, 0.8);
+  --bg-secondary: #0a0a10;
+  --bg-panel: #141418;
+  --text-primary: #f0f0f8;
+  --text-secondary: #9090a0;
+  --border-color: #202028;
+  --accent-color: #f0d020;
+  --accent-hover: #ffe840;
+  --success-color: #40d080;
+  --error-color: #e06060;
+  --warning-color: #e0b020;
+  --shadow-color: rgba(0, 0, 0, 0.9);
   
-  --gradient-btn-start: #ffd700;
-  --gradient-btn-mid: #ffc400;
-  --gradient-btn-end: #ffab00;
-  --btn-text: var(--bg-primary);
+  --gradient-btn-start: #ffe840;
+  --gradient-btn-mid: #d8b820;
+  --gradient-btn-end: #a88810;
+  --gradient-panel-start: #141418;
+  --gradient-panel-end: #0a0a10;
+  --gradient-bg-start: #0c0c14;
+  --gradient-bg-mid: #000000;
   
-  --chart-border: #ffd700;
-  --chart-border-light: #ffea00;
-  --chart-bg: #121212;
-  --chart-text: #ffffff;
-  --chart-item-bg: rgba(255,255,255,0.03);
-  --chart-qty: rgba(255, 255, 255, 0.6);
-  --chart-amount: #00e676;
-  --zelda-gold: #ffd700;
-  --hystorybtn: #ffab00;
+  --btn-text: #000000;
+  
+  --chart-border: #202028;
+  --chart-border-light: #f0d020;
+  --chart-bg: #0a0a10;
+  --chart-text: #f0f0f8;
+  --chart-item-bg: rgba(240, 208, 32, 0.1);
+  --chart-qty: #9090a0;
+  --chart-amount: #40d080;
+  --zelda-gold: #f0d020;
+  --hystorybtn: #a88810;
 }
+
+/* ================================================
+   ESTILOS BASE - Se aplican a cualquier tema
+   ================================================ */
 
 /* ---------- Estilos Base por Tema ---------- */
 [data-theme] body {
@@ -341,6 +369,11 @@
   filter: brightness(1.1);
 }
 
+[data-theme] button:active,
+[data-theme] .btn:active {
+  filter: brightness(0.95);
+}
+
 [data-theme] input,
 [data-theme] select,
 [data-theme] textarea {
@@ -349,755 +382,143 @@
   color: var(--text-primary);
 }
 
-[data-theme="zelda"] input,
-[data-theme="zelda"] select {
-  background: #f2e8bf;
-  color: #272013;
-}
-
 [data-theme] input:focus,
-[data-theme] select:focus {
+[data-theme] select:focus,
+[data-theme] textarea:focus {
   border-color: var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-color);
   outline: none;
 }
 
-[data-theme] .card-metric {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-}
-
-[data-theme="zelda"] .card-metric {
-  background: #f7efc9;
-}
-
-[data-theme] .card-metric p {
+[data-theme] ::placeholder {
   color: var(--text-secondary);
+  opacity: 0.7;
 }
 
-[data-theme="zelda"] .card-metric p {
-  color: #5a4722;
+/* ---------- Scrollbar styles (Ocultos pero funcionales) ---------- */
+/* Webkit (Chrome, Safari, Edge) */
+[data-theme] ::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
-[data-theme] .card-metric strong {
-  color: var(--accent-color);
+[data-theme] ::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-[data-theme="zelda"] .card-metric strong {
-  color: var(--bg-primary);
+[data-theme] ::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: none;
 }
 
-/* ================================================
-   ESTILOS COMPARTIDOS - Aplican a todos los temas
-   ================================================ */
-
-/* ---------- Navbar ---------- */
-[data-theme] .navbar {
-  border-bottom: var(--border-width-thick) solid var(--accent-color);
-  box-shadow: 0 4px 0 var(--border-color);
+[data-theme] ::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: transparent;
 }
 
-[data-theme] .brand-title {
-  color: var(--accent-color);
-  text-shadow: 2px 2px 0 var(--border-color);
+/* Firefox */
+[data-theme],
+.custom-scrollbar {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
 }
 
-[data-theme] .menu-link {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
+/* IE y Edge antiguos */
+[data-theme] *,
+.custom-scrollbar * {
+  -ms-overflow-style: none;
 }
 
-[data-theme] .logout-btn {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-/* ---------- Wood Sign (botones) ---------- */
-[data-theme] .wood-sign {
-  border: var(--border-width-thick) solid var(--border-color);
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
-  color: var(--text-primary);
-  text-shadow: 1px 1px 0 var(--border-color);
-  box-shadow: 6px 6px 0 black !important;
-}
-
-[data-theme] .wood-sign:hover {
-  filter: brightness(1.1);
-}
-
-/* ---------- Modal ---------- */
-[data-theme] .modal-overlay {
-  background: color-mix(in srgb, var(--bg-primary) 92%, transparent) !important;
-}
-
-[data-theme] .modal-card {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%) !important;
-  border: var(--border-width-thick) solid var(--accent-color) !important;
-  box-shadow: var(--shadow-inner) var(--border-color), 0 8px 0 var(--border-color), 0 12px 24px var(--shadow-color) !important;
-}
-
-[data-theme] .btn-cerrar-modal {
-  background: rgba(0, 0, 0, 0.4) !important;
-  color: var(--accent-color) !important;
-}
-
-[data-theme] .btn-cerrar-modal:hover {
-  background: var(--error-color) !important;
-  color: var(--text-primary) !important;
-}
-
-/* ---------- Progress Bar ---------- */
-[data-theme] .progress-bar {
+/* Clase utilitaria para elementos que necesitan scroll visible */
+.scroll-visible::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
   background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
 }
 
-[data-theme] .progress-fill {
-  background: linear-gradient(90deg, var(--gradient-panel-start) 0%, color-mix(in srgb, var(--accent-color) 80%, white) 100%);
+.scroll-visible::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
 }
 
-/* ---------- Stats Card ---------- */
-[data-theme] .stats-card {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
+.scroll-visible {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-color) var(--bg-primary);
 }
 
-[data-theme] .stats-card p {
-  color: var(--text-secondary);
+/* ---------- Modal styles ---------- */
+[data-theme] .modal-overlay {
+  background: rgba(0, 0, 0, 0.85);
 }
 
-[data-theme] .stats-card strong {
-  color: var(--accent-color);
-}
-[data-theme] .product-card {
-  box-shadow: 5px 5px 2px black;
-}
-
-/* ---------- Botones ---------- */
-[data-theme] .btn-agregar {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
+[data-theme] .modal-card,
+[data-theme] .modal-content {
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: var(--border-width-thick) solid var(--accent-color);
+  box-shadow: 0 10px 40px var(--shadow-color);
 }
 
-[data-theme] .btn-eliminar {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-/* ---------- Input placeholder ---------- */
-[data-theme] input::placeholder,
-[data-theme] textarea::placeholder {
-  color: color-mix(in srgb, var(--text-secondary) 60%, var(--bg-primary));
-}
-
-/* ---------- Modal header/body/actions ---------- */
 [data-theme] .modal-header {
-  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--accent-color);
 }
 
 [data-theme] .modal-header h3 {
-  color: var(--accent-color) !important;
-  text-shadow: 2px 2px 0 var(--border-color) !important;
-}
-
-[data-theme] .modal-body label {
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .modal-body input,
-[data-theme] .modal-body textarea,
-[data-theme] .modal-body select {
-  background: var(--bg-secondary) !important;
-  border: 3px solid var(--bg-panel) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .modal-actions {
-  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
-}
-
-[data-theme] .modal-actions button {
-  border: var(--border-width) solid var(--border-color) !important;
-}
-
-/* ---------- Totales ---------- */
-[data-theme] .total-card {
-  border: var(--border-width-thick) solid var(--border-color);
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  color: var(--text-primary);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent), 0 4px 0 var(--border-color);
-}
-
-[data-theme] .card-content p {
-  color: var(--text-secondary);
-}
-
-[data-theme] .card-content strong {
   color: var(--accent-color);
 }
 
-[data-theme] .estado {
-  color: var(--text-primary);
+/* ---------- Tabla styles ---------- */
+[data-theme] table {
+  border-collapse: collapse;
+  width: 100%;
 }
 
-/* ---------- Badges ---------- */
-[data-theme] .metodo-badge.efectivo {
-  background: color-mix(in srgb, var(--success-color) 30%, transparent);
-  color: var(--success-color);
-}
-
-[data-theme] .metodo-badge.transferencia {
-  background: color-mix(in srgb, var(--accent-color) 30%, transparent);
+[data-theme] th {
+  background: var(--bg-secondary);
   color: var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
+  font-family: 'Palatino Linotype', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-[data-theme] .estatus-badge.C {
-  color: var(--success-color);
-}
-
-[data-theme] .estatus-badge.P {
-  color: var(--accent-color);
-}
-
-/* ---------- Historial ---------- */
-[data-theme] .history-filters select {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  color: var(--text-primary);
-}
-
-[data-theme] .history-filters strong {
-  color: var(--accent-color);
-}
-
-[data-theme] .history-item {
-  padding: 0.7rem;
+[data-theme] td {
   border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  cursor: pointer;
-  transition: background 80ms steps(2);
 }
 
-[data-theme] .history-item:hover {
-  background: var(--bg-secondary);
+[data-theme] tr:hover td {
+  background: var(--chart-item-bg);
 }
 
-[data-theme] .history-item h4 {
-  color: var(--accent-color);
-  margin: 0 0 0.3rem;
-}
-
-[data-theme] .history-item p {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  margin: 0;
-}
-
-[data-theme] .history-item strong {
-  color: var(--success-color);
-}
-
-/* ---------- Detail Grid ---------- */
-[data-theme] .detail-grid {
-  background: var(--bg-secondary);
-  border: 3px solid var(--border-color);
-  padding: 0.8rem;
-  display: grid;
-  gap: 0.5rem;
-}
-
-[data-theme] .detail-grid p {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  margin: 0;
-}
-
-[data-theme] .detail-grid strong {
-  color: var(--accent-color);
-  font-size: 1rem;
-  display: block;
-  margin-top: 0.2rem;
-}
-
-/* ---------- Egresos ---------- */
-[data-theme] .egresos-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+/* ---------- Toggle/Switch ---------- */
+[data-theme] .toggle-slider {
+  background: var(--bg-primary);
   border: 2px solid var(--border-color);
-  padding: 0.8rem;
 }
 
-[data-theme] .egresos-total span {
-  color: var(--text-secondary);
-}
-
-[data-theme] .egresos-total strong {
-  color: var(--error-color);
-}
-
-[data-theme] .egreso-item {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  color: var(--text-primary);
-}
-
-[data-theme] .egreso-item:hover {
-  background: var(--bg-secondary);
-}
-
-/* ---------- Apartado ---------- */
-[data-theme] .apartado-form {
-  background: var(--bg-primary);
-  padding: 1rem;
-  border: 2px solid var(--bg-panel);
-}
-
-[data-theme] .apartado-form h4 {
-  color: var(--accent-color);
-  margin: 0 0 0.8rem;
-}
-
-[data-theme] .apartado-form input,
-[data-theme] .apartado-form select {
-  background: var(--bg-secondary);
-  border: 2px solid var(--bg-panel);
-  color: var(--text-primary);
-}
-
-[data-theme] .apartado-aviso {
-  background: color-mix(in srgb, var(--error-color) 20%, transparent);
-  border: 2px solid var(--error-color);
-  padding: 0.8rem;
-  margin-top: 0.8rem;
-}
-
-[data-theme] .apartado-total {
-  display: flex;
-  justify-content: space-between;
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  padding: 0.8rem;
-}
-
-[data-theme] .apartado-total strong {
-  color: var(--accent-color);
-}
-
-[data-theme] .apartado-item {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  padding: 0.8rem;
-}
-
-[data-theme] .apartado-item:hover {
-  background: var(--bg-secondary);
-}
-
-[data-theme] .apartado-info h4 {
-  color: var(--accent-color);
-  margin: 0 0 0.3rem;
-}
-
-[data-theme] .apartado-info p {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  margin: 0;
-}
-
-[data-theme] .apartado-info strong {
-  color: var(--success-color);
-}
-
-/* ---------- Pagos ---------- */
-[data-theme] .pago-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem;
-  font-size: 0.8rem;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--bg-panel);
-}
-
-/* ---------- Botones secundarios ---------- */
-[data-theme] .btn-secondary {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-/* ---------- Checkbox ---------- */
-[data-theme] input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  cursor: pointer;
-}
-
-[data-theme] input[type="checkbox"]:checked {
+[data-theme] input:checked + .toggle-slider {
   background: var(--accent-color);
   border-color: var(--accent-color);
 }
 
-/* ---------- Scanner ---------- */
-[data-theme] .scanner-viewport {
-  background: color-mix(in srgb, var(--bg-primary) 80%, black);
-  border: 2px solid var(--border-color);
+[data-theme] input:checked + .toggle-slider::after {
+  background: var(--bg-primary);
 }
 
-[data-theme] .scanner-laser {
+/* ---------- Badges ---------- */
+[data-theme] .badge,
+[data-theme] .tag {
   background: var(--accent-color);
+  color: var(--btn-text, var(--bg-primary));
 }
 
-[data-theme] .scanner-preview {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-}
-
-/* ---------- Modales ---------- */
-[data-theme] .stat-card {
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  padding: 0.7rem;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  border-radius: 0.5rem;
-  box-shadow: inset 0 -0.2rem 0.5rem var(--bg-primary);
-}
-
-[data-theme] .stat-card.warning {
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
-}
-
-[data-theme] .stat-card.danger {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-}
-
-[data-theme] .stat-card.gold {
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
-}
-
-[data-theme] .stat-card.success {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-}
-
-[data-theme] .stat-info p {
+/* ---------- Tooltips ---------- */
+[data-theme] [data-tooltip]::after {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-color);
   color: var(--text-primary);
 }
-
-/* ---------- Badges adicionales ---------- */
-[data-theme] .abono-badge {
-  background: color-mix(in srgb, var(--success-color) 30%, transparent);
-  color: var(--success-color);
-}
-
-[data-theme] .restante-badge {
-  background: color-mix(in srgb, var(--error-color) 30%, transparent);
-  color: var(--error-color);
-}
-
-[data-theme] .completado-badge {
-  background: color-mix(in srgb, var(--success-color) 30%, transparent);
-  color: var(--success-color);
-}
-
-/* ---------- Misc ---------- */
-[data-theme] .id-badge {
-  background: var(--bg-primary);
-  color: var(--accent-color);
-  border: 1px solid var(--bg-panel);
-}
-
-[data-theme] .stock-cell {
-  color: var(--accent-color);
-}
-
-[data-theme] .row-danger {
-  background: color-mix(in srgb, var(--error-color) 20%, transparent);
-}
-
-[data-theme] .row-danger .stock-cell {
-  color: var(--error-color);
-}
-
-[data-theme] tr.empty .stock-cell {
-  color: var(--error-color);
-}
-
-[data-theme] .btn-refresh {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-[data-theme] .btn-refresh:hover {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--success-color) 110%, white) 0%, var(--success-color) 100%);
-}
-
-/* ---------- Monthly ---------- */
-[data-theme] .monthly-head input {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  color: var(--text-primary);
-}
-
-[data-theme] .monthly-stats article {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  padding: 0.8rem;
-}
-
-[data-theme] .monthly-stats article strong {
-  color: var(--accent-color);
-}
-
-[data-theme] .monthly-stats p {
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-}
-
-/* ---------- Weekly chart ---------- */
-[data-theme] .weekly-chart {
-  border: var(--border-width-thick) solid var(--border-color);
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-}
-
-[data-theme] .chart-bar {
-  background: var(--accent-color);
-}
-
-[data-theme] .chart-label {
-  color: var(--text-secondary);
-}
-
-[data-theme] .chart-value {
-  color: var(--accent-color);
-}
-
-/* ---------- Quick buttons ---------- */
-[data-theme] .quick-buttons button {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-primary);
-}
-
-/* ---------- Input lg ---------- */
-[data-theme] .input-lg {
-  background: var(--bg-secondary);
-  border: var(--border-width) solid var(--bg-panel);
-  color: var(--text-primary);
-}
-
-/* ---------- Result card ---------- */
-[data-theme] .result-card {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--text-secondary);
-}
-
-[data-theme] .result-card strong {
-}
-
-/* ---------- Botones específicos ---------- */
-[data-theme] .btn-cancelar {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%) !important;
-  border: 2px solid var(--border-color) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .btn-ver {
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--border-color);
-}
-
-[data-theme] .btn-cerrar {
-  background: linear-gradient(180deg, var(--accent-color) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--border-color);
-}
-
-/* ---------- Cell styles ---------- */
-[data-theme] .ticket-cell {
-  color: var(--accent-color);
-}
-
-[data-theme] .monto-cell {
-  color: var(--success-color);
-}
-
-[data-theme] .fecha-cell {
-  color: var(--text-secondary);
-}
-
-/* ---------- Clickable row ---------- */
-[data-theme] .clickable-row:hover td {
-  background: color-mix(in srgb, var(--bg-panel) 90%, transparent) !important;
-}
-
-/* ---------- Botones de Corte ---------- */
-[data-theme] .btn-crear,
-[data-theme] .btn-pagar {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
-  border: 2px solid var(--border-color) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .btn-historial {
-  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--hystorybtn) 100%) !important;
-  border: 2px solid var(--border-color) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .btn-cerrar-historial {
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%) !important;
-  border: 2px solid var(--border-color) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .estado.ok {
-  color: var(--success-color) !important;
-}
-
-[data-theme] .estado.error {
-  color: var(--error-color) !important;
-}
-
-/* ---------- Apartado card ---------- */
-[data-theme] .apartado-card {
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-}
-
-[data-theme] .apartado-card:hover {
-  background: var(--bg-secondary);
-}
-
-/* ---------- Resumen Section ---------- */
-[data-theme] .resumen-section {
-  background: var(--bg-secondary) !important;
-}
-
-[data-theme] .resumen-section h3 {
-  background: var(--bg-primary) !important;
-  color: var(--text-primary) !important;
-}
-
-/* ---------- Metodo Pago Card ---------- */
-[data-theme] .metodo-pago-card {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border-color) !important;
-}
-
-[data-theme] .metodo-pago-card h4 {
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .metodo-pago-card .monto {
-  color: var(--accent-color) !important;
-}
-
-/* ---------- Total Corte ---------- */
-[data-theme] .total-corte {
-  background: var(--bg-primary) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .total-corte .monto {
-  color: var(--accent-color) !important;
-}
-
-/* ---------- Detalle Item ---------- */
-[data-theme] .detalle-item {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme] .detalle-item .label {
-  color: var(--text-secondary) !important;
-}
-
-/*-- Historial de Apartados --*/
-
-[data-theme] .apartados-historial-section {
-  margin-top: 1.5rem;
-  border-top: 2px dashed var(--accent-color);
-  padding-top: 1rem;
-}
-
-[data-theme] .btn-historial-completo {
-  width: 100%;
-  padding: 0.8rem;
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%) !important;
-  color: white;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 0.95rem;
-  box-shadow: 0 3px 0 var(--border-color);
-}
-
-[data-theme] .historial-completados {
-  background: var(--bg-secondary);
-  border: 3px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.2rem;
-  margin-top: 1rem;
-}
-
-[data-theme] .historial-completados h4 {
-  margin: 0 0 1rem 0;
-  color: var(--accent-color);
-  text-align: center;
-  font-size: 1.1rem;
-}
-
-[data-theme] .apartados-completados-list {
-  max-height: 300px;
-  overflow-y: auto;
-  border-radius: 8px;
-  border: 2px solid var(--border-color);
-}
-
-[data-theme] .apartado-completado-item {
-  padding: 1rem;
-  border-bottom: 2px solid var(--bg-panel);
-}
-
-[data-theme] .apartado-completado-item .apartado-info h4 {
-  margin: 0 0 0.5rem 0;
-  color: var(--accent-color);
-  font-size: 1rem;
-  text-align: left;
-}
-
-[data-theme] .apartado-completado-item .apartado-info p {
-  margin: 0.2rem 0;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-[data-theme] .estatus-badge.PAGADO {
-  background: var(--success-color) !important;
-  color: var(--bg-primary) !important;
-}
-
-[data-theme] .estatus-badge.CANCELADO {
-  background: var(--error-color) !important;
-  color: var(--text-primary) !important;
-}
-
-/* ================================================
-   ESTILOS ESPECÍFICOS - Si algún tema requiere lógica única
-   ================================================ */
-
-/* Final del archivo */
