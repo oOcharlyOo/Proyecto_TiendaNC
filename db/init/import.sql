@@ -33,6 +33,7 @@ CREATE TABLE tiendadb.usuarios (
     id_tipo_usuario INTEGER NOT NULL,
     avatar TEXT,
     sueldo_hora DECIMAL(10, 2) DEFAULT 0.00,
+    dias_semana INT DEFAULT 6,
 
     CONSTRAINT fk_tipo_usuario
         FOREIGN KEY(id_tipo_usuario) 
