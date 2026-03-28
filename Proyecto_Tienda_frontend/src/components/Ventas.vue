@@ -436,6 +436,18 @@ const isKeyboardVisible = ref(false);
 const promocionesActivas = ref<PromocionDTO[]>([]);
 const modalPromocionesAbierto = ref(false);
 
+const esAdmin = computed(() => {
+  return Number(localStorage.getItem('tipoUsuario') || 2) === 1;
+});
+
+const modoEdicionDetalle = ref(false);
+const montoTotalEditado = ref(0);
+const detalleEditandoIndex = ref<number | null>(null);
+const cantidadTemporal = ref(0);
+const precioTemporal = ref(0);
+const totalManualEditado = ref(false);
+const montoTotalInput = ref(0);
+
 async function cargarPromocionesActivas() {
   try {
     promocionesActivas.value = await apiListarPromocionesActivas();
@@ -1669,6 +1681,158 @@ async function processVoiceCommand(comando: string) {
     mostrarMensaje('Error al procesar el comando de voz.', 'error');
   }
 }
+
+function iniciarEdicionDetalle() {
+  montoTotalEditado.value = Number(historialVentaSeleccionada.value?.montoTotal ?? 0);
+  montoTotalInput.value = Math.round(Number(historialVentaSeleccionada.value?.montoTotal ?? 0));
+  totalManualEditado.value = false;
+  modoEdicionDetalle.value = true;
+}
+
+function calcularSubtotal(cantidad: number, precioUnitario: number): number {
+  const subtotal = cantidad * precioUnitario;
+  return Math.round(subtotal);
+}
+
+function calcularNuevoTotal(): number {
+  const total = historialVentaDetalle.value.reduce((sum, d) => {
+    return sum + calcularSubtotal(Number(d.cantidad), Number(d.precioUnitarioVenta));
+  }, 0);
+  return total;
+}
+
+function iniciarEditarItem(index: number) {
+  detalleEditandoIndex.value = index;
+  cantidadTemporal.value = historialVentaDetalle.value[index].cantidad;
+  precioTemporal.value = Number(historialVentaDetalle.value[index].precioUnitarioVenta);
+}
+
+function confirmarEdicionItem(index: number) {
+  historialVentaDetalle.value[index].cantidad = cantidadTemporal.value;
+  historialVentaDetalle.value[index].precioUnitarioVenta = Math.round(precioTemporal.value * 100) / 100;
+  if (!totalManualEditado.value) {
+    montoTotalEditado.value = calcularNuevoTotal();
+    montoTotalInput.value = montoTotalEditado.value;
+  }
+  detalleEditandoIndex.value = null;
+}
+
+function cancelarEdicionItem() {
+  detalleEditandoIndex.value = null;
+}
+
+function onTotalManualChange() {
+  montoTotalEditado.value = montoTotalInput.value;
+  totalManualEditado.value = true;
+}
+
+async function guardarCambiosDetalle() {
+  if (!historialVentaSeleccionada.value) return;
+  
+  try {
+    for (const detalle of historialVentaDetalle.value) {
+      const precioRedondeado = Math.round(Number(detalle.precioUnitarioVenta) * 100) / 100;
+      await getJson<ApiRespuesta<unknown>>(
+        `${API_BASE}/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            Venta: { idVenta: historialVentaSeleccionada.value.idVenta },
+            Producto: detalle.Producto || detalle.producto,
+            cantidad: detalle.cantidad,
+            precioUnitarioVenta: precioRedondeado
+          })
+        }
+      );
+    }
+    
+    const payload = {
+      idVenta: historialVentaSeleccionada.value.idVenta,
+      montoTotal: montoTotalEditado.value
+    };
+    
+    await getJson<ApiRespuesta<VentaDTO>>(
+      `${API_BASE}/ventas/actualizarVenta/${historialVentaSeleccionada.value.idVenta}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      }
+    );
+    
+    mostrarMensaje('Detalles actualizados correctamente', 'ok');
+    modoEdicionDetalle.value = false;
+    await cargarHistorialVentasDia();
+    cerrarDetalleVenta();
+  } catch (error) {
+    mostrarMensaje('Error al guardar cambios', 'error');
+  }
+}
+
+function cancelarEdicionDetalle() {
+  modoEdicionDetalle.value = false;
+  detalleEditandoIndex.value = null;
+  totalManualEditado.value = false;
+}
+
+async function eliminarDetalleVenta(index: number) {
+  const detalle = historialVentaDetalle.value[index];
+  if (!detalle?.idVentaDetalle) return;
+  
+  if (!confirm(`¿Eliminar "${(detalle.producto || detalle.Producto)?.nombre}" de esta venta?`)) {
+    return;
+  }
+  
+  try {
+    const response = await getJson<ApiRespuesta<unknown>>(
+      `${API_BASE}/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
+      { method: 'DELETE' }
+    );
+    
+    if (response?.codigo === 200) {
+      historialVentaDetalle.value.splice(index, 1);
+      if (!totalManualEditado.value) {
+        montoTotalEditado.value = calcularNuevoTotal();
+        montoTotalInput.value = montoTotalEditado.value;
+      }
+      mostrarMensaje('Producto eliminado de la venta', 'ok');
+    } else {
+      mostrarMensaje(response?.mensaje || 'Error al eliminar producto', 'error');
+    }
+  } catch (error) {
+    mostrarMensaje('Error al eliminar producto', 'error');
+  }
+}
+
+async function eliminarTodosLosDetalles() {
+  if (historialVentaDetalle.value.length === 0) {
+    mostrarMensaje('No hay productos para eliminar', 'info');
+    return;
+  }
+  
+  if (!confirm(`¿Eliminar todos los productos de esta venta? Esta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  try {
+    for (const detalle of historialVentaDetalle.value) {
+      if (detalle.idVentaDetalle) {
+        await getJson<ApiRespuesta<unknown>>(
+          `${API_BASE}/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
+          { method: 'DELETE' }
+        );
+      }
+    }
+    
+    historialVentaDetalle.value = [];
+    if (!totalManualEditado.value) {
+      montoTotalEditado.value = 0;
+      montoTotalInput.value = 0;
+    }
+    mostrarMensaje('Todos los productos han sido eliminados', 'ok');
+  } catch (error) {
+    mostrarMensaje('Error al eliminar productos', 'error');
+  }
+}
 </script>
 
 <template>
@@ -1940,7 +2104,14 @@ async function processVoiceCommand(comando: string) {
         
         <header class="modal-h">
           <h3>🔍 Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
-          <button class="close-x" @click="cerrarDetalleVenta">×</button>
+          <div class="modal-actions">
+            <button v-if="esAdmin && !modoEdicionDetalle" class="btn-editar" @click="iniciarEdicionDetalle">✏️ Editar</button>
+            <template v-if="modoEdicionDetalle">
+              <button class="btn-guardar" @click="guardarCambiosDetalle">💾 Guardar</button>
+              <button class="btn-cancelar" @click="cancelarEdicionDetalle">Cancelar</button>
+            </template>
+            <button class="close-x" @click="cerrarDetalleVenta">×</button>
+          </div>
         </header>
         <div class="modal-b custom-scrollbar">
           <div class="venta-meta-grid">
@@ -1959,17 +2130,52 @@ async function processVoiceCommand(comando: string) {
             <div class="meta-box total">
               <span class="meta-icon">💰</span>
               <span>Total</span>
-              <strong class="txt-pos">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</strong>
+              <template v-if="!modoEdicionDetalle">
+                <strong class="txt-pos">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</strong>
+              </template>
+              <template v-else>
+                <div class="total-edit-wrapper">
+                  <span class="currency-prefix">$</span>
+                  <input 
+                    v-model.number="montoTotalInput" 
+                    type="number" 
+                    min="0" 
+                    step="1" 
+                    class="total-input"
+                    :class="{ 'manual-edited': totalManualEditado }"
+                    @input="onTotalManualChange"
+                  />
+                  <span v-if="totalManualEditado" class="edit-indicator" title="Total modificado manualmente">✏️</span>
+                </div>
+              </template>
             </div>
           </div>
           <div class="items-header">
             <span>🛒 Productos</span>
+            <button v-if="esAdmin && modoEdicionDetalle && historialVentaDetalle.length > 0" class="btn-eliminar-todos" @click="eliminarTodosLosDetalles" title="Eliminar todos los productos">
+              🗑️ Eliminar todo
+            </button>
           </div>
           <div class="detalle-items-list">
             <div v-for="(d, i) in historialVentaDetalle" :key="i" class="d-item">
               <span class="d-name" :title="(d.producto || d.Producto)?.nombre">{{ (d.producto || d.Producto)?.nombre }}</span>
-              <span class="d-qty">{{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}</span>
-              <strong class="d-sub">{{ formatoMonedaRedondeada(d.precioUnitarioVenta * d.cantidad) }}</strong>
+              
+              <template v-if="detalleEditandoIndex === i">
+                <input v-model.number="cantidadTemporal" type="number" min="1" class="edit-input" />
+                <input v-model.number="precioTemporal" type="number" step="0.01" min="0" class="edit-input" />
+                <button class="btn-confirm" @click="confirmarEdicionItem(i)">✓</button>
+                <button class="btn-cancel" @click="cancelarEdicionItem">×</button>
+              </template>
+              <template v-else>
+                <span class="d-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? iniciarEditarItem(i) : null">
+                  {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
+                </span>
+                <strong class="d-sub">{{ formatoMonedaRedondeada(calcularSubtotal(d.cantidad, Number(d.precioUnitarioVenta))) }}</strong>
+                <div class="d-actions">
+                  <button v-if="esAdmin && modoEdicionDetalle" class="btn-edit-item" @click="iniciarEditarItem(i)" title="Editar">✏️</button>
+                  <button v-if="esAdmin && modoEdicionDetalle" class="btn-delete-item" @click="eliminarDetalleVenta(i)" title="Eliminar">🗑️</button>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -5250,5 +5456,233 @@ async function processVoiceCommand(comando: string) {
 
 .toast-leave-active {
   animation: toastPop 0.2s ease-in reverse;
+}
+
+/* =========================================
+   ESTILOS PARA EDICIÓN DE DETALLE DE VENTA
+   ========================================= */
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-editar, .btn-guardar, .btn-cancelar {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-editar {
+  background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+  color: #1a1a1a;
+}
+
+.btn-editar:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-guardar {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  color: white;
+}
+
+.btn-guardar:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-cancelar {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: white;
+}
+
+.btn-cancelar:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.d-item .editable {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--accent-color);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.d-item .editable:hover {
+  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.edit-input {
+  width: 60px;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  border: 2px solid var(--accent-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.edit-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.btn-confirm, .btn-cancel, .btn-edit-item {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  transition: all 0.2s;
+}
+
+.btn-confirm {
+  background: var(--success-color);
+  color: white;
+  border-color: var(--success-color);
+}
+
+.btn-confirm:hover {
+  filter: brightness(1.1);
+}
+
+.btn-cancel {
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+.btn-cancel:hover {
+  filter: brightness(1.1);
+}
+
+.btn-edit-item {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.3rem;
+}
+
+.btn-edit-item:hover {
+  background: color-mix(in srgb, var(--accent-color) 30%, transparent);
+  transform: scale(1.1);
+}
+
+.d-actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.btn-delete-item {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.3rem;
+  background: transparent;
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-item:hover {
+  background: var(--error-color);
+  color: white;
+  transform: scale(1.1);
+}
+
+.btn-eliminar-todos {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: white;
+  border: 2px solid var(--error-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn-eliminar-todos:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--error-color) 40%, transparent);
+}
+
+.items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.txt-pos.editing {
+  color: var(--success-color);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.total-edit-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.currency-prefix {
+  font-size: 0.9rem;
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+.total-input {
+  width: 80px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.9rem;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--success-color);
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.total-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.total-input.manual-edited {
+  border-color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+}
+
+.edit-indicator {
+  font-size: 0.8rem;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 </style>
