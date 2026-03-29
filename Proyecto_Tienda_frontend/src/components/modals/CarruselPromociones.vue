@@ -470,11 +470,11 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .promo-img {
-  width: 100%;
-  height: 100%;
+  width: 90%;
+  height: 90%;
   object-fit: scale-down;
   transition: transform 0.3s ease;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(10px 10px 1px black);
 }
 
 .promo-card:hover .promo-img {

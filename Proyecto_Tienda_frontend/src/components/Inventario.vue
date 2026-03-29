@@ -471,7 +471,7 @@ onMounted(async () => {
 <style>
 .inventario-layout {
   background: var(--bg-primary) !important;
-  color: var(--text-primary) !important;
+  color: var(--text-primar y) !important;
 }
 
 .stat-card {
@@ -573,9 +573,9 @@ onMounted(async () => {
 }
 
 .item-id { background: var(--bg-primary) !important; color: var(--text-secondary) !important; }
-.item-icon-large { background: var(--bg-primary) !important; }
+.item-icon-large { background: transparent !important; }
 .item-name { color: var(--accent-color) !important; }
-.item-stats { background: var(--bg-primary) !important; }
+.item-stats { background: transparent !important;}
 
 .stat-value.costo { color: var(--accent-color) !important; }
 .stat-value.venta { color: var(--success-color) !important; }
@@ -1986,7 +1986,6 @@ onMounted(async () => {
   margin-top: 0.2rem;
   padding-top: 0.2rem;
   border-top: 1px dashed var(--border-color);
-  opacity: 0.2;
 }
 
 .item-progress {

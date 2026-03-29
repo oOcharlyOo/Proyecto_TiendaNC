@@ -4042,8 +4042,8 @@ async function eliminarTodosLosDetalles() {
   border-radius: 4px;
   font-weight: bold;
 }
-.in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--success-color); border: 1px solid var(--success-color); }
-.low-stock { background: color-mix(in srgb, var(--error-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
+.in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--text-primary); border: 1px solid var(--success-color); }
+.low-stock { background: color-mix(in srgb, var(--e rror-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
 
 /* =========================================
    RIGHT PANEL: CHECKOUT
