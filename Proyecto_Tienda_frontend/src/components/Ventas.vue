@@ -219,6 +219,22 @@ function asAny(item: TicketItem | TicketItemPromocion): any {
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const AUTH_USER_ID_KEY = 'idUsuario';
 
+function formatImagenUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('http')) {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname;
+    const fileName = path.split('/').pop();
+    const folder = path.split('/').slice(-2, -1)[0];
+    if (fileName && folder) {
+      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
+    }
+    return url;
+  }
+  return url;
+}
+
 async function cargarTicketsDesdeBackend() {
   const idUsuario = obtenerIdUsuarioSesion();
   if (!idUsuario) {
@@ -2008,6 +2024,14 @@ async function eliminarTodosLosDetalles() {
           <TransitionGroup name="list">
             <article v-for="item in ticket" :key="item.id" class="ticket-item-row" :class="{ 'is-promo': asAny(item).is_promocion }">
               <div class="item-main">
+                <div v-if="asAny(item).is_promocion" class="item-image">
+                  <img 
+                    v-if="asAny(item).promocion?.imagen_url" 
+                    :src="formatImagenUrl(asAny(item).promocion.imagen_url)" 
+                    :alt="item.nombre" 
+                  />
+                  <span v-else class="promo-placeholder">🎁</span>
+                </div>
                 <div class="item-info">
                   <h4 class="item-name">
                     <span v-if="asAny(item).is_promocion" class="promo-badge">❧</span>
@@ -4203,6 +4227,35 @@ async function eliminarTodosLosDetalles() {
   position: relative;
   transition: all 0.2s;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.item-image {
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 2px 8px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.promo-placeholder {
+  font-size: 1.8rem;
+  color: var(--accent-color);
 }
 
 .ticket-item-row:hover { 
