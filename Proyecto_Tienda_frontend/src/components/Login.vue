@@ -34,6 +34,12 @@
     </div>
 
     <div class="classic-card">
+      <div class="card-glow"></div>
+      <div class="card-corner top-left"></div>
+      <div class="card-corner top-right"></div>
+      <div class="card-corner bottom-left"></div>
+      <div class="card-corner bottom-right"></div>
+      
       <div class="triforce-classic" aria-hidden="true">
         <span></span>
         <span></span>
@@ -69,6 +75,84 @@
         <button type="submit">Abrir portal</button>
       </form>
 
+      <div class="theme-selector">
+        <span class="theme-label">Seleccionar Tema</span>
+        <div class="theme-carousel">
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'zelda' }"
+            @click="setTheme('zelda')"
+            title="Tema Zelda"
+          >
+            🛡️
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'alforja' }"
+            @click="setTheme('alforja')"
+            title="Tema Alforja"
+          >
+            🎒
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'skyward' }"
+            @click="setTheme('skyward')"
+            title="Tema Skyward"
+          >
+            ☁️
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn" 
+            :class="{ active: currentTheme === 'deathmountain' }"
+            @click="setTheme('deathmountain')"
+            title="Tema Muerte Montaña"
+          >
+            🌋
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn dark" 
+            :class="{ active: currentTheme === 'darkforest' }"
+            @click="setTheme('darkforest')"
+            title="Tema Bosque Oscuro"
+          >
+            🌲
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn dark" 
+            :class="{ active: currentTheme === 'darkmountain' }"
+            @click="setTheme('darkmountain')"
+            title="Tema Montaña Oscura"
+          >
+            ⛰️
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn dark" 
+            :class="{ active: currentTheme === 'darkskyward' }"
+            @click="setTheme('darkskyward')"
+            title="Tema Cielo Oscuro"
+          >
+            🌙
+          </button>
+          <button 
+            type="button" 
+            class="theme-btn dark" 
+            :class="{ active: currentTheme === 'darknight' }"
+            @click="setTheme('darknight')"
+            title="Tema Noche Oscura"
+          >
+            ⭐
+          </button>
+        </div>
+      </div>
+
       <div ref="toastContainer" class="toast-container"></div>
     </div>
 
@@ -83,6 +167,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useTheme } from '@/composables/useTheme';
 import MontoInicialModal from './modals/MontoInicialModal.vue';
 
 const AUTH_KEY = 'isAuth';
@@ -95,6 +180,7 @@ const toastContainer = ref<HTMLElement | null>(null);
 const router = useRouter();
 const modalMontoInicialAbierto = ref(false);
 const idUsuarioActual = ref<number | null>(null);
+const { currentTheme, setTheme } = useTheme();
 
 async function iniciarSesion() {
   const usuarioDTO = { usuario: name.value, password_hash: pass.value };
@@ -434,7 +520,7 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   position: relative;
   overflow: hidden;
   background: 
-    linear-gradient(180deg, #050a08 0%, #07150d 30%, #0a1f18 70%, #07150d 100%);
+    linear-gradient(180deg, var(--gradient-bg-start) 0%, var(--bg-primary) 30%, var(--bg-secondary) 70%, var(--bg-primary) 100%);
   background-size: 200% 200%;
   animation: gradientShift 15s ease infinite;
 }
@@ -456,9 +542,9 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   inset: 0;
   pointer-events: none;
   background: 
-    radial-gradient(ellipse 90% 60% at 10% 50%, rgba(31, 91, 53, 0.25) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 50% at 90% 40%, rgba(31, 91, 53, 0.2) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 30% at 50% 90%, rgba(19, 53, 35, 0.3) 0%, transparent 50%);
+    radial-gradient(ellipse 90% 60% at 10% 50%, color-mix(in srgb, var(--accent-color) 15%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 90% 40%, color-mix(in srgb, var(--accent-color) 12%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 30% at 50% 90%, color-mix(in srgb, var(--accent-color) 18%, transparent) 0%, transparent 50%);
   animation: fogDrift 10s ease-in-out infinite;
 }
 
@@ -504,17 +590,17 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   position: absolute;
   width: 6px;
   height: 6px;
-  background: radial-gradient(circle, #f8d667 0%, #c79634 50%, #8b6914 80%, transparent 100%);
+  background: radial-gradient(circle, var(--zelda-gold) 0%, var(--accent-color) 50%, var(--border-color) 80%, transparent 100%);
   border-radius: 50%;
   animation: rupeeGlow 2.5s ease-in-out infinite;
-  box-shadow: 0 0 10px rgba(248, 214, 103, 0.8);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--zelda-gold) 80%, transparent);
 }
 
 .rupee-star::before {
   content: '';
   position: absolute;
   inset: -8px;
-  background: radial-gradient(circle, rgba(248, 214, 103, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--zelda-gold) 30%, transparent) 0%, transparent 70%);
   border-radius: 50%;
   animation: pulse 2s ease-in-out infinite;
 }
@@ -684,32 +770,70 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   width: min(100%, 470px);
   position: relative;
   z-index: 1;
-  padding: 1.5rem;
-  background: linear-gradient(180deg, var(--pixel-forest) 0%, var(--pixel-forest-dark) 100%);
-  border: 4px solid var(--pixel-gold);
+  padding: 2rem 1.5rem;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 4px solid var(--accent-color);
   box-shadow:
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
+    0 0 0 4px var(--border-color),
+    0 14px 0 var(--border-color),
+    0 20px 28px var(--shadow-color),
+    0 0 40px color-mix(in srgb, var(--accent-color) 20%, transparent);
   image-rendering: pixelated;
   animation: fadeSlideIn 400ms ease-out;
+  overflow: hidden;
 }
 
 .classic-card::before {
   content: "";
   position: absolute;
   inset: 8px;
-  border: 2px dashed rgba(248, 214, 103, 0.45);
+  border: 2px dashed color-mix(in srgb, var(--accent-color) 40%, transparent);
   pointer-events: none;
 }
 
+.classic-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.card-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--zelda-gold) 10%, transparent) 0%, transparent 50%);
+  animation: pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.card-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--accent-color);
+  opacity: 0.6;
+}
+
+.card-corner.top-left { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+.card-corner.top-right { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+.card-corner.bottom-left { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+.card-corner.bottom-right { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
 .triforce-classic {
   width: 72px;
-  margin: 0 auto 0.8rem auto;
+  margin: 0 auto 1rem auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
   animation: triforceGlow 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px #f8d667);
 }
 
 .triforce-classic span {
@@ -718,8 +842,8 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   height: 0;
   border-left: 17px solid transparent;
   border-right: 17px solid transparent;
-  border-bottom: 29px solid var(--pixel-gold);
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.55));
+  border-bottom: 29px solid #f8d667;
+  filter: drop-shadow(0 0 3px #f8d667);
 }
 
 .triforce-classic span:nth-child(1) {
@@ -735,27 +859,41 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
 .classic-title {
   margin: 0;
   text-align: center;
-  color: var(--pixel-gold);
+  color: var(--accent-color);
   text-transform: uppercase;
   font-weight: 900;
   font-family: "Courier New", monospace;
   font-size: clamp(1rem, 2.6vw, 1.5rem);
   letter-spacing: 0.09em;
   text-shadow:
-    2px 2px 0 #000,
-    -1px -1px 0 #000;
+    2px 2px 0 var(--border-color),
+    -1px -1px 0 var(--border-color),
+    0 0 15px color-mix(in srgb, var(--zelda-gold) 50%, transparent);
   animation: fadeSlideIn 500ms ease-out 100ms backwards;
+  position: relative;
+}
+
+.classic-title::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
 }
 
 .classic-subtitle {
-  margin: 0.4rem 0 1.25rem 0;
+  margin: 1rem 0 1.25rem 0;
   text-align: center;
-  color: var(--pixel-paper);
+  color: var(--text-primary);
   font-family: "Courier New", monospace;
   font-size: clamp(0.72rem, 2.2vw, 0.85rem);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   animation: fadeSlideIn 500ms ease-out 200ms backwards;
+  opacity: 0.9;
 }
 
 .classic-form {
@@ -775,7 +913,7 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
 .classic-form label {
   display: block;
   margin-bottom: 0.4rem;
-  color: var(--pixel-paper);
+  color: var(--text-primary);
   font-size: clamp(0.74rem, 2vw, 0.82rem);
   font-family: "Courier New", monospace;
   text-transform: uppercase;
@@ -784,50 +922,73 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
 
 .classic-form input {
   width: 100%;
-  border: 3px solid #2a1807;
+  border: 3px solid var(--border-color);
   padding: 0.7rem 0.7rem;
-  background: #f2e8bf;
-  color: #272013;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: "Courier New", monospace;
   font-size: clamp(0.8rem, 2.1vw, 0.95rem);
   outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
-  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent), 0 2px 0 var(--border-color);
+  transition: all 200ms ease;
+  position: relative;
 }
 
 .classic-form input::placeholder {
-  color: #7f7044;
+  color: var(--text-secondary);
 }
 
 .classic-form input:focus {
   filter: brightness(1.04);
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 2px #f8d667;
-  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 2px var(--accent-color), 0 0 0 2px var(--accent-color), 0 0 15px color-mix(in srgb, var(--zelda-gold) 40%, transparent);
+  transform: translateY(-2px);
 }
 
 .classic-form button {
   width: 100%;
-  border: 3px solid #2a1807;
+  border: 3px solid var(--border-color);
   padding: 0.82rem 1rem;
   font-size: clamp(0.84rem, 2.3vw, 0.98rem);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-family: "Courier New", monospace;
-  color: var(--pixel-ink);
-  background:
-    linear-gradient(180deg, #ffe48b 0%, #e2b84f 45%, #c99234 100%);
+  color: var(--btn-text, var(--bg-primary));
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
   cursor: pointer;
   box-shadow:
-    inset 0 0 0 2px #ffeeb4,
-    0 4px 0 #6f4b1c,
-    0 8px 16px rgba(0, 0, 0, 0.35);
-  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
+    inset 0 0 0 2px color-mix(in srgb, white 30%, var(--accent-color)),
+    0 4px 0 var(--border-color),
+    0 8px 16px var(--shadow-color),
+    0 0 20px color-mix(in srgb, var(--zelda-gold) 20%, transparent);
+  transition: all 200ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.classic-form button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s ease;
 }
 
 .classic-form button:hover {
-  filter: brightness(1.06);
-  transform: translateY(-2px);
+  filter: brightness(1.1);
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, white 40%, var(--accent-color)),
+    0 6px 0 var(--border-color),
+    0 12px 24px var(--shadow-color),
+    0 0 30px color-mix(in srgb, var(--zelda-gold) 40%, transparent);
+}
+
+.classic-form button:hover::before {
+  left: 100%;
 }
 
 .classic-form button:active {
@@ -917,5 +1078,66 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
   .classic-form button {
     padding: 0.75rem 0.7rem;
   }
+}
+
+.theme-selector {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
+  text-align: center;
+}
+
+.theme-label {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+  opacity: 0.8;
+}
+
+.theme-carousel {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.theme-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 0 var(--border-color);
+}
+
+.theme-btn:hover {
+  transform: scale(1.15);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--zelda-gold) 40%, transparent);
+}
+
+.theme-btn.active {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--zelda-gold) 50%, transparent);
+}
+
+.theme-btn.dark {
+  background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%);
+  border-color: #3a3a4a;
+}
+
+.theme-btn.dark.active {
+  background: linear-gradient(180deg, #4a4a5a 0%, #2a2a3a 100%);
+  border-color: #6a6a7a;
 }
 </style>

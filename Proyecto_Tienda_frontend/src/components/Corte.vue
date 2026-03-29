@@ -6376,8 +6376,8 @@ onMounted(() => {
 
 .triforce-divider {
   font-size: 1.5rem;
-  color: var(--accent-color);
-  text-shadow: 0 0 10px var(--accent-color);
+  color: #f8d667;
+  text-shadow: 0 0 10px #f8d667;
 }
 
 .top-products-title {
