@@ -2027,7 +2027,7 @@ async function eliminarTodosLosDetalles() {
                 
                 <div class="item-actions">
                   <div class="qty-control" v-if="asAny(item).is_gramaje">
-                    <button class="qty-btn calc-btn" @click="editarGramajeItem(asAny(item))" title="Editar cantidad">🧮</button>
+                    <button class="qty-btn calc-btn" @click="editarGramajeItem(asAny(item))" title="Editar cantidad">⚖️</button>
                     <span class="qty-val">{{ item.cantidad }}g</span>
                   </div>
                   <div class="qty-control" v-else-if="!asAny(item).is_promocion">
@@ -4337,8 +4337,21 @@ async function eliminarTodosLosDetalles() {
 }
 
 .calc-btn {
-  font-size: 0.9rem;
-  width: 32px;
+  font-size: 1.1rem;
+  width: 36px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .calc-btn {
+    font-size: 1rem;
+    width: 32px;
+    height: 28px;
+  }
 }
 
 .calc-btn:hover {
