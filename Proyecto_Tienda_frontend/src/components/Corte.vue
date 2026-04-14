@@ -82,6 +82,7 @@ type VentaDTO = {
   estatus?: string;
   usuario?: UsuarioDTO;
   nombreUsuario?: string;
+  tieneDiscrepancia?: boolean;
 };
 
 type GananciasDTO = {
@@ -332,9 +333,19 @@ const dineroApartarDiario = computed(() => {
 
 const anioReporte = ref(new Date().getFullYear());
 
+function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): boolean {
+  const sumaDetalles = detalles.reduce((sum: number, d) => {
+    const precio = Number(d.precioUnitarioVenta || 0);
+    const cantidad = Number(d.cantidad || 0);
+    return sum + (precio * cantidad);
+  }, 0);
+  
+  return Math.abs(sumaDetalles - montoTotal) > 1;
+}
+
 async function registrarSalida(payload: { montoEoS: number, descripcion: string }) {
   try {
-    const res = await fetch(`${API_BASE}/caja/salida`, {
+    const res = await fetch('/caja/salida', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, idUsuario: idUsuario.value })
@@ -417,11 +428,17 @@ const mensualTotalGanancias = ref(0);
 const mensualSemanas = shallowRef<{ semana: number; ventas: number; ganancia: number; dias: string }[]>([]);
 const rangoFechasSemanas = ref<{ inicio: Date; fin: Date } | null>(null);
 
-const historialDetalles = shallowRef<VentaDetalleDTO[]>([]);
+const historialDetalles = ref<VentaDetalleDTO[]>([]);
 const filtroMesHistorial = ref('all');
 const filtroDiaHistorial = ref('all');
+const filtroDiscrepanciaHistorial = ref(false);
 const ventaDetalleSeleccionada = ref<VentaDTO | null>(null);
 const ventaDetalleItems = shallowRef<VentaDetalleDTO[]>([]);
+const ventaDetalleEditando = ref(false);
+const ventaDetalleMontoEditado = ref(0);
+const ventaDetalleItemEditando = ref<number | null>(null);
+const ventaDetalleCantidadTemp = ref(0);
+const ventaDetallePrecioTemp = ref(0);
 
 const historialVentasAgrupadas = computed(() => {
   const map = new Map<number, { venta: VentaDTO; detalles: VentaDetalleDTO[] }>();
@@ -431,13 +448,20 @@ const historialVentasAgrupadas = computed(() => {
     if (!idVenta) continue;
 
     if (!map.has(idVenta)) {
+      const montoVenta = Number(d.Venta?.montoTotal ?? 0);
+      const tieneDiscrepancia = verificarDiscrepancia([d], montoVenta);
       map.set(idVenta, {
-        venta: d.Venta,
+        venta: { ...d.Venta, tieneDiscrepancia },
         detalles: []
       });
     }
 
     map.get(idVenta)?.detalles.push(d);
+  }
+
+  for (const item of map.values()) {
+    const montoVenta = Number(item.venta.montoTotal ?? 0);
+    item.venta.tieneDiscrepancia = verificarDiscrepancia(item.detalles, montoVenta);
   }
 
   return Array.from(map.values()).sort((a, b) => {
@@ -477,7 +501,8 @@ const historialFiltrado = computed(() => {
 
     const monthOk = filtroMesHistorial.value === 'all' || String(date.getMonth()) === filtroMesHistorial.value;
     const dayOk = filtroDiaHistorial.value === 'all' || String(date.getDate()) === filtroDiaHistorial.value;
-    return monthOk && dayOk;
+    const discrepancyOk = !filtroDiscrepanciaHistorial.value || item.venta.tieneDiscrepancia === true;
+    return monthOk && dayOk && discrepancyOk;
   });
 });
 
@@ -659,15 +684,26 @@ async function generarCorte() {
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
 
-    // Calcular productos más vendidos para el corte actual
+    // Calcular productos más vendidos para el corte actual (todas las ventas del día)
     try {
       const dataVentas = await fetchApi<GananciasDTO>(`/ventas/obtenerVentaPorDia/${corte.fechaCorte.split('T')[0]}`);
-      const ventasUsuario = (dataVentas?.ventas || []).filter(v => 
-        v.idUsuario === idUsuario.value && (v.estatus === 'C' || v.estatus === 'F')
-      );
       
-      if (ventasUsuario.length > 0) {
-        const idsVentas = ventasUsuario.map(v => v.idVenta);
+      // Usar ganancia total del día (todas las ventas) sin importar el usuario
+      const gananciaBrutaCorte = Number(dataVentas?.gananciaTotal || 0);
+      const gananciaNetaCorte = Math.max(0, gananciaBrutaCorte - dineroApartarDiario.value);
+      
+      // Actualizar la ganancia en el corte
+      if (corte.gananciaTotal !== gananciaBrutaCorte) {
+        corte.gananciaTotal = gananciaBrutaCorte;
+        corte.gananciaNeta = gananciaNetaCorte;
+        corteActual.value = { ...corte };
+      }
+      
+      // Para productos más vendidos, usar todas las ventas del día
+      const ventasDia = (dataVentas?.ventas || []).filter(v => v.estatus === 'C' || v.estatus === 'F');
+      
+      if (ventasDia.length > 0) {
+        const idsVentas = ventasDia.map(v => v.idVenta);
         const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
         const detallesCorte = (allDetails || []).filter(d => {
           const idVenta = Number(d?.Venta?.idVenta || 0);
@@ -722,6 +758,22 @@ async function generarReporteDiario() {
     const ventas = Array.isArray(data?.ventas) ? data.ventas : [];
     console.log('Ventas:', ventas);
     console.log('Primera venta:', ventas[0]);
+
+    const todosDetalles = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+    const detallesMap = new Map<number, VentaDetalleDTO[]>();
+    for (const d of todosDetalles || []) {
+      const idVenta = Number(d?.Venta?.idVenta || 0);
+      if (!detallesMap.has(idVenta)) {
+        detallesMap.set(idVenta, []);
+      }
+      detallesMap.get(idVenta)?.push(d);
+    }
+    
+    for (const venta of ventas) {
+      const detalles = detallesMap.get(venta.idVenta) || [];
+      const montoVenta = Number(venta.montoTotal ?? 0);
+      venta.tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
+    }
 
     ventasEfectivo.value = ventas
       .filter((v) => ['EFECTIVO', 'Efectivo'].includes(String(v.metodoPago || '')))
@@ -1970,8 +2022,97 @@ function abrirDetalleVenta(idVenta: number) {
   if (!grouped) return;
 
   ventaDetalleSeleccionada.value = grouped.venta;
-  ventaDetalleItems.value = grouped.detalles;
+  ventaDetalleItems.value = [...grouped.detalles];
+  ventaDetalleMontoEditado.value = Number(grouped.venta.montoTotal ?? 0);
+  ventaDetalleEditando.value = false;
+  ventaDetalleItemEditando.value = null;
   modalDetalleAbierto.value = true;
+}
+
+function iniciarEdicionVentaDetalle() {
+  if (!esAdministrador.value) return;
+  ventaDetalleEditando.value = true;
+}
+
+async function guardarEdicionVentaDetalle() {
+  if (!ventaDetalleSeleccionada.value) return;
+  
+  try {
+    for (const detalle of ventaDetalleItems.value) {
+      await fetchApi<unknown>(
+        `/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Venta: { idVenta: ventaDetalleSeleccionada.value.idVenta },
+            cantidad: Number(detalle.cantidad),
+            precioUnitarioVenta: Number(detalle.precioUnitarioVenta)
+          })
+        }
+      );
+    }
+    
+    await fetchApi<unknown>(
+      `/ventas/actualizarVenta/${ventaDetalleSeleccionada.value.idVenta}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ montoTotal: ventaDetalleMontoEditado.value })
+      }
+    );
+    
+    mostrarMensaje('Venta actualizada correctamente', 'ok');
+    ventaDetalleEditando.value = false;
+    modalDetalleAbierto.value = false;
+    
+    historialDetalles.value = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+  } catch (error) {
+    mostrarMensaje('Error al guardar cambios', 'error');
+  }
+}
+
+function cancelarEdicionVentaDetalle() {
+  ventaDetalleEditando.value = false;
+  ventaDetalleItemEditando.value = null;
+}
+
+function iniciarEditarItemDetalle(index: number) {
+  const item = ventaDetalleItems.value[index];
+  ventaDetalleItemEditando.value = index;
+  ventaDetalleCantidadTemp.value = Number(item.cantidad);
+  ventaDetallePrecioTemp.value = Number(item.precioUnitarioVenta);
+}
+
+function confirmarEditarItemDetalle(index: number) {
+  const item = ventaDetalleItems.value[index];
+  item.cantidad = ventaDetalleCantidadTemp.value;
+  item.precioUnitarioVenta = Number(ventaDetalleCantidadTemp.value.toFixed(2));
+  ventaDetalleItemEditando.value = null;
+  
+  if (!ventaDetalleEditando.value) {
+    ventaDetalleMontoEditado.value = ventaDetalleItems.value.reduce((sum, d) => sum + (Number(d.cantidad) * Number(d.precioUnitarioVenta)), 0);
+  }
+}
+
+function cancelarEditarItemDetalle() {
+  ventaDetalleItemEditando.value = null;
+}
+
+async function eliminarItemDetalle(index: number) {
+  const item = ventaDetalleItems.value[index];
+  if (!item?.idVentaDetalle) return;
+  
+  if (!confirm('¿Eliminar este producto de la venta?')) return;
+  
+  try {
+    await fetchApi<unknown>(`/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, { method: 'DELETE' });
+    ventaDetalleItems.value.splice(index, 1);
+    ventaDetalleMontoEditado.value = ventaDetalleItems.value.reduce((sum, d) => sum + (Number(d.cantidad) * Number(d.precioUnitarioVenta)), 0);
+    mostrarMensaje('Producto eliminado', 'ok');
+  } catch {
+    mostrarMensaje('Error al eliminar producto', 'error');
+  }
 }
 
 async function abrirModalEgresos() {
@@ -2412,7 +2553,6 @@ onMounted(() => {
           <div class="input-group">
             <label>Selecciona fecha</label>
             <div class="input-wrapper">
-              <span class="input-icon">📆</span>
               <input v-model="fechaDiaria" type="date" class="modern-input">
             </div>
           </div>
@@ -2595,6 +2735,12 @@ onMounted(() => {
                   </select>
                 </div>
               </div>
+              <div class="filter-discrepancia">
+                <label class="checkbox-scroll">
+                  <input type="checkbox" v-model="filtroDiscrepanciaHistorial" />
+                  <span>⚠️ Discrepancias</span>
+                </label>
+              </div>
               <div class="total-scroll-bar">
                 <span class="scroll-bar-label">⚜ Total del Período ⚜</span>
                 <span class="scroll-bar-amount">{{ formatoMoneda(historialTotalFiltrado) }}</span>
@@ -2606,9 +2752,12 @@ onMounted(() => {
               <p v-else-if="historialFiltrado.length === 0" class="empty-text">📭 No hay ventas con el filtro actual.</p>
 
               <div v-else class="scroll-entries">
-                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" @click="abrirDetalleVenta(v.venta.idVenta)">
+                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" :class="{ 'entry-discrepancia': v.venta.tieneDiscrepancia }" @click="abrirDetalleVenta(v.venta.idVenta)">
                   <div class="entry-left">
-                    <span class="entry-number">{{ historialFiltrado.length - index }}</span>
+                    <span class="entry-number">
+                      <span v-if="v.venta.tieneDiscrepancia" class="discrepancia-icon" title="Discrepancia">⚠️</span>
+                      {{ historialFiltrado.length - index }}
+                    </span>
                     <div class="entry-info">
                       <span class="entry-date">{{ formatoFecha(v.venta.fechaVenta) }}</span>
                       <span class="metodo-scroll-pill" :class="getMetodoClase(v.venta.metodoPago)">
@@ -2639,6 +2788,11 @@ onMounted(() => {
             </div>
             <h2>Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h2>
             <div class="header-line"></div>
+            <button v-if="esAdministrador && !ventaDetalleEditando" type="button" class="btn-editar-pergamino" @click="iniciarEdicionVentaDetalle">✏️ Editar</button>
+            <template v-if="esAdministrador && ventaDetalleEditando">
+              <button type="button" class="btn-guardar-pergamino" @click="guardarEdicionVentaDetalle">💾 Guardar</button>
+              <button type="button" class="btn-cancelar-pergamino" @click="cancelarEdicionVentaDetalle">Cancelar</button>
+            </template>
             <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalDetalleAbierto = false">✕</button>
           </header>
 
@@ -2659,23 +2813,42 @@ onMounted(() => {
             <div class="section-title">⚜ Detalle de Productos ⚜</div>
             
             <div class="items-scroll">
-              <div v-for="d in ventaDetalleItems" :key="d.idVentaDetalle" class="item-card">
+              <div v-for="(d, index) in ventaDetalleItems" :key="d.idVentaDetalle" class="item-card">
                 <div class="item-left">
                   <span class="item-bullet">◆</span>
                   <div class="item-info">
                     <span class="item-name">{{ d.productoNombre || 'Producto eliminado' }}</span>
-                    <span class="item-calc">
-                      {{ d.cantidad }} {{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'gramos' : 'pzas' }}
-                    </span>
+                    <template v-if="ventaDetalleEditando && ventaDetalleItemEditando === index">
+                      <input v-model.number="ventaDetalleCantidadTemp" type="number" min="1" class="edit-input-small" />
+                      <input v-model.number="ventaDetallePrecioTemp" type="number" step="0.01" min="0" class="edit-input-small" />
+                      <button class="btn-confirm-item" @click="confirmarEditarItemDetalle(index)">✓</button>
+                      <button class="btn-cancel-item" @click="cancelarEditarItemDetalle">×</button>
+                    </template>
+                    <template v-else>
+                      <span class="item-calc">
+                        {{ d.cantidad }} {{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'gramos' : 'pzas' }}
+                      </span>
+                    </template>
                   </div>
                 </div>
-                <span class="item-price">{{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}</span>
+                <span class="item-price">
+                  {{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}
+                  <template v-if="ventaDetalleEditando">
+                    <button class="btn-edit-item-pergamino" @click="iniciarEditarItemDetalle(index)" title="Editar">✏️</button>
+                    <button class="btn-delete-item-pergamino" @click="eliminarItemDetalle(index)" title="Eliminar">🗑️</button>
+                  </template>
+                </span>
               </div>
             </div>
 
             <div class="total-bar">
               <span class="total-bar-label">Total a Pagar</span>
-              <span class="total-bar-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+              <template v-if="ventaDetalleEditando">
+                <input v-model.number="ventaDetalleMontoEditado" type="number" class="total-input-pergamino" />
+              </template>
+              <template v-else>
+                <span class="total-bar-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+              </template>
             </div>
           </div>
         </div>
@@ -4822,6 +4995,92 @@ onMounted(() => {
   border-color: var(--error-color) !important;
   color: white !important;
   transform: scale(1.1) !important;
+}
+
+.btn-editar-pergamino,
+.btn-guardar-pergamino,
+.btn-cancelar-pergamino {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 0.5rem;
+}
+
+.btn-editar-pergamino {
+  background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+  color: #1a1a1a;
+}
+
+.btn-guardar-pergamino {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  color: white;
+}
+
+.btn-cancelar-pergamino {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: white;
+}
+
+.btn-edit-item-pergamino,
+.btn-delete-item-pergamino {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-left: 0.25rem;
+  padding: 0.1rem;
+}
+
+.btn-edit-item-pergamino:hover {
+  transform: scale(1.2);
+}
+
+.btn-delete-item-pergamino:hover {
+  transform: scale(1.2);
+}
+
+.edit-input-small {
+  width: 50px;
+  padding: 0.2rem;
+  margin-right: 0.25rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+}
+
+.btn-confirm-item,
+.btn-cancel-item {
+  padding: 0.1rem 0.3rem;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-right: 0.25rem;
+}
+
+.btn-confirm-item {
+  background: var(--success-color);
+  color: white;
+  border: 1px solid var(--success-color);
+}
+
+.btn-cancel-item {
+  background: var(--error-color);
+  color: white;
+  border: 1px solid var(--error-color);
+}
+
+.total-input-pergamino {
+  padding: 0.3rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  width: 100px;
+  text-align: right;
 }
 
 /* Contenedor scroll interno */
@@ -7519,6 +7778,32 @@ onMounted(() => {
   margin-bottom: 0.6rem;
 }
 
+.filter-discrepancia {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.checkbox-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #991b1b;
+  background: #fef2f2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ef4444;
+}
+
+.checkbox-scroll input {
+  width: 12px;
+  height: 12px;
+  accent-color: #ef4444;
+  cursor: pointer;
+}
+
 .filter-select-wrap {
   flex: 1;
   display: flex;
@@ -7637,6 +7922,20 @@ onMounted(() => {
   border-color: var(--accent-color);
   transform: translateX(4px);
   box-shadow: 3px 3px 0 var(--border-color);
+}
+
+.scroll-entry.entry-discrepancia {
+  border-color: #ef4444;
+}
+
+.scroll-entry.entry-discrepancia:hover {
+  border-color: #dc2626;
+}
+
+.discrepancia-icon {
+  display: inline-flex;
+  margin-right: 0.25rem;
+  font-size: 0.8rem;
 }
 
 .scroll-entry .entry-left {

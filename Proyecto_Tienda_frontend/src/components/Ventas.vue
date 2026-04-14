@@ -125,12 +125,15 @@ type UsuarioDTO = {
 
 type VentaDTO = {
   idVenta: number;
+  idUsuario?: number;
   usuario: UsuarioDTO;
+  nombreUsuario?: string;
   montoTotal?: number | string;
   estatus?: string;
   numeroTicket?: number;
   metodoPago?: string;
   fechaVenta?: string;
+  tieneDiscrepancia?: boolean;
 };
 
 type VentaDetalleDTO = {
@@ -140,6 +143,9 @@ type VentaDetalleDTO = {
   producto?: ProductoDTO;
   Producto?: ProductoDTO;
   idProducto?: number;
+  Venta?: {
+    idVenta: number;
+  };
 };
 
 type VentaPendienteDTO = VentaDTO;
@@ -243,7 +249,7 @@ async function cargarTicketsDesdeBackend() {
   }
 
   try {
-    const response = await getJson<ApiRespuesta<VentaPendienteDTO[]>>(`${API_BASE}/ventas/buscarVentasPendientes`);
+    const response = await getJson<ApiRespuesta<VentaPendienteDTO[]>>(`/ventas/buscarVentasPendientes`);
 
     if (response?.codigo === 200 && response?.datos) {
       const ventasPendientes = response.datos;
@@ -263,7 +269,7 @@ async function cargarTicketsDesdeBackend() {
           tickets.value.push(nuevoTicket);
           
           try {
-            const detallesResponse = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/ventasDetalle/porVenta/${venta.idVenta}`);
+            const detallesResponse = await getJson<ApiRespuesta<any[]>>(`/ventasDetalle/porVenta/${venta.idVenta}`);
             if (detallesResponse?.codigo === 200 && detallesResponse?.datos) {
               for (const detalle of detallesResponse.datos) {
                 const producto = detalle.Producto || detalle.producto;
@@ -339,7 +345,7 @@ async function crearVentaPendienteEnBackend() {
       numeroTicket: 0
     };
 
-    const data = await getJson<ApiRespuesta<VentaPendienteDTO>>(`${API_BASE}/ventas/agregarVenta`, {
+    const data = await getJson<ApiRespuesta<VentaPendienteDTO>>(`/ventas/agregarVenta`, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -399,7 +405,7 @@ async function eliminarTicket(id: number) {
   }
 
   try {
-    const response = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventas/eliminarVenta/${id}`, {
+    const response = await getJson<ApiRespuesta<unknown>>(`/ventas/eliminarVenta/${id}`, {
       method: 'DELETE'
     });
     
@@ -443,9 +449,11 @@ const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
 const historialGananciaTotal = ref(0);
 const historialVentas = ref<VentaDTO[]>([]);
+const historialUsuariosUnicos = ref<{ idUsuario: number; nombre: string }[]>([]);
 const historialDetalleCargando = ref(false);
 const historialVentaDetalle = ref<VentaDetalleDTO[]>([]);
-const historialVentaSeleccionada = ref<VentaDTO | { idVenta: number; numeroTicket?: number; fechaVenta?: string; montoTotal?: number | string; metodoPago?: string; estatus?: string } | null>(null);
+const historialVentaSeleccionada = ref<VentaDTO | { idVenta: number; numeroTicket?: number; fechaVenta?: string; montoTotal?: number | string; metodoPago?: string; estatus?: string; nombreUsuario?: string } | null>(null);
+const historialVentaTieneDiscrepancia = ref(false);
 const modalDetalleVentaAbierto = ref(false);
 const ticketVisibleMobile = ref(false); 
 const isKeyboardVisible = ref(false);
@@ -633,7 +641,7 @@ onMounted(async () => {
 });
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const respuesta = await fetch(url, {
+  const respuesta = await fetch(`${API_BASE}${url}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -649,12 +657,12 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 async function apiListarPromociones(): Promise<PromocionDTO[]> {
-  const response = await getJson<ApiRespuesta<PromocionDTO[]>>(`${API_BASE}/promociones/listarPromociones`);
+  const response = await getJson<ApiRespuesta<PromocionDTO[]>>(`/promociones/listarPromociones`);
   return response?.datos ?? [];
 }
 
 async function apiListarPromocionesActivas(): Promise<PromocionDTO[]> {
-  const response = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/promociones/listarActivas`);
+  const response = await getJson<ApiRespuesta<any[]>>(`/promociones/listarActivas`);
   const datos = response?.datos ?? [];
   return datos.map((p: any) => ({
     id_promocion: p.idPromocion,
@@ -678,7 +686,7 @@ async function apiListarPromocionesActivas(): Promise<PromocionDTO[]> {
 }
 
 async function apiCrearPromocion(dto: CrearPromocionDTO): Promise<PromocionDTO | null> {
-  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/crear`, {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`/promociones/crear`, {
     method: 'POST',
     body: JSON.stringify(dto)
   });
@@ -686,7 +694,7 @@ async function apiCrearPromocion(dto: CrearPromocionDTO): Promise<PromocionDTO |
 }
 
 async function apiActualizarPromocion(id: number, dto: CrearPromocionDTO): Promise<PromocionDTO | null> {
-  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/actualizar/${id}`, {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`/promociones/actualizar/${id}`, {
     method: 'PUT',
     body: JSON.stringify(dto)
   });
@@ -694,14 +702,14 @@ async function apiActualizarPromocion(id: number, dto: CrearPromocionDTO): Promi
 }
 
 async function apiEliminarPromocion(id: number): Promise<boolean> {
-  const response = await getJson<ApiRespuesta<null>>(`${API_BASE}/promociones/eliminar/${id}`, {
+  const response = await getJson<ApiRespuesta<null>>(`/promociones/eliminar/${id}`, {
     method: 'DELETE'
   });
   return response?.codigo === 200;
 }
 
 async function apiTogglePromocionActiva(id: number): Promise<PromocionDTO | null> {
-  const response = await getJson<ApiRespuesta<PromocionDTO>>(`${API_BASE}/promociones/toggleActiva/${id}`, {
+  const response = await getJson<ApiRespuesta<PromocionDTO>>(`/promociones/toggleActiva/${id}`, {
     method: 'PATCH'
   });
   return response?.datos ?? null;
@@ -764,7 +772,7 @@ async function cargarProductos() {
   }
 
   try {
-    const data = await getJson<ApiRespuesta<ProductoDTO[]>>(`${API_BASE}/productos/listarProductos`);
+    const data = await getJson<ApiRespuesta<ProductoDTO[]>>(`/productos/listarProductos`);
     if (data?.datos) {
       productos.value = normalizarProductos(data.datos);
       setProductosCache(data.datos);
@@ -789,7 +797,7 @@ function getFechaHoy() {
 async function buscarProductoPorCodigoBarras(codigo: string): Promise<Producto | undefined> {
   try {
     const data = await getJson<ApiRespuesta<ProductoDTO>>(
-      `${API_BASE}/productos/buscarPorCodigoBarras/${encodeURIComponent(codigo)}`
+      `/productos/buscarPorCodigoBarras/${encodeURIComponent(codigo)}`
     );
     const normalizados = normalizarProductos(data?.datos ? [data.datos] : []);
     return normalizados[0] ?? undefined;
@@ -953,7 +961,7 @@ async function quitarItem(id: number) {
   playSound('remove');
   
   if (idVentaDetalle) {
-    getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${idVentaDetalle}`, {
+    getJson<ApiRespuesta<unknown>>(`/ventasDetalle/eliminarVentaDetalle/${idVentaDetalle}`, {
       method: 'DELETE'
     }).catch(() => {});
   }
@@ -970,7 +978,7 @@ async function limpiarTicket() {
   ticketActual.value.items = [];
 
   for (const id of idsParaEliminar) {
-    getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/eliminarVentaDetalle/${id}`, {
+    getJson<ApiRespuesta<unknown>>(`/ventasDetalle/eliminarVentaDetalle/${id}`, {
       method: 'DELETE'
     }).catch(() => {});
   }
@@ -993,7 +1001,7 @@ async function crearVenta(idUsuario: number): Promise<VentaDTO> {
     numeroTicket: ticketActual.value?.numero ?? 1
   };
 
-  const data = await getJson<ApiRespuesta<VentaDTO>>(`${API_BASE}/ventas/agregarVenta`, {
+  const data = await getJson<ApiRespuesta<VentaDTO>>(`/ventas/agregarVenta`, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -1017,12 +1025,12 @@ async function crearDetalleVenta(ventaId: number, item: any) {
   let data;
   
   if (item.idVentaDetalle) {
-    data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/actualizarVentaDetalle/${item.idVentaDetalle}`, {
+    data = await getJson<ApiRespuesta<unknown>>(`/ventasDetalle/actualizarVentaDetalle/${item.idVentaDetalle}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
   } else {
-    data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/ventasDetalle/agregarVentaDetalle`, {
+    data = await getJson<ApiRespuesta<unknown>>(`/ventasDetalle/agregarVentaDetalle`, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -1040,7 +1048,7 @@ async function crearDetalleVenta(ventaId: number, item: any) {
 
 async function completarVenta(idVenta: number, metodoPago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA', montoTotal: number) {
   const data = await getJson<ApiRespuesta<unknown>>(
-    `${API_BASE}/ventas/completarVenta/${idVenta}?montoTotal=${encodeURIComponent(montoTotal.toString())}&metodoPago=${metodoPago}`,
+    `/ventas/completarVenta/${idVenta}?montoTotal=${encodeURIComponent(montoTotal.toString())}&metodoPago=${metodoPago}`,
     { method: 'PUT' }
   );
 
@@ -1164,7 +1172,7 @@ async function registrarEntradaEfectivo(payload: { montoEoS: number; descripcion
       descripcion: payload.descripcion,
       idUsuario
     };
-    const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/caja/entrada`, {
+    const data = await getJson<ApiRespuesta<unknown>>(`/caja/entrada`, {
       method: 'POST',
       body: JSON.stringify(body)
     });
@@ -1194,7 +1202,7 @@ async function registrarSalidaEfectivo(payload: { montoEoS: number; descripcion:
       descripcion: payload.descripcion,
       idUsuario
     };
-    const data = await getJson<ApiRespuesta<unknown>>(`${API_BASE}/caja/salida`, {
+    const data = await getJson<ApiRespuesta<unknown>>(`/caja/salida`, {
       method: 'POST',
       body: JSON.stringify(body)
     });
@@ -1216,7 +1224,7 @@ async function cargarHistorialVentasDia() {
   try {
     const fechaHoy = getFechaHoy();
     const data = await getJson<ApiRespuesta<{ cobroTotal?: number | string; gananciaTotal?: number | string; ventas?: VentaDTO[] }>>(
-      `${API_BASE}/ventas/obtenerVentaPorDia/${fechaHoy}`
+      `/ventas/obtenerVentaPorDia/${fechaHoy}`
     );
 
     historialCobroTotal.value = Number(data?.datos?.cobroTotal ?? 0);
@@ -1224,6 +1232,34 @@ async function cargarHistorialVentasDia() {
     historialVentas.value = Array.isArray(data?.datos?.ventas) 
       ? data.datos.ventas.sort((a, b) => (b.idVenta ?? 0) - (a.idVenta ?? 0))
       : [];
+    
+    const usuariosMap = new Map<number, string>();
+    for (const v of historialVentas.value) {
+      if (v.idUsuario && v.nombreUsuario && !usuariosMap.has(v.idUsuario)) {
+        usuariosMap.set(v.idUsuario, v.nombreUsuario);
+      }
+    }
+    historialUsuariosUnicos.value = Array.from(usuariosMap.entries()).map(([id, nombre]) => ({ idUsuario: id, nombre }));
+    
+    const idsVentas = historialVentas.value.map(v => v.idVenta);
+    const todosDetalles = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
+      `/ventasDetalle/obtenerTodosLosVentasDetalles`
+    );
+    
+    const detallesMap = new Map<number, VentaDetalleDTO[]>();
+    for (const d of todosDetalles?.datos || []) {
+      const idVenta = Number(d?.Venta?.idVenta || 0);
+      if (!detallesMap.has(idVenta)) {
+        detallesMap.set(idVenta, []);
+      }
+      detallesMap.get(idVenta)?.push(d);
+    }
+    
+    for (const venta of historialVentas.value) {
+      const detalles = detallesMap.get(venta.idVenta) || [];
+      const montoVenta = Number(venta.montoTotal ?? 0);
+      venta.tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
+    }
   } catch (_error) {
     historialCobroTotal.value = 0;
     historialGananciaTotal.value = 0;
@@ -1232,6 +1268,17 @@ async function cargarHistorialVentasDia() {
   } finally {
     historialCargando.value = false;
   }
+}
+
+function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): boolean {
+  const sumaDetalles = detalles.reduce((sum, d) => {
+    const precio = Number(d.precioUnitarioVenta || 0);
+    const cantidad = Number(d.cantidad || 0);
+    return sum + (precio * cantidad);
+  }, 0);
+  
+  const discrepancia = Math.abs(sumaDetalles - montoTotal) > 1;
+  return discrepancia;
 }
 
 function salidaEfectivo() {
@@ -1247,16 +1294,27 @@ async function historialVentasAbrir() {
   await cargarHistorialVentasDia();
 }
 
-async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket?: number }) {
+async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket?: number; montoTotal?: number | string; nombreUsuario?: string }) {
   historialVentaSeleccionada.value = venta;
   historialDetalleCargando.value = true;
+  historialVentaTieneDiscrepancia.value = false;
   modalDetalleVentaAbierto.value = true;
   
   try {
     const data = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
-      `${API_BASE}/ventasDetalle/porVenta/${venta.idVenta}`
+      `/ventasDetalle/porVenta/${venta.idVenta}`
     );
-    historialVentaDetalle.value = Array.isArray(data?.datos) ? data.datos : [];
+    const detalles = Array.isArray(data?.datos) ? data.datos : [];
+    historialVentaDetalle.value = detalles;
+    
+    const montoVenta = Number(venta.montoTotal ?? 0);
+    const tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
+    historialVentaTieneDiscrepancia.value = tieneDiscrepancia;
+    
+    const idx = historialVentas.value.findIndex(v => v.idVenta === venta.idVenta);
+    if (idx !== -1) {
+      historialVentas.value[idx] = { ...historialVentas.value[idx], tieneDiscrepancia };
+    }
   } catch (_error) {
     historialVentaDetalle.value = [];
     mostrarMensaje('No se pudieron cargar los detalles de la venta.', 'error');
@@ -1272,7 +1330,7 @@ async function cancelarVentaDesdeHistorial(venta: VentaDTO | { idVenta: number; 
 
   try {
     const data = await getJson<ApiRespuesta<VentaDTO>>(
-      `${API_BASE}/ventas/cancelarVenta/${venta.idVenta}`,
+      `/ventas/cancelarVenta/${venta.idVenta}`,
       { method: 'PUT' }
     );
 
@@ -1611,7 +1669,7 @@ async function processVoiceCommand(comando: string) {
   try {
     mostrarMensaje('Procesando comando de voz...', 'info');
     
-    const response = await getJson<ApiRespuesta<any[]>>(`${API_BASE}/ventas/comando-texto`, {
+    const response = await getJson<ApiRespuesta<any[]>>(`/ventas/comando-texto`, {
       method: 'POST',
       body: JSON.stringify({ comando })
     });
@@ -1749,7 +1807,7 @@ async function guardarCambiosDetalle() {
     for (const detalle of historialVentaDetalle.value) {
       const precioRedondeado = Math.round(Number(detalle.precioUnitarioVenta) * 100) / 100;
       await getJson<ApiRespuesta<unknown>>(
-        `${API_BASE}/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
+        `/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
         {
           method: 'PUT',
           body: JSON.stringify({
@@ -1768,7 +1826,7 @@ async function guardarCambiosDetalle() {
     };
     
     await getJson<ApiRespuesta<VentaDTO>>(
-      `${API_BASE}/ventas/actualizarVenta/${historialVentaSeleccionada.value.idVenta}`,
+      `/ventas/actualizarVenta/${historialVentaSeleccionada.value.idVenta}`,
       {
         method: 'PUT',
         body: JSON.stringify(payload)
@@ -1800,7 +1858,7 @@ async function eliminarDetalleVenta(index: number) {
   
   try {
     const response = await getJson<ApiRespuesta<unknown>>(
-      `${API_BASE}/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
+      `/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
       { method: 'DELETE' }
     );
     
@@ -1833,7 +1891,7 @@ async function eliminarTodosLosDetalles() {
     for (const detalle of historialVentaDetalle.value) {
       if (detalle.idVentaDetalle) {
         await getJson<ApiRespuesta<unknown>>(
-          `${API_BASE}/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
+          `/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`,
           { method: 'DELETE' }
         );
       }
@@ -2116,7 +2174,7 @@ async function eliminarTodosLosDetalles() {
     <!-- COMPONENTES ADICIONALES (MODALES, ESCÁNER) -->
     <EntradaEfectivoModal :open="modalEntradaAbierto" @close="modalEntradaAbierto = false" @submit="registrarEntradaEfectivo" />
     <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalidaEfectivo" />
-    <HistorialVentasModal :open="modalHistorialAbierto" :loading="historialCargando" :cobro-total="historialCobroTotal" :ganancia-total="historialGananciaTotal" :ventas="historialVentas" @close="modalHistorialAbierto = false" @ver-detalle="verDetalleVenta" @cancelar="cancelarVentaDesdeHistorial" />
+    <HistorialVentasModal :open="modalHistorialAbierto" :loading="historialCargando" :cobro-total="historialCobroTotal" :ganancia-total="historialGananciaTotal" :ventas="historialVentas" :usuarios-unicos="historialUsuariosUnicos" @close="modalHistorialAbierto = false" @ver-detalle="verDetalleVenta" @cancelar="cancelarVentaDesdeHistorial" />
     
     <!-- Detalle de venta modal custom -->
     <div v-if="modalDetalleVentaAbierto" class="pos-modal-overlay" @click.self="cerrarDetalleVenta">
@@ -2129,6 +2187,7 @@ async function eliminarTodosLosDetalles() {
         <header class="modal-h">
           <h3>🔍 Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
           <div class="modal-actions">
+            <button v-if="historialVentaTieneDiscrepancia" class="btn-warning" title="La suma de detalles no coincide con el total">⚠️ Discrepancia</button>
             <button v-if="esAdmin && !modoEdicionDetalle" class="btn-editar" @click="iniciarEdicionDetalle">✏️ Editar</button>
             <template v-if="modoEdicionDetalle">
               <button class="btn-guardar" @click="guardarCambiosDetalle">💾 Guardar</button>
@@ -2138,44 +2197,64 @@ async function eliminarTodosLosDetalles() {
           </div>
         </header>
         <div class="modal-b custom-scrollbar">
-          <div class="venta-meta-grid">
-            <div class="meta-box">
-              <span class="meta-icon">📅</span>
-              <span>Fecha</span>
-              <strong>{{ historialVentaSeleccionada?.fechaVenta?.slice(0, 10) }}</strong>
+          <div class="venta-info-grid">
+            <div class="info-card fecha-card">
+              <div class="info-icon">📅</div>
+              <div class="info-content">
+                <span class="info-label">Fecha</span>
+                <span class="info-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(0, 10) }}</span>
+              </div>
             </div>
-            <div class="meta-box">
-              <span class="meta-icon">💳</span>
-              <span>Método</span>
-              <strong class="method-badge" :class="getMetodoClase(historialVentaSeleccionada?.metodoPago)">
-                {{ historialVentaSeleccionada?.metodoPago }}
-              </strong>
+            <div class="info-card hora-card">
+              <div class="info-icon">🕐</div>
+              <div class="info-content">
+                <span class="info-label">Hora</span>
+                <span class="info-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(11, 16) }}</span>
+              </div>
             </div>
-            <div class="meta-box total">
-              <span class="meta-icon">💰</span>
-              <span>Total</span>
-              <template v-if="!modoEdicionDetalle">
-                <strong class="txt-pos">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</strong>
-              </template>
-              <template v-else>
-                <div class="total-edit-wrapper">
-                  <span class="currency-prefix">$</span>
-                  <input 
-                    v-model.number="montoTotalInput" 
-                    type="number" 
-                    min="0" 
-                    step="1" 
-                    class="total-input"
-                    :class="{ 'manual-edited': totalManualEditado }"
-                    @input="onTotalManualChange"
-                  />
-                  <span v-if="totalManualEditado" class="edit-indicator" title="Total modificado manualmente">✏️</span>
-                </div>
-              </template>
+            <div class="info-card cajero-card">
+              <div class="info-icon">👤</div>
+              <div class="info-content">
+                <span class="info-label">Cajero</span>
+                <span class="info-value">{{ historialVentaSeleccionada?.nombreUsuario || 'Cajero' }}</span>
+              </div>
+            </div>
+            <div class="info-card">
+              <div class="info-icon">💳</div>
+              <div class="info-content">
+                <span class="info-label">Método</span>
+                <span class="info-value method-badge" :class="getMetodoClase(historialVentaSeleccionada?.metodoPago)">
+                  {{ historialVentaSeleccionada?.metodoPago }}
+                </span>
+              </div>
             </div>
           </div>
+          <div class="total-card">
+            <div class="total-label">
+              <span class="total-icon">💰</span>
+              <span>Total de la Venta</span>
+            </div>
+            <template v-if="!modoEdicionDetalle">
+              <div class="total-value">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</div>
+            </template>
+            <template v-else>
+              <div class="total-edit-wrapper">
+                <span class="currency-prefix">$</span>
+                <input 
+                  v-model.number="montoTotalInput" 
+                  type="number" 
+                  min="0" 
+                  step="1" 
+                  class="total-input"
+                  :class="{ 'manual-edited': totalManualEditado }"
+                  @input="onTotalManualChange"
+                />
+                <span v-if="totalManualEditado" class="edit-indicator" title="Total modificado manualmente">✏️</span>
+              </div>
+            </template>
+          </div>
           <div class="items-header">
-            <span>🛒 Productos</span>
+            <span>🛒 Productos ({{ historialVentaDetalle.length }})</span>
             <button v-if="esAdmin && modoEdicionDetalle && historialVentaDetalle.length > 0" class="btn-eliminar-todos" @click="eliminarTodosLosDetalles" title="Eliminar todos los productos">
               🗑️ Eliminar todo
             </button>
@@ -4693,6 +4772,9 @@ async function eliminarTodosLosDetalles() {
   display: flex;
   gap: 0.4rem;
 }
+.extra-actions {
+  justify-content: center;
+}
 
 .checkout-actions-scroll .extra-actions .btn-checkout.secondary {
   background: var(--bg-primary);
@@ -5049,6 +5131,131 @@ async function eliminarTodosLosDetalles() {
   font-size: 1.25rem !important;
 }
 
+.venta-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.info-card.fecha-card {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+}
+
+.info-card.hora-card {
+  border-color: #8b5cf6;
+  background: color-mix(in srgb, #8b5cf6 10%, var(--bg-primary));
+}
+
+.info-card.cajero-card {
+  border-color: #06b6d4;
+  background: color-mix(in srgb, #06b6d4 10%, var(--bg-primary));
+}
+
+.info-icon {
+  font-size: 1.5rem;
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.total-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  border: 3px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.total-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: color-mix(in srgb, white 80%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.total-icon {
+  font-size: 1.25rem;
+}
+
+.total-value {
+  font-size: 2rem;
+  font-weight: 900;
+  font-family: "Courier New", monospace;
+  color: white;
+  text-shadow: 2px 2px 0 color-mix(in srgb, black 30%, transparent);
+}
+
+.total-edit-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+
+.total-input {
+  width: 100px;
+  padding: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  text-align: right;
+}
+
+.total-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.currency-prefix {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.edit-indicator {
+  font-size: 1rem;
+}
+
 .items-header {
   margin-bottom: 1rem;
   padding: 0.75rem 0;
@@ -5178,6 +5385,41 @@ async function eliminarTodosLosDetalles() {
   .venta-meta-grid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
+  }
+  
+  .venta-info-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .info-card {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .info-icon {
+    font-size: 1.25rem;
+  }
+  
+  .info-label {
+    font-size: 0.6rem;
+  }
+  
+  .info-value {
+    font-size: 0.8rem;
+  }
+  
+  .total-card {
+    padding: 1rem;
+  }
+  
+  .total-value {
+    font-size: 1.5rem;
+  }
+  
+  .total-input {
+    width: 80px;
+    font-size: 1rem;
   }
   
   .meta-box {
@@ -5548,6 +5790,17 @@ async function eliminarTodosLosDetalles() {
 .btn-editar {
   background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
   color: #1a1a1a;
+}
+
+.btn-warning {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 2px solid #dc2626;
+  border-radius: 6px;
+  cursor: help;
 }
 
 .btn-editar:hover {
