@@ -7,6 +7,7 @@ import Inventario from "@/components/Inventario.vue";
 import Corte from "@/components/Corte.vue";
 import Usuarios from "@/components/Usuarios.vue";
 import Finanzas from "@/components/Finanzas.vue";
+import Rental from "@/components/Rental.vue";
 
 const AUTH_KEY = 'isAuth';
 
@@ -51,6 +52,12 @@ const routes = [
     name: 'Finanzas',
     component: Finanzas,
     meta: { requiresAuth: true, adminOnly: true },
+  },
+  {
+    path: '/rental',
+    name: 'Rental',
+    component: Rental,
+    meta: { requiresAuth: true },
   }
 ];
 

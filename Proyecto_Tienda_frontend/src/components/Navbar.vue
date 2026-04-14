@@ -50,6 +50,7 @@ const links = computed(() => {
     { to: '/usuarios', label: 'Usuarios', adminOnly: false, icon: 'hero' },
     { to: '/inventario', label: 'Inventario', adminOnly: true, icon: 'chest' },
     { to: '/corte', label: 'Corte', adminOnly: false, icon: 'rupee' },
+    { to: '/rental', label: 'Rental', adminOnly: false, icon: 'clock' },
     { to: '/finanzas', label: 'Finanzas', adminOnly: true, icon: 'triforce' }
   ];
   return linksBase.filter(l => !l.adminOnly || esAdministrador.value);
@@ -478,6 +479,7 @@ function cerrarSesion() {
 .link-icon.chest::before { content: '📦'; font-size: 11px; }
 .link-icon.rupee::before { content: '💎'; font-size: 11px; }
 .link-icon.triforce::before { content: '🔺'; font-size: 11px; }
+.link-icon.clock::before { content: '⏱️'; font-size: 11px; }
 
 .link-text {
   position: relative;
