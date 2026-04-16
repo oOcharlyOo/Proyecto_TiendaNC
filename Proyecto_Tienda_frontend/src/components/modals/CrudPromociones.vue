@@ -62,6 +62,7 @@ const gramosTemp = ref(100);
 const editingId = ref<number | null>(null);
 const imagenPreview = ref<string | null>(null);
 const imagenBase64 = ref<string | null>(null);
+const imagenOriginalUrl = ref<string | null>(null);
 const subiendoImagen = ref(false);
 
 const form = ref({
@@ -232,6 +233,7 @@ function quitarProducto(index: number) {
 function editarPromocion(promocion: PromocionDTO) {
   editingId.value = promocion.id_promocion;
   imagenPreview.value = promocion.imagen_url;
+  imagenOriginalUrl.value = promocion.imagen_url;
   imagenBase64.value = null;
   console.log('Editando promocion:', promocion);
   console.log('Detalles:', promocion.detalles);
@@ -260,6 +262,7 @@ function nuevaPromocion() {
   editingId.value = null;
   imagenPreview.value = null;
   imagenBase64.value = null;
+  imagenOriginalUrl.value = null;
   form.value = {
     nombre: '',
     descripcion: '',
@@ -309,7 +312,7 @@ async function guardarPromocion() {
       nombre: form.value.nombre,
       descripcion: form.value.descripcion,
       precio_promocion: form.value.precio_promocion,
-      imagen_url: null,
+      imagen_url: imagenBase64.value ? null : imagenOriginalUrl.value,
       activa: form.value.activa,
       fecha_inicio: null,
       fecha_fin: null,

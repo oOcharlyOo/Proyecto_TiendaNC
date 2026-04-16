@@ -1,12 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import Swal from 'sweetalert2';
+import { useTheme } from '@/composables/useTheme';
+
+const { currentTheme } = useTheme();
+
+type ProductoCombo = {
+  idProducto: number;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: number;
+};
+
+type Opcion = {
+  id?: number;
+  nombre: string;
+  minutos: number;
+  precio: number;
+  productosIncluidos: ProductoCombo[];
+};
 
 type Estacion = {
   id: number;
-  nombre: string;
-  tipo: 'ps3' | 'ps4' | 'ps5' | 'arcade' | 'switch' | 'xbox';
-  icono: string;
-  tiempoRestante: number;
+  idProducto: number;
+  nombreProducto: string;
+  imagenProducto: string | null;
+  tiempoTotal: number;
+  inicioTimestamp: number;
   status: 'disponible' | 'activo' | 'terminado';
   ticket: TicketItem[];
   opciones: Opcion[];
@@ -18,18 +38,17 @@ type TicketItem = {
   precio: number;
 };
 
-type Opcion = {
-  id?: number;
+type ProductoDTO = {
+  idProducto: number;
   nombre: string;
-  minutos: number;
-  precio: number;
-  costo: number;
-  productosIncluidos: { idProducto: number; nombre: string; cantidad: number }[];
+  stock: number;
+  precio_venta: number;
+  imagen_url?: string;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const STORAGE_KEY = 'rental_estaciones';
-const intervaloGlobal = ref<number | undefined>();
+const TICKER_KEY = 'rental_ticker';
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -37,29 +56,10 @@ type ApiRespuesta<T> = {
   datos: T;
 };
 
-type ProductoDTO = {
-  idProducto?: number;
-  nombre: string;
-  stock: number;
-  precio_venta: number;
-};
-
 const productosInventario = ref<ProductoDTO[]>([]);
-
-const cargarProductos = async () => {
-  try {
-    const data = await fetch(`${API_BASE}/productos/listarProductos`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const res: ApiRespuesta<ProductoDTO[]> = await data.json();
-    if (res?.datos) {
-      productosInventario.value = res.datos;
-    }
-  } catch (error) {
-    console.error('Error cargando productos:', error);
-  }
-};
+const estaciones = ref<Estacion[]>([]);
+const productosDisponibles = computed(() => productosInventario.value.filter(p => Number(p.stock) > 0));
+const ticker = ref(0);
 
 const formatTime = (seconds: number): string => {
   if (seconds < 0) seconds = 0;
@@ -80,13 +80,22 @@ const getStationTotal = (station: Estacion): number => {
   return station.ticket.reduce((sum, item) => sum + item.precio, 0);
 };
 
+const getTiempoRestante = (station: Estacion): number => {
+  if (station.status !== 'activo') return station.tiempoTotal;
+  const ahora = Date.now();
+  const transcurrido = Math.floor((ahora - station.inicioTimestamp) / 1000);
+  return Math.max(0, station.tiempoTotal - transcurrido);
+};
+
 const guardarEnStorage = () => {
+  ticker.value++;
   const datos = estaciones.value.map(e => ({
     id: e.id,
-    nombre: e.nombre,
-    tipo: e.tipo,
-    icono: e.icono,
-    tiempoRestante: e.tiempoRestante,
+    idProducto: e.idProducto,
+    nombreProducto: e.nombreProducto,
+    imagenProducto: e.imagenProducto,
+    tiempoTotal: e.tiempoTotal,
+    inicioTimestamp: e.inicioTimestamp,
     status: e.status,
     ticket: e.ticket,
     opciones: e.opciones,
@@ -101,19 +110,50 @@ const cargarDesdeStorage = () => {
   
   try {
     const datosGuardados = JSON.parse(datos);
-    for (const saved of datosGuardados) {
-      const index = estaciones.value.findIndex(e => e.id === saved.id);
-      if (index !== -1) {
-        estaciones.value[index].tiempoRestante = saved.tiempoRestante || 0;
-        estaciones.value[index].status = saved.status || 'disponible';
-        estaciones.value[index].ticket = saved.ticket || [];
-        estaciones.value[index].notificado = saved.notificado || false;
-        
-        if (estaciones.value[index].tiempoRestante <= 0 && estaciones.value[index].status === 'activo') {
-          estaciones.value[index].status = 'terminado';
+    const ahora = Date.now();
+    estaciones.value = datosGuardados.map((saved: any) => {
+      let status = saved.status || 'disponible';
+      let notificado = saved.notificado || false;
+      const tiempoTotal = saved.tiempoTotal || 0;
+      const inicioTimestamp = saved.inicioTimestamp || 0;
+      
+      if (status === 'activo' && inicioTimestamp > 0) {
+        const transcurrido = Math.floor((ahora - inicioTimestamp) / 1000);
+        const tiempoRestante = tiempoTotal - transcurrido;
+        if (tiempoRestante <= 0) {
+          status = 'terminado';
+          if (!notificado) {
+            notificado = true;
+            mostrarNotificacion({
+              id: saved.id,
+              idProducto: saved.idProducto,
+              nombreProducto: saved.nombreProducto,
+              imagenProducto: saved.imagenProducto,
+              tiempoTotal,
+              inicioTimestamp,
+              status: 'terminado',
+              ticket: saved.ticket || [],
+              opciones: saved.opciones || [],
+              notificado: true
+            });
+          }
         }
       }
-    }
+      
+      return {
+        id: saved.id,
+        idProducto: saved.idProducto,
+        nombreProducto: saved.nombreProducto,
+        imagenProducto: saved.imagenProducto,
+        tiempoTotal: tiempoTotal,
+        inicioTimestamp: inicioTimestamp,
+        status: status,
+        ticket: saved.ticket || [],
+        opciones: saved.opciones || [],
+        notificado: notificado
+      };
+    });
+    guardarEnStorage();
     return true;
   } catch (e) {
     console.error('Error al cargar:', e);
@@ -121,77 +161,92 @@ const cargarDesdeStorage = () => {
   }
 };
 
+const cargarProductos = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/productos/listarProductos`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const res: ApiRespuesta<ProductoDTO[]> = await response.json();
+    if (res?.datos) {
+      productosInventario.value = res.datos;
+    }
+  } catch (error) {
+    console.error('Error cargando productos:', error);
+  }
+};
+
 const solicitarPermisoNotificaciones = async () => {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  
-  const permission = await Notification.requestPermission();
-  return permission === 'granted';
+  return true;
 };
 
 const mostrarNotificacion = (station: Estacion) => {
-  if (!('Notification' in window)) return;
-  if (Notification.permission !== 'granted') return;
-  
-  new Notification('⏱️ Tiempo Agotado', {
-    body: `El tiempo de ${station.nombre} ha terminado`,
-    icon: '/favicon.ico',
-    tag: station.id.toString()
+  Swal.fire({
+    toast: true,
+    position: 'center',
+    icon: 'warning',
+    title: '⏱️ Tiempo Agotado',
+    text: `El tiempo de ${station.nombreProducto} ha terminado`,
+    showConfirmButton: true,
+    confirmButtonText: 'Aceptar',
+    confirmButtonColor: '#8b5a2b',
+    background: '#f4e4bc',
+    color: '#5c3d1e',
+    timer: undefined,
+    customClass: {
+      popup: 'swal2-popup-papyrus'
+    }
   });
 };
 
+const intervalId = ref<number | null>(null);
+
 const iniciarTemporizador = () => {
-  if (intervaloGlobal.value) clearInterval(intervaloGlobal.value);
+  if (intervalId.value !== null) return;
   
-  intervaloGlobal.value = window.setInterval(() => {
+  intervalId.value = window.setInterval(() => {
     let cambio = false;
+    const ahora = Date.now();
     
     for (const station of estaciones.value) {
-      if (station.status === 'activo' && station.tiempoRestante > 0) {
-        station.tiempoRestante--;
-        cambio = true;
+      if (station.status === 'activo' && station.inicioTimestamp > 0) {
+        const transcurrido = Math.floor((ahora - station.inicioTimestamp) / 1000);
+        const tiempoRestante = station.tiempoTotal - transcurrido;
         
-        if (station.tiempoRestante <= 0) {
-          station.tiempoRestante = 0;
+        if (tiempoRestante <= 0 && !station.notificado) {
           station.status = 'terminado';
-          
-          if (!station.notificado) {
-            mostrarNotificacion(station);
-            station.notificado = true;
-          }
+          station.notificado = true;
+          cambio = true;
+          mostrarNotificacion(station);
+        } else if (tiempoRestante > 0) {
+          cambio = true;
         }
       }
     }
     
-    if (cambio) {
-      guardarEnStorage();
-    }
+    if (cambio) guardarEnStorage();
   }, 1000);
 };
 
 const agregarTiempo = (station: Estacion, minutos: number, precio: number, nombreOpcion: string) => {
   const segundosAgregados = minutos * 60;
+  const ahora = Date.now();
   
   if (station.status === 'disponible' || station.status === 'terminado') {
-    station.tiempoRestante = segundosAgregados;
+    station.tiempoTotal = segundosAgregados;
+    station.inicioTimestamp = ahora;
     station.status = 'activo';
     station.notificado = false;
     station.ticket = [];
-    station.ticket.push({ nombre: nombreOpcion, precio: precio });
+    station.ticket.push({ nombre: nombreOpcion, precio });
   } else {
-    station.tiempoRestante += segundosAgregados;
-    station.ticket.push({ nombre: nombreOpcion, precio: precio });
+    station.tiempoTotal += segundosAgregados;
+    station.ticket.push({ nombre: nombreOpcion, precio });
   }
   
-  if (!intervaloGlobal.value) {
-    iniciarTemporizador();
-  }
-  
+  iniciarTemporizador();
   guardarEnStorage();
 };
-
-const PRODUCTO_RENTAL_ID = 1;
 
 const registrarVentaEnAPI = async (station: Estacion, metodoPago: string = 'EFECTIVO') => {
   const total = getStationTotal(station);
@@ -200,10 +255,10 @@ const registrarVentaEnAPI = async (station: Estacion, metodoPago: string = 'EFEC
   try {
     const payloadVenta = {
       idUsuario: 1,
-      montoTotal: total,
-      estatus: 'C',
-      metodoPago: metodoPago,
-      numeroTicket: station.id
+      montoTotal: 0,
+      estatus: 'P',
+      metodoPago: 'EFECTIVO',
+      numeroTicket: 0
     };
     
     const responseVenta = await fetch(`${API_BASE}/ventas/agregarVenta`, {
@@ -212,11 +267,16 @@ const registrarVentaEnAPI = async (station: Estacion, metodoPago: string = 'EFEC
       body: JSON.stringify(payloadVenta)
     });
     
+    if (!responseVenta.ok) {
+      const errorText = await responseVenta.text();
+      console.error('Error al crear venta:', responseVenta.status, errorText);
+      return;
+    }
+    
     const dataVenta = await responseVenta.json();
     
     if (dataVenta?.codigo !== 200 || !dataVenta?.datos) {
       console.error('Error al crear venta:', dataVenta?.mensaje);
-      alert('Error al registrar venta. Ver consola para detalles.');
       return;
     }
     
@@ -224,66 +284,95 @@ const registrarVentaEnAPI = async (station: Estacion, metodoPago: string = 'EFEC
     
     for (const item of station.ticket) {
       const payloadDetalle = {
-        venta: { idVenta },
-        producto: { idProducto: PRODUCTO_RENTAL_ID, nombre: `Rental: ${station.nombre}`, precio_venta: item.precio, codigoBarras: '' },
+        Venta: { idVenta },
+        Producto: { idProducto: station.idProducto, nombre: station.nombreProducto, precio_venta: item.precio, codigoBarras: '' },
         cantidad: 1,
         precioUnitarioVenta: item.precio,
         tipoPrecioAplicado: 'VENTA'
       };
       
-      await fetch(`${API_BASE}/ventas/agregarDetalleVenta`, {
+      await fetch(`${API_BASE}/ventasDetalle/agregarVentaDetalle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadDetalle)
       });
     }
     
+    await fetch(`${API_BASE}/ventas/completarVenta/${idVenta}?montoTotal=${total}&metodoPago=${metodoPago}`, {
+      method: 'PUT'
+    });
   } catch (error) {
     console.error('Error al guardar venta:', error);
-    alert('Error al conectar con el servidor.');
   }
 };
 
 const cobrar = async (station: Estacion, metodoPago: string = 'EFECTIVO') => {
   const total = getStationTotal(station);
   if (total > 0) {
-    const confirmado = confirm(`¿Confirmar cobro de ${formatoMoneda(total)} para ${station.nombre}?`);
-    if (!confirmado) return;
-    
+    const result = await Swal.fire({
+      toast: true,
+      position: 'center',
+      icon: 'question',
+      title: 'Confirmar Cobro',
+      text: `¿Confirmar cobro de ${formatoMoneda(total)} para ${station.nombreProducto}?`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cobrar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#4a7c39',
+      cancelButtonColor: '#8b2020',
+      background: '#f4e4bc',
+      color: '#5c3d1e',
+      customClass: {
+        popup: 'swal2-popup-papyrus'
+      }
+    });
+    if (!result.isConfirmed) return;
     await registrarVentaEnAPI(station, metodoPago);
   }
   
-  if (intervaloGlobal.value) {
-    clearInterval(intervaloGlobal.value);
-    intervaloGlobal.value = undefined;
+  if (intervalId.value !== null) {
+    clearInterval(intervalId.value);
+    intervalId.value = null;
   }
   
-  station.tiempoRestante = 0;
+  station.tiempoTotal = 0;
+  station.inicioTimestamp = 0;
   station.status = 'disponible';
   station.ticket = [];
   station.notificado = false;
-  
   guardarEnStorage();
-}; 
-
-const editarOpcion = (station: Estacion, opcion: Opcion, nuevoNombre: string, nuevosMinutos: number, nuevoPrecio: number, nuevoCosto: number) => {
-  const idx = station.opciones.findIndex(o => o.nombre === opcion.nombre && o.minutos === opcion.minutos);
-  if (idx !== -1) {
-    station.opciones[idx] = { nombre: nuevoNombre, minutos: nuevosMinutos, precio: nuevoPrecio, costo: nuevoCosto, productosIncluidos: opcion.productosIncluidos || [] };
-    guardarEnStorage();
-  }
 };
 
-const eliminarOpcion = (station: Estacion, opcion: Opcion) => {
-  const idx = station.opciones.findIndex(o => o.nombre === opcion.nombre && o.minutos === opcion.minutos);
-  if (idx !== -1) {
-    station.opciones.splice(idx, 1);
-    guardarEnStorage();
+const cancelarTemporizador = async (station: Estacion) => {
+  const result = await Swal.fire({
+    toast: true,
+    position: 'center',
+    icon: 'warning',
+    title: 'Cancelar Temporizador',
+    text: `¿Cancelar el temporizador de ${station.nombreProducto}? No se registrará ninguna venta.`,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, cancelar',
+    cancelButtonText: 'No',
+    confirmButtonColor: '#8b2020',
+    cancelButtonColor: '#4a7c39',
+    background: '#f4e4bc',
+    color: '#5c3d1e',
+    customClass: {
+      popup: 'swal2-popup-papyrus'
+    }
+  });
+  if (!result.isConfirmed) return;
+  
+  if (intervalId.value !== null) {
+    clearInterval(intervalId.value);
+    intervalId.value = null;
   }
-};
-
-const agregarNuevaOpcion = (station: Estacion, nombre: string, minutos: number, precio: number, costo: number) => {
-  station.opciones.push({ nombre, minutos, precio, costo, productosIncluidos: [] });
+  
+  station.tiempoTotal = 0;
+  station.inicioTimestamp = 0;
+  station.status = 'disponible';
+  station.ticket = [];
+  station.notificado = false;
   guardarEnStorage();
 };
 
@@ -302,90 +391,56 @@ const getStatusBadgeClass = (station: Estacion): string => {
 const getTimerColorClass = (station: Estacion): string => {
   if (station.status === 'disponible') return 'timer-disponible';
   if (station.status === 'terminado') return 'timer-terminado';
-  if (station.tiempoRestante <= 300) return 'timer-warning';
+  if (getTiempoRestante(station) <= 300) return 'timer-warning';
   return 'timer-activo';
 };
 
 const getIconoTipo = (tipo: string): string => {
   const iconos: Record<string, string> = {
-    ps3: '🎮',
-    ps4: '🎮',
-    ps5: '🎮',
-    switch: '🎮',
-    xbox: '🎮',
-    arcade: '🕹️'
+    ps3: '🎮', ps4: '🎮', ps5: '🎮', switch: '🎮', xbox: '🎮', arcade: '🕹️'
   };
   return iconos[tipo] || '🎮';
 };
 
-const estaciones = ref<Estacion[]>([
-  {
-    id: 1,
-    nombre: 'PlayStation 3',
-    tipo: 'ps3',
-    icono: '🎮',
-    tiempoRestante: 0,
-    status: 'disponible',
-    ticket: [],
-    opciones: [
-      { nombre: '+ Media Hora', minutos: 30, precio: 12, costo: 0, productosIncluidos: [] },
-      { nombre: '+ 1 Hora', minutos: 60, precio: 20, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Link (1h + Agua)', minutos: 60, precio: 28, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Leyenda (1h+Papas+Agua)', minutos: 60, precio: 40, costo: 0, productosIncluidos: [] }
-    ],
-    notificado: false
-  },
-  {
-    id: 2,
-    nombre: 'PlayStation 4',
-    tipo: 'ps4',
-    icono: '🎮',
-    tiempoRestante: 0,
-    status: 'disponible',
-    ticket: [],
-    opciones: [
-      { nombre: '+ Media Hora', minutos: 30, precio: 15, costo: 0, productosIncluidos: [] },
-      { nombre: '+ 1 Hora', minutos: 60, precio: 25, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Heroe (1h+Refresco)', minutos: 60, precio: 35, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Master (2h+Todo)', minutos: 120, precio: 60, costo: 0, productosIncluidos: [] }
-    ],
-    notificado: false
-  },
-  {
-    id: 3,
-    nombre: 'Maquinita Arcade',
-    tipo: 'arcade',
-    icono: '🕹️',
-    tiempoRestante: 0,
-    status: 'disponible',
-    ticket: [],
-    opciones: [
-      { nombre: '+ 15 Minutos', minutos: 15, precio: 10, costo: 0, productosIncluidos: [] },
-      { nombre: '+ 30 Minutos', minutos: 30, precio: 15, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Retro (15m + Banderilla)', minutos: 15, precio: 18, costo: 0, productosIncluidos: [] }
-    ],
-    notificado: false
-  },
-  {
-    id: 4,
-    nombre: 'Nintendo Switch',
-    tipo: 'switch',
-    icono: '🎮',
-    tiempoRestante: 0,
-    status: 'disponible',
-    ticket: [],
-    opciones: [
-      { nombre: '+ Media Hora', minutos: 30, precio: 15, costo: 0, productosIncluidos: [] },
-      { nombre: '+ 1 Hora', minutos: 60, precio: 25, costo: 0, productosIncluidos: [] },
-      { nombre: 'Combo Familia (1h + Snacks)', minutos: 60, precio: 35, costo: 0, productosIncluidos: [] }
-    ],
-    notificado: false
-  }
-]);
-
-const mostrarModalAgregar = ref(false);
+const mostrarModalSeleccionarProducto = ref(false);
 const mostrarModalEditarOpciones = ref(false);
 const estacionEditando = ref<Estacion | null>(null);
+const opcionEditando = ref<Opcion | null>(null);
+const mostrarModalAgregarProducto = ref(false);
+const opcionProductoSeleccionado = ref<ProductoDTO | null>(null);
+const opcionProductoCantidad = ref(1);
+const buscarProductoModal = ref('');
+
+const productosFiltradosModal = computed(() => {
+  const query = buscarProductoModal.value.toLowerCase().trim();
+  if (!query) return productosDisponibles.value;
+  return productosDisponibles.value.filter(p => 
+    p.nombre.toLowerCase().includes(query)
+  );
+});
+
+const abrirModalSeleccionarProducto = () => {
+  buscarProductoModal.value = '';
+  mostrarModalSeleccionarProducto.value = true;
+};
+
+const crearEstacionDesdeProducto = (producto: ProductoDTO) => {
+  estaciones.value.push({
+    id: Date.now(),
+    idProducto: producto.idProducto,
+    nombreProducto: producto.nombre,
+    imagenProducto: producto.imagen_url || null,
+    tiempoTotal: 0,
+    inicioTimestamp: 0,
+    status: 'disponible',
+    ticket: [],
+    opciones: [],
+    notificado: false
+  });
+  
+  mostrarModalSeleccionarProducto.value = false;
+  guardarEnStorage();
+};
 
 const abrirEditarOpciones = (station: Estacion) => {
   estacionEditando.value = station;
@@ -397,57 +452,77 @@ const guardarOpciones = () => {
   mostrarModalEditarOpciones.value = false;
   estacionEditando.value = null;
 };
-const nuevaEstacion = ref({
-  nombre: '',
-  tipo: 'ps4' as const,
-  opciones: [] as Opcion[]
-});
 
-const agregarEstacion = () => {
-  if (!nuevaEstacion.value.nombre.trim()) return;
-  
-  const nuevasOpciones = nuevaEstacion.value.opciones.length > 0 
-    ? nuevaEstacion.value.opciones 
-    : [
-        { nombre: '+ 30 Min', minutos: 30, precio: 20, costo: 0, productosIncluidos: [] },
-        { nombre: '+ 1 Hora', minutos: 60, precio: 35, costo: 0, productosIncluidos: [] }
-      ];
-  
-  estaciones.value.push({
-    id: Date.now(),
-    nombre: nuevaEstacion.value.nombre,
-    tipo: nuevaEstacion.value.tipo,
-    icono: getIconoTipo(nuevaEstacion.value.tipo),
-    tiempoRestante: 0,
-    status: 'disponible',
-    ticket: [],
-    opciones: nuevasOpciones,
-    notificado: false
-  });
-  
-  mostrarModalAgregar.value = false;
-  nuevaEstacion.value = { nombre: '', tipo: 'ps4', opciones: [] };
-};
-
-const agregarOpcionDefault = () => {
-  nuevaEstacion.value.opciones.push({
+const agregarOpcion = () => {
+  if (!estacionEditando.value) return;
+  estacionEditando.value.opciones.push({
     nombre: '+ 30 Min',
     minutos: 30,
     precio: 20,
-    costo: 0,
     productosIncluidos: []
   });
+  guardarEnStorage();
+};
+
+const eliminarOpcion = (idx: number) => {
+  if (!estacionEditando.value) return;
+  estacionEditando.value.opciones.splice(idx, 1);
+  guardarEnStorage();
+};
+
+const abrirAgregarProducto = (opcion: Opcion) => {
+  opcionEditando.value = opcion;
+  opcionProductoSeleccionado.value = null;
+  opcionProductoCantidad.value = 1;
+  mostrarModalAgregarProducto.value = true;
+};
+
+const agregarProductoAOpcion = () => {
+  if (!opcionEditando.value || !opcionProductoSeleccionado.value) return;
+  
+  const existente = opcionEditando.value.productosIncluidos.find(
+    p => p.idProducto === opcionProductoSeleccionado.value!.idProducto
+  );
+  
+  if (existente) {
+    existente.cantidad += opcionProductoCantidad.value;
+  } else {
+    opcionEditando.value.productosIncluidos.push({
+      idProducto: opcionProductoSeleccionado.value.idProducto,
+      nombre: opcionProductoSeleccionado.value.nombre,
+      cantidad: opcionProductoCantidad.value,
+      precioUnitario: Number(opcionProductoSeleccionado.value.precio_venta) || 0
+    });
+  }
+  
+  opcionProductoSeleccionado.value = null;
+  opcionProductoCantidad.value = 1;
+  guardarEnStorage();
+};
+
+const eliminarProductoDeOpcion = (opcion: Opcion, idx: number) => {
+  opcion.productosIncluidos.splice(idx, 1);
+  guardarEnStorage();
 };
 
 const eliminarEstacion = (id: number) => {
   const idx = estaciones.value.findIndex(e => e.id === id);
   if (idx !== -1) {
-    if (estaciones.value[idx].status === 'activo') {
-      clearInterval(intervaloGlobal.value);
-      intervaloGlobal.value = undefined;
-    }
     estaciones.value.splice(idx, 1);
+    if (estaciones.value.every(e => e.status !== 'activo')) {
+      if (intervalId.value !== null) {
+        clearInterval(intervalId.value);
+        intervalId.value = null;
+      }
+    }
     guardarEnStorage();
+  }
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    ticker.value++;
+    cargarDesdeStorage();
   }
 };
 
@@ -456,211 +531,246 @@ onMounted(async () => {
   await solicitarPermisoNotificaciones();
   cargarDesdeStorage();
   
-  const hayActivas = estaciones.value.some(e => e.status === 'activo' && e.tiempoRestante > 0);
-  if (hayActivas) {
-    iniciarTemporizador();
-  }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  const hayActivas = estaciones.value.some(e => e.status === 'activo');
+  if (hayActivas) iniciarTemporizador();
 });
 
 onUnmounted(() => {
-  if (intervaloGlobal.value) {
-    clearInterval(intervaloGlobal.value);
-  }
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
 <template>
   <div class="rental-container">
     <header class="rental-header">
-      <div class="zelda-header-content">
-        <div class="triforce">
-          <svg width="50" height="50" viewBox="0 0 100 100" fill="#fcd34d">
-            <polygon points="50,10 25,50 75,50" />
-            <polygon points="25,50 0,90 50,90" />
-            <polygon points="75,50 50,90 100,90" />
-          </svg>
-        </div>
-        <h1 class="zelda-title">ZONA GAMER</h1>
-        <p class="zelda-subtitle">LA LEYENDA DEL DULCE</p>
-      </div>
-      
-      <div class="header-actions">
-        <button class="btn-agregar-estacion" @click="mostrarModalAgregar = true">
-          ➕ Agregar Estación
-        </button>
+      <div class="header-content">
+        <h1 class="zelda-title">⏱️ SALA DEL TIEMPO</h1>
+        <p class="zelda-subtitle">Alquila tu destino</p>
       </div>
     </header>
 
-    <main class="stations-grid">
-      <div 
-        v-for="station in estaciones" 
-        :key="station.id"
-        class="station-card"
-        :class="getStationBorderClass(station)"
-      >
-        <div class="station-header">
-          <div class="station-title">
-            <span class="station-icon" v-html="station.icono"></span>
-            <h2>{{ station.nombre }}</h2>
-          </div>
-          <div class="station-actions">
-            <span class="status-badge" :class="getStatusBadgeClass(station)">
-              {{ station.status.toUpperCase() }}
-            </span>
-            <button 
-              class="btn-editar-opciones"
-              @click="abrirEditarOpciones(station)"
-              title="Editar opciones de tiempo"
-            >
-              ⚙️
-            </button>
-            <button 
-              v-if="station.status === 'disponible'" 
-              class="btn-eliminar"
-              @click="eliminarEstacion(station.id)"
-              title="Eliminar estación"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
+    <main class="rental-main">
+      <section class="crear-estacion-section">
+        <button class="btn-grande-crear" @click="abrirModalSeleccionarProducto">
+          <span class="btn-icono">➕</span>
+          <span class="btn-texto">Crear Estación</span>
+        </button>
+      </section>
 
-        <div class="station-timer">
-          <div class="timer-display" :class="getTimerColorClass(station)">
-            {{ formatTime(station.tiempoRestante) }}
-          </div>
-          <p v-if="station.status === 'activo' && station.tiempoRestante <= 300" class="timer-warning">
-            ¡El tiempo se agota!
-          </p>
-        </div>
-
-        <div class="station-options">
-          <button 
-            v-for="opt in station.opciones"
-            :key="opt.nombre"
-            class="option-btn"
-            @click="agregarTiempo(station, opt.minutos, opt.precio, opt.nombre)"
+      <section v-if="estaciones.length > 0" class="estaciones-section">
+        <h2 class="section-title">🎮 Estaciones Activas</h2>
+        <div class="estaciones-grid">
+          <div 
+            v-for="station in estaciones" 
+            :key="`${station.id}-${ticker}`"
+            class="station-card"
+            :class="getStationBorderClass(station)"
           >
-            <span>{{ opt.nombre }}</span>
-            <span class="option-price">{{ formatoMoneda(opt.precio) }}</span>
-          </button>
-        </div>
+            <div class="card-papiro">
+              <div class="station-header">
+                <div class="station-title">
+                  <span class="station-icon">🎮</span>
+                  <h2>{{ station.nombreProducto }}</h2>
+                </div>
+                <div class="station-actions">
+                  <span class="status-badge" :class="getStatusBadgeClass(station)">
+                    {{ station.status.toUpperCase() }}
+                  </span>
+                  <button class="btn-config" @click="abrirEditarOpciones(station)" title="Configurar">⚙️</button>
+                  <button v-if="station.status === 'disponible'" class="btn-delete" @click="eliminarEstacion(station.id)" title="Eliminar">🗑️</button>
+                </div>
+              </div>
 
-        <div class="ticket-panel">
-          <h3 class="ticket-title">Ticket Actual</h3>
-          <div v-if="station.ticket.length === 0" class="ticket-empty">
-            Sin cargos.
-          </div>
-          <ul v-else class="ticket-list">
-            <li v-for="(item, index) in station.ticket" :key="index" class="ticket-item">
-              <span>⚔️ {{ item.nombre }}</span>
-              <span class="ticket-price">{{ formatoMoneda(item.precio) }}</span>
-            </li>
-          </ul>
-        </div>
+              <div class="station-timer">
+                <div class="timer-display" :class="getTimerColorClass(station)">
+                  {{ formatTime(getTiempoRestante(station)) }}
+                </div>
+                <p v-if="station.status === 'activo' && getTiempoRestante(station) <= 300" class="timer-warning">
+                  ¡Tiempo por terminar!
+                </p>
+              </div>
 
-        <div class="station-footer">
-          <div class="station-total">
-            Total: <span class="total-value">{{ formatoMoneda(getStationTotal(station)) }}</span>
+              <div class="station-options">
+                <button 
+                  v-for="opt in station.opciones"
+                  :key="opt.id || opt.nombre"
+                  class="option-btn"
+                  @click="agregarTiempo(station, opt.minutos, opt.precio, opt.nombre)"
+                >
+                  <span class="option-nombre">{{ opt.nombre }}</span>
+                  <span class="option-precio">{{ formatoMoneda(opt.precio) }}</span>
+                  <span v-if="opt.productosIncluidos.length > 0" class="option-combo-badge">+{{ opt.productosIncluidos.length }}</span>
+                </button>
+                <p v-if="station.opciones.length === 0" class="no-opciones">
+                  Sin opciones configuradas
+                </p>
+              </div>
+
+              <div class="ticket-panel">
+                <h3 class="ticket-title">📜 Ticket</h3>
+                <div v-if="station.ticket.length === 0" class="ticket-empty">
+                  Sin cargos
+                </div>
+                <ul v-else class="ticket-list">
+                  <li v-for="(item, idx) in station.ticket" :key="idx" class="ticket-item">
+                    <span>⚔️ {{ item.nombre }}</span>
+                    <span class="ticket-price">{{ formatoMoneda(item.precio) }}</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="station-footer">
+                <div class="station-total">
+                  Total: <span class="total-value">{{ formatoMoneda(getStationTotal(station)) }}</span>
+                </div>
+                <div class="station-footer-buttons">
+                  <button 
+                    v-if="station.status === 'activo' || station.status === 'terminado'"
+                    class="btn-cancelar-timer"
+                    @click="cancelarTemporizador(station)"
+                  >
+                    ✕ Cancelar
+                  </button>
+                  <button 
+                    class="btn-cobrar"
+                    :disabled="station.ticket.length === 0"
+                    @click="cobrar(station)"
+                  >
+                    💰 Cobrar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <button 
-            class="btn-cobrar"
-            :disabled="station.ticket.length === 0"
-            @click="cobrar(station)"
-          >
-            Cobrar y Liberar
-          </button>
         </div>
-      </div>
+      </section>
     </main>
 
-    <!-- Modal Editar Opciones -->
-    <div v-if="mostrarModalEditarOpciones && estacionEditando" class="modal-overlay" @click.self="mostrarModalEditarOpciones = false">
-      <div class="modal-content modal-opciones">
-        <h2 class="modal-title">⚙️ Opciones - {{ estacionEditando.nombre }}</h2>
+    <!-- Modal Seleccionar Producto -->
+    <div v-if="mostrarModalSeleccionarProducto" class="modal-overlay" @click.self="mostrarModalSeleccionarProducto = false">
+      <div class="modal-content modal-seleccionar-producto">
+        <h2 class="modal-title">🎮 Seleccionar Producto</h2>
+        <p class="modal-subtitle">Elige un producto para crear la estación</p>
         
-        <div class="opciones-header">
-          <span class="col-nombre">Nombre</span>
-          <span class="col-minutos">Minutos</span>
-          <span class="col-precio">Precio</span>
-          <span class="col-costo">Costo</span>
-          <span class="col-productos">Productos</span>
-          <span class="col-acciones"></span>
+        <div class="buscador-modal">
+          <span class="buscador-icono">🔍</span>
+          <input 
+            v-model="buscarProductoModal"
+            type="text"
+            placeholder="Buscar producto..."
+            class="buscador-input"
+          />
+          <button 
+            v-if="buscarProductoModal" 
+            class="buscador-limpiar"
+            @click="buscarProductoModal = ''"
+          >
+            ✕
+          </button>
         </div>
         
-        <div class="opciones-list">
-          <div v-for="(opt, idx) in estacionEditando.opciones" :key="idx" class="opcion-item">
-            <input 
-              v-model="opt.nombre" 
-              type="text" 
-              placeholder="Nombre"
-              class="input-nombre"
-            />
-            <input 
-              v-model.number="opt.minutos" 
-              type="number" 
-              placeholder="Min"
-              class="input-mini"
-            />
-            <input 
-              v-model.number="opt.precio" 
-              type="number" 
-              placeholder="$$$"
-              class="input-mini"
-            />
-            <input 
-              v-model.number="opt.costo" 
-              type="number" 
-              placeholder="$"
-              class="input-mini"
-            />
-            <div class="input-productos">
-              <span class="productos-count">{{ opt.productosIncluidos?.length || 0 }} productos</span>
+        <div class="productos-lista-modal">
+          <div 
+            v-for="producto in productosFiltradosModal" 
+            :key="producto.idProducto"
+            class="producto-item-modal"
+            @click="crearEstacionDesdeProducto(producto)"
+          >
+            <div class="producto-imagen-modal">
+              <img v-if="producto.imagen_url" :src="producto.imagen_url" :alt="producto.nombre" />
+              <span v-else>📦</span>
             </div>
-            <button class="btn-eliminar-opcion" @click="eliminarOpcion(estacionEditando, opt)">🗑️</button>
+            <div class="producto-datos-modal">
+              <span class="producto-nombre-modal">{{ producto.nombre }}</span>
+              <span class="producto-stock-modal">Stock: {{ producto.stock }}</span>
+            </div>
+            <span class="producto-seleccionar-icon">→</span>
+          </div>
+          <div v-if="productosFiltradosModal.length === 0" class="no-resultados">
+            No se encontraron productos
           </div>
         </div>
-        
-        <button class="btn-agregar-opcion" @click="agregarNuevaOpcion(estacionEditando, 'Nueva Opcion', 30, 20, 0)">
-          ➕ Agregar Opción
-        </button>
 
         <div class="modal-actions">
-          <button class="btn-cancelar" @click="mostrarModalEditarOpciones = false">✖ Cancelar</button>
-          <button class="btn-confirmar" @click="guardarOpciones">💾 Guardar</button>
+          <button class="btn-cancelar" @click="mostrarModalSeleccionarProducto = false">Cancelar</button>
         </div>
       </div>
     </div>
 
-    <!-- Modal Agregar Estación -->
-    <div v-if="mostrarModalAgregar" class="modal-overlay" @click.self="mostrarModalAgregar = false">
-      <div class="modal-content">
-        <h2 class="modal-title">➕ Nueva Estación</h2>
+    <!-- Modal Editar Opciones -->
+    <div v-if="mostrarModalEditarOpciones && estacionEditando" class="modal-overlay" @click.self="mostrarModalEditarOpciones = false">
+      <div class="modal-content modal-opciones">
+        <h2 class="modal-title">⚙️ Configurar - {{ estacionEditando.nombreProducto }}</h2>
         
-        <div class="form-group">
-          <label>Nombre de la Estación</label>
-          <input 
-            v-model="nuevaEstacion.nombre" 
-            type="text" 
-            placeholder="Ej: PlayStation 5" 
-          />
-        </div>
-        
-        <div class="form-group">
-          <label>Tipo de Consola</label>
-          <select v-model="nuevaEstacion.tipo">
-            <option value="ps3">PlayStation 3</option>
-            <option value="ps4">PlayStation 4</option>
-            <option value="ps5">PlayStation 5</option>
-            <option value="switch">Nintendo Switch</option>
-            <option value="xbox">Xbox</option>
-            <option value="arcade">Arcade</option>
-          </select>
+        <div class="opciones-config">
+          <div class="opciones-list">
+            <div v-for="(opt, idx) in estacionEditando.opciones" :key="idx" class="opcion-item">
+              <div class="opcion-header">
+                <input v-model="opt.nombre" type="text" placeholder="Nombre opción" class="input-nombre" />
+                <button class="btn-delete-opcion" @click="eliminarOpcion(idx)">🗑️</button>
+              </div>
+              <div class="opcion-detalles">
+                <div class="input-group">
+                  <label>Minutos</label>
+                  <input v-model.number="opt.minutos" type="number" min="1" class="input-mini" />
+                </div>
+                <div class="input-group">
+                  <label>Precio Total</label>
+                  <input v-model.number="opt.precio" type="number" min="0" class="input-mini" />
+                </div>
+              </div>
+              <div class="opcion-productos">
+                <div class="productos-header">
+                  <span>Productos incluidos:</span>
+                  <button class="btn-agregar-producto" @click="abrirAgregarProducto(opt)">➕</button>
+                </div>
+                <ul class="productos-list">
+                  <li v-for="(prod, pIdx) in opt.productosIncluidos" :key="pIdx">
+                    <span>{{ prod.cantidad }}x {{ prod.nombre }}</span>
+                    <button class="btn-quitar" @click="eliminarProductoDeOpcion(opt, pIdx)">✕</button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <button class="btn-agregar-opcion" @click="agregarOpcion">
+            ➕ Agregar Opción de Tiempo
+          </button>
         </div>
 
         <div class="modal-actions">
-          <button class="btn-cancelar" @click="mostrarModalAgregar = false">✖ Cancelar</button>
-          <button class="btn-confirmar" @click="agregarEstacion">💾 Guardar</button>
+          <button class="btn-cancelar" @click="mostrarModalEditarOpciones = false">Cancelar</button>
+          <button class="btn-confirmar" @click="guardarOpciones">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Agregar Producto a Opción -->
+    <div v-if="mostrarModalAgregarProducto" class="modal-overlay" @click.self="mostrarModalAgregarProducto = false">
+      <div class="modal-content">
+        <h2 class="modal-title">➕ Agregar Producto al Combo</h2>
+        
+        <div class="form-group">
+          <label>Producto</label>
+          <select v-model="opcionProductoSeleccionado">
+            <option :value="null">-- Seleccionar --</option>
+            <option v-for="p in productosDisponibles" :key="p.idProducto" :value="p">
+              {{ p.nombre }} - {{ formatoMoneda(p.precio_venta) }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input v-model.number="opcionProductoCantidad" type="number" min="1" />
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-cancelar" @click="mostrarModalAgregarProducto = false">Cancelar</button>
+          <button class="btn-confirmar" @click="agregarProductoAOpcion">Agregar</button>
         </div>
       </div>
     </div>
@@ -668,403 +778,513 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-}
-
 .rental-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
   min-height: 100vh;
-  color: #d4af37;
-  background-color: #120b08;
-  background-image: radial-gradient(#2c1a0d 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-.rental-container *, .rental-container *::before, .rental-container *::after {
-  box-sizing: border-box;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--gradient-bg-start, var(--bg-secondary)) 0%, var(--gradient-bg-mid, var(--bg-primary)) 100%);
 }
 
 .rental-header {
   text-align: center;
-  margin-bottom: 32px;
+  padding: 40px 20px 30px;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%);
+  border-bottom: 3px solid var(--accent-color);
+  position: relative;
 }
 
-.zelda-header-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+.rental-header::before,
+.rental-header::after {
+  content: '✦';
+  position: absolute;
+  top: 20px;
+  font-size: 1.5rem;
+  color: var(--accent-color);
 }
 
-.triforce svg {
-  filter: drop-shadow(0 0 10px rgba(252, 211, 77, 0.5));
+.rental-header::before { left: 30px; }
+.rental-header::after { right: 30px; }
+
+.header-content {
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .zelda-title {
   font-size: 2.5rem;
   font-weight: bold;
-  letter-spacing: 0.2em;
-  color: #fcd34d;
-  text-shadow: 2px 2px 0 #000;
-}
-
-.zelda-subtitle {
-  font-size: 1.25rem;
-  letter-spacing: 0.2em;
-  color: #8b5a2b;
-}
-
-.header-actions {
-  margin-top: 16px;
-}
-
-.btn-agregar-estacion {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #4caf50, #2e7d32);
-  color: #fff;
-  border: 2px solid #4ade80;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s;
-  text-transform: uppercase;
+  color: var(--accent-color);
+  text-shadow: 2px 2px 0 var(--border-color);
+  margin: 0 0 8px;
   letter-spacing: 0.1em;
 }
 
-.btn-agregar-estacion:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+.zelda-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  font-style: italic;
 }
 
-.stations-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 24px;
-  justify-content: center;
+.rental-main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 20px;
 }
 
-.station-card {
-  background: linear-gradient(145deg, #2c1a0d, #1a100c);
-  border: 2px solid #8b5a2b;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 15px rgba(212, 175, 55, 0.1);
-  transition: all 0.3s;
+.section-title {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  text-align: center;
+  margin-bottom: 8px;
 }
 
-.station-card.station-activo {
-  border-color: #d4af37;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(212, 175, 55, 0.3);
+.section-desc {
+  text-align: center;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  font-style: italic;
 }
 
-.station-card.station-terminado {
-  border-color: #ef4444;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(239, 68, 68, 0.3);
-}
-
-.station-header {
+.crear-estacion-section {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 2px solid #8b5a2b;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-  gap: 8px;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.btn-grande-crear {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 80px;
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  border: 4px solid var(--accent-color);
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  box-shadow: 6px 6px 0 var(--border-color);
+}
+
+.btn-grande-crear:hover {
+  transform: translateY(-4px);
+  box-shadow: 8px 10px 0 var(--border-color);
+  filter: brightness(1.1);
+}
+
+.btn-grande-crear:active {
+  transform: translateY(0);
+  box-shadow: 4px 4px 0 var(--border-color);
+}
+
+.btn-icono {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+
+.btn-texto {
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.productos-section {
+  margin-bottom: 50px;
+}
+
+.productos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.producto-card {
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 4px 4px 0 var(--shadow-color);
+}
+
+.producto-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 6px 8px 0 var(--shadow-color);
+  border-color: var(--accent-color);
+}
+
+.producto-imagen {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
   overflow: hidden;
 }
 
-.station-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex-shrink: 1;
+.producto-imagen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.station-icon {
-  font-size: 1.25rem;
+.producto-info h3 {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.producto-stock {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.btn-crear {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.btn-crear:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.productos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.producto-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 var(--shadow-color);
+}
+
+.producto-item:hover {
+  border-color: var(--accent-color);
+  box-shadow: 4px 4px 0 var(--shadow-color);
+}
+
+.producto-info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.producto-imagen-small {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  overflow: hidden;
   flex-shrink: 0;
 }
 
-.station-title h2 {
+.producto-imagen-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.producto-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.producto-nombre {
   font-size: 1.1rem;
-  margin: 0;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.btn-crear-estacion {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 var(--border-color);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.btn-crear-estacion:hover {
+  transform: translateY(-2px);
+  box-shadow: 4px 5px 0 var(--border-color);
+  filter: brightness(1.1);
+}
+
+.estaciones-section {
+  margin-bottom: 40px;
+}
+
+.estaciones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 30px;
+}
+
+.station-card {
+  perspective: 1000px;
+}
+
+.card-papiro {
+  background: 
+    linear-gradient(to right, #d4c4a0 0px, #e8d4a8 8px, #f4e4bc 16px, #e8d4a8 24px, #d4c4a0 32px) 0 0 / 32px 100%,
+    #f4e4bc;
+  border: 4px solid #8b5a2b;
+  border-radius: 4px;
+  padding: 24px;
+  position: relative;
+  box-shadow: 
+    6px 6px 0 #a08060,
+    inset 0 0 30px rgba(139, 90, 43, 0.1);
+}
+
+.card-papiro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    repeating-linear-gradient(
+      transparent 0px,
+      transparent 28px,
+      rgba(139, 90, 43, 0.15) 28px,
+      rgba(139, 90, 43, 0.15) 30px
+    );
+  pointer-events: none;
+}
+
+.station-header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed #8b5a2b;
+  position: relative;
+  z-index: 1;
+}
+
+.station-title {
+  align-items: center;
+  gap: 10px;
+}
+
+.station-icon {
+  font-size: 1.8rem;
+}
+
+.station-title h2 {
+  font-size: 1.3rem;
+  color: #5c3d1e;
+  margin: 0;
+  text-shadow: 1px 1px 0 #d4c4a0;
 }
 
 .station-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
 .status-badge {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.65rem;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.7rem;
   font-weight: bold;
   letter-spacing: 0.05em;
-  white-space: nowrap;
 }
 
 .status-badge.status-activo {
-  background: #14532d;
-  color: #4ade80;
-  border: 1px solid #4ade80;
+  background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
+  color: #90ee90;
+  border: 2px solid #4a7c39;
 }
 
 .status-badge.status-terminado {
-  background: #7f1d1d;
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  background: linear-gradient(135deg, #8b2020 0%, #5c1515 100%);
+  color: #ffb0b0;
+  border: 2px solid #a03030;
   animation: pulse 1s infinite;
 }
 
 .status-badge.status-disponible {
-  background: #1f2937;
-  color: #9ca3af;
-  border: 1px solid #4b5563;
+  background: linear-gradient(135deg, #4a4a4a 0%, #2a2a2a 100%);
+  color: #c0c0c0;
+  border: 2px solid #606060;
 }
 
-.btn-eliminar {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.btn-eliminar:hover {
-  opacity: 1;
-}
-
-.btn-editar-opciones {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.btn-editar-opciones:hover {
-  opacity: 1;
-}
-
-.btn-eliminar-opcion {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9rem;
-  opacity: 0.6;
-  padding: 4px;
-}
-
-.btn-eliminar-opcion:hover {
-  opacity: 1;
-}
-
-.modal-opciones {
-  max-width: 500px;
-}
-
-.opciones-header {
-  display: grid;
-  grid-template-columns: 2fr 60px 60px 50px 1fr 40px;
-  gap: 8px;
-  padding: 8px 4px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: #8b5a2b;
-  text-transform: uppercase;
-  border-bottom: 1px solid #8b5a2b;
-  margin-bottom: 8px;
-}
-
-.opciones-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.opcion-item {
-  display: grid;
-  grid-template-columns: 2fr 60px 60px 50px 1fr 40px;
-  gap: 8px;
-  align-items: center;
-}
-
-.input-nombre {
-  padding: 8px;
-  border: 1px solid #8b5a2b;
-  border-radius: 4px;
-  background: #1a100c;
-  color: #d4af37;
-  font-size: 0.85rem;
-}
-
-.input-mini {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #8b5a2b;
-  border-radius: 4px;
-  background: #1a100c;
-  color: #d4af37;
-  text-align: center;
-}
-
-.input-productos {
-  padding: 8px;
-  font-size: 0.75rem;
-  color: #8b5a2b;
-  text-align: center;
-  background: #1a100c;
-  border-radius: 4px;
-  border: 1px solid #3e2723;
-}
-
-.productos-count {
-  color: #d4af37;
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.btn-agregar-opcion {
-  width: 100%;
-  padding: 10px;
-  background: transparent;
-  border: 2px dashed #8b5a2b;
+.btn-config, .btn-delete {
+  background: #fff9f0;
+  border: 2px solid #8b5a2b;
   border-radius: 8px;
-  color: #8b5a2b;
+  padding: 6px 10px;
   cursor: pointer;
-  margin-bottom: 16px;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  transition: all 0.2s;
 }
 
-.btn-agregar-opcion:hover {
-  border-color: #d4af37;
-  color: #d4af37;
+.btn-config:hover, .btn-delete:hover {
+  background: #f4e4bc;
+  transform: scale(1.1);
 }
 
 .station-timer {
   text-align: center;
   margin: 24px 0;
+  position: relative;
+  z-index: 1;
 }
 
 .timer-display {
-  font-size: 4rem;
+  font-size: 3.5rem;
   font-weight: bold;
-  letter-spacing: 0.1em;
   font-family: 'Courier New', monospace;
-  text-shadow: 0 0 8px currentColor;
+  text-shadow: 2px 2px 0 #d4c4a0;
 }
 
-.timer-display.timer-disponible {
-  color: #4b5563;
-}
+.timer-disponible { color: #a0a0a0; }
+.timer-activo { color: #2d5016; }
+.timer-warning { color: #c47f00; animation: glow 0.5s infinite; }
+.timer-terminado { color: #8b2020; }
 
-.timer-display.timer-activo {
-  color: #4ade80;
-}
-
-.timer-display.timer-warning {
-  color: #fbbf24;
-}
-
-.timer-display.timer-terminado {
-  color: #ef4444;
-  animation: pulse 1s infinite;
+@keyframes glow {
+  50% { text-shadow: 2px 2px 0 #d4c4a0, 0 0 20px #c47f00; }
 }
 
 .timer-warning {
-  color: #ef4444;
+  color: #c47f00;
   font-weight: bold;
   margin-top: 8px;
-  animation: pulse 1s infinite;
+  font-size: 0.9rem;
 }
 
 .station-options {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-  width: 100%;
+  gap: 12px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .option-btn {
-  background: #3e2723;
-  border: 1px solid #8b5a2b;
-  border-radius: 6px;
-  padding: 8px 10px;
+  background: linear-gradient(135deg, #fff9f0 0%, #f4e4bc 100%);
+  border: 3px solid #8b5a2b;
+  border-radius: 12px;
+  padding: 14px 12px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  align-content: space-between;
-  color: #d4af37;
-  font-size: 0.8rem;
-  line-height: 1.2;
-  min-height: 44px;
-  max-height: 60px;
-  overflow: hidden;
-  text-align: left;
-  width: 100%;
+  gap: 4px;
+  position: relative;
+  box-shadow: 3px 3px 0 #a08060;
 }
 
 .option-btn:hover {
-  background: #5d4037;
-  border-color: #d4af37;
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #a08060;
+  border-color: #5c3d1e;
 }
 
 .option-btn:active {
-  transform: scale(0.98);
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 #a08060;
 }
 
-.option-price {
-  color: #fcd34d;
+.option-nombre {
+  font-size: 0.85rem;
   font-weight: bold;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: 6px;
+  color: #5c3d1e;
+  text-align: center;
+}
+
+.option-precio {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #2d5016;
+}
+
+.option-combo-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #c47f00;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 2px solid #8b5a2b;
+}
+
+.no-opciones {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #8b5a2b;
+  font-style: italic;
+  padding: 20px;
 }
 
 .ticket-panel {
-  background: #1a100c;
-  border: 1px solid #8b5a2b;
+  background: rgba(255, 249, 240, 0.9);
+  border: 2px solid #8b5a2b;
   border-radius: 8px;
-  padding: 12px;
+  padding: 16px;
   margin-bottom: 16px;
-  min-height: 100px;
-  max-height: 150px;
-  overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .ticket-title {
+  font-size: 0.9rem;
   color: #8b5a2b;
-  font-size: 0.85rem;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #3e2723;
-  padding-bottom: 4px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #8b5a2b;
 }
 
 .ticket-empty {
-  color: #6b7280;
-  font-style: italic;
   text-align: center;
-  margin-top: 20px;
-  font-size: 0.9rem;
+  color: #a08060;
+  font-style: italic;
+  padding: 12px;
 }
 
 .ticket-list {
@@ -1076,57 +1296,87 @@ onUnmounted(() => {
 .ticket-item {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
-  color: #d1d5db;
+  padding: 6px 0;
+  border-bottom: 1px dotted #d4c4a0;
   font-size: 0.9rem;
 }
 
+.ticket-item:last-child {
+  border-bottom: none;
+}
+
 .ticket-price {
-  color: #fcd34d;
+  font-weight: bold;
+  color: #2d5016;
 }
 
 .station-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 2px solid #8b5a2b;
   padding-top: 16px;
+  border-top: 2px dashed #8b5a2b;
+  position: relative;
+  z-index: 1;
 }
 
 .station-total {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  color: #5c3d1e;
 }
 
 .total-value {
-  color: #fcd34d;
   font-weight: bold;
+  color: #2d5016;
+  font-size: 1.4rem;
 }
 
 .btn-cobrar {
-  background: linear-gradient(135deg, #16a34a, #15803d);
-  color: #fff;
-  border: 2px solid #4ade80;
-  border-radius: 8px;
   padding: 12px 24px;
+  background: linear-gradient(135deg, #4a7c39 0%, #3d6530 100%);
+  color: #fff;
+  border: 3px solid #2d5016;
+  border-radius: 12px;
   font-weight: bold;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.3s;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.3);
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 #2d5016;
 }
 
 .btn-cobrar:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #2d5016;
 }
 
 .btn-cobrar:disabled {
-  background: #374151;
-  border-color: #4b5563;
-  color: #6b7280;
+  background: #a0a0a0;
+  border-color: #808080;
+  box-shadow: 2px 2px 0 #606060;
   cursor: not-allowed;
-  box-shadow: none;
+}
+
+.station-footer-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-cancelar-timer {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #8b2020 0%, #5c1515 100%);
+  color: #fff;
+  border: 3px solid #3d0a0a;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 #3d0a0a;
+}
+
+.btn-cancelar-timer:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #3d0a0a;
 }
 
 /* Modal */
@@ -1136,39 +1386,221 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal-content {
-  background: linear-gradient(145deg, #2c1a0d, #1a100c);
-  border: 2px solid #d4af37;
+  background: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f4e4bc' width='100' height='100'/%3E%3Cpath fill='%23e8d4a8' d='M0 0h100v2H0zM0 20h100v2H0zM0 40h100v2H0zM0 60h100v2H0zM0 80h100v2H0z'/%3E%3C/svg%3E") repeat,
+    #f4e4bc;
+  border: 4px solid #8b5a2b;
   border-radius: 16px;
   padding: 32px;
-  width: 90%;
-  max-width: 400px;
-  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 8px 8px 0 #a08060;
+}
+
+.modal-opciones {
+  max-width: 650px;
+}
+
+.modal-seleccionar-producto {
+  max-width: 600px;
+}
+
+.modal-subtitle {
+  text-align: center;
+  color: #8b5a2b;
+  margin-bottom: 20px;
+  font-style: italic;
+}
+
+.buscador-modal {
+  display: flex;
+  align-items: center;
+  background: #fff9f0;
+  border: 3px solid #8b5a2b;
+  border-radius: 12px;
+  padding: 8px 16px;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.buscador-icono {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.buscador-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  color: #5c3d1e;
+  outline: none;
+}
+
+.buscador-input::placeholder {
+  color: #a08060;
+}
+
+.buscador-limpiar {
+  background: transparent;
+  border: none;
+  color: #8b5a2b;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.buscador-limpiar:hover {
+  background: #f4e4bc;
+  color: #5c3d1e;
+}
+
+.no-resultados {
+  text-align: center;
+  color: #8b5a2b;
+  font-style: italic;
+  padding: 30px;
+}
+
+.productos-lista-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 8px;
+}
+
+.producto-item-modal {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff9f0;
+  border: 3px solid #8b5a2b;
+  border-radius: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 3px 3px 0 #d4c4a0;
+}
+
+.producto-item-modal:hover {
+  border-color: #4a7c39;
+  background: #e8f5e9;
+  box-shadow: 4px 4px 0 #c4b090;
+  transform: translateX(4px);
+}
+
+.producto-imagen-modal {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #f4e4bc;
+  border: 2px solid #8b5a2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.producto-imagen-modal img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.producto-datos-modal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.producto-nombre-modal {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #5c3d1e;
+}
+
+.producto-stock-modal {
+  font-size: 0.85rem;
+  color: #8b5a2b;
+}
+
+.producto-seleccionar-icon {
+  font-size: 1.5rem;
+  color: #4a7c39;
+  font-weight: bold;
 }
 
 .modal-title {
   font-size: 1.5rem;
-  color: #fcd34d;
+  color: #5c3d1e;
   text-align: center;
   margin-bottom: 24px;
+  text-shadow: 1px 1px 0 #d4c4a0;
+}
+
+.producto-seleccionado {
+  text-align: center;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #fff9f0;
+  border: 2px solid #8b5a2b;
+  border-radius: 12px;
+}
+
+.producto-imagen-grande {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #f4e4bc;
+  border: 3px solid #8b5a2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  overflow: hidden;
+}
+
+.producto-imagen-grande img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.producto-seleccionado h3 {
+  color: #5c3d1e;
+  margin: 0;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
   color: #8b5a2b;
   margin-bottom: 8px;
-  font-size: 0.9rem;
+  font-weight: bold;
 }
 
 .form-group input,
@@ -1177,342 +1609,331 @@ onUnmounted(() => {
   padding: 12px;
   border: 2px solid #8b5a2b;
   border-radius: 8px;
-  background: #1a100c;
-  color: #d4af37;
+  background: #fff9f0;
+  color: #5c3d1e;
   font-size: 1rem;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #d4af37;
+  border-color: #5c3d1e;
 }
 
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   margin-top: 24px;
 }
 
 .btn-cancelar, .btn-confirmar {
   flex: 1;
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: bold;
+  font-size: 1rem;
   cursor: pointer;
-  border: none;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
 
 .btn-cancelar {
-  background: transparent;
-  border: 2px solid #8b5a2b;
+  background: #fff9f0;
+  border: 3px solid #8b5a2b;
   color: #8b5a2b;
 }
 
 .btn-cancelar:hover {
-  background: rgba(139, 90, 43, 0.1);
+  background: #f4e4bc;
 }
 
 .btn-confirmar {
-  background: linear-gradient(135deg, #d4af37, #b8962e);
-  color: #1a100c;
+  background: linear-gradient(135deg, #8b5a2b 0%, #5c3d1e 100%);
+  border: 3px solid #5c3d1e;
+  color: #fff9f0;
+  box-shadow: 3px 3px 0 #3d2510;
 }
 
 .btn-confirmar:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 #3d2510;
+}
+
+/* Opciones Config */
+.opciones-config {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 8px;
+}
+
+.opciones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.opcion-item {
+  background: #fff9f0;
+  border: 2px solid #8b5a2b;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.opcion-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.input-nombre {
+  flex: 1;
+  padding: 10px 12px;
+  border: 2px solid #8b5a2b;
+  border-radius: 8px;
+  background: #fff9f0;
+  color: #5c3d1e;
+  font-size: 0.95rem;
+  font-weight: bold;
+}
+
+.btn-delete-opcion {
+  background: #ffebee;
+  border: 2px solid #c47f7f;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-delete-opcion:hover {
+  background: #ffcdd2;
+}
+
+.opcion-detalles {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.input-group {
+  flex: 1;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: #8b5a2b;
+  margin-bottom: 4px;
+}
+
+.input-mini {
+  width: 100%;
+  padding: 8px;
+  border: 2px solid #8b5a2b;
+  border-radius: 6px;
+  background: #fff9f0;
+  color: #5c3d1e;
+  text-align: center;
+}
+
+.opcion-productos {
+  background: #f4e4bc;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.productos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: #8b5a2b;
+}
+
+.btn-agregar-producto {
+  background: #e8f5e9;
+  border: 2px solid #4a7c39;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-agregar-producto:hover {
+  background: #c8e6c9;
+}
+
+.productos-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.productos-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px dotted #d4c4a0;
+}
+
+.productos-list li:last-child {
+  border-bottom: none;
+}
+
+.btn-quitar {
+  background: transparent;
+  border: none;
+  color: #c47f7f;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-quitar:hover {
+  color: #8b2020;
+}
+
+.btn-agregar-opcion {
+  width: 100%;
+  padding: 14px;
+  background: transparent;
+  border: 3px dashed #8b5a2b;
+  border-radius: 12px;
+  color: #8b5a2b;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.btn-agregar-opcion:hover {
+  background: #f4e4bc;
+  border-color: #5c3d1e;
+  color: #5c3d1e;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@media (max-width: 1200px) {
-  .stations-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  }
+  50% { opacity: 0.6; }
 }
 
 @media (max-width: 768px) {
-  .rental-container {
-    padding: 12px;
+  .btn-grande-crear {
+    padding: 30px 50px;
   }
   
-  .stations-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+  .btn-icono {
+    font-size: 2.5rem;
   }
   
-  .station-card {
-    padding: 16px;
-    border-radius: 12px;
+  .btn-texto {
+    font-size: 1.2rem;
   }
   
-  .zelda-header-content {
-    margin-bottom: 12px;
+  .productos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
   }
   
-  .triforce svg {
-    width: 40px;
-    height: 40px;
+  .producto-item {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .producto-info-row {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btn-crear-estacion {
+    width: 100%;
+  }
+  
+  .estaciones-grid {
+    grid-template-columns: 1fr;
   }
   
   .zelda-title {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
   }
   
-  .zelda-subtitle {
-    font-size: 0.9rem;
+  .station-options {
+    grid-template-columns: 1fr;
   }
   
-  .btn-agregar-estacion {
-    padding: 10px 16px;
-    font-size: 0.8rem;
-  }
-  
-  .station-header {
+  .station-footer {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding-bottom: 12px;
+    gap: 16px;
   }
   
-  .station-actions {
+  .btn-cobrar {
     width: 100%;
-    justify-content: space-between;
   }
   
-  .station-title {
-    gap: 8px;
+  .opcion-detalles {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .rental-header {
+    padding: 20px 16px;
   }
   
-  .station-icon {
-    font-size: 1.25rem;
+  .rental-main {
+    padding: 20px 12px;
   }
   
-  .station-title h2 {
-    font-size: 1.25rem;
+  .productos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
   
-  .status-badge {
-    font-size: 0.65rem;
-    padding: 4px 8px;
+  .producto-card {
+    padding: 12px;
+  }
+  
+  .producto-imagen {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
   }
   
   .timer-display {
     font-size: 2.5rem;
   }
-  
-  .station-timer {
-    margin: 16px 0;
-  }
-  
-  .timer-warning {
-    font-size: 0.85rem;
-  }
-  
-  .station-options {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  
-  .option-btn {
-    padding: 8px 10px;
-    font-size: 0.75rem;
-    min-height: 46px;
-    flex-wrap: wrap;
-  }
-  
-  .option-btn span:first-child {
-    flex: 1;
-    word-break: break-word;
-  }
-  
-  .option-price {
-    font-size: 0.75rem;
-    margin-left: 4px;
-  }
-  
-  .ticket-panel {
-    padding: 10px;
-    min-height: 80px;
-    max-height: 120px;
-  }
-  
-  .ticket-title {
-    font-size: 0.75rem;
-  }
-  
-  .ticket-item {
-    font-size: 0.8rem;
-    padding: 3px 0;
-  }
-  
-  .ticket-price {
-    font-size: 0.8rem;
-  }
-  
-  .station-footer {
-    flex-direction: column;
-    gap: 12px;
-    padding-top: 12px;
-  }
-  
-  .station-total {
-    font-size: 1rem;
-    width: 100%;
-    text-align: center;
-  }
-  
-  .btn-cobrar {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 0.85rem;
-  }
+}
+</style>
+
+<style>
+.swal2-popup-papyrus {
+  background: #f4e4bc !important;
+  border: 4px solid #8b5a2b !important;
+  border-radius: 16px !important;
+  box-shadow: 6px 6px 0 #a08060 !important;
 }
 
-@media (max-width: 480px) {
-  .rental-container {
-    padding: 8px;
-  }
-  
-  .stations-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
-  .station-card {
-    padding: 12px;
-  }
-  
-  .triforce svg {
-    width: 32px;
-    height: 32px;
-  }
-  
-  .zelda-title {
-    font-size: 1.25rem;
-    letter-spacing: 0.1em;
-  }
-  
-  .zelda-subtitle {
-    font-size: 0.75rem;
-  }
-  
-  .btn-agregar-estacion {
-    padding: 8px 12px;
-    font-size: 0.75rem;
-    width: 100%;
-  }
-  
-  .station-header {
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-  }
-  
-  .station-title h2 {
-    font-size: 1.1rem;
-  }
-  
-  .station-icon {
-    font-size: 1.1rem;
-  }
-  
-  .timer-display {
-    font-size: 2rem;
-  }
-  
-  .station-options {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-  
-  .option-btn {
-    padding: 8px 10px;
-    font-size: 0.75rem;
-    min-height: 44px;
-    flex-wrap: wrap;
-  }
-  
-  .option-btn span:first-child {
-    flex: 1;
-    word-break: break-word;
-  }
-  
-  .option-price {
-    font-size: 0.75rem;
-    margin-left: 4px;
-  }
-  
-  .ticket-panel {
-    min-height: 70px;
-    max-height: 100px;
-  }
-  
-  .ticket-title {
-    font-size: 0.7rem;
-  }
-  
-  .ticket-item {
-    font-size: 0.75rem;
-  }
-  
-  .ticket-price {
-    font-size: 0.7rem;
-  }
-  
-  .station-total {
-    font-size: 0.9rem;
-  }
-  
-  .btn-cobrar {
-    padding: 10px 12px;
-    font-size: 0.8rem;
-  }
-  
-  .status-badge {
-    font-size: 0.6rem;
-  }
+.swal2-title {
+  color: #5c3d1e !important;
+  font-family: inherit !important;
 }
 
-@media (max-width: 360px) {
-  .zelda-title {
-    font-size: 1.1rem;
-  }
-  
-  .station-title h2 {
-    font-size: 1rem;
-  }
-  
-  .timer-display {
-    font-size: 1.75rem;
-  }
-  
-  .station-options {
-    gap: 5px;
-  }
-  
-  .option-btn {
-    padding: 6px 8px;
-    font-size: 0.7rem;
-    min-height: 40px;
-  }
-  
-  .option-price {
-    font-size: 0.7rem;
-  }
-  
-  .station-timer {
-    margin: 12px 0;
-  }
-  
-  .timer-warning {
-    font-size: 0.75rem;
-  }
+.swal2-html-container {
+  color: #8b5a2b !important;
+}
+
+.swal2-confirm {
+  background: linear-gradient(135deg, #8b5a2b 0%, #5c3d1e 100%) !important;
+  border: 3px solid #5c3d1e !important;
+  border-radius: 10px !important;
+  box-shadow: 3px 3px 0 #3d2510 !important;
+}
+
+.swal2-confirm:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 5px 5px 0 #3d2510 !important;
 }
 </style>
