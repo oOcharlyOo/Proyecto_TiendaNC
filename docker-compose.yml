@@ -69,11 +69,27 @@ services:
     container_name: cloudflared-tunnel
     image: cloudflare/cloudflared:latest
     restart: always
-    command: tunnel --no-autoupdate run --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiNWYzNGQwNjYtZDE4NC00NzhhLTk4ZDItYjliMzJkY2M3ZDljIiwicyI6Ik1tWmpOV0kwWXpZdFpHRXpNeTAwTkRBeExXSTNaVFl0WVRCbU9ETTNZbVk1TXpWaSJ9
+    command: >
+      tunnel run 
+      --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiNWYzNGQwNjYtZDE4NC00NzhhLTk4ZDItYjliMzJkY2M3ZDljIiwicyI6Ik1tWmpOV0kwWXpZdFpHRXpNeTAwTkRBeExXSTNaVFl0WVRCbU9ETTNZbVk1TXpWaSJ9
+    environment:
+      - TUNNEL_ORIGIN_SERVER_NAME=api.laleyendadeldulce.com
+      - NO_TLS_VERIFY=true
+      - TUNNEL_METRICS=0.0.0.0:9090
+      - TUNNEL_LOGLEVEL=info
     networks:
       - tienda-red
     depends_on:
       - frontend
+      - backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
 networks:
   tienda-red:
