@@ -15,6 +15,7 @@ import {
 import { Bar, Pie } from 'vue-chartjs';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
 import SueldoXHoraModal from './modals/SueldoXHoraModal.vue';
+import CalculadoraGramajeModal from './modals/CalculadoraGramajeModal.vue';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -99,6 +100,7 @@ type CorteDTO = {
   totalEgresos: number;
   otrosIngresos: number;
   saldoFinalCalculado: number;
+  saldoFinalEfectivo: number;
   gananciaTotal: number;
   gananciaNeta: number;
   ventasEfectivo?: number;
@@ -337,10 +339,18 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
   const sumaDetalles = detalles.reduce((sum: number, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
-    return sum + (precio * cantidad);
+    let subtotal: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      subtotal = precio;
+    } else {
+      subtotal = precio * cantidad;
+    }
+    
+    return sum + Math.round(subtotal * 100) / 100;
   }, 0);
   
-  return Math.abs(sumaDetalles - montoTotal) > 1;
+  return Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
 }
 
 async function registrarSalida(payload: { montoEoS: number, descripcion: string }) {
@@ -439,6 +449,14 @@ const ventaDetalleMontoEditado = ref(0);
 const ventaDetalleItemEditando = ref<number | null>(null);
 const ventaDetalleCantidadTemp = ref(0);
 const ventaDetallePrecioTemp = ref(0);
+const modalGramajeAbierto = ref(false);
+const modalProductoGramaje = ref<any>(null);
+const gramajeEditandoIndice = ref<number | null>(null);
+const gramajeEditandoCantidad = ref<number>(0);
+const gramajeEditandoPrecio = ref<number>(0);
+const ventasHistorialSeleccionadas = ref<Set<number>>(new Set());
+const corrigiendoHistorial = ref(false);
+const correccionHistorialMsg = ref('');
 
 const historialVentasAgrupadas = computed(() => {
   const map = new Map<number, { venta: VentaDTO; detalles: VentaDetalleDTO[] }>();
@@ -472,6 +490,9 @@ const historialVentasAgrupadas = computed(() => {
 });
 
 const egresosDia = ref<EgresoDTO[]>([]);
+const entradasDia = ref<EgresoDTO[]>([]);
+const modalEntradasAbierto = ref(false);
+const cargandoEntradas = ref(false);
 const cargandoEgresos = ref(false);
 
 const historialMeses = computed(() => {
@@ -675,7 +696,7 @@ async function generarCorte() {
 
     const fechaCorte = new Date(corte.fechaCorte);
 
-    // Usar datos del corte directamente en lugar de llamar a obtenerVentas
+    // Usar datos del corte directamente
     ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
     ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
     totalTicketsDia.value = Number(corte.totalTickets || 0);
@@ -684,39 +705,8 @@ async function generarCorte() {
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
 
-    // Calcular productos más vendidos para el corte actual (todas las ventas del día)
-    try {
-      const dataVentas = await fetchApi<GananciasDTO>(`/ventas/obtenerVentaPorDia/${corte.fechaCorte.split('T')[0]}`);
-      
-      // Usar ganancia total del día (todas las ventas) sin importar el usuario
-      const gananciaBrutaCorte = Number(dataVentas?.gananciaTotal || 0);
-      const gananciaNetaCorte = Math.max(0, gananciaBrutaCorte - dineroApartarDiario.value);
-      
-      // Actualizar la ganancia en el corte
-      if (corte.gananciaTotal !== gananciaBrutaCorte) {
-        corte.gananciaTotal = gananciaBrutaCorte;
-        corte.gananciaNeta = gananciaNetaCorte;
-        corteActual.value = { ...corte };
-      }
-      
-      // Para productos más vendidos, usar todas las ventas del día
-      const ventasDia = (dataVentas?.ventas || []).filter(v => v.estatus === 'C' || v.estatus === 'F');
-      
-      if (ventasDia.length > 0) {
-        const idsVentas = ventasDia.map(v => v.idVenta);
-        const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
-        const detallesCorte = (allDetails || []).filter(d => {
-          const idVenta = Number(d?.Venta?.idVenta || 0);
-          return idsVentas.includes(idVenta);
-        });
-        calcularProductosReporte(detallesCorte, 'diario');
-      } else {
-        productosUnitariosDiario.value = [];
-        productosGranelDiario.value = [];
-      }
-    } catch (e) {
-      console.error('Error al calcular productos para el corte:', e);
-    }
+    // Usar las ganancias del corte (ya filtradas por usuario)
+    // El backend ya filtra por usuario, no necesitamos sobrescribir
 
     if (idUsuario.value) {
       try {
@@ -843,6 +833,7 @@ async function generarReporteDiario() {
 
     const totalVentas = Number(data?.cobroTotal || 0);
     const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
+    const saldoFinalEfectivo = montoInicial + Number(ventasEfectivo.value || 0) + otrosIngresos - totalEgresos;
 
     if (data?.nombreUsuario && !nombreUsuario.value) {
       nombreUsuario.value = data.nombreUsuario;
@@ -892,6 +883,7 @@ async function generarReporteDiario() {
       totalEgresos: totalEgresos,
       otrosIngresos: otrosIngresos,
       saldoFinalCalculado: saldoFinal,
+      saldoFinalEfectivo: saldoFinalEfectivo,
       gananciaTotal: gananciaBruta,
       gananciaNeta: gananciaNeta,
       ventasTarjeta: Number(ventasTarjeta.value || 0),
@@ -994,9 +986,13 @@ function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
   for (const d of detalles) {
     const nombre = d.productoNombre || 'Producto eliminado';
     const cantidad = Number(d.cantidad || 0);
-    const importe = Number(d.precioUnitarioVenta || 0) * cantidad;
+    let importe = Number(d.precioUnitarioVenta || 0) * cantidad;
     const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
     const isGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+
+    if (isGramaje) {
+      importe = Math.round(importe * 100) / 100;
+    }
 
     if (!productosMap.has(nombre)) {
       productosMap.set(nombre, { nombre, cantidadTotal: 0, montoTotal: 0, isGramaje });
@@ -1029,9 +1025,13 @@ function calcularProductosReporte(detalles: VentaDetalleDTO[], tipo: 'diario' | 
   for (const d of detalles) {
     const nombre = d.productoNombre || 'Producto eliminado';
     const cantidad = Number(d.cantidad || 0);
-    const importe = Number(d.precioUnitarioVenta || 0) * cantidad;
+    let importe = Number(d.precioUnitarioVenta || 0) * cantidad;
     const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
     const isGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+
+    if (isGramaje) {
+      importe = Math.round(importe * 100) / 100;
+    }
 
     if (!productosMap.has(nombre)) {
       productosMap.set(nombre, { nombre, cantidadTotal: 0, montoTotal: 0, isGramaje });
@@ -2034,11 +2034,17 @@ function iniciarEdicionVentaDetalle() {
   ventaDetalleEditando.value = true;
 }
 
+function iniciarEdicionSoloTotal() {
+  if (!esAdministrador.value) return;
+  ventaDetalleEditando.value = true;
+}
+
 async function guardarEdicionVentaDetalle() {
   if (!ventaDetalleSeleccionada.value) return;
   
   try {
     for (const detalle of ventaDetalleItems.value) {
+      const prod = detalle.producto || detalle.Producto;
       await fetchApi<unknown>(
         `/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
         {
@@ -2046,8 +2052,10 @@ async function guardarEdicionVentaDetalle() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             Venta: { idVenta: ventaDetalleSeleccionada.value.idVenta },
+            Producto: prod ? { idProducto: prod.idProducto } : null,
             cantidad: Number(detalle.cantidad),
-            precioUnitarioVenta: Number(detalle.precioUnitarioVenta)
+            precioUnitarioVenta: Number(detalle.precioUnitarioVenta),
+            tipoPrecioAplicado: detalle.tipoPrecioAplicado || 'VENTA'
           })
         }
       );
@@ -2079,20 +2087,63 @@ function cancelarEdicionVentaDetalle() {
 
 function iniciarEditarItemDetalle(index: number) {
   const item = ventaDetalleItems.value[index];
-  ventaDetalleItemEditando.value = index;
-  ventaDetalleCantidadTemp.value = Number(item.cantidad);
-  ventaDetallePrecioTemp.value = Number(item.precioUnitarioVenta);
+  const prod = item.producto || item.Producto;
+  const isGramaje = item.tipoPrecioAplicado === 'VENTA_GRAMAJE' || prod?.is_gramaje === true;
+  
+  if (isGramaje) {
+    const productoModal = {
+      id: prod?.idProducto || item.idProducto || 0,
+      nombre: prod?.nombre || item.productoNombre || 'Producto de gramaje',
+      precio: prod?.precio_venta || prod?.precioVenta || 0,
+      codigo_barras: prod?.codigoBarras || prod?.codigo_barras || ''
+    };
+    modalProductoGramaje.value = productoModal;
+    gramajeEditandoIndice.value = index;
+    gramajeEditandoCantidad.value = Number(item.cantidad);
+    gramajeEditandoPrecio.value = Number(item.precioUnitarioVenta);
+    modalGramajeAbierto.value = true;
+  } else {
+    ventaDetalleItemEditando.value = index;
+    ventaDetalleCantidadTemp.value = Number(item.cantidad);
+    ventaDetallePrecioTemp.value = Number(item.precioUnitarioVenta);
+  }
+}
+
+function confirmarEdicionGramaje(payload: { gramos: number; precioTotal: number }) {
+  if (gramajeEditandoIndice.value === null) return;
+  
+  const index = gramajeEditandoIndice.value;
+  const item = ventaDetalleItems.value[index];
+  const gramos = Math.max(1, Math.round(payload.gramos));
+  const precioTotalExacto = Math.round(payload.precioTotal * 100) / 100;
+  
+  item.cantidad = gramos;
+  item.precioUnitarioVenta = precioTotalExacto;
+  item.tipoPrecioAplicado = 'VENTA_GRAMAJE';
+  
+  recalcularTotalDetalle();
+  
+  modalGramajeAbierto.value = false;
+  modalProductoGramaje.value = null;
+  gramajeEditandoIndice.value = null;
+  mostrarMensaje(`Actualizado ${gramos}g de ${item.producto?.nombre || item.Producto?.nombre || 'producto'}.`, 'ok');
+}
+
+function recalcularTotalDetalle() {
+  ventaDetalleMontoEditado.value = ventaDetalleItems.value.reduce((sum, d) => {
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      return sum + Number(d.precioUnitarioVenta);
+    }
+    return sum + Math.round(Number(d.cantidad) * Number(d.precioUnitarioVenta) * 100) / 100;
+  }, 0);
 }
 
 function confirmarEditarItemDetalle(index: number) {
   const item = ventaDetalleItems.value[index];
   item.cantidad = ventaDetalleCantidadTemp.value;
-  item.precioUnitarioVenta = Number(ventaDetalleCantidadTemp.value.toFixed(2));
+  item.precioUnitarioVenta = Number(ventaDetallePrecioTemp.value.toFixed(2));
   ventaDetalleItemEditando.value = null;
-  
-  if (!ventaDetalleEditando.value) {
-    ventaDetalleMontoEditado.value = ventaDetalleItems.value.reduce((sum, d) => sum + (Number(d.cantidad) * Number(d.precioUnitarioVenta)), 0);
-  }
+  recalcularTotalDetalle();
 }
 
 function cancelarEditarItemDetalle() {
@@ -2108,10 +2159,68 @@ async function eliminarItemDetalle(index: number) {
   try {
     await fetchApi<unknown>(`/ventasDetalle/eliminarVentaDetalle/${item.idVentaDetalle}`, { method: 'DELETE' });
     ventaDetalleItems.value.splice(index, 1);
-    ventaDetalleMontoEditado.value = ventaDetalleItems.value.reduce((sum, d) => sum + (Number(d.cantidad) * Number(d.precioUnitarioVenta)), 0);
+    recalcularTotalDetalle();
     mostrarMensaje('Producto eliminado', 'ok');
   } catch {
     mostrarMensaje('Error al eliminar producto', 'error');
+  }
+}
+
+async function corregirVentasHistorial(ids: number[]) {
+  if (ids.length === 0) return;
+  
+  corrigiendoHistorial.value = true;
+  correccionHistorialMsg.value = '';
+  
+  try {
+    const respuesta = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idVentas: ids })
+    });
+    
+    const raw = await respuesta.text();
+    let res: any;
+    try {
+      res = JSON.parse(raw);
+    } catch {
+      correccionHistorialMsg.value = `❌ Respuesta inválida`;
+      return;
+    }
+    
+    if (res?.codigo === 200) {
+      const corregidos = res.datos?.filter((r: any) => r.corregido)?.length || 0;
+      const fallidos = res.datos?.filter((r: any) => !r.corregido)?.length || 0;
+      correccionHistorialMsg.value = `✅ ${corregidos} corregidas${fallidos > 0 ? `, ${fallidos} sin cambios` : ''}`;
+      ventasHistorialSeleccionadas.value.clear();
+      await abrirHistorialVentas();
+    } else {
+      correccionHistorialMsg.value = `❌ Error: ${res?.mensaje || 'Error desconocido'}`;
+    }
+  } catch (e) {
+    console.error('Error corrigiendo:', e);
+    correccionHistorialMsg.value = `❌ Error: ${e instanceof Error ? e.message : 'Desconocido'}`;
+  } finally {
+    corrigiendoHistorial.value = false;
+    setTimeout(() => { correccionHistorialMsg.value = ''; }, 5000);
+  }
+}
+
+function toggleSeleccionHistorial(idVenta: number) {
+  if (ventasHistorialSeleccionadas.value.has(idVenta)) {
+    ventasHistorialSeleccionadas.value.delete(idVenta);
+  } else {
+    ventasHistorialSeleccionadas.value.add(idVenta);
+  }
+}
+
+function seleccionarTodasHistorial() {
+  const discrepancias = historialFiltrado.value.filter(v => v.venta.tieneDiscrepancia);
+  const todasSel = discrepancias.length > 0 && discrepancias.every(v => ventasHistorialSeleccionadas.value.has(v.venta.idVenta));
+  if (todasSel) {
+    ventasHistorialSeleccionadas.value.clear();
+  } else {
+    discrepancias.forEach(v => ventasHistorialSeleccionadas.value.add(v.venta.idVenta));
   }
 }
 
@@ -2133,6 +2242,27 @@ async function abrirModalEgresos() {
     mostrarMensaje('Error al cargar egresos', 'error');
   } finally {
     cargandoEgresos.value = false;
+  }
+}
+
+async function abrirModalEntradas() {
+  if (!corteActual.value) return;
+  
+  const fecha = corteActual.value.fechaCorte.split('T')[0];
+  cargandoEntradas.value = true;
+  modalEntradasAbierto.value = true;
+  
+  try {
+    const url = `/caja/entradas/${fecha}`;
+    const data = await fetchApi<EgresoDTO[]>(url);
+    entradasDia.value = (data || []).sort((a, b) => 
+      new Date(a.fechaMovimiento).getTime() - new Date(b.fechaMovimiento).getTime()
+    );
+  } catch (error) {
+    entradasDia.value = [];
+    mostrarMensaje('Error al cargar entradas', 'error');
+  } finally {
+    cargandoEntradas.value = false;
   }
 }
 
@@ -2386,9 +2516,25 @@ onMounted(() => {
               <span>Monto Inicial:</span>
               <strong>{{ formatoMoneda(corteActual.montoInicial) }}</strong>
             </div>
-            <div class="detail-row">
+            <div class="detail-row clickable" @click="abrirModalEntradas">
               <span>Otras Entradas:</span>
               <strong>{{ formatoMoneda(corteActual.otrosIngresos) }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="reporte-card">
+          <div class="card-header">
+            <span class="card-icon">💵</span>
+            <h3>Efectivo en Caja</h3>
+          </div>
+          <div class="card-value success">
+            {{ formatoMoneda(corteActual.saldoFinalEfectivo) }}
+          </div>
+          <div class="card-details">
+            <div class="detail-row">
+              <span>Ventas Efvo:</span>
+              <strong>{{ formatoMoneda(ventasEfectivo) }}</strong>
             </div>
           </div>
         </div>
@@ -2741,6 +2887,31 @@ onMounted(() => {
                   <span>⚠️ Discrepancias</span>
                 </label>
               </div>
+              <div v-if="esAdministrador" class="correccion-historial">
+                <div class="correccion-header">
+                  <span class="correccion-title">🔧 Corregir</span>
+                  <button 
+                    v-if="ventasHistorialSeleccionadas.size > 0" 
+                    class="btn-corregir-sel" 
+                    :disabled="corrigiendoHistorial"
+                    @click="corregirVentasHistorial(Array.from(ventasHistorialSeleccionadas))"
+                  >
+                    🔧 ({{ ventasHistorialSeleccionadas.size }})
+                  </button>
+                  <button 
+                    class="btn-corregir-todas" 
+                    :disabled="corrigiendoHistorial"
+                    @click="corregirVentasHistorial(historialFiltrado.filter(v => v.venta.tieneDiscrepancia).map(v => v.venta.idVenta))"
+                  >
+                    ⚡ Todas
+                  </button>
+                  <label class="checkbox-scroll check-all">
+                    <input type="checkbox" :checked="historialFiltrado.filter(v => v.venta.tieneDiscrepancia).length > 0 && historialFiltrado.filter(v => v.venta.tieneDiscrepancia).every(v => ventasHistorialSeleccionadas.has(v.venta.idVenta))" @change="seleccionarTodasHistorial" />
+                    <span>Todo</span>
+                  </label>
+                </div>
+                <div v-if="correccionHistorialMsg" class="correccion-msg">{{ correccionHistorialMsg }}</div>
+              </div>
               <div class="total-scroll-bar">
                 <span class="scroll-bar-label">⚜ Total del Período ⚜</span>
                 <span class="scroll-bar-amount">{{ formatoMoneda(historialTotalFiltrado) }}</span>
@@ -2752,10 +2923,18 @@ onMounted(() => {
               <p v-else-if="historialFiltrado.length === 0" class="empty-text">📭 No hay ventas con el filtro actual.</p>
 
               <div v-else class="scroll-entries">
-                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" :class="{ 'entry-discrepancia': v.venta.tieneDiscrepancia }" @click="abrirDetalleVenta(v.venta.idVenta)">
+                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" :class="{ 'entry-discrepancia': v.venta.tieneDiscrepancia, 'entry-seleccionada': ventasHistorialSeleccionadas.has(v.venta.idVenta) }" @click="abrirDetalleVenta(v.venta.idVenta)">
                   <div class="entry-left">
                     <span class="entry-number">
                       <span v-if="v.venta.tieneDiscrepancia" class="discrepancia-icon" title="Discrepancia">⚠️</span>
+                      <input 
+                        v-if="esAdministrador && v.venta.tieneDiscrepancia" 
+                        type="checkbox" 
+                        class="entry-checkbox"
+                        :checked="ventasHistorialSeleccionadas.has(v.venta.idVenta)"
+                        @click.stop
+                        @change="toggleSeleccionHistorial(v.venta.idVenta)"
+                      />
                       {{ historialFiltrado.length - index }}
                     </span>
                     <div class="entry-info">
@@ -2832,7 +3011,7 @@ onMounted(() => {
                   </div>
                 </div>
                 <span class="item-price">
-                  {{ formatoMonedaRedondeada(Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) }}
+                  {{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}
                   <template v-if="ventaDetalleEditando">
                     <button class="btn-edit-item-pergamino" @click="iniciarEditarItemDetalle(index)" title="Editar">✏️</button>
                     <button class="btn-delete-item-pergamino" @click="eliminarItemDetalle(index)" title="Eliminar">🗑️</button>
@@ -2844,10 +3023,11 @@ onMounted(() => {
             <div class="total-bar">
               <span class="total-bar-label">Total a Pagar</span>
               <template v-if="ventaDetalleEditando">
-                <input v-model.number="ventaDetalleMontoEditado" type="number" class="total-input-pergamino" />
+                <input v-model.number="ventaDetalleMontoEditado" type="number" step="0.01" class="total-input-pergamino" />
               </template>
               <template v-else>
                 <span class="total-bar-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+                <button v-if="esAdministrador" class="btn-edit-total" @click="iniciarEdicionSoloTotal" title="Editar Total">✏️</button>
               </template>
             </div>
           </div>
@@ -2900,12 +3080,66 @@ onMounted(() => {
       </div>
     </div>
 
+    <div v-if="modalEntradasAbierto" class="modal-overlay" @click.self="modalEntradasAbierto = false">
+      <div class="pergamino egresos-pergamino entradas-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <div class="header-emblem">
+              <span class="emblem-icon">📥</span>
+            </div>
+            <h2>Entradas Extra del Día</h2>
+            <div class="header-line"></div>
+            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalEntradasAbierto = false">✕</button>
+          </header>
+
+          <div class="modal-body">
+            <div v-if="cargandoEntradas" class="empty-text">📡 Cargando pergamino...</div>
+            <div v-else-if="entradasDia.length === 0" class="empty-text">📭 No hay entradas extra para este día.</div>
+
+            <div v-else class="egresos-scroll">
+              <div v-for="(entrada, index) in entradasDia" :key="entrada.idCaja" class="egreso-card entrada-card">
+                <div class="egreso-left">
+                  <span class="egreso-number">{{ index + 1 }}</span>
+                  <div class="egreso-info">
+                    <span class="egreso-date">{{ formatoFecha(entrada.fechaMovimiento) }}</span>
+                    <span class="egreso-desc">{{ entrada.descripcion || 'Sin descripción' }}</span>
+                    <span class="egreso-user" v-if="entrada.usuario">👤 {{ entrada.usuario.nombre }} {{ entrada.usuario.apellido_p }}</span>
+                  </div>
+                </div>
+                <span class="egreso-amount success">{{ formatoMoneda(Number(entrada.monto || 0)) }}</span>
+              </div>
+            </div>
+
+            <div class="total-egresos-bar success-bar" v-if="entradasDia.length > 0">
+              <span class="total-egresos-label">⚜ Total Entradas ⚜</span>
+              <span class="total-egresos-amount">{{ formatoMoneda(entradasDia.reduce((sum, e) => sum + Number(e.monto || 0), 0)) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalida" />
 
     <SueldoXHoraModal 
       :open="modalSueldoHoraAbierto" 
       @close="modalSueldoHoraAbierto = false" 
       @save="(usuarios) => { cargarUsuariosConSueldo(); recalcularGananciaNeta(); }"
+    />
+
+    <CalculadoraGramajeModal 
+      :open="modalGramajeAbierto" 
+      :producto="modalProductoGramaje" 
+      :is-editing="gramajeEditandoIndice !== null"
+      :cantidad-inicial="gramajeEditandoCantidad"
+      :precio-inicial="gramajeEditandoPrecio"
+      @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoIndice = null" 
+      @add="confirmarEdicionGramaje" 
     />
 
     <div v-if="modalApartadosAbierto" class="modal-overlay" @click.self="modalApartadosAbierto = false">
@@ -4268,13 +4502,7 @@ onMounted(() => {
 }
 
 .pergamino {
-  background: 
-    linear-gradient(135deg, 
-      color-mix(in srgb, var(--accent-color) 15%, var(--bg-secondary)) 0%, 
-      color-mix(in srgb, var(--accent-color) 10%, var(--bg-panel)) 25%, 
-      color-mix(in srgb, var(--accent-color) 18%, var(--bg-secondary)) 50%, 
-      color-mix(in srgb, var(--accent-color) 8%, var(--bg-panel)) 75%, 
-      color-mix(in srgb, var(--accent-color) 12%, var(--bg-secondary)) 100%);
+  background:var(--bg-primary);
   border-radius: 4px;
   position: relative;
   box-shadow: 
@@ -5026,7 +5254,8 @@ onMounted(() => {
 }
 
 .btn-edit-item-pergamino,
-.btn-delete-item-pergamino {
+.btn-delete-item-pergamino,
+.btn-edit-total {
   background: none;
   border: none;
   cursor: pointer;
@@ -5035,7 +5264,8 @@ onMounted(() => {
   padding: 0.1rem;
 }
 
-.btn-edit-item-pergamino:hover {
+.btn-edit-item-pergamino:hover,
+.btn-edit-total:hover {
   transform: scale(1.2);
 }
 
@@ -7784,6 +8014,83 @@ onMounted(() => {
   margin-bottom: 0.5rem;
 }
 
+.correccion-historial {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--accent-color);
+  border-radius: 8px;
+}
+
+.correccion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.correccion-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-corregir-sel {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btn-corregir-sel:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-corregir-sel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-corregir-todas {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
+  color: var(--bg-primary);
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btn-corregir-todas:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-corregir-todas:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.check-all { margin-left: auto; }
+
+.correccion-msg {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  text-align: center;
+  padding: 0.2rem;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  margin-top: 0.3rem;
+}
+
+.entry-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+  margin-right: 0.2rem;
+}
+
+.entry-seleccionada {
+  border-color: var(--accent-color) !important;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent) !important;
+}
+
 .checkbox-scroll {
   display: flex;
   align-items: center;
@@ -7950,12 +8257,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
-  border: 2px solid var(--border-color);
   border-radius: 50%;
   font-size: 0.7rem;
   font-weight: 800;
-  color: var(--border-color);
+  color: var(--zelda-gold);
 }
 
 .scroll-entry .entry-info {
@@ -8022,7 +8327,15 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.egresos-pergamino .pergamino-inner {
+.entradas-pergamino {
+  width: min(100%, 520px);
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.entradas-pergamino .pergamino-inner {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -8031,6 +8344,15 @@ onMounted(() => {
 }
 
 .egresos-pergamino .modal-header {
+  text-align: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--bg-panel);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.entradas-pergamino .modal-header {
   text-align: center;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
@@ -8048,6 +8370,21 @@ onMounted(() => {
   height: 34px;
   background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 60%, black) 100%);
   border: 3px solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entradas-pergamino .header-emblem {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
+  border: 3px solid var(--success-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -8071,10 +8408,27 @@ onMounted(() => {
   text-shadow: 2px 2px 0 var(--border-color);
 }
 
+.entradas-pergamino .modal-header h2 {
+  margin: 0;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 1.1rem;
+  color: var(--success-color);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
 .egresos-pergamino .header-line {
   margin-top: 0.4rem;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--error-color) 20%, var(--error-color) 80%, transparent);
+}
+
+.entradas-pergamino .header-line {
+  margin-top: 0.4rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--success-color) 20%, var(--success-color) 80%, transparent);
 }
 
 .egresos-pergamino .pergamino-close {
@@ -8169,6 +8523,37 @@ onMounted(() => {
   border-color: var(--error-color);
   transform: translateX(4px);
   box-shadow: 3px 3px 0 var(--border-color);
+}
+
+.entrada-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--bg-panel);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.entrada-card:hover {
+  border-color: var(--success-color);
+  transform: translateX(-4px);
+  box-shadow: -3px 3px 0 var(--success-color);
+}
+
+.entrada-card .egreso-number {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
+  border-color: var(--success-color);
+}
+
+.entrada-card .egreso-amount.success {
+  color: var(--success-color);
+  font-weight: 700;
+}
+
+.success-bar {
+  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%) !important;
 }
 
 .egreso-left {

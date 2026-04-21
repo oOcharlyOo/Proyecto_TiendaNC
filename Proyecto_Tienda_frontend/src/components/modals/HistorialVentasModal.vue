@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+
 type VentaResumen = {
   idVenta: number;
   idUsuario?: number;
@@ -20,16 +22,21 @@ const props = defineProps<{
   gananciaTotal: number;
   ventas: VentaResumen[];
   usuariosUnicos?: { idUsuario: number; nombre: string }[];
+  esAdmin?: boolean;
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'ver-detalle', venta: VentaResumen): void;
   (event: 'cancelar', venta: VentaResumen): void;
+  (event: 'ventas-corregidas'): void;
 }>();
 
 const filtroUsuario = ref<number | 'todos'>('todos');
 const filtroDiscrepancia = ref<'todas' | 'discrepancia'>('todas');
+const ventasSeleccionadas = ref<Set<number>>(new Set());
+const corrigiendo = ref(false);
+const correccionMensaje = ref('');
 
 const ventasFiltradas = computed(() => {
   let result = props.ventas;
@@ -45,9 +52,34 @@ const ventasFiltradas = computed(() => {
   return result;
 });
 
+const ventasConDiscrepancia = computed(() => {
+  return ventasFiltradas.value.filter(v => v.tieneDiscrepancia);
+});
+
 const cobroTotalFiltrado = computed(() => {
   return ventasFiltradas.value.reduce((sum, v) => sum + Number(v.montoTotal ?? 0), 0);
 });
+
+const todasSeleccionadas = computed(() => {
+  return ventasConDiscrepancia.value.length > 0 && 
+         ventasConDiscrepancia.value.every(v => ventasSeleccionadas.value.has(v.idVenta));
+});
+
+function toggleSeleccion(idVenta: number) {
+  if (ventasSeleccionadas.value.has(idVenta)) {
+    ventasSeleccionadas.value.delete(idVenta);
+  } else {
+    ventasSeleccionadas.value.add(idVenta);
+  }
+}
+
+function seleccionarTodas() {
+  if (todasSeleccionadas.value) {
+    ventasSeleccionadas.value.clear();
+  } else {
+    ventasConDiscrepancia.value.forEach(v => ventasSeleccionadas.value.add(v.idVenta));
+  }
+}
 
 function formatoMoneda(valor: number) {
   return new Intl.NumberFormat('es-MX', {
@@ -109,6 +141,102 @@ function formatoHora(fecha?: string): string {
   if (Number.isNaN(parsed.getTime())) return 'N/D';
   return parsed.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 }
+
+async function corregirSeleccionadas() {
+  const ids = Array.from(ventasSeleccionadas.value);
+  if (ids.length === 0) return;
+  
+  corrigiendo.value = true;
+  correccionMensaje.value = '';
+  
+  try {
+    const respuesta = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idVentas: ids })
+    });
+    
+    console.log('Status:', respuesta.status, 'OK:', respuesta.ok);
+    
+    const raw = await respuesta.text();
+    console.log('Raw response (first 300):', raw.substring(0, 300));
+    
+    let res: any;
+    try {
+      res = JSON.parse(raw);
+    } catch (parseErr) {
+      console.error('Parse error:', parseErr);
+      correccionMensaje.value = `❌ Respuesta inválida`;
+      return;
+    }
+    
+    console.log('Parsed response:', res);
+    
+    if (res?.codigo === 200) {
+      const corregidos = res.datos?.filter((r: any) => r.corregido)?.length || 0;
+      const fallidos = res.datos?.filter((r: any) => !r.corregido)?.length || 0;
+      correccionMensaje.value = `✅ ${corregidos} corregidas${fallidos > 0 ? `, ${fallidos} sin cambios` : ''}`;
+      ventasSeleccionadas.value.clear();
+      emit('ventas-corregidas');
+    } else {
+      correccionMensaje.value = `❌ Error: ${res?.mensaje || 'Error desconocido'}`;
+    }
+  } catch (e) {
+    console.error('Fetch error:', e);
+    correccionMensaje.value = `❌ Error: ${e instanceof Error ? e.message : 'Desconocido'}`;
+  } finally {
+    corrigiendo.value = false;
+    setTimeout(() => { correccionMensaje.value = ''; }, 5000);
+  }
+}
+
+async function corregirTodas() {
+  const ids = ventasConDiscrepancia.value.map(v => v.idVenta);
+  if (ids.length === 0) return;
+  
+  corrigiendo.value = true;
+  correccionMensaje.value = '';
+  
+  try {
+    const respuesta = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idVentas: ids })
+    });
+    
+    console.log('Status:', respuesta.status, 'OK:', respuesta.ok);
+    
+    const raw = await respuesta.text();
+    console.log('Raw response (first 300):', raw.substring(0, 300));
+    
+    let res: any;
+    try {
+      res = JSON.parse(raw);
+    } catch (parseErr) {
+      console.error('Parse error:', parseErr);
+      correccionMensaje.value = `❌ Respuesta inválida`;
+      return;
+    }
+    
+    console.log('Parsed response:', res);
+    
+    if (res?.codigo === 200) {
+      const corregidos = res.datos?.filter((r: any) => r.corregido)?.length || 0;
+      const fallidos = res.datos?.filter((r: any) => !r.corregido)?.length || 0;
+      correccionMensaje.value = `✅ ${corregidos} corregidas${fallidos > 0 ? `, ${fallidos} sin cambios` : ''}`;
+      ventasSeleccionadas.value.clear();
+      emit('ventas-corregidas');
+    } else {
+      correccionMensaje.value = `❌ Error: ${res?.mensaje || 'Error desconocido'}`;
+    }
+  } catch (e) {
+    console.error('Fetch error:', e);
+    correccionMensaje.value = `❌ Error: ${e instanceof Error ? e.message : 'Desconocido'}`;
+  } finally {
+    corrigiendo.value = false;
+    setTimeout(() => { correccionMensaje.value = ''; }, 5000);
+  }
+}
 </script>
 
 <template>
@@ -147,6 +275,34 @@ function formatoHora(fecha?: string): string {
         </label>
       </div>
 
+      <div v-if="esAdmin && ventasConDiscrepancia.length > 0" class="correccion-admin">
+        <div class="correccion-header">
+          <span class="correccion-title">🔧 Corregir Discrepancias</span>
+          <button 
+            v-if="ventasSeleccionadas.size > 0" 
+            class="btn-corregir-sel" 
+            :disabled="corrigiendo"
+            @click="corregirSeleccionadas"
+          >
+            🔧 Corregir seleccionadas ({{ ventasSeleccionadas.size }})
+          </button>
+          <button 
+            class="btn-corregir-todas" 
+            :disabled="corrigiendo"
+            @click="corregirTodas"
+          >
+            ⚡ Corregir todas ({{ ventasConDiscrepancia.length }})
+          </button>
+        </div>
+        <div v-if="ventasConDiscrepancia.length > 0" class="seleccion-todas">
+          <label class="checkbox-label">
+            <input type="checkbox" :checked="todasSeleccionadas" @change="seleccionarTodas" />
+            <span class="checkbox-text">Seleccionar todas</span>
+          </label>
+        </div>
+        <div v-if="correccionMensaje" class="correccion-msg">{{ correccionMensaje }}</div>
+      </div>
+
       <div class="totales-wrap">
         <article class="total-card">
           <div class="card-icon">💎</div>
@@ -173,13 +329,21 @@ function formatoHora(fecha?: string): string {
             v-for="(venta, index) in ventasFiltradas" 
             :key="venta.idVenta" 
             class="venta-card" 
-            :class="{ 'row-discrepancia': venta.tieneDiscrepancia }"
+            :class="{ 'row-discrepancia': venta.tieneDiscrepancia, 'seleccionada': ventasSeleccionadas.has(venta.idVenta) }"
             :style="{ animationDelay: `${index * 30}ms` }"
             @click="emit('ver-detalle', venta)"
           >
             <div class="card-header">
               <span class="card-ticket">
                 <span v-if="venta.tieneDiscrepancia" class="discrepancia-badge" title="Discrepancia">⚠️</span>
+                <input 
+                  v-if="esAdmin && venta.tieneDiscrepancia" 
+                  type="checkbox" 
+                  class="card-checkbox"
+                  :checked="ventasSeleccionadas.has(venta.idVenta)"
+                  @click.stop
+                  @change="toggleSeleccion(venta.idVenta)"
+                />
                 Ticket #{{ venta.numeroTicket ?? venta.idVenta }}
               </span>
             </div>
@@ -413,6 +577,102 @@ function formatoHora(fecha?: string): string {
   background: #fef2f2;
   border: 2px solid #ef4444;
   border-radius: 8px;
+}
+
+.correccion-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--accent-color);
+  border-radius: 8px;
+}
+
+.correccion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.correccion-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-corregir-sel {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btn-corregir-sel:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-corregir-sel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-corregir-todas {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
+  color: var(--bg-primary);
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btn-corregir-todas:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-corregir-todas:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seleccion-todas {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.correccion-msg {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  text-align: center;
+  padding: 0.25rem;
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.card-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+  margin-right: 0.25rem;
+}
+
+.venta-card.seleccionada {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
 }
 
 .checkbox-label {

@@ -143,9 +143,12 @@ type VentaDetalleDTO = {
   producto?: ProductoDTO;
   Producto?: ProductoDTO;
   idProducto?: number;
+  tipoPrecioAplicado?: string;
   Venta?: {
     idVenta: number;
   };
+  Producto?: any;
+  producto?: any;
 };
 
 type VentaPendienteDTO = VentaDTO;
@@ -166,6 +169,7 @@ type TicketItem = Producto & {
   is_mayoreo?: boolean;
   is_promocion?: false;
   promocion?: never;
+  productoId?: number;
 };
 
 type TicketItemPromocion = {
@@ -442,8 +446,12 @@ const modalEntradaAbierto = ref(false);
 const modalSalidaAbierto = ref(false);
 const modalHistorialAbierto = ref(false);
 const modalGramajeAbierto = ref(false);
-const modalProductoGramaje = ref<Producto | null>(null);
+const modalProductoGramaje = ref<any>(null);
 const gramajeItemEditando = ref<TicketItem | null>(null);
+const gramajeEditandoDesdeHistorial = ref(false);
+const gramajeEditandoIndice = ref<number | null>(null);
+const gramajeEditandoCantidad = ref<number>(0);
+const gramajeEditandoPrecio = ref<number>(0);
 const modalCobroAbierto = ref(false);
 const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
@@ -1219,6 +1227,13 @@ async function registrarSalidaEfectivo(payload: { montoEoS: number; descripcion:
   }
 }
 
+async function onVentasCorregidas() {
+  await cargarHistorialVentasDia();
+  if (historialVentaSeleccionada.value) {
+    await verDetalleVenta(historialVentaSeleccionada.value);
+  }
+}
+
 async function cargarHistorialVentasDia() {
   historialCargando.value = true;
   try {
@@ -1274,10 +1289,11 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
   const sumaDetalles = detalles.reduce((sum, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
-    return sum + (precio * cantidad);
+    const subtotal = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? precio : precio * cantidad;
+    return sum + subtotal;
   }, 0);
   
-  const discrepancia = Math.abs(sumaDetalles - montoTotal) > 1;
+  const discrepancia = Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
   return discrepancia;
 }
 
@@ -1355,6 +1371,29 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   const producto = modalProductoGramaje.value;
   if (!producto) {
     mostrarMensaje('No se encontro el producto de gramaje.', 'error');
+    return;
+  }
+
+  if (gramajeEditandoDesdeHistorial.value && gramajeEditandoIndice.value !== null) {
+    const index = gramajeEditandoIndice.value;
+    const gramos = Math.max(1, Math.round(payload.gramos));
+    const precioUnitario = payload.precioTotal / gramos;
+    
+    historialVentaDetalle.value[index].cantidad = gramos;
+    historialVentaDetalle.value[index].precioUnitarioVenta = Number.isFinite(precioUnitario) ? precioUnitario : historialVentaDetalle.value[index].precioUnitarioVenta;
+    historialVentaDetalle.value[index].tipoPrecioAplicado = 'VENTA_GRAMAJE';
+    
+    if (!totalManualEditado.value) {
+      montoTotalEditado.value = calcularNuevoTotal();
+      montoTotalInput.value = montoTotalEditado.value;
+    }
+    
+    gramajeItemEditando.value = null;
+    gramajeEditandoDesdeHistorial.value = false;
+    gramajeEditandoIndice.value = null;
+    modalGramajeAbierto.value = false;
+    modalProductoGramaje.value = null;
+    mostrarMensaje(`Actualizado ${gramos}g de ${producto.nombre}.`, 'ok');
     return;
   }
 
@@ -1776,9 +1815,39 @@ function calcularNuevoTotal(): number {
 }
 
 function iniciarEditarItem(index: number) {
-  detalleEditandoIndex.value = index;
-  cantidadTemporal.value = historialVentaDetalle.value[index].cantidad;
-  precioTemporal.value = Number(historialVentaDetalle.value[index].precioUnitarioVenta);
+  const item = historialVentaDetalle.value[index];
+  const prod = item.producto || item.Producto;
+  const isGramaje = item.tipoPrecioAplicado === 'VENTA_GRAMAJE' || prod?.is_gramaje === true;
+  
+  console.log('iniciarEditarItem:', { index, item, prod, isGramaje, tipoPrecioAplicado: item.tipoPrecioAplicado, is_gramaje: prod?.is_gramaje });
+  
+  if (isGramaje && prod) {
+    const productoModal = {
+      id: prod.idProducto,
+      nombre: prod.nombre,
+      precio: prod.precio_venta || prod.precioVenta || 0,
+      codigo_barras: prod.codigoBarras || prod.codigo_barras || ''
+    };
+    gramajeItemEditando.value = {
+      id: Number(item.idVentaDetalle) || Date.now(),
+      cantidad: item.cantidad,
+      precio: Number(item.precioUnitarioVenta),
+      nombre: prod.nombre || '',
+      is_gramaje: true
+    } as any;
+    gramajeEditandoDesdeHistorial.value = true;
+    gramajeEditandoIndice.value = index;
+    modalProductoGramaje.value = productoModal;
+    gramajeEditandoCantidad.value = item.cantidad;
+    gramajeEditandoPrecio.value = Number(item.precioUnitarioVenta);
+    setTimeout(() => {
+      modalGramajeAbierto.value = true;
+    }, 100);
+  } else {
+    detalleEditandoIndex.value = index;
+    cantidadTemporal.value = item.cantidad;
+    precioTemporal.value = Number(item.precioUnitarioVenta);
+  }
 }
 
 function confirmarEdicionItem(index: number) {
@@ -1806,15 +1875,18 @@ async function guardarCambiosDetalle() {
   try {
     for (const detalle of historialVentaDetalle.value) {
       const precioRedondeado = Math.round(Number(detalle.precioUnitarioVenta) * 100) / 100;
+      const prod = detalle.producto || detalle.Producto;
+      
       await getJson<ApiRespuesta<unknown>>(
         `/ventasDetalle/actualizarVentaDetalle/${detalle.idVentaDetalle}`,
         {
           method: 'PUT',
           body: JSON.stringify({
             Venta: { idVenta: historialVentaSeleccionada.value.idVenta },
-            Producto: detalle.Producto || detalle.producto,
+            Producto: prod ? { idProducto: prod.idProducto } : null,
             cantidad: detalle.cantidad,
-            precioUnitarioVenta: precioRedondeado
+            precioUnitarioVenta: precioRedondeado,
+            tipoPrecioAplicado: detalle.tipoPrecioAplicado || 'VENTA'
           })
         }
       );
@@ -2174,7 +2246,7 @@ async function eliminarTodosLosDetalles() {
     <!-- COMPONENTES ADICIONALES (MODALES, ESCÁNER) -->
     <EntradaEfectivoModal :open="modalEntradaAbierto" @close="modalEntradaAbierto = false" @submit="registrarEntradaEfectivo" />
     <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalidaEfectivo" />
-    <HistorialVentasModal :open="modalHistorialAbierto" :loading="historialCargando" :cobro-total="historialCobroTotal" :ganancia-total="historialGananciaTotal" :ventas="historialVentas" :usuarios-unicos="historialUsuariosUnicos" @close="modalHistorialAbierto = false" @ver-detalle="verDetalleVenta" @cancelar="cancelarVentaDesdeHistorial" />
+    <HistorialVentasModal :open="modalHistorialAbierto" :loading="historialCargando" :cobro-total="historialCobroTotal" :ganancia-total="historialGananciaTotal" :ventas="historialVentas" :usuarios-unicos="historialUsuariosUnicos" :es-admin="esAdmin" @close="modalHistorialAbierto = false" @ver-detalle="verDetalleVenta" @cancelar="cancelarVentaDesdeHistorial" @ventas-corregidas="onVentasCorregidas" />
     
     <!-- Detalle de venta modal custom -->
     <div v-if="modalDetalleVentaAbierto" class="pos-modal-overlay" @click.self="cerrarDetalleVenta">
@@ -2285,7 +2357,15 @@ async function eliminarTodosLosDetalles() {
       </div>
     </div>
 
-    <CalculadoraGramajeModal :open="modalGramajeAbierto" :producto="modalProductoGramaje ? { ...modalProductoGramaje, codigo_barras: modalProductoGramaje.codigo_barras ?? '' } : null" @close="modalGramajeAbierto = false; modalProductoGramaje = null" @add="agregarProductoGramaje" />
+    <CalculadoraGramajeModal 
+      :open="modalGramajeAbierto" 
+      :producto="modalProductoGramaje ? { ...modalProductoGramaje, codigo_barras: modalProductoGramaje.codigo_barras ?? '' } : null"
+      :is-editing="gramajeEditandoDesdeHistorial"
+      :cantidad-inicial="gramajeEditandoCantidad"
+      :precio-inicial="gramajeEditandoPrecio"
+      @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null" 
+      @add="agregarProductoGramaje" 
+    />
     <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" />
     <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />
 

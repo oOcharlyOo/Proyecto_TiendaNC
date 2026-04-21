@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+
 type ProductoGramaje = {
   id: number;
   nombre: string;
@@ -11,6 +13,9 @@ type ProductoGramaje = {
 const props = defineProps<{
   open: boolean;
   producto: ProductoGramaje | null;
+  isEditing?: boolean;
+  cantidadInicial?: number;
+  precioInicial?: number;
 }>();
 
 const emit = defineEmits<{
@@ -20,26 +25,72 @@ const emit = defineEmits<{
 
 const gramos = ref<number | null>(null);
 const precioTotal = ref<number | null>(null);
-const precioPorKilo = computed(() => Number(props.producto?.precio ?? 0));
+const precioPorKilo = ref<number>(0);
+const loading = ref(false);
 
 watch(
   () => props.open,
-  (abierto) => {
+  async (abierto) => {
     if (!abierto) return;
     gramos.value = null;
     precioTotal.value = null;
+    
+    if (props.isEditing && props.cantidadInicial && props.precioInicial) {
+      gramos.value = props.cantidadInicial;
+      precioTotal.value = props.cantidadInicial * props.precioInicial;
+    }
   }
 );
 
+watch(() => props.producto, async (prod) => {
+  if (prod?.precio) {
+    precioPorKilo.value = prod.precio;
+  }
+  
+  if (prod?.id && props.open) {
+    await cargarPrecioPorKilo(prod.id);
+  }
+}, { immediate: true });
+
+async function cargarPrecioPorKilo(idProducto: number) {
+  loading.value = true;
+  try {
+    const respuesta = await fetch(`${API_BASE}/ventasDetalle/calcularGramaje`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idProducto: idProducto,
+        cantidad: 0,
+        tipoInput: 'GRAMOS'
+      })
+    });
+    const res = await respuesta.json();
+    
+    if (res?.datos?.precioPorKilo) {
+      precioPorKilo.value = Number(res.datos.precioPorKilo);
+    }
+  } catch (e) {
+    console.error('Error al cargar precio por kilo:', e);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function recalcularDesdeGramos() {
   const nuevoGramaje = Number(gramos.value ?? 0);
-  if (nuevoGramaje <= 0 || precioPorKilo.value <= 0) return;
+  if (nuevoGramaje <= 0 || precioPorKilo.value <= 0) {
+    precioTotal.value = null;
+    return;
+  }
   precioTotal.value = Number(((nuevoGramaje / 1000) * precioPorKilo.value).toFixed(2));
 }
 
 function recalcularDesdeTotal() {
   const nuevoTotal = Number(precioTotal.value ?? 0);
-  if (nuevoTotal <= 0 || precioPorKilo.value <= 0) return;
+  if (nuevoTotal <= 0 || precioPorKilo.value <= 0) {
+    gramos.value = null;
+    return;
+  }
   gramos.value = Math.round((nuevoTotal / precioPorKilo.value) * 1000);
 }
 
@@ -50,6 +101,14 @@ function setGramaje(valor: number) {
 
 function setTotalRapido(valor: number) {
   precioTotal.value = valor;
+  recalcularDesdeTotal();
+}
+
+function onGramosChange() {
+  recalcularDesdeGramos();
+}
+
+function onTotalChange() {
   recalcularDesdeTotal();
 }
 
@@ -79,7 +138,7 @@ function confirmar() {
         
         <header class="modal-header">
           <div class="header-icon">⚖️</div>
-          <h3>Calculadora de Gramaje</h3>
+          <h3>{{ isEditing ? 'Editar Gramaje' : 'Calculadora de Gramaje' }}</h3>
           <p>Pesa tu producto y calcula el precio</p>
         </header>
 
@@ -90,6 +149,10 @@ function confirmar() {
               <span class="product-icon">📦</span>
               <span>{{ producto?.nombre || '' }}</span>
             </div>
+          </div>
+
+          <div v-if="loading" class="loading-indicator">
+            Calculando...
           </div>
 
           <div class="inputs-grid">
@@ -103,7 +166,7 @@ function confirmar() {
                   min="0"
                   step="10"
                   placeholder="0"
-                  @input="recalcularDesdeGramos"
+                  @input="onGramosChange"
                 >
                 <span class="input-unit">g</span>
               </div>
@@ -124,489 +187,361 @@ function confirmar() {
                   class="input-lg"
                   type="number"
                   min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  @input="recalcularDesdeTotal"
+                  step="1"
+                  placeholder="0"
+                  @input="onTotalChange"
                 >
               </div>
 
               <div class="quick-buttons">
-                <button type="button" class="btn-quick" @click="setTotalRapido(5)">$5</button>
                 <button type="button" class="btn-quick" @click="setTotalRapido(10)">$10</button>
                 <button type="button" class="btn-quick" @click="setTotalRapido(20)">$20</button>
+                <button type="button" class="btn-quick" @click="setTotalRapido(30)">$30</button>
               </div>
             </section>
           </div>
 
-          <div class="result-card">
-            <div class="result-header">
-              <span class="result-icon">📊</span>
-              <span>Resumen</span>
-            </div>
-            <div class="result-grid">
-              <div class="result-item">
-                <span class="result-label">Precio/kg</span>
-                <span class="result-value">{{ precioPorKilo.toFixed(2) }}</span>
-              </div>
-              <div class="result-item">
-                <span class="result-label">Gramaje</span>
-                <span class="result-value highlight">{{ Number(gramos || 0) }}g</span>
-              </div>
-              <div class="result-item total">
-                <span class="result-label">Total</span>
-                <span class="result-value">${{ Number(precioTotal || 0).toFixed(2) }}</span>
-              </div>
-            </div>
+          <div v-if="precioPorKilo > 0" class="precio-kilo-info">
+            <span class="precio-kilo-label">Precio por kilo:</span>
+            <span class="precio-kilo-value">${{ precioPorKilo }}</span>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" @click="emit('close')">
+              Cancelar
+            </button>
+            <button 
+              type="button" 
+              class="btn-primary" 
+              :disabled="!gramos || !precioTotal || loading"
+              @click="confirmar"
+            >
+              {{ isEditing ? 'Actualizar' : 'Agregar' }}
+            </button>
           </div>
         </div>
-
-        <footer class="modal-actions">
-          <button type="button" class="btn-cancel" @click="emit('close')">
-            <span class="btn-icon">✕</span>
-            <span>Cancelar</span>
-          </button>
-          <button type="button" class="btn-save" @click="confirmar" :disabled="!gramos || !precioTotal">
-            <span class="btn-icon">➕</span>
-            <span>Agregar</span>
-          </button>
-        </footer>
       </div>
-      
+
       <div class="scale-decor bottom">
-        <span class="scale-string"></span>
         <span class="scale-pan"></span>
+        <span class="scale-string"></span>
       </div>
     </section>
   </div>
 </template>
 
 <style scoped>
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, var(--zelda-gold) 15%, transparent); }
-  50% { box-shadow: 0 0 35px color-mix(in srgb, var(--zelda-gold) 25%, transparent); }
-}
-
-@keyframes scaleSwing {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
-}
-
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 9999;
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--shadow-color);
   backdrop-filter: blur(4px);
 }
 
 .scale-modal {
-  width: min(100%, 480px);
+  width: min(100%, 420px);
   position: relative;
-  animation: popIn 300ms ease-out;
-}
-
-.scale-decor {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: scaleSwing 4s ease-in-out infinite;
-  z-index: 5;
+  gap: 0;
+}
+
+.scale-decor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .scale-decor.top {
-  top: -30px;
+  margin-bottom: -30px;
+  z-index: 1;
 }
 
 .scale-decor.bottom {
-  bottom: -30px;
-  animation-delay: 2s;
-}
-
-.scale-pan {
-  width: 60px;
-  height: 20px;
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 0 0 30px 30px;
-  box-shadow: 0 2px 8px var(--shadow-color);
+  margin-top: -30px;
+  transform: rotate(180deg);
 }
 
 .scale-string {
   width: 4px;
-  height: 25px;
-  background: linear-gradient(180deg, var(--border-color) 0%, color-mix(in srgb, var(--border-color) 50%, transparent) 100%);
+  height: 40px;
+  background: linear-gradient(180deg, var(--accent-color) 0%, var(--border-color) 100%);
 }
 
-.modal-card {
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+.scale-pan {
+  width: 200px;
+  height: 60px;
+  border-radius: 0 0 100px 100px;
+  background: linear-gradient(180deg, var(--accent-color) 0%, var(--bg-secondary) 100%);
   border: 3px solid var(--accent-color);
-  box-shadow: 
-    0 0 0 3px var(--border-color),
-    0 20px 40px var(--shadow-color);
-  padding: 1.5rem;
-  display: grid;
-  gap: 1rem;
-  position: relative;
-  overflow: hidden;
-  animation: pulseGlow 3s ease-in-out infinite;
+  border-top: none;
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
 
-.modal-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+.scale-modal .modal-card {
+  width: 100%;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 4px solid var(--accent-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px var(--shadow-color);
+  overflow: hidden;
+  position: relative;
 }
 
 .modal-glow {
   position: absolute;
-  top: -30%;
-  left: -30%;
-  width: 160%;
-  height: 160%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--zelda-gold) 8%, transparent) 0%, transparent 50%);
+  inset: 12px;
   pointer-events: none;
-  animation: pulseGlow 4s ease-in-out infinite;
+  border-radius: 8px;
+  box-shadow: inset 0 0 30px color-mix(in srgb, var(--accent-color) 15%, transparent);
 }
 
-.modal-header {
+.scale-modal .modal-header {
   text-align: center;
-  padding-bottom: 1rem;
-  border-bottom: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
+  padding: 1.5rem 1rem 1rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
   position: relative;
 }
 
-.header-icon {
+.scale-modal .header-icon {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  filter: drop-shadow(0 2px 4px var(--shadow-color));
 }
 
-.modal-header h3 {
-  margin: 0 0 0.3rem 0;
+.scale-modal .modal-header h3 {
   color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 900;
-  font-family: "Courier New", monospace;
+  font-family: 'HyliaSerif', 'Palatino Linotype', serif;
+  font-size: 1.5rem;
+  margin: 0;
   text-shadow: 2px 2px 0 var(--border-color);
 }
 
-.modal-header p {
-  margin: 0;
-  font-size: 0.75rem;
+.scale-modal .modal-header p {
   color: var(--text-secondary);
-  font-family: "Courier New", monospace;
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
 }
 
-.modal-body {
-  display: grid;
+.scale-modal .modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-.form-group {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.form-group label {
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-  font-family: "Courier New", monospace;
-}
-
-.product-name {
+.scale-modal .form-group {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.product-icon {
-  font-size: 1.2rem;
-}
-
-.inputs-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.input-block {
-  display: grid;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.input-block label {
+.scale-modal .form-group label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.scale-modal .product-name {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  color: var(--text-primary);
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-  font-family: "Courier New", monospace;
-}
-
-.input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-lg {
-  width: 100%;
+  gap: 0.5rem;
+  padding: 0.75rem;
   background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 2px solid var(--border-color);
-  padding: 0.8rem 1rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-  font-family: "Courier New", monospace;
-  text-align: center;
-  outline: none;
-  transition: all 200ms ease;
-}
-
-.input-wrapper.currency .input-lg {
-  padding-left: 2rem;
-}
-
-.input-unit {
-  position: absolute;
-  right: 1rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  font-weight: 700;
-  pointer-events: none;
-}
-
-.currency-symbol {
-  position: absolute;
-  left: 1rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--accent-color);
-  z-index: 1;
-}
-
-.input-lg:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zelda-gold) 30%, transparent);
-}
-
-.input-lg::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.5;
-}
-
-.quick-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-}
-
-.btn-quick {
-  padding: 0.5rem 0.3rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-family: "Courier New", monospace;
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  color: var(--text-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.btn-quick:hover {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
-  color: var(--btn-text, var(--bg-primary));
-  border-color: var(--accent-color);
-  transform: translateY(-2px);
-}
-
-.result-card {
-  background: var(--bg-primary);
-  border: 2px solid var(--accent-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem;
-  box-shadow: inset 0 0 20px color-mix(in srgb, var(--zelda-gold) 10%, transparent);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
-.result-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.8rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
-  font-weight: 700;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.8rem;
+.scale-modal .product-icon {
+  font-size: 1.25rem;
 }
 
-.result-icon {
-  font-size: 1rem;
-}
-
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.8rem;
-}
-
-.result-item {
-  text-align: center;
-}
-
-.result-item.total {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
-  padding: 0.5rem;
-  border-radius: 6px;
-  margin-top: -0.5rem;
-}
-
-.result-item.total .result-label,
-.result-item.total .result-value {
-  color: var(--btn-text, var(--bg-primary));
-}
-
-.result-label {
-  display: block;
-  font-size: 0.65rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.2rem;
-}
-
-.result-value {
-  display: block;
-  font-size: 1rem;
-  font-weight: 900;
-  color: var(--accent-color);
-  font-family: "Courier New", monospace;
-}
-
-.result-value.highlight {
-  color: var(--success-color);
-}
-
-.result-item.total .result-value {
-  font-size: 1.2rem;
-}
-
-.modal-actions {
+.scale-modal .inputs-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
+  gap: 1rem;
 }
 
-.btn-cancel,
-.btn-save {
+.scale-modal .input-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scale-modal .input-block label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.scale-modal .input-wrapper {
   display: flex;
   align-items: center;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 150ms;
+}
+
+.scale-modal .input-wrapper:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
+.scale-modal .input-lg {
+  flex: 1;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  outline: none;
+  width: 100%;
+}
+
+.scale-modal .input-lg::placeholder {
+  color: var(--text-secondary);
+}
+
+.scale-modal .input-lg:focus {
+  outline: none;
+}
+
+.scale-modal .input-unit {
+  padding: 0 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.scale-modal .input-wrapper.currency {
+  padding-left: 0.5rem;
+}
+
+.scale-modal .currency-symbol {
+  padding: 0 0.25rem 0 0.75rem;
+  color: var(--success-color);
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.scale-modal .quick-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.scale-modal .btn-quick {
+  flex: 1;
+  padding: 0.5rem 0.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.scale-modal .btn-quick:hover {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
+}
+
+.scale-modal .precio-kilo-info {
+  display: flex;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.8rem 1rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-family: "Courier New", monospace;
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.btn-cancel {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.btn-cancel:hover {
+  padding: 0.75rem;
   background: var(--bg-primary);
-  border-color: var(--accent-color);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
 }
 
-.btn-save {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
-  color: var(--btn-text, var(--bg-primary));
-  box-shadow: 0 3px 0 var(--border-color);
+.scale-modal .precio-kilo-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
-.btn-save:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 0 var(--border-color), 0 0 15px color-mix(in srgb, var(--zelda-gold) 30%, transparent);
-}
-
-.btn-save:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--border-color);
-}
-
-.btn-save:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-icon {
+.scale-modal .precio-kilo-value {
+  color: var(--accent-color);
+  font-weight: 600;
   font-size: 1rem;
 }
 
-@media (max-width: 520px) {
-  .inputs-grid {
+.scale-modal .modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.scale-modal .btn-secondary,
+.scale-modal .btn-primary {
+  flex: 1;
+  padding: 0.875rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+  border: 2px solid;
+}
+
+.scale-modal .btn-secondary {
+  background: transparent;
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.scale-modal .btn-secondary:hover {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.scale-modal .btn-primary {
+  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
+  border-color: var(--accent-color);
+  color: var(--bg-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
+.scale-modal .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.scale-modal .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 480px) {
+  .scale-modal .inputs-grid {
     grid-template-columns: 1fr;
   }
   
-  .result-grid {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
+  .scale-modal .quick-buttons {
+    flex-wrap: wrap;
   }
   
-  .result-item.total {
-    margin-top: 0;
-  }
-  
-  .scale-decor {
-    display: none;
-  }
-  
-  .modal-card {
-    padding: 1rem;
-  }
-  
-  .header-icon {
-    font-size: 2rem;
+  .scale-modal .btn-quick {
+    min-width: calc(33% - 0.5rem);
   }
 }
 </style>
