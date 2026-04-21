@@ -8,16 +8,18 @@ const props = withDefaults(defineProps<{
   subtitle?: string;
   confirmText?: string;
   label?: string;
+  initialValue?: number;
 }>(), {
   title: 'Monto Inicial de Caja',
   subtitle: 'Ingresa el monto con el que abres la caja hoy',
   confirmText: 'Continuar a Ventas',
-  label: 'Cantidad inicial'
+  label: 'Cantidad inicial',
+  initialValue: 0
 });
 
 const emit = defineEmits<{
   (event: 'close'): void;
-  (event: 'submit', payload: { montoInicial: number }): void;
+  (event: 'submit', payload: any): void;
 }>();
 
 const { currentTheme } = useTheme();
@@ -28,7 +30,7 @@ watch(
   () => props.open,
   (abierto) => {
     if (abierto) {
-      montoInicial.value = '';
+      montoInicial.value = props.initialValue || '';
     }
   }
 );

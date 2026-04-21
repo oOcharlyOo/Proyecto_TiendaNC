@@ -189,9 +189,9 @@ const mostrarNotificacion = (station: Estacion) => {
     text: `El tiempo de ${station.nombreProducto} ha terminado`,
     showConfirmButton: true,
     confirmButtonText: 'Aceptar',
-    confirmButtonColor: '#8b5a2b',
-    background: '#f4e4bc',
-    color: '#5c3d1e',
+    confirmButtonColor: 'var(--border-color)',
+    background: 'var(--bg-panel)',
+    color: 'var(--text-primary)',
     timer: undefined,
     customClass: {
       popup: 'swal2-popup-papyrus'
@@ -318,10 +318,10 @@ const cobrar = async (station: Estacion, metodoPago: string = 'EFECTIVO') => {
       showCancelButton: true,
       confirmButtonText: 'Sí, cobrar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#4a7c39',
-      cancelButtonColor: '#8b2020',
-      background: '#f4e4bc',
-      color: '#5c3d1e',
+      confirmButtonColor: 'var(--accent-color)',
+      cancelButtonColor: 'var(--error-color)',
+      background: 'var(--bg-panel)',
+      color: 'var(--text-primary)',
       customClass: {
         popup: 'swal2-popup-papyrus'
       }
@@ -353,10 +353,10 @@ const cancelarTemporizador = async (station: Estacion) => {
     showCancelButton: true,
     confirmButtonText: 'Sí, cancelar',
     cancelButtonText: 'No',
-    confirmButtonColor: '#8b2020',
-    cancelButtonColor: '#4a7c39',
-    background: '#f4e4bc',
-    color: '#5c3d1e',
+    confirmButtonColor: 'var(--error-color)',
+    cancelButtonColor: 'var(--accent-color)',
+    background: 'var(--bg-panel)',
+    color: 'var(--text-primary)',
     customClass: {
       popup: 'swal2-popup-papyrus'
     }
@@ -857,7 +857,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 40px 80px;
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--bg-secondary) 100%);
   color: var(--text-primary);
   border: 4px solid var(--accent-color);
   border-radius: 20px;
@@ -949,7 +949,7 @@ onUnmounted(() => {
 .btn-crear {
   margin-top: 12px;
   padding: 8px 16px;
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--bg-secondary) 100%);
   color: var(--text-primary);
   border: 2px solid var(--border-color);
   border-radius: 8px;
@@ -1027,7 +1027,7 @@ onUnmounted(() => {
 
 .btn-crear-estacion {
   padding: 10px 20px;
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--bg-secondary) 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--bg-secondary) 100%);
   color: var(--text-primary);
   border: 2px solid var(--border-color);
   border-radius: 10px;
@@ -1060,33 +1060,16 @@ onUnmounted(() => {
 }
 
 .card-papiro {
-  background: 
-    linear-gradient(to right, #d4c4a0 0px, #e8d4a8 8px, #f4e4bc 16px, #e8d4a8 24px, #d4c4a0 32px) 0 0 / 32px 100%,
-    #f4e4bc;
-  border: 4px solid #8b5a2b;
-  border-radius: 4px;
-  padding: 24px;
+  background: var(--bg-panel);
+  border: 2px solid var(--zelda-gold);
+  border-radius: 8px;
+  padding: 20px;
   position: relative;
-  box-shadow: 
-    6px 6px 0 #a08060,
-    inset 0 0 30px rgba(139, 90, 43, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .card-papiro::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    repeating-linear-gradient(
-      transparent 0px,
-      transparent 28px,
-      rgba(139, 90, 43, 0.15) 28px,
-      rgba(139, 90, 43, 0.15) 30px
-    );
-  pointer-events: none;
+  display: none;
 }
 
 .station-header {
@@ -1094,7 +1077,7 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 2px dashed #8b5a2b;
+  border-bottom: 2px dashed var(--border-color);
   position: relative;
   z-index: 1;
 }
@@ -1110,9 +1093,9 @@ onUnmounted(() => {
 
 .station-title h2 {
   font-size: 1.3rem;
-  color: #5c3d1e;
+  color: var(--text-primary);
   margin: 0;
-  text-shadow: 1px 1px 0 #d4c4a0;
+  text-shadow: 1px 1px 0 var(--accent-color);
 }
 
 .station-actions {
@@ -1132,11 +1115,11 @@ onUnmounted(() => {
 .status-badge.status-activo {
   background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
   color: #90ee90;
-  border: 2px solid #4a7c39;
+  border: 2px solid var(--accent-color);
 }
 
 .status-badge.status-terminado {
-  background: linear-gradient(135deg, #8b2020 0%, #5c1515 100%);
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--bg-secondary) 100%);
   color: #ffb0b0;
   border: 2px solid #a03030;
   animation: pulse 1s infinite;
@@ -1149,8 +1132,8 @@ onUnmounted(() => {
 }
 
 .btn-config, .btn-delete {
-  background: #fff9f0;
-  border: 2px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
@@ -1159,8 +1142,9 @@ onUnmounted(() => {
 }
 
 .btn-config:hover, .btn-delete:hover {
-  background: #f4e4bc;
+  background: var(--bg-panel);
   transform: scale(1.1);
+  border-color: var(--zelda-gold);
 }
 
 .station-timer {
@@ -1174,20 +1158,20 @@ onUnmounted(() => {
   font-size: 3.5rem;
   font-weight: bold;
   font-family: 'Courier New', monospace;
-  text-shadow: 2px 2px 0 #d4c4a0;
+  text-shadow: 2px 2px 0 var(--accent-color);
 }
 
 .timer-disponible { color: #a0a0a0; }
 .timer-activo { color: #2d5016; }
-.timer-warning { color: #c47f00; animation: glow 0.5s infinite; }
-.timer-terminado { color: #8b2020; }
+.timer-warning { color: var(--warning-color); animation: glow 0.5s infinite; }
+.timer-terminado { color: var(--warning-color); }
 
 @keyframes glow {
-  50% { text-shadow: 2px 2px 0 #d4c4a0, 0 0 20px #c47f00; }
+  50% { text-shadow: 2px 2px 0 var(--accent-color), 0 0 20px var(--warning-color); }
 }
 
 .timer-warning {
-  color: #c47f00;
+  color: var(--warning-color);
   font-weight: bold;
   margin-top: 8px;
   font-size: 0.9rem;
@@ -1203,8 +1187,8 @@ onUnmounted(() => {
 }
 
 .option-btn {
-  background: linear-gradient(135deg, #fff9f0 0%, #f4e4bc 100%);
-  border: 3px solid #8b5a2b;
+  background: linear-gradient(135deg, var(--text-primary)9f0 0%, var(--bg-panel) 100%);
+  border: 3px solid var(--border-color);
   border-radius: 12px;
   padding: 14px 12px;
   cursor: pointer;
@@ -1214,75 +1198,76 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   position: relative;
-  box-shadow: 3px 3px 0 #a08060;
+  box-shadow: 3px 3px 0 var(--shadow-color);
 }
 
 .option-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 5px 5px 0 #a08060;
-  border-color: #5c3d1e;
+  box-shadow: 5px 5px 0 var(--shadow-color);
+  border-color: var(--zelda-gold);
 }
 
 .option-btn:active {
   transform: translateY(0);
-  box-shadow: 2px 2px 0 #a08060;
+  box-shadow: 2px 2px 0 var(--shadow-color);
 }
 
 .option-nombre {
   font-size: 0.85rem;
   font-weight: bold;
-  color: #5c3d1e;
+  color: var(--text-primary);
   text-align: center;
 }
 
 .option-precio {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #2d5016;
+  color: var(--success-color);
 }
 
 .option-combo-badge {
   position: absolute;
   top: -8px;
   right: -8px;
-  background: #c47f00;
-  color: #fff;
+  background: var(--warning-color);
+  color: var(--text-primary);
   font-size: 0.7rem;
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 10px;
-  border: 2px solid #8b5a2b;
+  border: 2px solid var(--border-color);
 }
 
 .no-opciones {
   grid-column: 1 / -1;
   text-align: center;
-  color: #8b5a2b;
+  color: var(--text-primary);
   font-style: italic;
   padding: 20px;
 }
 
 .ticket-panel {
-  background: rgba(255, 249, 240, 0.9);
-  border: 2px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-color);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
   position: relative;
   z-index: 1;
+  box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .ticket-title {
   font-size: 0.9rem;
-  color: #8b5a2b;
+  color: var(--text-primary);
   margin: 0 0 12px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed #8b5a2b;
+  border-bottom: 1px dashed var(--accent-color);
 }
 
 .ticket-empty {
   text-align: center;
-  color: #a08060;
+  color: var(--shadow-color);
   font-style: italic;
   padding: 12px;
 }
@@ -1297,7 +1282,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px dotted #d4c4a0;
+  border-bottom: 1px dotted var(--accent-color);
   font-size: 0.9rem;
 }
 
@@ -1315,26 +1300,26 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding-top: 16px;
-  border-top: 2px dashed #8b5a2b;
+  border-top: 2px dashed var(--border-color);
   position: relative;
   z-index: 1;
 }
 
 .station-total {
   font-size: 1.2rem;
-  color: #5c3d1e;
+  color: var(--text-primary);
 }
 
 .total-value {
   font-weight: bold;
-  color: #2d5016;
+  color: var(--success-color);
   font-size: 1.4rem;
 }
 
 .btn-cobrar {
   padding: 12px 24px;
-  background: linear-gradient(135deg, #4a7c39 0%, #3d6530 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent-color) 0%, #3d6530 100%);
+  color: var(--text-primary);
   border: 3px solid #2d5016;
   border-radius: 12px;
   font-weight: bold;
@@ -1363,8 +1348,8 @@ onUnmounted(() => {
 
 .btn-cancelar-timer {
   padding: 12px 20px;
-  background: linear-gradient(135deg, #8b2020 0%, #5c1515 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
   border: 3px solid #3d0a0a;
   border-radius: 12px;
   font-weight: bold;
@@ -1396,17 +1381,15 @@ onUnmounted(() => {
 }
 
 .modal-content {
-  background: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f4e4bc' width='100' height='100'/%3E%3Cpath fill='%23e8d4a8' d='M0 0h100v2H0zM0 20h100v2H0zM0 40h100v2H0zM0 60h100v2H0zM0 80h100v2H0z'/%3E%3C/svg%3E") repeat,
-    #f4e4bc;
-  border: 4px solid #8b5a2b;
-  border-radius: 16px;
-  padding: 32px;
+  background: var(--bg-panel);
+  border: 3px solid var(--accent-color);
+  border-radius: 12px;
+  padding: 28px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 8px 8px 0 #a08060;
+  box-shadow: 0 6px 20px var(--shadow-color);
 }
 
 .modal-opciones {
@@ -1419,7 +1402,7 @@ onUnmounted(() => {
 
 .modal-subtitle {
   text-align: center;
-  color: #8b5a2b;
+  color: var(--text-primary);
   margin-bottom: 20px;
   font-style: italic;
 }
@@ -1427,8 +1410,8 @@ onUnmounted(() => {
 .buscador-modal {
   display: flex;
   align-items: center;
-  background: #fff9f0;
-  border: 3px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
   border-radius: 12px;
   padding: 8px 16px;
   margin-bottom: 20px;
@@ -1445,18 +1428,18 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   font-size: 1rem;
-  color: #5c3d1e;
+  color: var(--text-primary);
   outline: none;
 }
 
 .buscador-input::placeholder {
-  color: #a08060;
+  color: var(--shadow-color);
 }
 
 .buscador-limpiar {
   background: transparent;
   border: none;
-  color: #8b5a2b;
+  color: var(--text-primary);
   font-size: 1rem;
   cursor: pointer;
   padding: 4px 8px;
@@ -1465,13 +1448,13 @@ onUnmounted(() => {
 }
 
 .buscador-limpiar:hover {
-  background: #f4e4bc;
-  color: #5c3d1e;
+  background: var(--bg-panel);
+  color: var(--text-primary);
 }
 
 .no-resultados {
   text-align: center;
-  color: #8b5a2b;
+  color: var(--text-primary);
   font-style: italic;
   padding: 30px;
 }
@@ -1490,17 +1473,17 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: #fff9f0;
-  border: 3px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
   border-radius: 12px;
   padding: 16px 20px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 3px 3px 0 #d4c4a0;
+  box-shadow: 3px 3px 0 var(--accent-color);
 }
 
 .producto-item-modal:hover {
-  border-color: #4a7c39;
+  border-color: var(--accent-color);
   background: #e8f5e9;
   box-shadow: 4px 4px 0 #c4b090;
   transform: translateX(4px);
@@ -1510,8 +1493,8 @@ onUnmounted(() => {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #f4e4bc;
-  border: 2px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1536,34 +1519,34 @@ onUnmounted(() => {
 .producto-nombre-modal {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #5c3d1e;
+  color: var(--text-primary);
 }
 
 .producto-stock-modal {
   font-size: 0.85rem;
-  color: #8b5a2b;
+  color: var(--text-primary);
 }
 
 .producto-seleccionar-icon {
   font-size: 1.5rem;
-  color: #4a7c39;
+  color: var(--accent-color);
   font-weight: bold;
 }
 
 .modal-title {
   font-size: 1.5rem;
-  color: #5c3d1e;
+  color: var(--accent-color);
   text-align: center;
   margin-bottom: 24px;
-  text-shadow: 1px 1px 0 #d4c4a0;
+  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 .producto-seleccionado {
   text-align: center;
   margin-bottom: 24px;
   padding: 20px;
-  background: #fff9f0;
-  border: 2px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
   border-radius: 12px;
 }
 
@@ -1572,8 +1555,8 @@ onUnmounted(() => {
   height: 100px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  background: #f4e4bc;
-  border: 3px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1588,7 +1571,7 @@ onUnmounted(() => {
 }
 
 .producto-seleccionado h3 {
-  color: #5c3d1e;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -1598,7 +1581,7 @@ onUnmounted(() => {
 
 .form-group label {
   display: block;
-  color: #8b5a2b;
+  color: var(--text-primary);
   margin-bottom: 8px;
   font-weight: bold;
 }
@@ -1607,17 +1590,17 @@ onUnmounted(() => {
 .form-group select {
   width: 100%;
   padding: 12px;
-  border: 2px solid #8b5a2b;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
-  background: #fff9f0;
-  color: #5c3d1e;
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #5c3d1e;
+  border-color: var(--text-primary);
 }
 
 .modal-actions {
@@ -1637,19 +1620,19 @@ onUnmounted(() => {
 }
 
 .btn-cancelar {
-  background: #fff9f0;
-  border: 3px solid #8b5a2b;
-  color: #8b5a2b;
+  background: var(--bg-panel);
+  border: 3px solid var(--border-color);
+  color: var(--text-primary);
 }
 
 .btn-cancelar:hover {
-  background: #f4e4bc;
+  background: var(--bg-panel);
 }
 
 .btn-confirmar {
-  background: linear-gradient(135deg, #8b5a2b 0%, #5c3d1e 100%);
-  border: 3px solid #5c3d1e;
-  color: #fff9f0;
+  background: linear-gradient(135deg, var(--border-color) 0%, var(--text-primary) 100%);
+  border: 3px solid var(--text-primary);
+  color: var(--text-primary)9f0;
   box-shadow: 3px 3px 0 #3d2510;
 }
 
@@ -1673,8 +1656,8 @@ onUnmounted(() => {
 }
 
 .opcion-item {
-  background: #fff9f0;
-  border: 2px solid #8b5a2b;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
   border-radius: 12px;
   padding: 16px;
 }
@@ -1688,10 +1671,10 @@ onUnmounted(() => {
 .input-nombre {
   flex: 1;
   padding: 10px 12px;
-  border: 2px solid #8b5a2b;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
-  background: #fff9f0;
-  color: #5c3d1e;
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: bold;
 }
@@ -1722,22 +1705,22 @@ onUnmounted(() => {
 .input-group label {
   display: block;
   font-size: 0.8rem;
-  color: #8b5a2b;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
 .input-mini {
   width: 100%;
   padding: 8px;
-  border: 2px solid #8b5a2b;
+  border: 2px solid var(--border-color);
   border-radius: 6px;
-  background: #fff9f0;
-  color: #5c3d1e;
+  background: var(--bg-panel);
+  color: var(--text-primary);
   text-align: center;
 }
 
 .opcion-productos {
-  background: #f4e4bc;
+  background: var(--bg-panel);
   border-radius: 8px;
   padding: 12px;
 }
@@ -1748,12 +1731,12 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 8px;
   font-size: 0.85rem;
-  color: #8b5a2b;
+  color: var(--text-primary);
 }
 
 .btn-agregar-producto {
   background: #e8f5e9;
-  border: 2px solid #4a7c39;
+  border: 2px solid var(--accent-color);
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
@@ -1776,7 +1759,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 4px 0;
   font-size: 0.85rem;
-  border-bottom: 1px dotted #d4c4a0;
+  border-bottom: 1px dotted var(--accent-color);
 }
 
 .productos-list li:last-child {
@@ -1792,16 +1775,16 @@ onUnmounted(() => {
 }
 
 .btn-quitar:hover {
-  color: #8b2020;
+  color: var(--error-color);
 }
 
 .btn-agregar-opcion {
   width: 100%;
   padding: 14px;
   background: transparent;
-  border: 3px dashed #8b5a2b;
+  border: 3px dashed var(--border-color);
   border-radius: 12px;
-  color: #8b5a2b;
+  color: var(--text-primary);
   font-weight: bold;
   cursor: pointer;
   font-size: 1rem;
@@ -1809,9 +1792,9 @@ onUnmounted(() => {
 }
 
 .btn-agregar-opcion:hover {
-  background: #f4e4bc;
-  border-color: #5c3d1e;
-  color: #5c3d1e;
+  background: var(--bg-panel);
+  border-color: var(--text-primary);
+  color: var(--text-primary);
 }
 
 @keyframes pulse {
@@ -1910,24 +1893,24 @@ onUnmounted(() => {
 
 <style>
 .swal2-popup-papyrus {
-  background: #f4e4bc !important;
-  border: 4px solid #8b5a2b !important;
+  background: var(--bg-panel) !important;
+  border: 4px solid var(--border-color) !important;
   border-radius: 16px !important;
-  box-shadow: 6px 6px 0 #a08060 !important;
+  box-shadow: 6px 6px 0 var(--shadow-color) !important;
 }
 
 .swal2-title {
-  color: #5c3d1e !important;
+  color: var(--zelda-gold) !important;
   font-family: inherit !important;
 }
 
 .swal2-html-container {
-  color: #8b5a2b !important;
+  color: var(--text-primary) !important;
 }
 
 .swal2-confirm {
-  background: linear-gradient(135deg, #8b5a2b 0%, #5c3d1e 100%) !important;
-  border: 3px solid #5c3d1e !important;
+  background: linear-gradient(135deg, var(--border-color) 0%, var(--text-primary) 100%) !important;
+  border: 3px solid var(--text-primary) !important;
   border-radius: 10px !important;
   box-shadow: 3px 3px 0 #3d2510 !important;
 }

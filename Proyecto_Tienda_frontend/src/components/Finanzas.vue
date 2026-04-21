@@ -16,10 +16,20 @@ const cargando = ref(false);
 const modalEntradaAbierto = ref(false);
 const modalSalidaAbierto = ref(false);
 const modalAjusteAbierto = ref(false);
+const pestañaActiva = ref<'boveda' | 'ganancias'>('boveda');
 
 // Datos de Bóveda Maestra (Ahora desde la tabla boveda)
 const saldoBovedaReal = ref(0);
 const historialBoveda = ref<any[]>([]);
+
+// Datos de Ganancias
+const gananciasTotales = ref(0);
+const gananciasDelDia = ref(0);
+const gananciasEditadas = ref(0);
+const historialGanancias = ref<any[]>([]);
+const gananciaPaginaActual = ref(0);
+const gananciaTotalPaginas = ref(0);
+const modalEditarGananciasAbierto = ref(false);
 
 // Filtrar duplicados por idBoveda para evitar datos repetidos en la UI
 const historialUnico = computed(() => {
@@ -75,9 +85,79 @@ async function cargarDatos(pagina = 0) {
   }
 }
 
+async function cargarGanancias(pagina = 0) {
+  cargando.value = true;
+  gananciaPaginaActual.value = pagina;
+  try {
+    const hoy = new Date().toISOString().split('T')[0];
+    
+    // Cargar ganancias reales del día desde ventas
+    try {
+      const resVentas = await fetch(`${API_BASE}/ventas/obtenerVentaPorDia/${hoy}`);
+      if (resVentas.ok) {
+        const dataVentas = await resVentas.json();
+        const gananciaDia = Number(dataVentas.datos?.gananciaTotal) || 0;
+        gananciasDelDia.value = isNaN(gananciaDia) ? 0 : gananciaDia;
+      }
+    } catch (e) {
+      console.log("No se pudieron obtener ventas del día");
+    }
+    
+    // Intentar obtener del endpoint de ajustes (total acumulado)
+    try {
+      const resAjustes = await fetch(`${API_BASE}/ganancias/ajuste`);
+      if (resAjustes.ok) {
+        const dataAjustes = await resAjustes.json();
+        if (dataAjustes.datos?.ajustes?.length > 0) {
+          const ajustes = dataAjustes.datos.ajustes;
+          historialGanancias.value = ajustes.map((a: any) => {
+            const fechaObj = a.fecha ? new Date(a.fecha) : null;
+            return {
+              id: a.id,
+              monto: a.monto,
+              descripcion: a.descripcion,
+              fecha: fechaObj && !isNaN(fechaObj.getTime()) ? fechaObj.toLocaleString('es-MX') : 'Sin fecha',
+              idUsuario: a.idUsuario
+            };
+          });
+          const ultimo = ajustes[0];
+          const montoTotal = Number(ultimo?.monto) || 0;
+          gananciasTotales.value = isNaN(montoTotal) ? 0 : montoTotal;
+        } else {
+          const ajusteLocal = localStorage.getItem('ganancia_ajuste');
+          if (ajusteLocal) {
+            const montoLocal = Number(ajusteLocal);
+            gananciasTotales.value = isNaN(montoLocal) ? 0 : montoLocal;
+          }
+          historialGanancias.value = [];
+        }
+      }
+    } catch (e) {
+      console.log("Endpoint de ajustes no disponible");
+      const ajusteLocal = localStorage.getItem('ganancia_ajuste');
+      if (ajusteLocal) {
+        const montoLocal = Number(ajusteLocal);
+        gananciasTotales.value = isNaN(montoLocal) ? 0 : montoLocal;
+      }
+    }
+    
+    gananciaTotalPaginas.value = 1;
+  } catch (err) {
+    console.error("Error cargando ganancias:", err);
+  } finally {
+    cargando.value = false;
+  }
+}
+
 function cambiarPagina(nuevaPagina: number) {
-  if (nuevaPagina >= 0 && nuevaPagina < totalPaginas.value) {
-    cargarDatos(nuevaPagina);
+  if (pestañaActiva.value === 'boveda') {
+    if (nuevaPagina >= 0 && nuevaPagina < totalPaginas.value) {
+      cargarDatos(nuevaPagina);
+    }
+  } else {
+    if (nuevaPagina >= 0 && nuevaPagina < gananciaTotalPaginas.value) {
+      cargarGanancias(nuevaPagina);
+    }
   }
 }
 
@@ -105,6 +185,51 @@ async function handleAjusteBase(payload: { montoInicial: number }) {
   }
 }
 
+const editarGanancias = () => {
+  const ajusteGuardado = localStorage.getItem('ganancia_ajuste');
+  if (ajusteGuardado) {
+    gananciasEditadas.value = Number(ajusteGuardado);
+  } else {
+    gananciasEditadas.value = Number(gananciasTotales.value) || 0;
+  }
+  modalEditarGananciasAbierto.value = true;
+};
+
+async function handleEditarGanancias(payload: any) {
+  const monto = payload?.monto ?? payload?.montoInicial ?? Number(gananciasEditadas.value) ?? 0;
+  
+  try {
+    const res = await fetch(`${API_BASE}/ganancias/ajuste`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idUsuario: idUsuario.value,
+        monto: monto,
+        descripcion: "Ajuste manual de ganancias"
+      })
+    });
+
+    if (res.ok) {
+      modalEditarGananciasAbierto.value = false;
+      mostrarMensaje("Ganancias actualizadas con éxito.", "ok");
+      localStorage.setItem('ganancia_ajuste', monto.toString());
+      await cargarGanancias();
+    } else {
+      // Fallback: guardar en localStorage si el endpoint no existe
+      localStorage.setItem('ganancia_ajuste', monto.toString());
+      modalEditarGananciasAbierto.value = false;
+      mostrarMensaje("Ganancias guardadas localmente (endpoint no disponible).", "ok");
+      gananciasTotales.value = monto;
+    }
+  } catch (e) {
+    // Fallback: guardar en localStorage si hay error de conexión
+    localStorage.setItem('ganancia_ajuste', monto.toString());
+    modalEditarGananciasAbierto.value = false;
+    mostrarMensaje("Ganancias guardadas localmente.", "ok");
+    gananciasTotales.value = monto;
+  }
+}
+
 async function registrarMovimiento(payload: { montoEoS: number, descripcion: string }, tipo: 'entrada' | 'salida') {
   try {
     const endpoint = tipo === 'entrada' ? 'entrada' : 'salida';
@@ -122,8 +247,21 @@ async function registrarMovimiento(payload: { montoEoS: number, descripcion: str
 }
 
 onMounted(() => {
-  cargarDatos();
+  if (pestañaActiva.value === 'ganancias') {
+    cargarGanancias();
+  } else {
+    cargarDatos();
+  }
 });
+
+function cambiarPestaña(pestaña: 'boveda' | 'ganancias') {
+  pestañaActiva.value = pestaña;
+  if (pestaña === 'ganancias') {
+    cargarGanancias();
+  } else {
+    cargarDatos();
+  }
+}
 </script>
 
 <template>
@@ -139,8 +277,26 @@ onMounted(() => {
             <div class="crown-glow"></div>
           </div>
           <div class="title-group">
-            <h1>Bóveda Real</h1>
-            <p class="subtitle">Gestión centralizada del capital y flujo de efectivo</p>
+            <h1>{{ pestañaActiva === 'boveda' ? 'Bóveda Real' : 'Ganancias' }}</h1>
+            <p class="subtitle">{{ pestañaActiva === 'boveda' ? 'Gestión centralizada del capital y flujo de efectivo' : 'Seguimiento de ganancias y rentabilidad' }}</p>
+          </div>
+          <div class="tabs-wrapper">
+            <button 
+              class="tab-btn" 
+              :class="{ active: pestañaActiva === 'boveda' }"
+              @click="cambiarPestaña('boveda')"
+            >
+              <span class="tab-icon">💰</span>
+              Bóveda
+            </button>
+            <button 
+              class="tab-btn" 
+              :class="{ active: pestañaActiva === 'ganancias' }"
+              @click="cambiarPestaña('ganancias')"
+            >
+              <span class="tab-icon">📈</span>
+              Ganancias
+            </button>
           </div>
         </div>
         
@@ -295,8 +451,8 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- PAGINACIÓN -->
-            <footer v-if="totalPaginas > 1" class="pagination-footer">
+            <!-- PAGINACIÓN BÓVEDA -->
+            <footer v-if="totalPaginas > 1 && pestañaActiva === 'boveda'" class="pagination-footer">
               <button 
                 class="nav-btn" 
                 :disabled="paginaActual === 0" 
@@ -319,6 +475,119 @@ onMounted(() => {
             </footer>
           </div>
         </section>
+        
+        <!-- SECCIÓN DE GANANCIAS (solo cuando está activa) -->
+        <section v-if="pestañaActiva === 'ganancias'" class="history-section animate-slide-up" style="animation-delay: 0.2s">
+          <div class="section-card history-card">
+            <div class="history-header">
+              <h3><span class="icon">📈</span> Ganancias del Mes</h3>
+              <div class="loading-indicator" v-if="cargando">
+                <span class="spinner"></span>
+              </div>
+            </div>
+            
+            <div class="ganancias-cards-grid">
+              <div class="ganancia-card">
+                <div class="ganancia-card-inner">
+                  <div class="card-label">
+                    <span class="icon-label">💵</span>
+                    Ganancias de Hoy
+                  </div>
+                  <div class="balance-display">
+                    <span class="currency-symbol">$</span>
+                    <strong class="balance-amount">{{ formatoMoneda(gananciasDelDia).replace('$', '') }}</strong>
+                  </div>
+                </div>
+              </div>
+              
+              <div 
+                class="ganancia-card clickable" 
+                @click="editarGanancias"
+                title="Click para ajustar ganancias"
+              >
+                <div class="ganancia-card-inner">
+                  <div class="card-label">
+                    <span class="icon-label">📊</span>
+                    Total del Mes
+                  </div>
+                  <div class="balance-display">
+                    <span class="currency-symbol">$</span>
+                    <strong class="balance-amount">{{ formatoMoneda(gananciasTotales).replace('$', '') }}</strong>
+                  </div>
+                  <div class="card-footer">
+                    <span class="edit-badge">
+                      <span class="pencil">🖊️</span> Ajustar
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="history-header" style="margin-top: 1.5rem;">
+              <h3><span class="icon">📋</span> Historial de Ajustes</h3>
+            </div>
+            
+            <div class="history-list-container parchment-effect">
+              <div class="history-labels-list" v-if="historialGanancias.length">
+                <div v-for="v in historialGanancias" :key="v.id" class="history-entry-label animate-fade-in">
+                  <div class="label-header">
+                    <div class="label-time">
+                      <span class="icon">🕒</span>
+                      <span class="text">{{ v.fecha }}</span>
+                    </div>
+                    <div class="label-indicator indicator-pos">
+                      ✓ Ajuste
+                    </div>
+                  </div>
+                  
+                  <div class="label-body">
+                    <p class="label-desc">Ajuste #{{ v.id }}</p>
+                  </div>
+                  
+                  <div class="label-footer">
+                    <div class="footer-segment">
+                      <span class="caption">Monto:</span>
+                      <strong class="txt-pos">{{ formatoMoneda(Number(v.monto) || 0) }}</strong>
+                    </div>
+                    <div class="footer-divider"></div>
+                    <div class="footer-segment">
+                      <span class="caption">Descripción:</span>
+                      <strong class="txt-pos">{{ v.descripcion }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-if="!historialGanancias.length && !cargando" class="empty-state">
+                <span class="empty-icon">📭</span>
+                <p>No hay ajustes registrados.</p>
+              </div>
+            </div>
+            
+            <!-- PAGINACIÓN GANANCIAS -->
+            <footer v-if="gananciaTotalPaginas > 1" class="pagination-footer">
+              <button 
+                class="nav-btn" 
+                :disabled="gananciaPaginaActual === 0" 
+                @click="cambiarPagina(gananciaPaginaActual - 1)"
+              >
+                <span class="arrow">←</span> Anterior
+              </button>
+              
+              <div class="page-info">
+                Página <strong>{{ gananciaPaginaActual + 1 }}</strong> de {{ gananciaTotalPaginas }}
+              </div>
+              
+              <button 
+                class="nav-btn" 
+                :disabled="gananciaPaginaActual >= gananciaTotalPaginas - 1" 
+                @click="cambiarPagina(gananciaPaginaActual + 1)"
+              >
+                Siguiente <span class="arrow">→</span>
+              </button>
+            </footer>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -333,6 +602,16 @@ onMounted(() => {
       confirm-text="Actualizar Saldo de Bóveda"
       @close="modalAjusteAbierto = false" 
       @submit="handleAjusteBase" 
+    />
+    <MontoInicialModal 
+      :open="modalEditarGananciasAbierto" 
+      title="Ajuste de Ganancias"
+      subtitle="Ingresa el monto total de ganancias registrado manualmente"
+      label="Total Ganancias"
+      confirm-text="Actualizar Ganancias"
+      :initial-value="gananciasEditadas"
+      @close="modalEditarGananciasAbierto = false" 
+      @submit="handleEditarGanancias" 
     />
   </main>
 </template>
@@ -900,6 +1179,87 @@ onMounted(() => {
     box-shadow: 0 5px 15px var(--shadow-color);
     border-color: var(--accent-color);
   }
+}
+
+/* =========================================
+   TABS (PESTAÑAS)
+   ========================================= */
+.tabs-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: linear-gradient(145deg, var(--accent-color), var(--bg-secondary));
+  border-color: var(--accent-color);
+  color: var(--bg-primary);
+}
+
+.tab-icon {
+  font-size: 1.1rem;
+}
+
+/* =========================================
+   GANANCIAS CARDS
+   ========================================= */
+.ganancias-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ganancia-card {
+  background: linear-gradient(145deg, var(--success-color), var(--bg-secondary));
+  border: 3px solid var(--success-color);
+  border-radius: 16px;
+  padding: 4px;
+}
+
+.ganancia-card-inner {
+  background: linear-gradient(145deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.ganancia-card .card-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.ganancia-card .balance-display {
+  color: var(--success-color);
+}
+
+.ganancia-card .balance-amount {
+  font-size: 1.5rem;
 }
 </style>
 
