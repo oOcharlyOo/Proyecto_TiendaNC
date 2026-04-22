@@ -91,8 +91,6 @@ async function cargarGanancias(pagina = 0) {
   try {
     const ahora = new Date();
     const hoy = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-    const mesActual = ahora.toLocaleString('en-CA', { timeZone: 'America/Mexico_City', month: 'numeric' });
-    const anioActual = ahora.toLocaleString('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric' });
     
     // Cargar ganancias reales del día desde ventas
     try {
@@ -101,25 +99,43 @@ async function cargarGanancias(pagina = 0) {
         const dataVentas = await resVentas.json();
         console.log('Ganancias del día (backend):', dataVentas);
         const gananciaDia = Number(dataVentas.datos?.gananciaTotal) || 0;
-        const cobroTotal = Number(dataVentas.datos?.cobroTotal) || 0;
-        console.log('Ganancia calculada:', gananciaDia, 'Cobro total:', cobroTotal);
         gananciasDelDia.value = isNaN(gananciaDia) ? 0 : gananciaDia;
       }
     } catch (e) {
       console.log("No se pudieron obtener ventas del día", e);
     }
     
-    // Cargar ganancias totales del mes desde ventas
+    // Cargar ganancias acumuladas totales (como bóveda)
     try {
-      const resMes = await fetch(`${API_BASE}/ventas/gananciasDelMes?mes=${mesActual}&anio=${anioActual}`);
-      if (resMes.ok) {
-        const dataMes = await resMes.json();
-        console.log('Ganancias del mes (backend):', dataMes);
-        const gananciaMes = Number(dataMes.datos?.gananciaTotal) || 0;
-        gananciasTotales.value = isNaN(gananciaMes) ? 0 : gananciaMes;
+      const resGanancias = await fetch(`${API_BASE}/gananciasAcumuladas/estado`);
+      if (resGanancias.ok) {
+        const dataGanancias = await resGanancias.json();
+        console.log('Ganancias acumuladas (backend):', dataGanancias);
+        const montoTotal = Number(dataGanancias.datos?.montoTotal) || 0;
+        gananciasTotales.value = isNaN(montoTotal) ? 0 : montoTotal;
       }
     } catch (e) {
-      console.log("No se pudieron obtener ganancias del mes", e);
+      console.log("No se pudieron obtener ganancias acumuladas", e);
+    }
+    
+    // Cargar historial de ganancias
+    try {
+      const resHistorial = await fetch(`${API_BASE}/gananciasAcumuladas/historial?page=${pagina}&size=${tamanoPagina.value}`);
+      if (resHistorial.ok) {
+        const dataHistorial = await resHistorial.json();
+        if (dataHistorial.datos) {
+          historialGanancias.value = dataHistorial.datos.contenido.map((g: any) => ({
+            id: g.idGanancia,
+            monto: g.montoTotal,
+            descripcion: g.descripcion,
+            fecha: new Date(g.fechaMovimiento).toLocaleString('es-MX'),
+            idUsuario: g.usuario?.idUsuario
+          }));
+          gananciaTotalPaginas.value = dataHistorial.datos.totalPaginas;
+        }
+      }
+    } catch (e) {
+      console.log("No se pudo obtener historial de ganancias", e);
     }
     
     gananciaTotalPaginas.value = 1;
@@ -167,49 +183,9 @@ async function handleAjusteBase(payload: { montoInicial: number }) {
 }
 
 const editarGanancias = () => {
-  const ajusteGuardado = localStorage.getItem('ganancia_ajuste');
-  if (ajusteGuardado) {
-    gananciasEditadas.value = Number(ajusteGuardado);
-  } else {
-    gananciasEditadas.value = Number(gananciasTotales.value) || 0;
-  }
+  gananciasEditadas.value = Number(gananciasTotales.value) || 0;
   modalEditarGananciasAbierto.value = true;
 };
-
-async function handleEditarGanancias(payload: any) {
-  const monto = payload?.monto ?? payload?.montoInicial ?? Number(gananciasEditadas.value) ?? 0;
-  
-  try {
-    const res = await fetch(`${API_BASE}/ganancias/ajuste`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        idUsuario: idUsuario.value,
-        monto: monto,
-        descripcion: "Ajuste manual de ganancias"
-      })
-    });
-
-    if (res.ok) {
-      modalEditarGananciasAbierto.value = false;
-      mostrarMensaje("Ganancias actualizadas con éxito.", "ok");
-      localStorage.setItem('ganancia_ajuste', monto.toString());
-      await cargarGanancias();
-    } else {
-      // Fallback: guardar en localStorage si el endpoint no existe
-      localStorage.setItem('ganancia_ajuste', monto.toString());
-      modalEditarGananciasAbierto.value = false;
-      mostrarMensaje("Ganancias guardadas localmente (endpoint no disponible).", "ok");
-      gananciasTotales.value = monto;
-    }
-  } catch (e) {
-    // Fallback: guardar en localStorage si hay error de conexión
-    localStorage.setItem('ganancia_ajuste', monto.toString());
-    modalEditarGananciasAbierto.value = false;
-    mostrarMensaje("Ganancias guardadas localmente.", "ok");
-    gananciasTotales.value = monto;
-  }
-}
 
 async function registrarMovimiento(payload: { montoEoS: number, descripcion: string }, tipo: 'entrada' | 'salida') {
   try {
