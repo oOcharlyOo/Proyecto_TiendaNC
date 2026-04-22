@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useTheme } from '../composables/useTheme';
 import EntradaEfectivoModal from './modals/EntradaEfectivoModal.vue';
 import SalidaEfectivoModal from './modals/SalidaEfectivoModal.vue';
@@ -89,56 +89,37 @@ async function cargarGanancias(pagina = 0) {
   cargando.value = true;
   gananciaPaginaActual.value = pagina;
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    const ahora = new Date();
+    const hoy = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const mesActual = ahora.toLocaleString('en-CA', { timeZone: 'America/Mexico_City', month: 'numeric' });
+    const anioActual = ahora.toLocaleString('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric' });
     
     // Cargar ganancias reales del día desde ventas
     try {
       const resVentas = await fetch(`${API_BASE}/ventas/obtenerVentaPorDia/${hoy}`);
       if (resVentas.ok) {
         const dataVentas = await resVentas.json();
+        console.log('Ganancias del día (backend):', dataVentas);
         const gananciaDia = Number(dataVentas.datos?.gananciaTotal) || 0;
+        const cobroTotal = Number(dataVentas.datos?.cobroTotal) || 0;
+        console.log('Ganancia calculada:', gananciaDia, 'Cobro total:', cobroTotal);
         gananciasDelDia.value = isNaN(gananciaDia) ? 0 : gananciaDia;
       }
     } catch (e) {
-      console.log("No se pudieron obtener ventas del día");
+      console.log("No se pudieron obtener ventas del día", e);
     }
     
-    // Intentar obtener del endpoint de ajustes (total acumulado)
+    // Cargar ganancias totales del mes desde ventas
     try {
-      const resAjustes = await fetch(`${API_BASE}/ganancias/ajuste`);
-      if (resAjustes.ok) {
-        const dataAjustes = await resAjustes.json();
-        if (dataAjustes.datos?.ajustes?.length > 0) {
-          const ajustes = dataAjustes.datos.ajustes;
-          historialGanancias.value = ajustes.map((a: any) => {
-            const fechaObj = a.fecha ? new Date(a.fecha) : null;
-            return {
-              id: a.id,
-              monto: a.monto,
-              descripcion: a.descripcion,
-              fecha: fechaObj && !isNaN(fechaObj.getTime()) ? fechaObj.toLocaleString('es-MX') : 'Sin fecha',
-              idUsuario: a.idUsuario
-            };
-          });
-          const ultimo = ajustes[0];
-          const montoTotal = Number(ultimo?.monto) || 0;
-          gananciasTotales.value = isNaN(montoTotal) ? 0 : montoTotal;
-        } else {
-          const ajusteLocal = localStorage.getItem('ganancia_ajuste');
-          if (ajusteLocal) {
-            const montoLocal = Number(ajusteLocal);
-            gananciasTotales.value = isNaN(montoLocal) ? 0 : montoLocal;
-          }
-          historialGanancias.value = [];
-        }
+      const resMes = await fetch(`${API_BASE}/ventas/gananciasDelMes?mes=${mesActual}&anio=${anioActual}`);
+      if (resMes.ok) {
+        const dataMes = await resMes.json();
+        console.log('Ganancias del mes (backend):', dataMes);
+        const gananciaMes = Number(dataMes.datos?.gananciaTotal) || 0;
+        gananciasTotales.value = isNaN(gananciaMes) ? 0 : gananciaMes;
       }
     } catch (e) {
-      console.log("Endpoint de ajustes no disponible");
-      const ajusteLocal = localStorage.getItem('ganancia_ajuste');
-      if (ajusteLocal) {
-        const montoLocal = Number(ajusteLocal);
-        gananciasTotales.value = isNaN(montoLocal) ? 0 : montoLocal;
-      }
+      console.log("No se pudieron obtener ganancias del mes", e);
     }
     
     gananciaTotalPaginas.value = 1;
@@ -246,11 +227,28 @@ async function registrarMovimiento(payload: { montoEoS: number, descripcion: str
   } catch (e) { mostrarMensaje("Error en la operación.", "error"); }
 }
 
+let refreshHandler: (() => void) | null = null;
+
 onMounted(() => {
   if (pestañaActiva.value === 'ganancias') {
     cargarGanancias();
   } else {
     cargarDatos();
+  }
+
+  refreshHandler = () => {
+    if (pestañaActiva.value === 'ganancias') {
+      cargarGanancias();
+    } else {
+      cargarDatos();
+    }
+  };
+  window.addEventListener('venta-completada', refreshHandler);
+});
+
+onBeforeUnmount(() => {
+  if (refreshHandler) {
+    window.removeEventListener('venta-completada', refreshHandler);
   }
 });
 

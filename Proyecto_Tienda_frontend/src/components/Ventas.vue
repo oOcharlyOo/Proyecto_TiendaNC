@@ -561,7 +561,12 @@ const ticket = computed(() => {
 });
 
 const totalVenta = computed(() => {
-  return ticket.value.reduce((acumulado, item) => acumulado + item.precio * item.cantidad, 0);
+  return ticket.value.reduce((acumulado, item) => {
+    if ((item as any).is_gramaje) {
+      return acumulado + item.precio;
+    }
+    return acumulado + item.precio * item.cantidad;
+  }, 0);
 });
 
 const totalArticulos = computed(() => {
@@ -1124,7 +1129,11 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA
     }
     
     await Promise.all(detallesParaGuardar.map((item) => crearDetalleVenta(ventaId, item)));
+    console.log('Completando venta:', { ventaId, montoCobrado, metodoPago });
     await completarVenta(ventaId, metodoPago, montoCobrado);
+    
+    window.dispatchEvent(new CustomEvent('venta-completada', { detail: { ventaId, montoTotal: montoCobrado } }));
+    
     const numeroTicketVenta = numeroTicket ? ` Ticket #${numeroTicket}.` : '';
     
     tickets.value = tickets.value.filter(t => t.id !== ticketActual.value!.id);
@@ -1256,22 +1265,11 @@ async function cargarHistorialVentasDia() {
     }
     historialUsuariosUnicos.value = Array.from(usuariosMap.entries()).map(([id, nombre]) => ({ idUsuario: id, nombre }));
     
-    const idsVentas = historialVentas.value.map(v => v.idVenta);
-    const todosDetalles = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
-      `/ventasDetalle/obtenerTodosLosVentasDetalles`
-    );
-    
-    const detallesMap = new Map<number, VentaDetalleDTO[]>();
-    for (const d of todosDetalles?.datos || []) {
-      const idVenta = Number(d?.Venta?.idVenta || 0);
-      if (!detallesMap.has(idVenta)) {
-        detallesMap.set(idVenta, []);
-      }
-      detallesMap.get(idVenta)?.push(d);
-    }
-    
     for (const venta of historialVentas.value) {
-      const detalles = detallesMap.get(venta.idVenta) || [];
+      const detallesResp = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
+        `/ventasDetalle/porVenta/${venta.idVenta}`
+      );
+      const detalles = detallesResp?.datos || [];
       const montoVenta = Number(venta.montoTotal ?? 0);
       venta.tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
     }
@@ -1289,8 +1287,10 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
   const sumaDetalles = detalles.reduce((sum, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
-    const subtotal = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? precio : precio * cantidad;
-    return sum + subtotal;
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      return sum + precio;
+    }
+    return sum + (precio * cantidad);
   }, 0);
   
   const discrepancia = Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
@@ -1377,10 +1377,10 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   if (gramajeEditandoDesdeHistorial.value && gramajeEditandoIndice.value !== null) {
     const index = gramajeEditandoIndice.value;
     const gramos = Math.max(1, Math.round(payload.gramos));
-    const precioUnitario = payload.precioTotal / gramos;
+    const precioTotal = Math.round(payload.precioTotal * 100) / 100;
     
     historialVentaDetalle.value[index].cantidad = gramos;
-    historialVentaDetalle.value[index].precioUnitarioVenta = Number.isFinite(precioUnitario) ? precioUnitario : historialVentaDetalle.value[index].precioUnitarioVenta;
+    historialVentaDetalle.value[index].precioUnitarioVenta = precioTotal;
     historialVentaDetalle.value[index].tipoPrecioAplicado = 'VENTA_GRAMAJE';
     
     if (!totalManualEditado.value) {
@@ -1406,13 +1406,13 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
   }
 
   const gramos = Math.max(1, Math.round(payload.gramos));
-  const precioUnitario = payload.precioTotal / gramos;
+  const precioTotal = Math.round(payload.precioTotal * 100) / 100;
   const items = ticketActual.value!.items;
 
   if (gramajeItemEditando.value) {
     const existente = gramajeItemEditando.value;
     existente.cantidad = gramos;
-    existente.precio = Number.isFinite(precioUnitario) ? precioUnitario : existente.precio;
+    existente.precio = precioTotal;
     try {
       await crearDetalleVenta(ticketActual.value.id, existente);
     } catch (e) {
@@ -1430,7 +1430,7 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
 
   if (existente) {
     existente.cantidad += gramos;
-    existente.precio = Number.isFinite(precioUnitario) ? precioUnitario : existente.precio;
+    existente.precio = precioTotal;
     try {
       await crearDetalleVenta(ticketActual.value.id, existente);
     } catch (e) {
@@ -1441,7 +1441,7 @@ async function agregarProductoGramaje(payload: { gramos: number; precioTotal: nu
     items.push({
       ...producto,
       cantidad: gramos,
-      precio: Number.isFinite(precioUnitario) ? precioUnitario : producto.precio
+      precio: precioTotal
     });
     try {
       const nuevoItem = items[items.length - 1];
@@ -1722,12 +1722,15 @@ async function processVoiceCommand(comando: string) {
           const comando = item.comando;
           const isGramaje = producto.is_gramaje || comando.tipo === 'PESO' || comando.unidad === 'g' || comando.unidad === 'gramos';
           let cantidad = Number(comando.valor) || 1;
-          let precioUnitario = Number(producto.precio_venta);
+          let precioTotal = 0;
+          let esGramaje = isGramaje;
           
           if (comando.tipo === 'PESO') {
-            size: 1;
-            if (producto.is_gramaje && precioUnitario > 0) {
-              precioUnitario = precioUnitario / 1000;
+            if (producto.is_gramaje) {
+              const precioPorKilo = Number(producto.precio_venta) || 0;
+              precioTotal = Math.round(((cantidad / 1000) * precioPorKilo) * 100) / 100;
+            } else {
+              precioTotal = Number(producto.precio_venta);
             }
           } else if (comando.tipo === 'PRECIO') {
             const valorPesos = Number(comando.valor) || 0;
@@ -1735,11 +1738,10 @@ async function processVoiceCommand(comando: string) {
             if (producto.is_gramaje && precioVentaNum > 0) {
               cantidad = Math.floor((valorPesos / precioVentaNum) * 1000);
               cantidad = cantidad > 0 ? cantidad : 1;
-              const precioRedondeado = Math.round(valorPesos);
-              precioUnitario = precioRedondeado / cantidad;
+              precioTotal = Math.round(valorPesos * 100) / 100;
             } else {
               cantidad = 1;
-              precioUnitario = valorPesos;
+              precioTotal = valorPesos;
             }
           }
           
@@ -1753,12 +1755,13 @@ async function processVoiceCommand(comando: string) {
           
           if (existente) {
             existente.cantidad += cantidad;
-            existente.precio = precioUnitario;
+            existente.precio += precioTotal;
             if (existente.idVentaDetalle && ticketActual.value) {
               try {
                 await crearDetalleVenta(ticketActual.value.id, existente);
               } catch (e) {
                 existente.cantidad -= cantidad;
+                existente.precio -= precioTotal;
               }
             }
           } else {
@@ -1766,8 +1769,8 @@ async function processVoiceCommand(comando: string) {
               id: producto.idProducto || producto.id,
               nombre: producto.nombre,
               cantidad: cantidad,
-              precio: precioUnitario,
-              is_gramaje: isGramaje || comando.tipo === 'PRECIO',
+              precio: precioTotal,
+              is_gramaje: esGramaje || comando.tipo === 'PRECIO',
               dto: producto,
               codigo_barras: producto.codigoBarras || producto.codigo_barras || null
             });
@@ -1802,14 +1805,18 @@ function iniciarEdicionDetalle() {
   modoEdicionDetalle.value = true;
 }
 
-function calcularSubtotal(cantidad: number, precioUnitario: number): number {
-  const subtotal = cantidad * precioUnitario;
-  return Math.round(subtotal);
+function calcularSubtotal(d: VentaDetalleDTO): number {
+  const precio = Number(d.precioUnitarioVenta || 0);
+  const cantidad = Number(d.cantidad || 0);
+  if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+    return precio;
+  }
+  return Math.round(precio * cantidad);
 }
 
 function calcularNuevoTotal(): number {
   const total = historialVentaDetalle.value.reduce((sum, d) => {
-    return sum + calcularSubtotal(Number(d.cantidad), Number(d.precioUnitarioVenta));
+    return sum + calcularSubtotal(d);
   }, 0);
   return total;
 }
@@ -1904,6 +1911,8 @@ async function guardarCambiosDetalle() {
         body: JSON.stringify(payload)
       }
     );
+    
+    window.dispatchEvent(new CustomEvent('venta-completada', { detail: { ventaId: historialVentaSeleccionada.value.idVenta, montoTotal: montoTotalEditado.value } }));
     
     mostrarMensaje('Detalles actualizados correctamente', 'ok');
     modoEdicionDetalle.value = false;
@@ -2171,7 +2180,8 @@ async function eliminarTodosLosDetalles() {
                     <span class="promo-contents">{{ asAny(item).promocion.detalles.map((d: any) => `${d.cantidad >= 1000 ? (d.cantidad / 1000) + 'kg' : d.cantidad + 'pza'} ${d.nombre_producto}`).join(', ') }}</span>
                   </div>
                   <div class="item-meta" v-else>
-                    <span class="unit-price">{{ formatoMoneda(item.precio) }}</span>
+                    <span class="unit-price" v-if="asAny(item).is_gramaje">{{ formatoMoneda(asAny(item).dto?.precio_venta || item.precio) }}/kg</span>
+                    <span class="unit-price" v-else>{{ formatoMoneda(item.precio) }}</span>
                     <label v-if="asAny(item).precio_mayoreo && asAny(item).precio_mayoreo > 0" class="mayoreo-toggle">
                       <input type="checkbox" :checked="asAny(item).is_mayoreo" @change="toggleMayoreo(asAny(item))">
                       <span>Mayoreo</span>
@@ -2195,7 +2205,7 @@ async function eliminarTodosLosDetalles() {
                     <button class="qty-btn" @click="aumentarCantidad(asAny(item))">+</button>
                   </div>
                   <div class="item-subtotal" :class="{ 'promo-price': asAny(item).is_promocion }">
-                    {{ formatoMoneda(item.precio * item.cantidad) }}
+                    {{ formatoMoneda(asAny(item).is_gramaje ? item.precio : item.precio * item.cantidad) }}
                   </div>
                 </div>
               </div>
@@ -2345,7 +2355,7 @@ async function eliminarTodosLosDetalles() {
                 <span class="d-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? iniciarEditarItem(i) : null">
                   {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
                 </span>
-                <strong class="d-sub">{{ formatoMonedaRedondeada(calcularSubtotal(d.cantidad, Number(d.precioUnitarioVenta))) }}</strong>
+                <strong class="d-sub">{{ formatoMonedaRedondeada(calcularSubtotal(d)) }}</strong>
                 <div class="d-actions">
                   <button v-if="esAdmin && modoEdicionDetalle" class="btn-edit-item" @click="iniciarEditarItem(i)" title="Editar">✏️</button>
                   <button v-if="esAdmin && modoEdicionDetalle" class="btn-delete-item" @click="eliminarDetalleVenta(i)" title="Eliminar">🗑️</button>

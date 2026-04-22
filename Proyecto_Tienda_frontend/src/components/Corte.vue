@@ -339,15 +339,10 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
   const sumaDetalles = detalles.reduce((sum: number, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
-    let subtotal: number;
-    
     if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
-      subtotal = precio;
-    } else {
-      subtotal = precio * cantidad;
+      return sum + precio;
     }
-    
-    return sum + Math.round(subtotal * 100) / 100;
+    return sum + (precio * cantidad);
   }, 0);
   
   return Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
