@@ -329,6 +329,15 @@ function formatoFecha(fecha?: string) {
   return parsed.toLocaleString('es-MX');
 }
 
+function formatoCantidad(cantidad: number, isGramaje: boolean) {
+  if (!isGramaje) return `${cantidad} pza`;
+  if (cantidad >= 1000) {
+    const kg = cantidad / 1000;
+    return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(2)} kg`;
+  }
+  return `${cantidad} g`;
+}
+
 function abrirModalNuevo() {
   editando.value = false;
   form.value = {
@@ -841,7 +850,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
                 class="producto-item"
               >
                 <span class="producto-nombre">{{ producto.nombre }}</span>
-                <span class="producto-qty">{{ producto.cantidadTotal }}{{ producto.isGramaje ? 'g' : 'pza' }}</span>
+                <span class="producto-qty">{{ formatoCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
                 <span class="producto-monto">{{ formatoMoneda(producto.montoTotal) }}</span>
               </div>
               <div v-if="item.productos.length > 5" class="productos-more">

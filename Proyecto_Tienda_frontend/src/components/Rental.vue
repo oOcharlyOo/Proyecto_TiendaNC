@@ -44,6 +44,7 @@ type ProductoDTO = {
   stock: number;
   precio_venta: number;
   imagen_url?: string;
+  idCategoria?: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -58,7 +59,7 @@ type ApiRespuesta<T> = {
 
 const productosInventario = ref<ProductoDTO[]>([]);
 const estaciones = ref<Estacion[]>([]);
-const productosDisponibles = computed(() => productosInventario.value.filter(p => Number(p.stock) > 0));
+const productosDisponibles = computed(() => productosInventario.value.filter(p => Number(p.stock) > 0 && Number(p.idCategoria) === 7));
 const ticker = ref(0);
 
 const formatTime = (seconds: number): string => {
@@ -684,7 +685,7 @@ onUnmounted(() => {
             </div>
             <div class="producto-datos-modal">
               <span class="producto-nombre-modal">{{ producto.nombre }}</span>
-              <span class="producto-stock-modal">Stock: {{ producto.stock }}</span>
+              <span class="producto-stock-modal">🎮 Rentable</span>
             </div>
             <span class="producto-seleccionar-icon">→</span>
           </div>

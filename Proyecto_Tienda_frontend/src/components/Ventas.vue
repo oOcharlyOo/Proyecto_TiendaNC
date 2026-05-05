@@ -116,6 +116,7 @@ type ProductoDTO = {
   codigoBarras: string;
   stock?: number;
   is_gramaje?: boolean;
+  idCategoria?: number;
 };
 
 type UsuarioDTO = {
@@ -147,8 +148,6 @@ type VentaDetalleDTO = {
   Venta?: {
     idVenta: number;
   };
-  Producto?: any;
-  producto?: any;
 };
 
 type VentaPendienteDTO = VentaDTO;
@@ -161,6 +160,7 @@ type Producto = {
   precio_mayoreo?: number | null;
   dto: ProductoDTO;
   is_gramaje?: boolean;
+  idCategoria?: number;
 };
 
 type TicketItem = Producto & {
@@ -430,7 +430,9 @@ async function eliminarTicket(id: number) {
 }
 
 const terminoBusqueda = ref('');
+const categoriaFiltro = ref<number | null>(null);
 const productos = shallowRef<Producto[]>([]);
+const categorias = shallowRef<{ idCategoria: number; nombre: string }[]>([]);
 const tickets = ref<Ticket[]>([]);
 const ticketActualId = ref<number | null>(null);
 const mensaje = ref('');
@@ -622,9 +624,14 @@ const productosParaMostrar = computed(() => {
   const query = terminoBusqueda.value.trim().toLowerCase();
   
   let resultados = productos.value.filter(p => {
+    if (p.idCategoria === 7) return false;
     const stock = p.dto?.stock;
     return stock === undefined || stock === null || stock > 0;
   });
+  
+  if (categoriaFiltro.value !== null) {
+    resultados = resultados.filter(p => p.idCategoria === categoriaFiltro.value);
+  }
   
   if (query) {
     resultados = resultados.filter(p => 
@@ -642,13 +649,16 @@ const sugerenciasPorNombre = computed(() => {
   if (!query) return [];
   
   return productos.value.filter(p => 
-    p.nombre.toLowerCase().includes(query) ||
-    (p.codigo_barras && p.codigo_barras.includes(query))
+    p.idCategoria !== 7 && (
+      p.nombre.toLowerCase().includes(query) ||
+      (p.codigo_barras && p.codigo_barras.includes(query))
+    )
   ).slice(0, 20);
 });
 
 onMounted(async () => {
   await cargarProductos();
+  await cargarCategorias();
   await cargarTicketsDesdeBackend();
   await cargarPromocionesActivas();
 });
@@ -746,7 +756,8 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
         precio,
         precio_mayoreo: (precioMayoreo != null && precioMayoreo > 0) ? precioMayoreo : null,
         dto: markRaw(item),
-        is_gramaje: item.is_gramaje
+        is_gramaje: item.is_gramaje,
+        idCategoria: item.idCategoria
       };
     })
     .filter((p) => p.id > 0 && p.nombre.length > 0 && Number.isFinite(p.precio));
@@ -796,6 +807,15 @@ async function cargarProductos() {
       productos.value = [];
       mostrarMensaje('No se pudo cargar el catalogo de productos.', 'error');
     }
+  }
+}
+
+async function cargarCategorias() {
+  try {
+    const data = await getJson<ApiRespuesta<{ idCategoria: number; nombre: string }[]>>(`/categorias/listarCategorias`);
+    categorias.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (_error) {
+    categorias.value = [];
   }
 }
 
@@ -1832,8 +1852,8 @@ function iniciarEditarItem(index: number) {
     const productoModal = {
       id: prod.idProducto,
       nombre: prod.nombre,
-      precio: prod.precio_venta || prod.precioVenta || 0,
-      codigo_barras: prod.codigoBarras || prod.codigo_barras || ''
+      precio: prod.precio_venta || 0,
+      codigo_barras: prod.codigoBarras || ''
     };
     gramajeItemEditando.value = {
       id: Number(item.idVentaDetalle) || Date.now(),
@@ -2017,7 +2037,7 @@ async function eliminarTodosLosDetalles() {
           <div class="ticket-info">
             <span class="ticket-num">#{{ t.numero }}</span>
             <span class="ticket-total" v-if="t.items.length > 0">
-              {{ formatoMoneda(t.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0)) }}
+              {{ formatoMoneda(t.items.reduce((sum, i) => sum + ((i as any).is_gramaje ? i.precio : i.precio * i.cantidad), 0)) }}
             </span>
             <span class="ticket-status" v-else>vacío</span>
           </div>
@@ -2088,6 +2108,15 @@ async function eliminarTodosLosDetalles() {
               @keydown="manejarTeclasSugerencias"
               @keydown.enter.prevent="agregarDesdeBuscador"
             >
+            <select 
+              v-model="categoriaFiltro" 
+              class="category-filter-select"
+            >
+              <option :value="null">Todas</option>
+              <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+                {{ cat.nombre }}
+              </option>
+            </select>
             <div class="action-tools">
               <button class="tool-btn btn-promo" @click="modalPromocionesAbierto = true" title="Gestionar Promociones">⚔</button>
               <button class="tool-btn btn-scan" @click="startScanner" title="Escanear">📷</button>
@@ -2100,7 +2129,7 @@ async function eliminarTodosLosDetalles() {
         <!-- ÁREA DE PRODUCTOS RÁPIDOS / RESULTADOS -->
       <div class="catalog-grid custom-scrollbar">
         <div class="catalog-items-container">
-          <div class="carousel-wrapper" v-if="promocionesActivas.length > 0 && !terminoBusqueda">
+          <div class="carousel-wrapper" v-if="promocionesActivas.length > 0 && !terminoBusqueda && categoriaFiltro === null">
             <CarruselPromociones
               :promociones="promocionesActivas"
               @agregar="agregarPromocionAlTicket"
@@ -2120,8 +2149,9 @@ async function eliminarTodosLosDetalles() {
                 <h4 class="product-name">{{ p.nombre }}</h4>
                 <div class="product-price-tag">{{ formatoMoneda(p.precio) }}</div>
               </div>
-              <div class="stock-badge" :class="(p.dto?.stock ?? 0) > 5 ? 'in-stock' : 'low-stock'">
-                Stock: {{ p.dto?.stock ?? '∞' }}
+              <div class="stock-badge" :class="p.dto?.idCategoria === 7 ? 'rentable' : (p.dto?.stock ?? 0) > 5 ? 'in-stock' : 'low-stock'">
+                <template v-if="p.dto?.idCategoria === 7">🎮 Rentable</template>
+                <template v-else>Stock: {{ p.dto?.stock ?? '∞' }}</template>
               </div>
             </article>
           </div>
@@ -3017,6 +3047,14 @@ async function eliminarTodosLosDetalles() {
     flex: 1;
   }
   
+  .category-filter-select {
+    min-width: 60px;
+    max-width: 80px;
+    font-size: 0.6rem;
+    padding: 0.15rem 1rem 0.15rem 0.3rem;
+    border-width: 1px;
+  }
+  
   .input-wrapper input::placeholder {
     font-size: 0.55rem;
   }
@@ -3859,14 +3897,53 @@ async function eliminarTodosLosDetalles() {
   box-sizing: border-box;
 }
 
+.category-filter-select {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.4rem 2rem 0.4rem 0.6rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b0a890' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  min-width: 100px;
+  max-width: 150px;
+  flex-shrink: 0;
+}
+
+.category-filter-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.category-filter-select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 @media (max-width: 767px) {
   .input-wrapper {
     padding: 0.4rem 0.6rem;
     gap: 0.4rem;
     border-radius: 10px;
+    flex-wrap: wrap;
   }
   .input-wrapper input {
     font-size: 1rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .category-filter-select {
+    min-width: 80px;
+    max-width: 120px;
+    font-size: 0.75rem;
+    padding: 0.3rem 1.5rem 0.3rem 0.5rem;
   }
   .tool-btn {
     width: 36px;
@@ -4236,7 +4313,8 @@ async function eliminarTodosLosDetalles() {
   font-weight: bold;
 }
 .in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--text-primary); border: 1px solid var(--success-color); }
-.low-stock { background: color-mix(in srgb, var(--e rror-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
+.low-stock { background: color-mix(in srgb, var(--error-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
+.stock-badge.rentable { background: color-mix(in srgb, #7c3aed 20%, transparent); color: #a78bfa; border: 1px solid #7c3aed; }
 
 /* =========================================
    RIGHT PANEL: CHECKOUT

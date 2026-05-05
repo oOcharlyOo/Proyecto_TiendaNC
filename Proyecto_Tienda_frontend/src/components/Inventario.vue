@@ -8,6 +8,11 @@ type ApiRespuesta<T> = {
   datos: T;
 };
 
+type CategoriaDTO = {
+  idCategoria: number;
+  nombre: string;
+};
+
 type ProductoDTO = {
   idProducto?: number;
   nombre: string;
@@ -19,7 +24,7 @@ type ProductoDTO = {
   cantidad_max: number;
   precio_mayoreo: number | null;
   is_gramaje: boolean;
-  categoria?: string;
+  idCategoria?: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -70,8 +75,9 @@ function obtenerMensajeStock(producto: ProductoDTO): string {
 const cargando = ref(false);
 const mensaje = ref('');
 const productos = shallowRef<ProductoDTO[]>([]);
+const categorias = shallowRef<CategoriaDTO[]>([]);
 const filtroBusqueda = ref('');
-const filtroCategoria = ref('todas');
+const filtroCategoria = ref<number | null>(null);
 const ordenarPor = ref('nombre');
 const verSoloProblemas = ref(false);
 
@@ -79,13 +85,15 @@ const modalFormOpen = ref(false);
 const modalProductoEditando = ref<ProductoDTO | undefined>(undefined);
 const guardando = ref(false);
 
-const categorias = computed(() => {
-  const cats = new Set<string>();
-  productos.value.forEach(p => {
-    if (p.categoria) cats.add(p.categoria);
-  });
-  return ['todas', ...Array.from(cats).sort()];
+const categoriasLista = computed(() => {
+  return [{ idCategoria: null, nombre: 'Todas' }, ...categorias.value];
 });
+
+function obtenerNombreCategoria(idCategoria: number | undefined): string {
+  if (!idCategoria) return 'Sin asignar';
+  const cat = categorias.value.find(c => c.idCategoria === idCategoria);
+  return cat ? cat.nombre : 'Sin asignar';
+}
 
 const productosFiltrados = computed(() => {
   let result = [...productos.value];
@@ -106,8 +114,8 @@ const productosFiltrados = computed(() => {
     );
   }
   
-  if (filtroCategoria.value !== 'todas') {
-    result = result.filter(p => p.categoria === filtroCategoria.value);
+  if (filtroCategoria.value !== null) {
+    result = result.filter(p => p.idCategoria === filtroCategoria.value);
   }
   
   switch (ordenarPor.value) {
@@ -124,7 +132,8 @@ const productosFiltrados = computed(() => {
 });
 
 const bajoStock = computed(() => {
-  return productos.value.filter((p) => {
+  return productosFiltrados.value.filter((p) => {
+    if (Number(p.idCategoria) === 7) return false;
     const stock = Number(p.stock || 0);
     const min = Number(p.cantidad_min || 0);
     return stock > 0 && stock < min;
@@ -132,13 +141,18 @@ const bajoStock = computed(() => {
 });
 
 const productosAgotados = computed(() => {
-  return productos.value.filter((p) => Number(p.stock || 0) === 0);
+  return productosFiltrados.value.filter((p) => {
+    if (Number(p.idCategoria) === 7) return false;
+    return Number(p.stock || 0) === 0;
+  });
 });
 
 const costoTotalInventario = computed(() => {
   let sum = 0;
-  for (const p of productos.value) {
+  for (const p of productosFiltrados.value) {
+    if (Number(p.idCategoria) === 7) continue;
     const stock = Number(p.stock || 0);
+    if (stock <= 0) continue;
     const costo = Number(p.precio_costo || 0);
     if (p.is_gramaje) {
       sum += (stock / 1000) * costo;
@@ -151,8 +165,10 @@ const costoTotalInventario = computed(() => {
 
 const valorTotalVenta = computed(() => {
   let sum = 0;
-  for (const p of productos.value) {
+  for (const p of productosFiltrados.value) {
+    if (Number(p.idCategoria) === 7) continue;
     const stock = Number(p.stock || 0);
+    if (stock <= 0) continue;
     const venta = Number(p.precio_venta || 0);
     if (p.is_gramaje) {
       sum += (stock / 1000) * venta;
@@ -163,11 +179,12 @@ const valorTotalVenta = computed(() => {
   return sum;
 });
 
-const margenGanancia = computed(() => {
-  const costo = costoTotalInventario.value;
-  const venta = valorTotalVenta.value;
-  if (costo === 0) return 0;
-  return ((venta - costo) / costo) * 100;
+const gananciaReal = computed(() => {
+  return valorTotalVenta.value - costoTotalInventario.value;
+});
+
+const productosInventario = computed(() => {
+  return productosFiltrados.value.filter(p => Number(p.idCategoria) !== 7);
 });
 
 function formatoMoneda(valor: number) {
@@ -251,8 +268,18 @@ async function cargarInventario() {
   }
 }
 
+async function cargarCategorias() {
+  try {
+    const data = await fetchApi<ApiRespuesta<CategoriaDTO[]>>(`${API_BASE}/categorias/listarCategorias`);
+    categorias.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (_error) {
+    categorias.value = [];
+  }
+}
+
 onMounted(async () => {
   await cargarInventario();
+  await cargarCategorias();
 });
 </script>
 
@@ -276,11 +303,11 @@ onMounted(async () => {
 
     <section class="stats-section">
       <div class="stat-card-wrapper" v-for="(stat, index) in [
-        { label: 'Total Items', value: productos.length, icon: '📦', clase: '' },
+        { label: 'Total Items', value: productosInventario.length, icon: '📦', clase: '' },
         { label: 'Bajo Stock', value: bajoStock.length, icon: '⚠️', clase: 'warning' },
         { label: 'Agotados', value: productosAgotados.length, icon: '💀', clase: 'danger' },
         { label: 'Valor Inventario', value: formatoMoneda(valorTotalVenta), icon: '💰', clase: 'gold' },
-        { label: 'Ganancia', value: margenGanancia.toFixed(1) + '%', icon: '📈', clase: 'success' }
+        { label: 'Ganancia Real', value: formatoMoneda(gananciaReal), icon: '📈', clase: 'success' }
       ]" :key="index" :class="['stat-card', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
         <div class="stat-glow"></div>
         <div class="stat-icon-wrapper">
@@ -363,6 +390,13 @@ onMounted(async () => {
             </div>
 
             <div class="filter-controls">
+              <select v-model="filtroCategoria" class="filter-select">
+                <option :value="null">🏷️ Todas</option>
+                <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+                  {{ cat.nombre }}
+                </option>
+              </select>
+
               <select v-model="ordenarPor" class="filter-select">
                 <option value="nombre">Ordenar: Nombre</option>
                 <option value="stock">Ordenar: Stock ↑</option>
@@ -400,14 +434,15 @@ onMounted(async () => {
             <article 
               v-for="producto in productosFiltrados" 
               :key="producto.idProducto"
-              :class="['item-card', obtenerClaseStock(producto)]"
+              :class="['item-card', Number(producto.idCategoria) === 7 ? 'rentable' : obtenerClaseStock(producto)]"
               @click="abrirModalEditarProducto(producto)"
             >
               <div class="item-card-header">
                 <div class="item-id">#{{ producto.idProducto }}</div>
-                <span v-if="obtenerMensajeStock(producto)" :class="['status-badge', obtenerClaseStock(producto)]">
+                <span v-if="Number(producto.idCategoria) !== 7 && obtenerMensajeStock(producto)" :class="['status-badge', obtenerClaseStock(producto)]">
                   {{ obtenerMensajeStock(producto) }}
                 </span>
+                <span v-if="Number(producto.idCategoria) === 7" class="rentable-badge-header">🎮 Rentable</span>
                 <span v-if="producto.is_gramaje" class="gramaje-badge">⚖️</span>
                 <button class="btn-edit-card" @click.stop="abrirModalEditarProducto(producto)" title="Editar producto">
                   ✏️
@@ -430,8 +465,9 @@ onMounted(async () => {
                 <div class="stat-divider"></div>
                 <div class="stat-row stock-row">
                   <span class="stat-label">Stock</span>
-                  <span class="stat-value stock" :class="obtenerClaseStock(producto)">
-                    {{ formatoNumero(producto.stock) }}{{ producto.is_gramaje ? 'g' : 'u' }}
+                  <span class="stat-value stock" :class="Number(producto.idCategoria) === 7 ? 'rentable' : obtenerClaseStock(producto)">
+                    <span v-if="Number(producto.idCategoria) === 7" class="rentable-badge">🎮 Rentable</span>
+                    <span v-else>{{ formatoNumero(producto.stock) }}{{ producto.is_gramaje ? 'g' : 'u' }}</span>
                   </span>
                 </div>
                 <div class="stat-row">
@@ -440,7 +476,7 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <div class="item-progress">
+              <div class="item-progress" v-if="Number(producto.idCategoria) !== 7">
                 <div class="progress-bar">
                   <div 
                     class="progress-fill" 
@@ -462,6 +498,7 @@ onMounted(async () => {
       :open="modalFormOpen"
       :data="modalProductoEditando"
       :loading="guardando"
+      :categorias="categorias"
       @close="handleCloseModal"
       @submit="handleSubmitProducto"
     />
@@ -557,6 +594,7 @@ onMounted(async () => {
 .item-card.bajo { border-color: var(--warning-color) !important; }
 .item-card.agotado { border-color: var(--error-color) !important; }
 .item-card.abundante { border-color: var(--success-color) !important; }
+.item-card.rentable { border-color: #7c3aed !important; }
 
 .item-card::before {
   background: linear-gradient(90deg, transparent, var(--accent-color), transparent) !important;
@@ -570,6 +608,9 @@ onMounted(async () => {
 }
 .item-card.abundante::before {
   background: linear-gradient(90deg, transparent, var(--success-color), transparent) !important;
+}
+.item-card.rentable::before {
+  background: linear-gradient(90deg, transparent, #7c3aed, transparent) !important;
 }
 
 .item-id { background: var(--bg-primary) !important; color: var(--text-secondary) !important; }
@@ -1832,6 +1873,14 @@ onMounted(async () => {
   background: linear-gradient(90deg, transparent, var(--success-color), transparent);
 }
 
+.item-card.rentable {
+  border-color: #7c3aed;
+}
+
+.item-card.rentable::before {
+  background: linear-gradient(90deg, transparent, #7c3aed, transparent);
+}
+
 .item-card-header {
   display: flex;
   align-items: center;
@@ -1869,6 +1918,27 @@ onMounted(async () => {
 
 .gramaje-badge {
   font-size: 0.8rem;
+}
+
+.rentable-badge-header {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rentable-badge {
+  color: #7c3aed;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.stat-value.stock.rentable {
+  color: #7c3aed !important;
 }
 
 .btn-edit-card {

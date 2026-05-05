@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, watch, ref } from 'vue';
 
+type CategoriaDTO = {
+  idCategoria: number;
+  nombre: string;
+  descripcion?: string | null;
+};
+
 type ProductoPayload = {
   idProducto?: number;
   nombre: string;
@@ -12,6 +18,7 @@ type ProductoPayload = {
   cantidad_max: number;
   precio_mayoreo: number | null;
   is_gramaje: boolean;
+  idCategoria?: number;
 };
 
 const props = defineProps<{
@@ -19,6 +26,7 @@ const props = defineProps<{
   data?: ProductoPayload;
   loading?: boolean;
   prefillCode?: string;
+  categorias?: CategoriaDTO[];
 }>();
 
 const emit = defineEmits<{
@@ -37,7 +45,8 @@ const form = ref<ProductoPayload>({
   cantidad_min: 0,
   cantidad_max: 0,
   precio_mayoreo: null,
-  is_gramaje: false
+  is_gramaje: false,
+  idCategoria: 1
 });
 
 watch(
@@ -69,7 +78,8 @@ function setFormFromData() {
     cantidad_min: 0,
     cantidad_max: 0,
     precio_mayoreo: null,
-    is_gramaje: false
+    is_gramaje: false,
+    idCategoria: 1
   };
     return;
   }
@@ -84,7 +94,8 @@ function setFormFromData() {
     cantidad_min: Number(source.cantidad_min || 0),
     cantidad_max: Number(source.cantidad_max || 0),
     precio_mayoreo: source.precio_mayoreo ?? null,
-    is_gramaje: Boolean(source.is_gramaje)
+    is_gramaje: Boolean(source.is_gramaje),
+    idCategoria: source.idCategoria || 1
   };
 }
 
@@ -124,6 +135,13 @@ function formatCurrency(value: number): string {
 
             <label>Nombre del producto <span class="required">*</span></label>
             <input v-model="form.nombre" type="text" required placeholder="Ej: Chocolate Ferrero" class="input-field">
+
+            <label>Categoría</label>
+            <select v-model="form.idCategoria" class="input-field select-field">
+              <option v-for="cat in props.categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+                {{ cat.nombre }}
+              </option>
+            </select>
           </div>
         </div>
 
@@ -154,15 +172,19 @@ function formatCurrency(value: number): string {
         <div class="form-section">
           <h4 class="section-title">📦 Inventario</h4>
           <div class="modal-grid inventory-grid">
-            <div class="stock-field">
+            <div class="stock-field" v-if="form.idCategoria !== 7">
               <label>{{ form.is_gramaje ? 'Stock actual (gramos)' : 'Stock actual (unidades)' }} <span class="required">*</span></label>
               <input v-model.number="form.stock" type="number" min="0" required class="input-field stock-input">
             </div>
-            <div class="stock-field">
+            <div v-else class="stock-field rentable-info">
+              <label>Stock</label>
+              <span class="rentable-label">🎮 Producto Rentable (no maneja inventario)</span>
+            </div>
+            <div class="stock-field" v-if="form.idCategoria !== 7">
               <label>Cantidad mínima <span class="required">*</span></label>
               <input v-model.number="form.cantidad_min" type="number" min="0" required class="input-field">
             </div>
-            <div class="stock-field">
+            <div class="stock-field" v-if="form.idCategoria !== 7">
               <label>Cantidad máxima <span class="required">*</span></label>
               <input v-model.number="form.cantidad_max" type="number" min="0" required class="input-field">
             </div>
@@ -260,6 +282,20 @@ function formatCurrency(value: number): string {
   opacity: 0.6;
 }
 
+.select-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b0a890' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
+  cursor: pointer;
+}
+
+.select-field option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 .barcode-row {
   grid-column: span 2;
   display: grid;
@@ -355,6 +391,17 @@ function formatCurrency(value: number): string {
 .stock-input {
   font-weight: 700;
   font-size: 1rem;
+}
+
+.rentable-label {
+  color: #7c3aed;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.5rem 0;
+}
+
+.rentable-info {
+  justify-content: center;
 }
 
 .checkbox-field {
