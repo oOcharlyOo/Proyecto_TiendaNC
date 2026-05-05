@@ -137,6 +137,9 @@ type VentaDetalleDTO = {
   productoNombre?: string;
   productoPrecioCosto?: number;
   productoIsGramaje?: boolean;
+  producto?: { idProducto?: number; nombre?: string; precio_venta?: number; is_gramaje?: boolean; codigoBarras?: string; codigo_barras?: string };
+  Producto?: { idProducto?: number; nombre?: string; precio_venta?: number; is_gramaje?: boolean; codigoBarras?: string; codigo_barras?: string };
+  idProducto?: number;
 };
 
 type ApartadoDTO = {
@@ -2089,8 +2092,8 @@ function iniciarEditarItemDetalle(index: number) {
     const productoModal = {
       id: prod?.idProducto || item.idProducto || 0,
       nombre: prod?.nombre || item.productoNombre || 'Producto de gramaje',
-      precio: prod?.precio_venta || prod?.precioVenta || 0,
-      codigo_barras: prod?.codigoBarras || prod?.codigo_barras || ''
+      precio: prod?.precio_venta || 0,
+      codigo_barras: prod?.codigoBarras || ''
     };
     modalProductoGramaje.value = productoModal;
     gramajeEditandoIndice.value = index;

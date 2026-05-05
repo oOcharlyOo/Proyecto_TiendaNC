@@ -187,6 +187,32 @@ const editarGanancias = () => {
   modalEditarGananciasAbierto.value = true;
 };
 
+async function handleEditarGanancias(payload: any) {
+  const monto = payload?.monto ?? payload?.montoInicial ?? Number(gananciasEditadas.value) ?? 0;
+  
+  try {
+    const res = await fetch(`${API_BASE}/gananciasAcumuladas/ajuste`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idUsuario: idUsuario.value,
+        monto: monto,
+        descripcion: "Ajuste manual de ganancias"
+      })
+    });
+
+    if (res.ok) {
+      modalEditarGananciasAbierto.value = false;
+      mostrarMensaje("Ganancias actualizadas con éxito.", "ok");
+      await cargarGanancias();
+    } else {
+      mostrarMensaje("Error al ajustar ganancias.", "error");
+    }
+  } catch (e) {
+    mostrarMensaje("Error de conexión.", "error");
+  }
+}
+
 async function registrarMovimiento(payload: { montoEoS: number, descripcion: string }, tipo: 'entrada' | 'salida') {
   try {
     const endpoint = tipo === 'entrada' ? 'entrada' : 'salida';

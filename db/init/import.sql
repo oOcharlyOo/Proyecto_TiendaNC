@@ -77,18 +77,37 @@ CREATE TABLE tiendadb.boveda (
         ON UPDATE CASCADE
 );
 
--- 3. Tabla de Productos
+-- 3. Tabla de Categorías
+CREATE TABLE tiendadb.categorias (
+    id_categoria SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL UNIQUE,
+    descripcion TEXT,
+    estatus VARCHAR(1) DEFAULT 'A'
+);
+
+-- Insertar categoría por defecto
+INSERT INTO tiendadb.categorias (nombre, descripcion, estatus) VALUES 
+('Sin asignar', 'Categoría por defecto', 'A');
+
+-- 4. Tabla de Productos
 CREATE TABLE tiendadb.productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
     codigo_barras VARCHAR(255), -- Se agrega sin UNIQUE para permitir nulos/vacíos
+    id_categoria INT NOT NULL DEFAULT 1,
     precio_costo DECIMAL(10, 2) NOT NULL,
     precio_venta DECIMAL(10, 2) NOT NULL,
     cantidad_min INT NOT NULL,
     cantidad_max INT NOT NULL,
     stock INT NOT NULL,
     precio_mayoreo DECIMAL(10, 2),
-    is_gramaje BOOLEAN DEFAULT FALSE
+    is_gramaje BOOLEAN DEFAULT FALSE,
+
+    CONSTRAINT fk_categoria_producto
+        FOREIGN KEY(id_categoria) 
+        REFERENCES tiendadb.categorias(id_categoria)
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE
 );
 
 -- FUNCIÓN Y TRIGGER PARA PRODUCTOS
@@ -108,7 +127,7 @@ BEFORE INSERT OR UPDATE ON tiendadb.productos
 FOR EACH ROW
 EXECUTE FUNCTION tiendadb.fn_limpiar_codigo_barras();
 
--- 4. Tabla Maestra de Ventas
+-- 5. Tabla Maestra de Ventas
 CREATE TABLE tiendadb.ventas (
     id_venta SERIAL PRIMARY KEY,
     id_usuario INT NOT NULL,
@@ -123,7 +142,7 @@ CREATE TABLE tiendadb.ventas (
         REFERENCES tiendadb.usuarios(id_usuario)
 );
 
--- 5. Tabla de Detalles de Venta
+-- 6. Tabla de Detalles de Venta
 CREATE TABLE tiendadb.ventas_detalle (
     id_venta_detalle SERIAL PRIMARY KEY,
     id_venta INT NOT NULL,
