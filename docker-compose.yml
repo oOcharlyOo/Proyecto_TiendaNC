@@ -16,6 +16,9 @@ services:
       - MINIO_PUBLIC_URL=https://minio.laleyendadeldulce.com
       - QUARKUS_HTTP_CORS=true
       - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:8081,https://laleyendadeldulce.com,https://api.laleyendadeldulce.com
+    volumes:
+      - backup-trigger:/trigger
+      - ./db/backups:/deployments/db/backups
     depends_on:
       - database 
       - minio
@@ -67,6 +70,25 @@ services:
     networks:
       - tienda-red
 
+  db-backup:
+    image: postgres:17
+    container_name: db-backup
+    environment:
+      - TZ=America/Mexico_City
+      - PGPASSWORD=password
+      - DB_HOST=Dulceria-DB
+      - DB_NAME=dulcesnc
+      - DB_USER=user
+    volumes:
+      - ./db/backups:/backups
+      - backup-trigger:/trigger
+    command: ["sh", "-c", "mkdir -p /trigger && chmod 777 /trigger && while true; do if [ -f /trigger/backup ]; then TIMESTAMP=$$(date +%Y%m%d_%H%M%S); for db in dulcesnc dulcesnc_abarrotera; do BACKUP_FILE=dump-$${db}-$${TIMESTAMP}.sql; echo \"[$$(date)] Iniciando backup de $${db}\"; pg_dump -h $${DB_HOST} -U $${DB_USER} -d $${db} -F c -f /backups/$${BACKUP_FILE}; if [ $$? -eq 0 ]; then echo \"[$$(date)] OK: $${BACKUP_FILE}\"; else echo \"[$$(date)] ERROR en $${db}\"; fi; done; find /backups -name 'dump-*.sql' -mtime +30 -delete; rm -f /trigger/backup; fi; sleep 5; done"]
+    restart: unless-stopped
+    networks:
+      - tienda-red
+    depends_on:
+      - database
+
   tunnel:
     container_name: cloudflared-tunnel
     image: cloudflare/cloudflared:latest
@@ -100,3 +122,4 @@ networks:
 volumes:
   db-data:
   minio-data:
+  backup-trigger:
