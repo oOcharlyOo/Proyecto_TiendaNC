@@ -76,6 +76,17 @@ const cargando = ref(false);
 const mensaje = ref('');
 const productos = shallowRef<ProductoDTO[]>([]);
 const categorias = shallowRef<CategoriaDTO[]>([]);
+
+const gamingCategoryId = computed(() => {
+  const cat = categorias.value.find(c => c.nombre.toLowerCase() === 'gaming');
+  return cat ? cat.idCategoria : null;
+});
+
+function esCategoriaGaming(idCategoria: number | undefined): boolean {
+  if (!idCategoria || !gamingCategoryId.value) return false;
+  return idCategoria === gamingCategoryId.value;
+}
+
 const filtroBusqueda = ref('');
 const filtroCategoria = ref<number | null>(null);
 const ordenarPor = ref('nombre');
@@ -133,7 +144,7 @@ const productosFiltrados = computed(() => {
 
 const bajoStock = computed(() => {
   return productosFiltrados.value.filter((p) => {
-    if (Number(p.idCategoria) === 7) return false;
+    if (esCategoriaGaming(p.idCategoria)) return false;
     const stock = Number(p.stock || 0);
     const min = Number(p.cantidad_min || 0);
     return stock > 0 && stock < min;
@@ -142,7 +153,7 @@ const bajoStock = computed(() => {
 
 const productosAgotados = computed(() => {
   return productosFiltrados.value.filter((p) => {
-    if (Number(p.idCategoria) === 7) return false;
+    if (esCategoriaGaming(p.idCategoria)) return false;
     return Number(p.stock || 0) === 0;
   });
 });
@@ -150,7 +161,7 @@ const productosAgotados = computed(() => {
 const costoTotalInventario = computed(() => {
   let sum = 0;
   for (const p of productosFiltrados.value) {
-    if (Number(p.idCategoria) === 7) continue;
+    if (esCategoriaGaming(p.idCategoria)) continue;
     const stock = Number(p.stock || 0);
     if (stock <= 0) continue;
     const costo = Number(p.precio_costo || 0);
@@ -166,7 +177,7 @@ const costoTotalInventario = computed(() => {
 const valorTotalVenta = computed(() => {
   let sum = 0;
   for (const p of productosFiltrados.value) {
-    if (Number(p.idCategoria) === 7) continue;
+    if (esCategoriaGaming(p.idCategoria)) continue;
     const stock = Number(p.stock || 0);
     if (stock <= 0) continue;
     const venta = Number(p.precio_venta || 0);
@@ -184,7 +195,7 @@ const gananciaReal = computed(() => {
 });
 
 const productosInventario = computed(() => {
-  return productosFiltrados.value.filter(p => Number(p.idCategoria) !== 7);
+  return productosFiltrados.value.filter(p => !esCategoriaGaming(p.idCategoria));
 });
 
 function formatoMoneda(valor: number) {
@@ -306,7 +317,7 @@ onMounted(async () => {
         { label: 'Total Items', value: productosInventario.length, icon: '📦', clase: '' },
         { label: 'Bajo Stock', value: bajoStock.length, icon: '⚠️', clase: 'warning' },
         { label: 'Agotados', value: productosAgotados.length, icon: '💀', clase: 'danger' },
-        { label: 'Valor Inventario', value: formatoMoneda(valorTotalVenta), icon: '💰', clase: 'gold' },
+        { label: 'Valor Inventario', value: formatoMoneda(costoTotalInventario), icon: '💰', clase: 'gold' },
         { label: 'Ganancia Real', value: formatoMoneda(gananciaReal), icon: '📈', clase: 'success' }
       ]" :key="index" :class="['stat-card', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
         <div class="stat-glow"></div>
@@ -434,15 +445,15 @@ onMounted(async () => {
             <article 
               v-for="producto in productosFiltrados" 
               :key="producto.idProducto"
-              :class="['item-card', Number(producto.idCategoria) === 7 ? 'rentable' : obtenerClaseStock(producto)]"
+              :class="['item-card', esCategoriaGaming(producto.idCategoria) ? 'rentable' : obtenerClaseStock(producto)]"
               @click="abrirModalEditarProducto(producto)"
             >
               <div class="item-card-header">
                 <div class="item-id">#{{ producto.idProducto }}</div>
-                <span v-if="Number(producto.idCategoria) !== 7 && obtenerMensajeStock(producto)" :class="['status-badge', obtenerClaseStock(producto)]">
+                <span v-if="!esCategoriaGaming(producto.idCategoria) && obtenerMensajeStock(producto)" :class="['status-badge', obtenerClaseStock(producto)]">
                   {{ obtenerMensajeStock(producto) }}
                 </span>
-                <span v-if="Number(producto.idCategoria) === 7" class="rentable-badge-header">🎮 Rentable</span>
+                <span v-if="esCategoriaGaming(producto.idCategoria)" class="rentable-badge-header">🎮 Rentable</span>
                 <span v-if="producto.is_gramaje" class="gramaje-badge">⚖️</span>
                 <button class="btn-edit-card" @click.stop="abrirModalEditarProducto(producto)" title="Editar producto">
                   ✏️
@@ -465,8 +476,8 @@ onMounted(async () => {
                 <div class="stat-divider"></div>
                 <div class="stat-row stock-row">
                   <span class="stat-label">Stock</span>
-                  <span class="stat-value stock" :class="Number(producto.idCategoria) === 7 ? 'rentable' : obtenerClaseStock(producto)">
-                    <span v-if="Number(producto.idCategoria) === 7" class="rentable-badge">🎮 Rentable</span>
+                  <span class="stat-value stock" :class="esCategoriaGaming(producto.idCategoria) ? 'rentable' : obtenerClaseStock(producto)">
+                    <span v-if="esCategoriaGaming(producto.idCategoria)" class="rentable-badge">🎮 Rentable</span>
                     <span v-else>{{ formatoNumero(producto.stock) }}{{ producto.is_gramaje ? 'g' : 'u' }}</span>
                   </span>
                 </div>
@@ -476,7 +487,7 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <div class="item-progress" v-if="Number(producto.idCategoria) !== 7">
+              <div class="item-progress" v-if="!esCategoriaGaming(producto.idCategoria)">
                 <div class="progress-bar">
                   <div 
                     class="progress-fill" 

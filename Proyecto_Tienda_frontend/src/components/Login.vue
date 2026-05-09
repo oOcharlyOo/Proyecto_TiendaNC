@@ -49,6 +49,30 @@
       <h2 class="classic-title">La Leyenda Del Dulce</h2>
       <p class="classic-subtitle">Pulsa Start para entrar al reino</p>
 
+      <div class="sucursal-selector">
+        <span class="sucursal-label">Selecciona tu sucursal</span>
+        <div class="sucursal-cards">
+          <div 
+            class="sucursal-card" 
+            :class="{ active: sucursalSeleccionada === 'dulceria' }"
+            @click="seleccionarSucursal('dulceria')"
+          >
+            <span class="sucursal-icon">🍬</span>
+            <span class="sucursal-name">Dulcería</span>
+            <span class="sucursal-desc">La Leyenda del Dulce</span>
+          </div>
+          <div 
+            class="sucursal-card" 
+            :class="{ active: sucursalSeleccionada === 'abarrotera' }"
+            @click="seleccionarSucursal('abarrotera')"
+          >
+            <span class="sucursal-icon">🏪</span>
+            <span class="sucursal-name">Abarrotera</span>
+            <span class="sucursal-desc">Nueva Sucursal</span>
+          </div>
+        </div>
+      </div>
+
       <form @submit.prevent="iniciarSesion" class="classic-form">
         <div>
           <label for="name">Nombre del viajero</label>
@@ -168,6 +192,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTheme } from '@/composables/useTheme';
+import { useSucursal, type Sucursal } from '@/composables/useSucursal';
 import MontoInicialModal from './modals/MontoInicialModal.vue';
 
 const AUTH_KEY = 'isAuth';
@@ -176,11 +201,17 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.
 
 const name = ref("");
 const pass = ref("");
+const sucursalSeleccionada = ref<Sucursal>('dulceria');
 const toastContainer = ref<HTMLElement | null>(null);
 const router = useRouter();
 const modalMontoInicialAbierto = ref(false);
 const idUsuarioActual = ref<number | null>(null);
 const { currentTheme, setTheme } = useTheme();
+const { setSucursal, getHeader } = useSucursal();
+
+function seleccionarSucursal(sucursal: Sucursal) {
+  sucursalSeleccionada.value = sucursal;
+}
 
 async function iniciarSesion() {
   const usuarioDTO = { usuario: name.value, password_hash: pass.value };
@@ -188,7 +219,8 @@ async function iniciarSesion() {
     const resLogin = await fetch(`${API_BASE}/usuarios/login`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...getHeader()
       },
       body: JSON.stringify(usuarioDTO)
     });
@@ -196,6 +228,7 @@ async function iniciarSesion() {
     const usuario = await resLogin.json();
     if (usuario.codigo === 200) {
       localStorage.setItem(AUTH_KEY, 'true');
+      setSucursal(sucursalSeleccionada.value);
       if (usuario?.datos?.idUsuario) {
         const userId = usuario.datos.idUsuario;
         localStorage.setItem(AUTH_USER_ID_KEY, String(userId));
@@ -225,7 +258,9 @@ async function iniciarSesion() {
 
 async function verificarCajaActiva(idUsuario: number) {
   try {
-    const res = await fetch(`${API_BASE}/caja/apertura/activa?idUsuario=${idUsuario}`);
+    const res = await fetch(`${API_BASE}/caja/apertura/activa?idUsuario=${idUsuario}`, {
+      headers: getHeader()
+    });
     const data = await res.json();
 
     if (res.ok && data.datos !== null) {
@@ -264,7 +299,8 @@ async function registrarMontoInicial(payload: { montoInicial: number }) {
     const res = await fetch(`${API_BASE}/caja/apertura`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...getHeader()
       },
       body: JSON.stringify({
         idUsuario: idUsuarioActual.value,
@@ -295,6 +331,8 @@ function cerrarModalMontoInicial() {
   modalMontoInicialAbierto.value = false;
   localStorage.removeItem(AUTH_KEY);
   localStorage.removeItem(AUTH_USER_ID_KEY);
+  const { clearSucursal } = useSucursal();
+  clearSucursal();
   idUsuarioActual.value = null;
   name.value = "";
   pass.value = "";
@@ -1000,6 +1038,84 @@ function mostrarToast(mensaje: string, type: 'success' | 'error' = 'success') {
 
 .classic-form button::before {
   content: "🗡️ ";
+}
+
+.sucursal-selector {
+  margin-bottom: 1.25rem;
+  animation: fadeSlideIn 500ms ease-out 250ms backwards;
+}
+
+.sucursal-label {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+  opacity: 0.8;
+  text-align: center;
+}
+
+.sucursal-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.sucursal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0.5rem;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+  border: 3px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 0 var(--border-color);
+  gap: 0.3rem;
+}
+
+.sucursal-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+  box-shadow: 0 5px 0 var(--border-color), 0 0 15px color-mix(in srgb, var(--zelda-gold) 30%, transparent);
+}
+
+.sucursal-card.active {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  border-color: var(--accent-color);
+  box-shadow: 0 3px 0 var(--border-color), 0 0 20px color-mix(in srgb, var(--zelda-gold) 40%, transparent);
+}
+
+.sucursal-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.sucursal-name {
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sucursal-desc {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.sucursal-card.active .sucursal-name {
+  color: var(--btn-text, var(--bg-primary));
+}
+
+.sucursal-card.active .sucursal-desc {
+  color: color-mix(in srgb, var(--btn-text, var(--bg-primary)) 70%, transparent);
 }
 
 .toast-container {

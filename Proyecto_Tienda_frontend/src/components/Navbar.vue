@@ -10,12 +10,53 @@ const route = useRoute();
 const router = useRouter();
 const menuAbierto = ref(false);
 const { currentTheme, setTheme, toggleTheme } = useTheme();
+const syncLoading = ref(false);
+const syncMessage = ref('');
+const syncDirection = ref<'abarrotera' | 'dulceria' | null>(null);
 
 const tipoUsuario = computed(() => {
   return Number(localStorage.getItem('tipoUsuario') || 2);
 });
 
 const esAdministrador = computed(() => tipoUsuario.value === 1);
+
+const sucursalActiva = computed(() => {
+  return localStorage.getItem('sucursalActiva') || 'dulceria';
+});
+
+const sucursalLabel = computed(() => {
+  return sucursalActiva.value === 'abarrotera' ? 'Abarrotera' : 'Dulceria';
+});
+
+const sucursalIcon = computed(() => {
+  return sucursalActiva.value === 'abarrotera' ? '🏪' : '🍬';
+});
+
+async function sincronizarUsuarios(direccion: 'abarrotera' | 'dulceria') {
+  if (syncLoading.value) return;
+  syncLoading.value = true;
+  syncDirection.value = direccion;
+  syncMessage.value = '';
+  try {
+    const endpoint = direccion === 'abarrotera' ? 'sincronizarAbarrotera' : 'sincronizarDulceria';
+    const res = await fetch(`${API_BASE}/usuarios/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.codigo === 200) {
+      syncMessage.value = data.mensaje;
+    } else {
+      syncMessage.value = data.mensaje || 'Error al sincronizar.';
+    }
+  } catch (e) {
+    syncMessage.value = 'Error de conexion al sincronizar.';
+  } finally {
+    syncLoading.value = false;
+    syncDirection.value = null;
+    setTimeout(() => { syncMessage.value = ''; }, 5000);
+  }
+}
 
 const avatarUsuario = computed(() => {
   const avatar = localStorage.getItem('avatarUsuario');
@@ -67,6 +108,7 @@ function cerrarMenu() {
 function cerrarSesion() {
   localStorage.removeItem(AUTH_KEY);
   localStorage.removeItem('tipoUsuario');
+  localStorage.removeItem('sucursalActiva');
   menuAbierto.value = false;
   router.push('/');
 }
@@ -80,6 +122,7 @@ function cerrarSesion() {
           <span class="brand-title">La Leyenda</span>
           <span class="brand-subtitle">Del Dulce</span>
         </div>
+        <span class="sucursal-badge">{{ sucursalIcon }} {{ sucursalLabel }}</span>
         <div class="brand-decoration left">
           <svg viewBox="0 0 30 30" class="rupee-icon">
             <polygon points="15,2 25,8 25,22 15,28 5,22 5,8" fill="#f8d667" opacity="0.6"/>
@@ -180,6 +223,37 @@ function cerrarSesion() {
               <span class="link-icon" :class="link.icon"></span>
               <span class="link-text">{{ link.label }}</span>
             </RouterLink>
+          </div>
+
+          <div v-if="esAdministrador" class="sync-section">
+            <span class="sync-label">Sincronizar Usuarios</span>
+            <div class="sync-buttons">
+              <button 
+                type="button" 
+                class="sync-btn" 
+                :class="{ loading: syncLoading && syncDirection === 'abarrotera', success: syncMessage && syncMessage.includes('Abarrotera') }"
+                @click="sincronizarUsuarios('abarrotera')"
+                :disabled="syncLoading"
+              >
+                <svg viewBox="0 0 24 24" class="sync-icon">
+                  <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Dulceria -> Abarrotera</span>
+              </button>
+              <button 
+                type="button" 
+                class="sync-btn" 
+                :class="{ loading: syncLoading && syncDirection === 'dulceria', success: syncMessage && syncMessage.includes('Dulceria') }"
+                @click="sincronizarUsuarios('dulceria')"
+                :disabled="syncLoading"
+              >
+                <svg viewBox="0 0 24 24" class="sync-icon">
+                  <path d="M19 12H5M12 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Abarrotera -> Dulceria</span>
+              </button>
+            </div>
+            <p v-if="syncMessage" class="sync-msg" :class="{ error: !syncMessage.includes('sincronizados') }">{{ syncMessage }}</p>
           </div>
 
           <div class="theme-selector">
@@ -365,6 +439,22 @@ function cerrarSesion() {
   opacity: 0.9;
 }
 
+.sucursal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 40%, transparent);
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 @keyframes titleGlow {
   from { text-shadow: 2px 2px 0 var(--border-color), 0 0 10px color-mix(in srgb, var(--zelda-gold) 30%, transparent); }
   to { text-shadow: 2px 2px 0 var(--border-color), 0 0 20px color-mix(in srgb, var(--zelda-gold) 60%, transparent), 0 0 30px color-mix(in srgb, var(--zelda-gold) 30%, transparent); }
@@ -480,6 +570,7 @@ function cerrarSesion() {
 .link-icon.rupee::before { content: '💎'; font-size: 11px; }
 .link-icon.triforce::before { content: '🔺'; font-size: 11px; }
 .link-icon.clock::before { content: '⏱️'; font-size: 11px; }
+.link-icon.folder::before { content: '📂'; font-size: 11px; }
 
 .link-text {
   position: relative;
@@ -797,6 +888,104 @@ function cerrarSesion() {
 
 .theme-btn.dark {
   border-color: color-mix(in srgb, var(--border-color) 70%, black);
+}
+
+.sync-section {
+  padding: 0.5rem 0.8rem;
+  border-top: 1px dashed var(--border-color);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.sync-label {
+  display: block;
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.4rem;
+  text-align: center;
+}
+
+.sync-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sync-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 0 var(--border-color);
+}
+
+.sync-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent-color);
+  box-shadow: 0 3px 0 var(--border-color), 0 0 15px color-mix(in srgb, var(--zelda-gold) 30%, transparent);
+}
+
+.sync-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-btn.loading {
+  opacity: 0.7;
+}
+
+.sync-btn.success {
+  background: linear-gradient(180deg, #4a9e4a 0%, #2d7a2d 100%);
+  color: #fff;
+  border-color: #4a9e4a;
+}
+
+.sync-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.sync-btn.loading .sync-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sync-msg {
+  margin: 0.4rem 0 0;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  color: var(--accent-color);
+}
+
+.sync-msg.error {
+  background: color-mix(in srgb, #c75a5a 20%, transparent);
+  color: #c75a5a;
 }
 
 .logout-btn {

@@ -59,7 +59,17 @@ type ApiRespuesta<T> = {
 
 const productosInventario = ref<ProductoDTO[]>([]);
 const estaciones = ref<Estacion[]>([]);
-const productosDisponibles = computed(() => productosInventario.value.filter(p => Number(p.stock) > 0 && Number(p.idCategoria) === 7));
+const categorias = ref<{ idCategoria: number; nombre: string }[]>([]);
+
+const gamingCategoryId = computed(() => {
+  const cat = categorias.value.find(c => c.nombre.toLowerCase() === 'gaming');
+  return cat ? cat.idCategoria : null;
+});
+
+const productosDisponibles = computed(() => {
+  const gamingId = gamingCategoryId.value;
+  return productosInventario.value.filter(p => Number(p.stock) > 0 && p.idCategoria === gamingId);
+});
 const ticker = ref(0);
 
 const formatTime = (seconds: number): string => {
@@ -174,6 +184,21 @@ const cargarProductos = async () => {
     }
   } catch (error) {
     console.error('Error cargando productos:', error);
+  }
+};
+
+const cargarCategorias = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/categorias/listarCategorias`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const res: ApiRespuesta<{ idCategoria: number; nombre: string }[]> = await response.json();
+    if (res?.datos) {
+      categorias.value = res.datos;
+    }
+  } catch (error) {
+    console.error('Error cargando categorías:', error);
   }
 };
 
@@ -528,6 +553,7 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(async () => {
+  await cargarCategorias();
   await cargarProductos();
   await solicitarPermisoNotificaciones();
   cargarDesdeStorage();

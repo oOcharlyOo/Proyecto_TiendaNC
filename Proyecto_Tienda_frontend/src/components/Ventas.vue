@@ -433,6 +433,16 @@ const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
 const productos = shallowRef<Producto[]>([]);
 const categorias = shallowRef<{ idCategoria: number; nombre: string }[]>([]);
+
+const gamingCategoryId = computed(() => {
+  const cat = categorias.value.find(c => c.nombre.toLowerCase() === 'gaming');
+  return cat ? cat.idCategoria : null;
+});
+
+function esCategoriaGaming(idCategoria: number | undefined): boolean {
+  if (!idCategoria || !gamingCategoryId.value) return false;
+  return idCategoria === gamingCategoryId.value;
+}
 const tickets = ref<Ticket[]>([]);
 const ticketActualId = ref<number | null>(null);
 const mensaje = ref('');
@@ -624,7 +634,7 @@ const productosParaMostrar = computed(() => {
   const query = terminoBusqueda.value.trim().toLowerCase();
   
   let resultados = productos.value.filter(p => {
-    if (p.idCategoria === 7) return false;
+    if (esCategoriaGaming(p.idCategoria)) return false;
     const stock = p.dto?.stock;
     return stock === undefined || stock === null || stock > 0;
   });
@@ -649,7 +659,7 @@ const sugerenciasPorNombre = computed(() => {
   if (!query) return [];
   
   return productos.value.filter(p => 
-    p.idCategoria !== 7 && (
+    !esCategoriaGaming(p.idCategoria) && (
       p.nombre.toLowerCase().includes(query) ||
       (p.codigo_barras && p.codigo_barras.includes(query))
     )
@@ -2149,8 +2159,8 @@ async function eliminarTodosLosDetalles() {
                 <h4 class="product-name">{{ p.nombre }}</h4>
                 <div class="product-price-tag">{{ formatoMoneda(p.precio) }}</div>
               </div>
-              <div class="stock-badge" :class="p.dto?.idCategoria === 7 ? 'rentable' : (p.dto?.stock ?? 0) > 5 ? 'in-stock' : 'low-stock'">
-                <template v-if="p.dto?.idCategoria === 7">🎮 Rentable</template>
+              <div class="stock-badge" :class="esCategoriaGaming(p.dto?.idCategoria) ? 'rentable' : (p.dto?.stock ?? 0) > 5 ? 'in-stock' : 'low-stock'">
+                <template v-if="esCategoriaGaming(p.dto?.idCategoria)">🎮 Rentable</template>
                 <template v-else>Stock: {{ p.dto?.stock ?? '∞' }}</template>
               </div>
             </article>

@@ -7,6 +7,13 @@ type CategoriaDTO = {
   descripcion?: string | null;
 };
 
+type SubcategoriaDTO = {
+  idSubcategoria: number;
+  nombre: string;
+  descripcion?: string | null;
+  idCategoria: number | null;
+};
+
 type ProductoPayload = {
   idProducto?: number;
   nombre: string;
@@ -19,6 +26,7 @@ type ProductoPayload = {
   precio_mayoreo: number | null;
   is_gramaje: boolean;
   idCategoria?: number;
+  idSubcategoria?: number | null;
 };
 
 const props = defineProps<{
@@ -27,6 +35,7 @@ const props = defineProps<{
   loading?: boolean;
   prefillCode?: string;
   categorias?: CategoriaDTO[];
+  subcategorias?: SubcategoriaDTO[];
 }>();
 
 const emit = defineEmits<{
@@ -46,7 +55,8 @@ const form = ref<ProductoPayload>({
   cantidad_max: 0,
   precio_mayoreo: null,
   is_gramaje: false,
-  idCategoria: 1
+  idCategoria: 1,
+  idSubcategoria: null
 });
 
 watch(
@@ -66,6 +76,13 @@ watch(
   }
 );
 
+watch(
+  () => form.value.idCategoria,
+  () => {
+    form.value.idSubcategoria = null;
+  }
+);
+
 function setFormFromData() {
   const source = props.data;
   if (!source) {
@@ -79,7 +96,8 @@ function setFormFromData() {
     cantidad_max: 0,
     precio_mayoreo: null,
     is_gramaje: false,
-    idCategoria: 1
+    idCategoria: 1,
+    idSubcategoria: null
   };
     return;
   }
@@ -95,7 +113,8 @@ function setFormFromData() {
     cantidad_max: Number(source.cantidad_max || 0),
     precio_mayoreo: source.precio_mayoreo ?? null,
     is_gramaje: Boolean(source.is_gramaje),
-    idCategoria: source.idCategoria || 1
+    idCategoria: source.idCategoria || 1,
+    idSubcategoria: source.idSubcategoria ?? null
   };
 }
 
@@ -110,6 +129,17 @@ function handleSubmit() {
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value || 0));
 }
+
+const subcategoriasFiltradas = computed(() => {
+  if (!form.value.idCategoria) return [];
+  return (props.subcategorias || []).filter(s => s.idCategoria === form.value.idCategoria);
+});
+
+const esCategoriaGaming = computed(() => {
+  if (!form.value.idCategoria || !props.categorias) return false;
+  const cat = props.categorias.find(c => c.idCategoria === form.value.idCategoria);
+  return cat ? cat.nombre.toLowerCase() === 'gaming' : false;
+});
 </script>
 
 <template>
@@ -142,6 +172,14 @@ function formatCurrency(value: number): string {
                 {{ cat.nombre }}
               </option>
             </select>
+
+            <label>Subcategoría</label>
+            <select v-model="form.idSubcategoria" class="input-field select-field">
+              <option :value="null">Sin subcategoría</option>
+              <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
+                {{ sub.nombre }}
+              </option>
+            </select>
           </div>
         </div>
 
@@ -172,7 +210,7 @@ function formatCurrency(value: number): string {
         <div class="form-section">
           <h4 class="section-title">📦 Inventario</h4>
           <div class="modal-grid inventory-grid">
-            <div class="stock-field" v-if="form.idCategoria !== 7">
+            <div class="stock-field" v-if="!esCategoriaGaming">
               <label>{{ form.is_gramaje ? 'Stock actual (gramos)' : 'Stock actual (unidades)' }} <span class="required">*</span></label>
               <input v-model.number="form.stock" type="number" min="0" required class="input-field stock-input">
             </div>
@@ -180,11 +218,11 @@ function formatCurrency(value: number): string {
               <label>Stock</label>
               <span class="rentable-label">🎮 Producto Rentable (no maneja inventario)</span>
             </div>
-            <div class="stock-field" v-if="form.idCategoria !== 7">
+            <div class="stock-field" v-if="!esCategoriaGaming">
               <label>Cantidad mínima <span class="required">*</span></label>
               <input v-model.number="form.cantidad_min" type="number" min="0" required class="input-field">
             </div>
-            <div class="stock-field" v-if="form.idCategoria !== 7">
+            <div class="stock-field" v-if="!esCategoriaGaming">
               <label>Cantidad máxima <span class="required">*</span></label>
               <input v-model.number="form.cantidad_max" type="number" min="0" required class="input-field">
             </div>

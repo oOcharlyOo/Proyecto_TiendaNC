@@ -1,0 +1,1160 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, shallowRef } from 'vue';
+
+type ApiRespuesta<T> = {
+  codigo: number;
+  mensaje: string;
+  datos: T;
+};
+
+type CategoriaDTO = {
+  idCategoria?: number;
+  nombre: string;
+  descripcion: string | null;
+};
+
+type SubcategoriaDTO = {
+  idSubcategoria?: number;
+  nombre: string;
+  descripcion: string | null;
+  idCategoria: number | null;
+};
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+
+const subcategorias = shallowRef<SubcategoriaDTO[]>([]);
+const categorias = shallowRef<CategoriaDTO[]>([]);
+const cargando = ref(false);
+const guardando = ref(false);
+const terminoBusqueda = ref('');
+const filtroCategoria = ref<number | null>(null);
+const showForm = ref(false);
+const isEditing = ref(false);
+const showDeleteModal = ref(false);
+const subcategoriaToDelete = ref<SubcategoriaDTO | null>(null);
+const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
+
+const formData = ref<SubcategoriaDTO>({
+  nombre: '',
+  descripcion: null,
+  idCategoria: null
+});
+
+let toastIdCounter = 0;
+
+const subcategoriasFiltradas = computed(() => {
+  let results = [...subcategorias.value];
+  
+  if (filtroCategoria.value !== null) {
+    results = results.filter(s => s.idCategoria === filtroCategoria.value);
+  }
+  
+  const termino = terminoBusqueda.value.trim().toLowerCase();
+  if (termino) {
+    results = results.filter(s => {
+      const catNombre = categorias.value.find(c => c.idCategoria === s.idCategoria)?.nombre || '';
+      return (s.nombre || '').toLowerCase().includes(termino) ||
+             (s.descripcion || '').toLowerCase().includes(termino) ||
+             catNombre.toLowerCase().includes(termino);
+    });
+  }
+  
+  return results.reverse();
+});
+
+function mostrarToast(texto: string, tipo: 'ok' | 'error' | 'info') {
+  const id = toastIdCounter++;
+  toasts.value.push({ id, mensaje: texto, tipo });
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id);
+  }, 3000);
+}
+
+async function fetchApi<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {})
+    }
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function cargarCategorias() {
+  try {
+    const data = await fetchApi<ApiRespuesta<CategoriaDTO[]>>(`${API_BASE}/categorias/listarCategorias`);
+    categorias.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (error) {
+    categorias.value = [];
+  }
+}
+
+async function cargarSubcategorias() {
+  cargando.value = true;
+  try {
+    const data = await fetchApi<ApiRespuesta<SubcategoriaDTO[]>>(`${API_BASE}/subcategorias/listarSubcategorias`);
+    subcategorias.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (error) {
+    subcategorias.value = [];
+    mostrarToast(`Error al cargar subcategorías: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  } finally {
+    cargando.value = false;
+  }
+}
+
+function getNombreCategoria(idCategoria: number | null): string {
+  if (!idCategoria) return 'Sin categoría';
+  return categorias.value.find(c => c.idCategoria === idCategoria)?.nombre || 'Desconocida';
+}
+
+function openCreateForm() {
+  isEditing.value = false;
+  formData.value = { nombre: '', descripcion: null, idCategoria: null };
+  showForm.value = true;
+}
+
+function openEditForm(subcategoria: SubcategoriaDTO) {
+  isEditing.value = true;
+  formData.value = { ...subcategoria };
+  showForm.value = true;
+}
+
+function closeForm() {
+  showForm.value = false;
+}
+
+async function saveSubcategoria() {
+  if (!formData.value.nombre.trim()) {
+    mostrarToast('El nombre de la subcategoría es obligatorio.', 'error');
+    return;
+  }
+  if (!formData.value.idCategoria) {
+    mostrarToast('Debes seleccionar una categoría.', 'error');
+    return;
+  }
+
+  guardando.value = true;
+  try {
+    if (isEditing.value && formData.value.idSubcategoria) {
+      const data = await fetchApi<ApiRespuesta<SubcategoriaDTO>>(
+        `${API_BASE}/subcategorias/actualizarSubcategoria/${formData.value.idSubcategoria}`,
+        { method: 'PUT', body: JSON.stringify(formData.value) }
+      );
+      if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo actualizar.');
+      mostrarToast(`Subcategoría "${formData.value.nombre}" actualizada.`, 'ok');
+    } else {
+      const data = await fetchApi<ApiRespuesta<SubcategoriaDTO>>(
+        `${API_BASE}/subcategorias/agregarSubcategoria`,
+        { method: 'POST', body: JSON.stringify(formData.value) }
+      );
+      if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo agregar.');
+      mostrarToast(`Subcategoría "${formData.value.nombre}" creada.`, 'ok');
+    }
+
+    await cargarSubcategorias();
+    closeForm();
+  } catch (error) {
+    mostrarToast(`Error al guardar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  } finally {
+    guardando.value = false;
+  }
+}
+
+function confirmDelete(subcategoria: SubcategoriaDTO) {
+  subcategoriaToDelete.value = subcategoria;
+  showDeleteModal.value = true;
+}
+
+async function deleteSubcategoria() {
+  if (!subcategoriaToDelete.value?.idSubcategoria) return;
+
+  try {
+    const data = await fetchApi<ApiRespuesta<unknown>>(
+      `${API_BASE}/subcategorias/eliminarSubcategoria/${subcategoriaToDelete.value.idSubcategoria}`,
+      { method: 'DELETE' }
+    );
+    if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo eliminar.');
+    mostrarToast(`Subcategoría "${subcategoriaToDelete.value.nombre}" eliminada.`, 'ok');
+    await cargarSubcategorias();
+    showDeleteModal.value = false;
+    subcategoriaToDelete.value = null;
+  } catch (error) {
+    mostrarToast(`Error al eliminar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  }
+}
+
+onMounted(async () => {
+  await cargarCategorias();
+  await cargarSubcategorias();
+});
+</script>
+
+<template>
+  <div class="subcategorias-container">
+    <header class="subcategorias-toolbar">
+      <div class="toolbar-left">
+        <h1 class="toolbar-title">
+          <span class="title-icon">📂</span>
+          <span class="title-text">Subcategorías</span>
+        </h1>
+        <p class="toolbar-subtitle">Administra las subcategorías del catálogo</p>
+      </div>
+
+      <div class="toolbar-right">
+        <select 
+          v-model="filtroCategoria" 
+          class="category-filter"
+        >
+          <option :value="null">Todas las categorías</option>
+          <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+            {{ cat.nombre }}
+          </option>
+        </select>
+        <div class="search-wrapper">
+          <span class="search-icon">🔍</span>
+          <input 
+            v-model="terminoBusqueda" 
+            type="text" 
+            placeholder="Buscar subcategoría..."
+            class="search-input"
+          >
+          <button 
+            v-if="terminoBusqueda" 
+            type="button" 
+            class="search-clear"
+            @click="terminoBusqueda = ''"
+          >✕</button>
+        </div>
+        <button type="button" class="btn-primary" @click="openCreateForm">
+          <span class="btn-icon">＋</span>
+          <span class="btn-text">Nueva</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="subcategorias-table-container">
+      <div v-if="cargando" class="estado-loading">
+        <div class="loading-spinner"></div>
+        <span>Cargando subcategorías...</span>
+      </div>
+
+      <div v-else-if="subcategoriasFiltradas.length === 0" class="estado-empty">
+        <span class="empty-icon">{{ terminoBusqueda.trim() ? '🔍' : '📂' }}</span>
+        <span class="empty-text">{{ terminoBusqueda.trim() ? 'No se encontraron subcategorías' : 'No hay subcategorías registradas' }}</span>
+      </div>
+
+      <table v-else class="tabla-subcategorias">
+        <thead>
+          <tr>
+            <th class="col-id">ID</th>
+            <th class="col-nombre">Nombre</th>
+            <th class="col-categoria">Categoría</th>
+            <th class="col-desc">Descripción</th>
+            <th class="col-acciones text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr 
+            v-for="subcategoria in subcategoriasFiltradas" 
+            :key="subcategoria.idSubcategoria"
+            class="subcategoria-row"
+          >
+            <td class="col-id">
+              <span class="id-badge">#{{ String(subcategoria.idSubcategoria).padStart(4, '0') }}</span>
+            </td>
+            <td class="col-nombre">
+              <span class="nombre-text">{{ subcategoria.nombre }}</span>
+            </td>
+            <td class="col-categoria">
+              <span class="categoria-badge">{{ getNombreCategoria(subcategoria.idCategoria) }}</span>
+            </td>
+            <td class="col-desc">
+              <span class="desc-text">{{ subcategoria.descripcion || '—' }}</span>
+            </td>
+            <td class="col-acciones text-center">
+              <div class="acciones-cell">
+                <button 
+                  type="button" 
+                  class="btn-action btn-edit" 
+                  @click="openEditForm(subcategoria)"
+                  title="Editar subcategoría"
+                >
+                  <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="btn-action btn-delete" 
+                  @click="confirmDelete(subcategoria)"
+                  title="Eliminar subcategoría"
+                >
+                  <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer" v-if="!cargando && subcategoriasFiltradas.length > 0">
+      <span class="footer-count">
+        {{ subcategoriasFiltradas.length }} subcategoría{{ subcategoriasFiltradas.length !== 1 ? 's' : '' }}
+        <span v-if="terminoBusqueda.trim() || filtroCategoria !== null" class="filter-indicator">
+          (filtrado
+          <span v-if="filtroCategoria !== null"> por: {{ getNombreCategoria(filtroCategoria) }}</span>
+          )
+        </span>
+      </span>
+    </div>
+
+    <!-- Slide-over form -->
+    <transition name="fade">
+      <div v-if="showForm" class="overlay" @click="closeForm"></div>
+    </transition>
+
+    <transition name="slide">
+      <aside v-if="showForm" class="drawer">
+        <div class="drawer-header">
+          <h2 class="drawer-title">{{ isEditing ? 'Editar Subcategoría' : 'Nueva Subcategoría' }}</h2>
+          <button type="button" class="drawer-close" @click="closeForm">✕</button>
+        </div>
+
+        <div class="drawer-body">
+          <label class="form-label">
+            Nombre <span class="required">*</span>
+          </label>
+          <input 
+            v-model="formData.nombre" 
+            type="text" 
+            placeholder="Ej: Sabritas, Doritos..." 
+            class="input-field"
+          >
+
+          <label class="form-label">
+            Categoría <span class="required">*</span>
+          </label>
+          <select 
+            v-model="formData.idCategoria" 
+            class="input-field select-field"
+          >
+            <option :value="null" disabled>Seleccionar categoría...</option>
+            <option 
+              v-for="cat in categorias" 
+              :key="cat.idCategoria" 
+              :value="cat.idCategoria"
+            >
+              {{ cat.nombre }}
+            </option>
+          </select>
+
+          <label class="form-label">
+            Descripción
+          </label>
+          <textarea 
+            v-model="formData.descripcion" 
+            placeholder="Descripción opcional..." 
+            class="input-field textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="drawer-footer">
+          <button type="button" class="btn-secondary" @click="closeForm">
+            Cancelar
+          </button>
+          <button 
+            type="button" 
+            class="btn-primary" 
+            :disabled="guardando || !formData.nombre.trim() || !formData.idCategoria"
+            @click="saveSubcategoria"
+          >
+            {{ guardando ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Crear Subcategoría' }}
+          </button>
+        </div>
+      </aside>
+    </transition>
+
+    <!-- Delete confirmation modal -->
+    <transition name="fade">
+      <div v-if="showDeleteModal" class="modal-delete">
+        <div class="modal-delete-content">
+          <div class="modal-delete-icon">⚠️</div>
+          <h3 class="modal-delete-title">¿Eliminar subcategoría?</h3>
+          <p class="modal-delete-text">
+            Estás a punto de eliminar <strong>{{ subcategoriaToDelete?.nombre }}</strong>. Esta acción es permanente.
+          </p>
+          <div class="modal-delete-actions">
+            <button type="button" class="btn-secondary" @click="showDeleteModal = false">
+              Cancelar
+            </button>
+            <button type="button" class="btn-danger" @click="deleteSubcategoria">
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Toast notifications -->
+    <transition-group name="toast" tag="div" class="toast-container">
+      <div 
+        v-for="toast in toasts" 
+        :key="toast.id"
+        class="toast-notification"
+        :class="`toast-${toast.tipo}`"
+      >
+        <span class="toast-icon">{{ toast.tipo === 'ok' ? '✓' : toast.tipo === 'error' ? '✕' : 'ℹ' }}</span>
+        <span class="toast-message">{{ toast.mensaje }}</span>
+      </div>
+    </transition-group>
+  </div>
+</template>
+
+<style scoped>
+.subcategorias-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.subcategorias-toolbar {
+  padding: 1rem 1.5rem;
+  background: var(--bg-panel);
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.toolbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  font-weight: 900;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 2px 2px 0 var(--border-color);
+}
+
+.title-icon {
+  font-size: 1.5rem;
+}
+
+.toolbar-subtitle {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.category-filter {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 2.5rem 0.6rem 0.85rem;
+  color: var(--text-primary);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b0a890' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  min-width: 180px;
+}
+
+.category-filter:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.category-filter option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 0.85rem;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.search-input {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 2.25rem 0.6rem 2.25rem;
+  color: var(--text-primary);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  width: 240px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.search-clear {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  width: 24px;
+  height: 24px;
+}
+
+.search-clear:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-primary {
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: inherit;
+  color: var(--btn-text, var(--bg-primary));
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow-color);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-icon {
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.subcategorias-table-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.tabla-subcategorias {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla-subcategorias thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-panel);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.tabla-subcategorias th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.subcategoria-row {
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.15s;
+}
+
+.subcategoria-row:hover {
+  background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+}
+
+.subcategoria-row td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+}
+
+.id-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.nombre-text {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.categoria-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 1px solid var(--accent-color);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.desc-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.acciones-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-action {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: var(--bg-primary);
+  padding: 0;
+  box-shadow: none;
+}
+
+.btn-action .action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-edit {
+  color: var(--accent-color);
+}
+
+.btn-edit:hover {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+}
+
+.btn-delete {
+  color: var(--error-color);
+}
+
+.btn-delete:hover {
+  background: var(--error-color);
+  color: var(--text-primary);
+  border-color: var(--error-color);
+  transform: translateY(-2px);
+}
+
+.table-footer {
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-panel);
+  border-top: 2px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.footer-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.filter-indicator {
+  color: var(--accent-color);
+  margin-left: 0.25rem;
+}
+
+.estado-loading,
+.estado-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 1rem;
+  color: var(--text-secondary);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  font-size: 3.5rem;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+}
+
+/* Drawer */
+.drawer {
+  position: fixed;
+  inset-y: 0;
+  right: 0;
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--border-color);
+  box-shadow: -10px 0 30px var(--shadow-color);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-panel);
+}
+
+.drawer-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+}
+
+.drawer-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+  box-shadow: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-close:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+  transform: none;
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+.required {
+  color: var(--error-color);
+}
+
+.input-field {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-primary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.input-field::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.select-field {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.drawer-footer {
+  padding: 1rem 1.5rem;
+  border-top: 2px solid var(--border-color);
+  display: flex;
+  gap: 0.75rem;
+  background: var(--bg-panel);
+}
+
+.drawer-footer button {
+  flex: 1;
+}
+
+/* Delete modal */
+.modal-delete {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.modal-delete-content {
+  background: var(--bg-secondary);
+  border: 3px solid var(--error-color);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 50px var(--shadow-color);
+}
+
+.modal-delete-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.modal-delete-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.modal-delete-text {
+  margin: 0 0 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.modal-delete-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.modal-delete-actions button {
+  flex: 1;
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast-notification {
+  background: var(--bg-panel);
+  border-left: 4px solid var(--accent-color);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 8px 20px var(--shadow-color);
+  min-width: 280px;
+  max-width: 400px;
+  pointer-events: auto;
+}
+
+.toast-ok {
+  border-left-color: var(--success-color);
+}
+
+.toast-error {
+  border-left-color: var(--error-color);
+}
+
+.toast-info {
+  border-left-color: var(--infoBlueColor);
+}
+
+.toast-icon {
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.toast-ok .toast-icon {
+  color: var(--success-color);
+}
+
+.toast-error .toast-icon {
+  color: var(--error-color);
+}
+
+.toast-info .toast-icon {
+  color: var(--infoBlueColor);
+}
+
+.toast-message {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-leave-active {
+  transition: transform 0.2s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+.toast-enter-active {
+  transition: all 0.3s ease;
+}
+
+.toast-leave-active {
+  transition: all 0.2s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+@media (max-width: 1024px) {
+  .col-desc {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .subcategorias-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.875rem 1rem;
+  }
+  
+  .toolbar-left {
+    text-align: center;
+  }
+  
+  .toolbar-title {
+    justify-content: center;
+  }
+  
+  .toolbar-right {
+    justify-content: center;
+  }
+  
+  .category-filter {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .col-desc {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-primary .btn-text {
+    display: none;
+  }
+  
+  .btn-primary {
+    padding: 0.6rem 0.875rem;
+  }
+}
+</style>

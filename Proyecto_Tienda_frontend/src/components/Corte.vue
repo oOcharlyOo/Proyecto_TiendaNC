@@ -397,6 +397,18 @@ const historialPagos = ref<ApartadoPagoDTO[]>([]);
 const cargandoHistorialPagos = ref(false);
 const mostrarHistorialApartado = ref(false);
 const mostrarHistorialCompletados = ref(false);
+const mostrarModalPago = ref(false);
+const apartadoParaPago = ref<ApartadoDTO | null>(null);
+const montoPagoCustom = ref(0);
+const errorMontoPago = ref('');
+
+const mostrarBackupManager = ref(false);
+const mostrarImportModal = ref(false);
+const cargandoBackup = ref(false);
+const backupFileRef = ref<HTMLInputElement | null>(null);
+const backupLog = ref<string[]>([]);
+const selectedFile = ref<File | null>(null);
+const dragOver = ref(false);
 
 const apartadoActivo = computed(() => {
   return apartadosActivos.value.length > 0 ? apartadosActivos.value[0] : null;
@@ -1787,6 +1799,17 @@ async function cerrarTurno() {
       })
     });
 
+    try {
+      const backupResp = await fetchApi<string>('/corte/cierreTurno', { method: 'POST' });
+      if (backupResp) {
+        console.log(`✅ Backup realizado correctamente: ${backupResp}`);
+      } else {
+        console.warn('⚠️ Backup completado sin identificador');
+      }
+    } catch (backupError) {
+      console.warn('⚠️ No se pudo verificar el backup:', backupError);
+    }
+
     mostrarMensaje('Turno cerrado con exito. Cerrando sesion...', 'ok');
     
     localStorage.removeItem('isAuth');
@@ -2351,6 +2374,108 @@ async function pagarApartado(id: number, monto: number) {
   } catch (error) {
     mostrarMensaje('Error al registrar pago', 'error');
   }
+}
+
+function abrirModalPago(apartado: ApartadoDTO) {
+  apartadoParaPago.value = apartado;
+  montoPagoCustom.value = apartado.montoDiario;
+  errorMontoPago.value = '';
+  mostrarModalPago.value = true;
+}
+
+function cerrarModalPago() {
+  mostrarModalPago.value = false;
+  apartadoParaPago.value = null;
+  montoPagoCustom.value = 0;
+  errorMontoPago.value = '';
+}
+
+async function descargarBackups() {
+  try {
+    const resp = await fetch(`${API_BASE}/backup/listar`);
+    if (!resp.ok) throw new Error('Error al listar backups');
+    const data = await resp.json();
+    if (data?.datos?.length) {
+      const file = data.datos[0];
+      const link = document.createElement('a');
+      link.href = `${API_BASE}/backup/descargar?file=${encodeURIComponent(file)}`;
+      link.download = file;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      mostrarMensaje(`Backup descargado: ${file}`, 'ok');
+    } else {
+      mostrarMensaje('No hay backups disponibles', 'info');
+    }
+  } catch (e) {
+    mostrarMensaje(`Error al descargar: ${e instanceof Error ? e.message : 'Error'}`, 'error');
+  }
+}
+
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  selectedFile.value = target.files?.[0] || null;
+}
+
+function handleFileDrop(event: DragEvent) {
+  dragOver.value = false;
+  const file = event.dataTransfer?.files[0];
+  if (file && (file.name.endsWith('.sql') || file.name.endsWith('.dump') || file.name.endsWith('.bak'))) {
+    selectedFile.value = file;
+  }
+}
+
+async function importarBackup() {
+  if (!selectedFile.value) return;
+
+  cargandoBackup.value = true;
+  backupLog.value = [`Cargando ${selectedFile.value.name}...`];
+
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedFile.value);
+    formData.append('filename', selectedFile.value.name);
+    const resp = await fetch(`${API_BASE}/backup/restaurar`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+    if (data?.codigo === 200) {
+      backupLog.value.push('✅ Archivo subido exitosamente');
+      mostrarMensaje('Backup importado. Recargando...', 'ok');
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      backupLog.value.push(`❌ ${data?.mensaje || 'Error al importar'}`);
+    }
+  } catch (e) {
+    backupLog.value.push(`❌ Error: ${e instanceof Error ? e.message : 'Error inesperado'}`);
+  } finally {
+    cargandoBackup.value = false;
+    if (backupFileRef.value) backupFileRef.value.value = '';
+    selectedFile.value = null;
+  }
+}
+
+function validarMontoPago(): boolean {
+  if (!apartadoParaPago.value) return false;
+  const min = apartadoParaPago.value.montoDiario;
+  const max = apartadoParaPago.value.montoRestante;
+  if (montoPagoCustom.value < min) {
+    errorMontoPago.value = `El monto mínimo por día es ${formatoMoneda(min)}`;
+    return false;
+  }
+  if (montoPagoCustom.value > max) {
+    errorMontoPago.value = `El monto no puede ser mayor al restante (${formatoMoneda(max)})`;
+    return false;
+  }
+  errorMontoPago.value = '';
+  return true;
+}
+
+async function confirmarPagoCustom() {
+  if (!apartadoParaPago.value || !validarMontoPago()) return;
+  await pagarApartado(apartadoParaPago.value.idApartado, montoPagoCustom.value);
+  cerrarModalPago();
 }
 
 async function toggleHistorialPagos(idApartado: number) {
@@ -3214,7 +3339,7 @@ onMounted(() => {
               </div>
             </div>
             <div class="apartado-actions">
-              <button class="btn-pagar" @click="pagarApartado(apartado.idApartado, apartado.montoDiario)">Pagar</button>
+              <button class="btn-pagar" @click="abrirModalPago(apartado)">Pagar</button>
               <button class="btn-historial" @click="toggleHistorialPagos(apartado.idApartado)" title="Ver historial">📜</button>
               <button class="btn-cancelar" @click="cancelarApartado(apartado.idApartado)" title="Cancelar">✕</button>
             </div>
@@ -3271,6 +3396,84 @@ onMounted(() => {
         </div>
         </div>
       </section>
+    </div>
+
+    <div v-if="mostrarModalPago" class="modal-overlay" @click.self="cerrarModalPago">
+      <div class="pergamino modal-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <h3>💳 Pagar Apartado</h3>
+            <p>{{ apartadoParaPago?.nombreProducto }}</p>
+          </header>
+
+          <div class="pago-modal-body">
+            <div class="pago-info-grid">
+              <div class="pago-info-item">
+                <span class="info-label">Monto total</span>
+                <span class="info-value">{{ formatoMoneda(apartadoParaPago?.montoTotal || 0) }}</span>
+              </div>
+              <div class="pago-info-item">
+                <span class="info-label">Pagado</span>
+                <span class="info-value paid">{{ formatoMoneda(apartadoParaPago?.montoPagado || 0) }}</span>
+              </div>
+              <div class="pago-info-item highlight">
+                <span class="info-label">Restante</span>
+                <span class="info-value remaining">{{ formatoMoneda(apartadoParaPago?.montoRestante || 0) }}</span>
+              </div>
+              <div class="pago-info-item">
+                <span class="info-label">Mínimo por día</span>
+                <span class="info-value min-pay">{{ formatoMoneda(apartadoParaPago?.montoDiario || 0) }}</span>
+              </div>
+            </div>
+
+            <div class="pago-input-section">
+              <label class="pago-label">Monto a pagar</label>
+              <div class="pago-input-wrapper">
+                <span class="input-prefix">$</span>
+                <input 
+                  v-model.number="montoPagoCustom" 
+                  type="number" 
+                  class="pago-input"
+                  :min="apartadoParaPago?.montoDiario || 0"
+                  :max="apartadoParaPago?.montoRestante || 0"
+                  step="0.01"
+                  placeholder="0.00"
+                  @input="validarMontoPago()"
+                />
+              </div>
+              <p v-if="errorMontoPago" class="pago-error">{{ errorMontoPago }}</p>
+              <p v-else class="pago-hint">Mínimo: {{ formatoMoneda(apartadoParaPago?.montoDiario || 0) }} por día</p>
+            </div>
+
+            <div class="pago-quick-amounts">
+              <button type="button" class="quick-btn" @click="montoPagoCustom = apartadoParaPago?.montoDiario || 0; validarMontoPago()">
+                Mínimo diario
+              </button>
+              <button type="button" class="quick-btn" @click="montoPagoCustom = (apartadoParaPago?.montoDiario || 0) * 7; validarMontoPago()">
+                Semana
+              </button>
+              <button type="button" class="quick-btn" @click="montoPagoCustom = (apartadoParaPago?.montoDiario || 0) * 30; validarMontoPago()">
+                Mes
+              </button>
+              <button type="button" class="quick-btn" @click="montoPagoCustom = apartadoParaPago?.montoRestante || 0; validarMontoPago()">
+                Liquidar
+              </button>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button type="button" class="btn-modal-cancel" @click="cerrarModalPago">Cancelar</button>
+            <button type="button" class="btn-modal-confirm" :disabled="!!errorMontoPago || montoPagoCustom <= 0" @click="confirmarPagoCustom">
+              Confirmar Pago
+            </button>
+          </footer>
+        </div>
+      </div>
     </div>
 
     <div v-if="modalAnualAbierto" class="modal-overlay" @click.self="modalAnualAbierto = false">
@@ -3458,6 +3661,73 @@ onMounted(() => {
           <div class="loading-spinner"></div>
           <p>Cargando datos del pergamino...</p>
         </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="backup-section">
+      <div class="backup-bar">
+        <span class="backup-title">🗄️ Gestión de Backups</span>
+        <div class="backup-actions">
+          <button type="button" class="btn-backup" @click="descargarBackups">
+            <span class="btn-icon">📥</span>
+            <span class="btn-text">Descargar Backups</span>
+          </button>
+          <button type="button" class="btn-backup btn-import" @click="mostrarImportModal = true">
+            <span class="btn-icon">📤</span>
+            <span class="btn-text">Importar Backup</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="mostrarImportModal" class="modal-overlay" @click.self="mostrarImportModal = false">
+      <div class="pergamino modal-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <h3>📤 Importar Backup</h3>
+          </header>
+          <div class="import-modal-content">
+            <div class="file-drop-zone" :class="{ 'drag-over': dragOver }" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="handleFileDrop">
+              <input ref="backupFileRef" type="file" accept=".sql,.dump,.bak" class="hidden-file-input" @change="handleFileSelect" />
+              <button type="button" class="btn-select-file" @click="backupFileRef?.click()">Seleccionar Archivo</button>
+              <p v-if="selectedFile" class="selected-file-name">📄 {{ selectedFile.name }}</p>
+              <p v-else class="drop-hint">Arrastra un archivo aquí o usa el botón</p>
+            </div>
+            <div v-if="backupLog.length" class="backup-log">
+              <p v-for="(line, i) in backupLog" :key="i" class="log-line">{{ line }}</p>
+              <div v-if="cargandoBackup" class="log-spinner"></div>
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn-modal-cancel" @click="mostrarImportModal = false" :disabled="cargandoBackup">Cancelar</button>
+            <button type="button" class="btn-modal-confirm" @click="importarBackup" :disabled="!selectedFile || cargandoBackup">Importar</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="mostrarBackupManager" class="modal-overlay" @click.self="mostrarBackupManager = false">
+      <div class="pergamino modal-pergamino">
+        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
+        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
+        <div class="corner-decor corner-br"><div class="ornament"></div></div>
+        <div class="pergamino-inner">
+          <header class="modal-header">
+            <h3>🗄️ Restaurar Base de Datos</h3>
+          </header>
+          <div class="backup-log">
+            <p v-for="(line, i) in backupLog" :key="i" class="log-line">{{ line }}</p>
+            <div v-if="cargandoBackup" class="log-spinner"></div>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" class="btn-modal-cancel" @click="mostrarBackupManager = false" :disabled="cargandoBackup">Cerrar</button>
+          </footer>
         </div>
       </div>
     </div>
@@ -9159,6 +9429,208 @@ th {
   justify-content: center;
 }
 
+.pago-modal-body {
+  padding: 1rem 0;
+}
+
+.pago-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.pago-info-item {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pago-info-item.highlight {
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.info-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.info-value.paid {
+  color: var(--success-color);
+}
+
+.info-value.remaining {
+  color: #ffc107;
+  font-size: 1.1rem;
+}
+
+.info-value.min-pay {
+  color: var(--infoBlueColor);
+}
+
+.pago-input-section {
+  margin-bottom: 1rem;
+}
+
+.pago-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.pago-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.pago-input {
+  width: 100%;
+  padding: 0.85rem 1rem 0.85rem 2rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: monospace;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s;
+}
+
+.pago-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+.pago-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+.pago-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.pago-quick-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.quick-btn {
+  padding: 0.5rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.quick-btn:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 2px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.btn-modal-cancel,
+.btn-modal-confirm {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  border: 2px solid var(--border-color);
+}
+
+.btn-modal-cancel {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.btn-modal-cancel:hover {
+  filter: brightness(1.1);
+}
+
+.btn-modal-confirm {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
+  color: var(--btn-text, var(--bg-primary));
+}
+
+.btn-modal-confirm:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-modal-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 500px) {
+  .pago-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pago-quick-amounts {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+}
+
 @keyframes swing {
   0%, 100% { transform: rotate(0deg) translateY(0); }
   25% { transform: rotate(-0.8deg) translateY(1px); }
@@ -9603,6 +10075,164 @@ th {
 
   .products-grid {
     overflow-x: hidden !important;
+  }
+}
+
+.backup-section {
+  padding: 0 1rem 1rem;
+}
+
+.backup-bar {
+  background: var(--bg-panel);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.backup-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-backup {
+  border: 2px solid var(--border-color);
+  padding: 0.5rem 0.85rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-primary) 100%);
+  cursor: pointer;
+  box-shadow: 0 3px 8px var(--shadow-color);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 8px;
+}
+
+.btn-backup:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+}
+
+.btn-backup.btn-import {
+  background: linear-gradient(180deg, #4a9e4a 0%, #2d7a2d 100%);
+  color: #fff;
+  border-color: #4a9e4a;
+}
+
+.btn-backup.btn-import:hover {
+  filter: brightness(1.15);
+}
+
+.backup-log {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.log-line {
+  margin: 0.25rem 0;
+  line-height: 1.4;
+}
+
+.log-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0.5rem auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.import-modal-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.file-drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-drop-zone.drag-over {
+  border-color: var(--accent-color);
+  background: rgba(139, 69, 19, 0.1);
+}
+
+.btn-select-file {
+  padding: 0.5rem 1.5rem;
+  background: var(--accent-color);
+  color: var(--text-light);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: filter 0.2s;
+}
+
+.btn-select-file:hover {
+  filter: brightness(1.1);
+}
+
+.selected-file-name {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.drop-hint {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .backup-bar {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .backup-actions {
+    justify-content: center;
   }
 }
 </style>

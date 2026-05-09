@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import ProductoFormModal from './modals/Productos/ProductoFormModal.vue';
 import ProductoScannerModal from './modals/Productos/ProductoScannerModal.vue';
 import Categorias from './Categorias.vue';
+import Subcategorias from './Subcategorias.vue';
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -14,6 +15,13 @@ type CategoriaDTO = {
   idCategoria: number;
   nombre: string;
   descripcion: string | null;
+};
+
+type SubcategoriaDTO = {
+  idSubcategoria: number;
+  nombre: string;
+  descripcion?: string | null;
+  idCategoria: number | null;
 };
 
 type ProductoDTO = {
@@ -28,18 +36,21 @@ type ProductoDTO = {
   precio_mayoreo: number | null;
   is_gramaje: boolean;
   idCategoria?: number;
+  idSubcategoria?: number | null;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const productos = shallowRef<ProductoDTO[]>([]);
 const categorias = shallowRef<CategoriaDTO[]>([]);
+const subcategorias = shallowRef<SubcategoriaDTO[]>([]);
 const cargando = ref(false);
 const guardando = ref(false);
 const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
+const subcategoriaFiltro = ref<number | null>(null);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
-const tabActiva = ref<'productos' | 'categorias'>('productos');
+const tabActiva = ref<'productos' | 'categorias' | 'subcategorias'>('productos');
 
 const modalFormOpen = ref(false);
 const modalScannerOpen = ref(false);
@@ -48,12 +59,148 @@ const scannerCode = ref('');
 
 let toastIdCounter = 0;
 
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const importando = ref(false);
+
+async function exportarCSV() {
+  const XLSX = await import('xlsx');
+  const headers = ['ID', 'Nombre', 'Código de Barras', 'Categoría', 'Subcategoría', 'Precio Costo', 'Precio Venta', 'Precio Mayoreo', 'Stock', 'Cantidad Mínima', 'Cantidad Máxima', 'Gramaje'];
+  const rows = productos.value.map(p => [
+    p.idProducto ?? '',
+    p.nombre,
+    p.codigoBarras || '',
+    obtenerNombreCategoria(p.idCategoria),
+    obtenerNombreSubcategoria(p.idSubcategoria),
+    p.precio_costo,
+    p.precio_venta,
+    p.precio_mayoreo ?? '',
+    p.stock,
+    p.cantidad_min,
+    p.cantidad_max,
+    p.is_gramaje ? 'Sí' : 'No'
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.writeFile(wb, `productos_${new Date().toISOString().slice(0, 10)}.csv`, { bookType: 'csv' });
+  mostrarToast('Archivo CSV exportado correctamente.', 'ok');
+}
+
+async function exportarXLSX() {
+  const XLSX = await import('xlsx');
+  const headers = ['ID', 'Nombre', 'Código de Barras', 'Categoría', 'Subcategoría', 'Precio Costo', 'Precio Venta', 'Precio Mayoreo', 'Stock', 'Cantidad Mínima', 'Cantidad Máxima', 'Gramaje'];
+  const rows = productos.value.map(p => [
+    p.idProducto ?? '',
+    p.nombre,
+    p.codigoBarras || '',
+    obtenerNombreCategoria(p.idCategoria),
+    obtenerNombreSubcategoria(p.idSubcategoria),
+    p.precio_costo,
+    p.precio_venta,
+    p.precio_mayoreo ?? '',
+    p.stock,
+    p.cantidad_min,
+    p.cantidad_max,
+    p.is_gramaje ? 'Sí' : 'No'
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.writeFile(wb, `productos_${new Date().toISOString().slice(0, 10)}.xlsx`, { bookType: 'xlsx' });
+  mostrarToast('Archivo Excel exportado correctamente.', 'ok');
+}
+
+function triggerImport() {
+  fileInputRef.value?.click();
+}
+
+async function handleImport(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (!['csv', 'xlsx', 'xls'].includes(ext || '')) {
+    mostrarToast('Formato no válido. Use .csv o .xlsx', 'error');
+    target.value = '';
+    return;
+  }
+
+  importando.value = true;
+  try {
+    const XLSX = await import('xlsx');
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+    if (json.length === 0) {
+      mostrarToast('El archivo está vacío.', 'error');
+      importando.value = false;
+      target.value = '';
+      return;
+    }
+
+    let importados = 0;
+    let errores = 0;
+
+    for (const row of json) {
+      const nombre = String(row['Nombre'] || '').trim();
+      if (!nombre) { errores++; continue; }
+
+      const catNombre = String(row['Categoría'] || '').trim();
+      const subNombre = String(row['Subcategoría'] || '').trim();
+
+      const cat = categorias.value.find(c => c.nombre.toLowerCase() === catNombre.toLowerCase());
+      const sub = subcategorias.value.find(s => s.nombre.toLowerCase() === subNombre.toLowerCase());
+
+      const payload: ProductoDTO = {
+        nombre,
+        codigoBarras: String(row['Código de Barras'] || '').trim() || null,
+        precio_costo: Number(row['Precio Costo']) || 0,
+        precio_venta: Number(row['Precio Venta']) || 0,
+        precio_mayoreo: row['Precio Mayoreo'] ? Number(row['Precio Mayoreo']) : null,
+        stock: Number(row['Stock']) || 0,
+        cantidad_min: Number(row['Cantidad Mínima']) || 0,
+        cantidad_max: Number(row['Cantidad Máxima']) || 0,
+        is_gramaje: String(row['Gramaje'] || '').toLowerCase() === 'sí',
+        idCategoria: cat?.idCategoria,
+        idSubcategoria: sub?.idSubcategoria ?? null
+      };
+
+      try {
+        await fetchApi<ApiRespuesta<ProductoDTO>>(
+          `${API_BASE}/productos/agregarProducto`,
+          { method: 'POST', body: JSON.stringify(payload) }
+        );
+        importados++;
+      } catch {
+        errores++;
+      }
+    }
+
+    await cargarProductos();
+    mostrarToast(`Importación completada: ${importados} agregados, ${errores} errores.`, importados > 0 ? 'ok' : 'error');
+  } catch (error) {
+    mostrarToast(`Error al importar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  } finally {
+    importando.value = false;
+    target.value = '';
+  }
+}
+
 const productosFiltrados = computed(() => {
   let results = [...productos.value];
   
   const cat = categoriaFiltro.value;
   if (cat !== null) {
     results = results.filter(p => p.idCategoria === cat);
+  }
+  
+  const sub = subcategoriaFiltro.value;
+  if (sub !== null) {
+    results = results.filter(p => p.idSubcategoria === sub);
   }
   
   const termino = terminoBusqueda.value.trim().toLowerCase();
@@ -67,10 +214,25 @@ const productosFiltrados = computed(() => {
   return results.reverse();
 });
 
+const subcategoriasFiltradas = computed(() => {
+  if (categoriaFiltro.value === null) return subcategorias.value;
+  return subcategorias.value.filter(s => s.idCategoria === categoriaFiltro.value);
+});
+
+watch(categoriaFiltro, () => {
+  subcategoriaFiltro.value = null;
+});
+
 function obtenerNombreCategoria(idCategoria: number | undefined): string {
   if (!idCategoria) return 'Sin asignar';
   const cat = categorias.value.find(c => c.idCategoria === idCategoria);
   return cat ? cat.nombre : 'Sin asignar';
+}
+
+function obtenerNombreSubcategoria(idSubcategoria: number | null | undefined): string {
+  if (!idSubcategoria) return '—';
+  const sub = subcategorias.value.find(s => s.idSubcategoria === idSubcategoria);
+  return sub ? sub.nombre : '—';
 }
 
 function formatoMoneda(valor: number) {
@@ -78,6 +240,16 @@ function formatoMoneda(valor: number) {
 }
 
 const EMOJIS_DULCES = ['🍬', '🍭', '🍫', '🍩', '🍪', '🧁', '🍰', '🎂', '🍮', '🍯', '🥤', '🍦', '🍧', '🍨', '🥧', '🥐', '🥨', '🥞', '🧇', '🥖'];
+
+const gamingCategoryId = computed(() => {
+  const cat = categorias.value.find(c => c.nombre.toLowerCase() === 'gaming');
+  return cat ? cat.idCategoria : null;
+});
+
+function esCategoriaGaming(idCategoria: number | undefined): boolean {
+  if (!idCategoria || !gamingCategoryId.value) return false;
+  return idCategoria === gamingCategoryId.value;
+}
 
 function obtenerEmojiDulce(id: number | undefined): string {
   const indice = (id ?? 0) % EMOJIS_DULCES.length;
@@ -126,6 +298,15 @@ async function cargarCategorias() {
     categorias.value = Array.isArray(data?.datos) ? data.datos : [];
   } catch (error) {
     categorias.value = [];
+  }
+}
+
+async function cargarSubcategorias() {
+  try {
+    const data = await fetchApi<ApiRespuesta<SubcategoriaDTO[]>>(`${API_BASE}/subcategorias/listarSubcategorias`);
+    subcategorias.value = Array.isArray(data?.datos) ? data.datos : [];
+  } catch (error) {
+    subcategorias.value = [];
   }
 }
 
@@ -204,6 +385,7 @@ function handleScannerApply(code: string) {
 onMounted(() => {
   cargarProductos();
   cargarCategorias();
+  cargarSubcategorias();
 });
 </script>
 
@@ -230,6 +412,17 @@ onMounted(() => {
               {{ cat.nombre }}
             </option>
           </select>
+          <select 
+            v-model="subcategoriaFiltro" 
+            class="category-filter"
+            :disabled="categoriaFiltro === null"
+            @change="subcategoriaFiltro = subcategoriaFiltro ? Number(subcategoriaFiltro) : null"
+          >
+            <option :value="null">{{ categoriaFiltro === null ? 'Selecciona categoría' : 'Todas las subcategorías' }}</option>
+            <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
+              {{ sub.nombre }}
+            </option>
+          </select>
           <div class="search-wrapper">
             <span class="search-icon">🔍</span>
             <input 
@@ -244,6 +437,20 @@ onMounted(() => {
               class="search-clear"
               @click="terminoBusqueda = ''"
             >✕</button>
+          </div>
+          <div class="import-export-group">
+            <button type="button" class="btn-secondary btn-sm" @click="exportarCSV" title="Exportar CSV">
+              <span class="btn-icon">📄</span>
+              <span class="btn-text">CSV</span>
+            </button>
+            <button type="button" class="btn-secondary btn-sm" @click="exportarXLSX" title="Exportar Excel">
+              <span class="btn-icon">📊</span>
+              <span class="btn-text">Excel</span>
+            </button>
+            <button type="button" class="btn-secondary btn-sm" @click="triggerImport" :disabled="importando" title="Importar archivo">
+              <span class="btn-icon">{{ importando ? '⏳' : '📥' }}</span>
+              <span class="btn-text">{{ importando ? '...' : 'Importar' }}</span>
+            </button>
           </div>
           <button type="button" class="btn-primary" @click="abrirModalNuevoProducto">
             <span class="btn-icon">＋</span>
@@ -270,6 +477,15 @@ onMounted(() => {
         >
           <span class="tab-icon">🏷️</span>
           <span class="tab-text">Categorías</span>
+        </button>
+        <button 
+          type="button" 
+          class="tab-btn" 
+          :class="{ active: tabActiva === 'subcategorias' }"
+          @click="tabActiva = 'subcategorias'"
+        >
+          <span class="tab-icon">📂</span>
+          <span class="tab-text">Subcategorías</span>
         </button>
       </div>
 
@@ -301,6 +517,7 @@ onMounted(() => {
                 <th class="col-icon">Icono</th>
                 <th class="col-nombre">Nombre del Producto</th>
                 <th class="col-categoria">Categoría</th>
+                <th class="col-subcategoria">Subcategoría</th>
                 <th class="col-codigo">Código</th>
                 <th class="col-precio text-right">Precio Venta</th>
                 <th class="col-stock text-center">Stock</th>
@@ -332,6 +549,9 @@ onMounted(() => {
                 <td class="col-categoria">
                   <span class="categoria-badge">{{ obtenerNombreCategoria(producto.idCategoria) }}</span>
                 </td>
+                <td class="col-subcategoria">
+                  <span class="subcategoria-badge">{{ obtenerNombreSubcategoria(producto.idSubcategoria) }}</span>
+                </td>
                 <td class="col-codigo">
                   <span class="codigo-badge" v-if="producto.codigoBarras">
                     {{ producto.codigoBarras }}
@@ -347,8 +567,8 @@ onMounted(() => {
                   </div>
                 </td>
                 <td class="col-stock text-center">
-                  <div class="stock-cell" :class="{ 'stock-critical': Number(producto.idCategoria) !== 7 && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) }">
-                    <template v-if="Number(producto.idCategoria) === 7">
+                  <div class="stock-cell" :class="{ 'stock-critical': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) }">
+                    <template v-if="esCategoriaGaming(producto.idCategoria)">
                       <span class="stock-icon">🎮</span>
                       <span class="stock-value rentable-text">Rentable</span>
                     </template>
@@ -359,7 +579,7 @@ onMounted(() => {
                   </div>
                 </td>
                 <td class="col-tipo text-center">
-                  <span class="tipo-badge tipo-rentable" v-if="Number(producto.idCategoria) === 7">🎮 Rentable</span>
+                  <span class="tipo-badge tipo-rentable" v-if="esCategoriaGaming(producto.idCategoria)">🎮 Rentable</span>
                   <span class="tipo-badge" v-else-if="producto.is_gramaje">⚖️ Gramaje</span>
                   <span class="tipo-badge tipo-normal" v-else>📦 Unidad</span>
                 </td>
@@ -404,8 +624,12 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-else class="tab-content">
+      <div v-else-if="tabActiva === 'categorias'" class="tab-content">
         <Categorias @categorias-changed="cargarCategorias" />
+      </div>
+
+      <div v-else class="tab-content">
+        <Subcategorias />
       </div>
     </section>
 
@@ -415,6 +639,7 @@ onMounted(() => {
       :loading="guardando"
       :prefill-code="scannerCode"
       :categorias="categorias"
+      :subcategorias="subcategorias"
       @submit="handleSubmitProducto"
       @delete="handleDeleteProducto"
       @close="modalFormOpen = false"
@@ -425,6 +650,14 @@ onMounted(() => {
       :open="modalScannerOpen"
       @apply="handleScannerApply"
       @close="modalScannerOpen = false"
+    />
+
+    <input 
+      ref="fileInputRef" 
+      type="file" 
+      accept=".csv,.xlsx,.xls" 
+      class="hidden-file-input"
+      @change="handleImport"
     />
 
     <transition-group name="toast" tag="div" class="toast-container">
@@ -658,6 +891,56 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.import-export-group {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.btn-secondary {
+  border: 2px solid var(--border-color);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-primary) 100%);
+  cursor: pointer;
+  box-shadow: 0 3px 8px var(--shadow-color);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 0.5rem 0.7rem;
+  font-size: 0.7rem;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
 .btn-primary {
   border: 2px solid var(--border-color);
   padding: 0.6rem 1.25rem;
@@ -799,6 +1082,18 @@ onMounted(() => {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--infoBlueColor);
+  white-space: nowrap;
+}
+
+.subcategoria-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-color);
   white-space: nowrap;
 }
 
@@ -1077,6 +1372,7 @@ onMounted(() => {
 
 @media (max-width: 1024px) {
   .col-categoria,
+  .col-subcategoria,
   .col-codigo,
   .col-tipo {
     display: none;
@@ -1103,6 +1399,11 @@ onMounted(() => {
   }
   
   .toolbar-right {
+    justify-content: center;
+  }
+  
+  .import-export-group {
+    width: 100%;
     justify-content: center;
   }
   

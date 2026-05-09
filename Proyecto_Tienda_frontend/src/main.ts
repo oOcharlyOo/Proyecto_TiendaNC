@@ -1,4 +1,5 @@
 // src/main.ts
+import './interceptors/sucursal';
 import { createApp } from 'vue';
 import './components/styles/themes.css';
 import './components/styles/inventario.css';
