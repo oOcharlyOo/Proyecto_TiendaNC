@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps<{
   open: boolean;
@@ -14,12 +14,16 @@ const emit = defineEmits<{
 }>();
 
 const montoRecibido = ref<number | null>(null);
+const inputRef = ref<HTMLInputElement | null>(null);
 
 watch(
   () => props.open,
   (abierto) => {
     if (abierto) {
       montoRecibido.value = null;
+      nextTick(() => {
+        inputRef.value?.focus();
+      });
     }
   }
 );
@@ -41,6 +45,29 @@ function confirmarEfectivo() {
   const recibido = Number(montoRecibido.value ?? 0);
   emit('confirmar-efectivo', { montoRecibido: recibido });
 }
+
+function manejarTeclado(e: KeyboardEvent) {
+  if (!props.open) return;
+  
+  if (e.key === 'F2') {
+    e.preventDefault();
+    confirmarEfectivo();
+  } else if (e.key === 'F3') {
+    e.preventDefault();
+    emit('confirmar-transferencia');
+  } else if (e.key === 'F4') {
+    e.preventDefault();
+    emit('confirmar-tarjeta');
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', manejarTeclado);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', manejarTeclado);
+});
 </script>
 
 <template>
@@ -80,12 +107,12 @@ function confirmarEfectivo() {
               <div class="input-container">
                 <span class="coin-icon">🪙</span>
                 <input 
+                  ref="inputRef"
                   v-model.number="montoRecibido" 
                   type="number" 
                   step="0.01" 
                   min="0" 
                   placeholder="0.00"
-                  autofocus
                 >
               </div>
             </div>
@@ -101,18 +128,21 @@ function confirmarEfectivo() {
               <button class="pay-btn efectivo" @click="confirmarEfectivo">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Efectivo</span>
+                <span class="btn-shortcut">F2</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button class="pay-btn transferencia" @click="emit('confirmar-transferencia')">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Transferencia</span>
+                <span class="btn-shortcut">F3</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button class="pay-btn tarjeta" @click="emit('confirmar-tarjeta')">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Tarjeta</span>
+                <span class="btn-shortcut">F4</span>
                 <span class="btn-rune">◈</span>
               </button>
             </div>
@@ -426,15 +456,48 @@ function confirmarEfectivo() {
 
 .pay-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  padding: 0.6rem 0.4rem;
+  gap: 0.2rem;
+  padding: 0.6rem 0.3rem;
   border: 2px solid #5c4a2a;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
   font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.btn-rune {
+  font-size: 0.5rem;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.btn-label {
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.btn-shortcut {
+  display: inline-block;
+  padding: 0.1rem 0.3rem;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  font-size: 0.55rem;
+  font-weight: 900;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
 .pay-btn:hover {
@@ -452,10 +515,36 @@ function confirmarEfectivo() {
 }
 
 .btn-label {
-  font-size: 0.7rem;
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.btn-shortcut {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.efectivo .btn-shortcut {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.transferencia .btn-shortcut {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.tarjeta .btn-shortcut {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .efectivo {
@@ -522,12 +611,93 @@ function confirmarEfectivo() {
 }
 
 @media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0.75rem;
+  }
+  
+  .pergamino {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .pergamino-inner {
+    padding: 1.25rem 1rem;
+  }
+  
   .payment-buttons {
     grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+  
+  .pay-btn {
+    padding: 0.7rem 0.5rem;
+    gap: 0.4rem;
+  }
+  
+  .btn-shortcut {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
   }
   
   .pergamino-amount {
     font-size: 1.6rem;
+  }
+  
+  .total-parchment {
+    padding: 0.8rem;
+  }
+  
+  .parchment-label {
+    font-size: 0.7rem;
+  }
+  
+  .input-parchment {
+    padding: 0.8rem;
+  }
+  
+  .input-parchment label {
+    font-size: 0.75rem;
+  }
+  
+  .input-container input {
+    font-size: 1rem;
+    padding: 0.6rem 0.6rem 0.6rem 2rem;
+  }
+  
+  .cambio-parchment {
+    padding: 0.7rem;
+  }
+  
+  .cambio-label {
+    font-size: 0.7rem;
+  }
+  
+  .cambio-amount {
+    font-size: 0.95rem;
+  }
+  
+  .modal-header h2 {
+    font-size: 1rem;
+  }
+  
+  .cancel-btn {
+    padding: 0.7rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .pergamino-inner {
+    padding: 1rem 0.75rem;
+  }
+  
+  .btn-shortcut {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .pay-btn {
+    padding: 0.6rem 0.4rem;
   }
 }
 </style>

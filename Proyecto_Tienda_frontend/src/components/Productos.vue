@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import ProductoFormModal from './modals/Productos/ProductoFormModal.vue';
 import ProductoScannerModal from './modals/Productos/ProductoScannerModal.vue';
 import Categorias from './Categorias.vue';
@@ -58,6 +58,10 @@ const modalFormOpen = ref(false);
 const modalScannerOpen = ref(false);
 const selectedProduct = ref<ProductoDTO | null>(null);
 const scannerCode = ref('');
+
+let scannerBuffer = '';
+let scannerTimer: ReturnType<typeof setTimeout> | null = null;
+let lastScannerKeyTime = 0;
 
 let toastIdCounter = 0;
 
@@ -209,7 +213,8 @@ const productosFiltrados = computed(() => {
   if (termino) {
     results = results.filter(p => 
       (p.nombre || '').toLowerCase().includes(termino) ||
-      (p.codigoBarras || '').toLowerCase().includes(termino)
+      (p.codigoBarras || '').toLowerCase().includes(termino) ||
+      normalizarCodigo(p.codigoBarras || '') === normalizarCodigo(termino)
     );
   }
   
@@ -225,6 +230,16 @@ const productosFiltrados = computed(() => {
     results.sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0));
   } else {
     results.reverse();
+  }
+  
+  if (termino) {
+    results.sort((a, b) => {
+      const aExact = (a.codigoBarras || '').toLowerCase() === termino || normalizarCodigo(a.codigoBarras || '') === normalizarCodigo(termino);
+      const bExact = (b.codigoBarras || '').toLowerCase() === termino || normalizarCodigo(b.codigoBarras || '') === normalizarCodigo(termino);
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      return 0;
+    });
   }
   
   return results;
@@ -402,7 +417,68 @@ onMounted(() => {
   cargarProductos();
   cargarCategorias();
   cargarSubcategorias();
+  window.addEventListener('keydown', manejarEscannerProductos);
 });
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', manejarEscannerProductos);
+  if (scannerTimer) clearTimeout(scannerTimer);
+});
+
+function manejarEscannerProductos(e: KeyboardEvent) {
+  const target = e.target as HTMLElement;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  
+  if (e.key === 'Enter' && !isInput && scannerBuffer.length > 0) {
+    e.preventDefault();
+    procesarEscaneoProductos(scannerBuffer);
+    scannerBuffer = '';
+    return;
+  }
+  
+  if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const now = Date.now();
+    const timeDiff = now - lastScannerKeyTime;
+    
+    if (lastScannerKeyTime > 0 && timeDiff > 100) {
+      scannerBuffer = '';
+    }
+    
+    scannerBuffer += e.key;
+    lastScannerKeyTime = now;
+    
+    if (scannerTimer) clearTimeout(scannerTimer);
+    scannerTimer = setTimeout(() => {
+      if (scannerBuffer.length > 0) {
+        procesarEscaneoProductos(scannerBuffer);
+        scannerBuffer = '';
+      }
+    }, 300);
+  }
+}
+
+function normalizarCodigo(codigo: string): string {
+  return codigo.replace(/^0+/, '') || '0';
+}
+
+function procesarEscaneoProductos(codigo: string) {
+  const codigoLimpio = codigo.trim();
+  if (!codigoLimpio) return;
+  
+  const codigoNormalizado = normalizarCodigo(codigoLimpio);
+  
+  const productoEncontrado = productos.value.find(p => {
+    if (!p.codigoBarras) return false;
+    const codigoProducto = normalizarCodigo(p.codigoBarras);
+    return codigoProducto === codigoNormalizado || p.codigoBarras === codigoLimpio;
+  });
+  
+  if (productoEncontrado) {
+    terminoBusqueda.value = productoEncontrado.codigoBarras || productoEncontrado.nombre;
+  } else {
+    terminoBusqueda.value = codigoLimpio;
+  }
+}
 </script>
 
 <template>

@@ -431,6 +431,10 @@ async function eliminarTicket(id: number) {
 
 const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
+
+let scannerBuffer = '';
+let scannerTimer: ReturnType<typeof setTimeout> | null = null;
+let lastScannerKeyTime = 0;
 const productos = shallowRef<Producto[]>([]);
 const categorias = shallowRef<{ idCategoria: number; nombre: string }[]>([]);
 
@@ -554,6 +558,8 @@ onMounted(() => {
   window.addEventListener('focusout', () => {
     isKeyboardVisible.value = false;
   });
+  
+  window.addEventListener('keydown', manejarAtajosTeclado);
 });
 
 onUnmounted(() => {
@@ -561,7 +567,65 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopResize);
   document.removeEventListener('touchmove', doResize);
   document.removeEventListener('touchend', stopResize);
+  window.removeEventListener('keydown', manejarAtajosTeclado);
 });
+
+function manejarAtajosTeclado(e: KeyboardEvent) {
+  if (e.key === 'F12') {
+    e.preventDefault();
+    if (ticket.value.length > 0 && !modalCobroAbierto.value) {
+      cobrar();
+    }
+  }
+  
+  const target = e.target as HTMLElement;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  
+  if (e.key === 'Enter' && !isInput && scannerBuffer.length > 0) {
+    e.preventDefault();
+    procesarEscaneo(scannerBuffer);
+    scannerBuffer = '';
+    return;
+  }
+  
+  if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const now = Date.now();
+    const timeDiff = now - lastScannerKeyTime;
+    
+    if (lastScannerKeyTime > 0 && timeDiff > 100) {
+      scannerBuffer = '';
+    }
+    
+    scannerBuffer += e.key;
+    lastScannerKeyTime = now;
+    
+    if (scannerTimer) clearTimeout(scannerTimer);
+    scannerTimer = setTimeout(() => {
+      if (scannerBuffer.length > 0) {
+        procesarEscaneo(scannerBuffer);
+        scannerBuffer = '';
+      }
+    }, 300);
+  }
+}
+
+async function procesarEscaneo(codigo: string) {
+  const codigoLimpio = codigo.trim();
+  if (!codigoLimpio) return;
+  
+  const producto = await buscarProductoPorCodigoBarras(codigoLimpio);
+  if (producto) {
+    const stockDisponible = producto.dto?.stock ?? Infinity;
+    if (stockDisponible <= 0) {
+      mostrarMensaje(`Producto ${producto.nombre} sin stock`, 'error');
+      return;
+    }
+    await agregarProductoATicket(producto);
+    mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
+  } else {
+    mostrarMensaje(`Producto no encontrado: ${codigoLimpio}`, 'error');
+  }
+}
 
 const ticketActual = computed(() => {
   if (ticketActualId.value === null) return null;
@@ -644,26 +708,61 @@ const productosParaMostrar = computed(() => {
   }
   
   if (query) {
+    const queryNormalizado = query.replace(/^0+/, '') || '0';
     resultados = resultados.filter(p => 
       p.nombre.toLowerCase().includes(query) ||
-      (p.codigo_barras && p.codigo_barras.includes(query))
+      (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
+      ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
     );
+    
+    resultados.sort((a, b) => {
+      const aExact = (a.codigo_barras || '').toLowerCase() === query || ((a.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+      const bExact = (b.codigo_barras || '').toLowerCase() === query || ((b.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+  } else {
+    resultados.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
   
-  return resultados
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return resultados;
 });
 
 const sugerenciasPorNombre = computed(() => {
   const query = terminoBusqueda.value.trim().toLowerCase();
   if (!query) return [];
   
+  const queryNormalizado = query.replace(/^0+/, '') || '0';
+  
   return productos.value.filter(p => 
     !esCategoriaGaming(p.idCategoria) && (
       p.nombre.toLowerCase().includes(query) ||
-      (p.codigo_barras && p.codigo_barras.includes(query))
+      (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
+      ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
     )
-  ).slice(0, 20);
+  ).sort((a, b) => {
+    const aExact = (a.codigo_barras || '').toLowerCase() === query || ((a.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+    const bExact = (b.codigo_barras || '').toLowerCase() === query || ((b.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+    return 0;
+  }).slice(0, 20);
+});
+
+const productosAccesoRapido = computed(() => {
+  return productos.value.filter(p => {
+    if (esCategoriaGaming(p.idCategoria)) return false;
+    const stock = p.dto?.stock;
+    if (stock !== undefined && stock !== null && stock <= 0) return false;
+    if (!p.codigo_barras) return false;
+    const codigoLimpio = p.codigo_barras.replace(/^0+/, '') || '0';
+    return codigoLimpio.length >= 1 && codigoLimpio.length <= 2;
+  }).sort((a, b) => {
+    const aLimpio = (a.codigo_barras || '').replace(/^0+/, '') || '0';
+    const bLimpio = (b.codigo_barras || '').replace(/^0+/, '') || '0';
+    return Number(aLimpio) - Number(bLimpio);
+  });
 });
 
 onMounted(async () => {
@@ -2145,6 +2244,28 @@ async function eliminarTodosLosDetalles() {
               @agregar="agregarPromocionAlTicket"
             />
           </div>
+          
+          <!-- Productos de Acceso Rápido (códigos 1-2 dígitos) -->
+          <div v-if="productosAccesoRapido.length > 0 && !terminoBusqueda && categoriaFiltro === null" class="acceso-rapido-section">
+            <h3 class="acceso-rapido-title">
+              <span class="title-icon">⚡</span>
+              <span class="title-text">Productos de Acceso Rápido</span>
+            </h3>
+            <div class="acceso-rapido-grid">
+              <button 
+                v-for="p in productosAccesoRapido" 
+                :key="p.id"
+                class="acceso-rapido-btn clickable animate-pop-in"
+                @click="agregarProductoATicket(p)"
+                :title="`${p.nombre} - Código: ${p.codigo_barras}`"
+              >
+                <span class="acceso-code">{{ p.codigo_barras }}</span>
+                <span class="acceso-name">{{ p.nombre }}</span>
+                <span class="acceso-price">{{ formatoMoneda(p.precio) }}</span>
+              </button>
+            </div>
+          </div>
+          
           <!-- Mostrar todos los productos disponibles -->
           <div v-if="productosParaMostrar.length > 0" class="products-grid">
             <article 
@@ -2276,6 +2397,7 @@ async function eliminarTodosLosDetalles() {
               <button class="btn-checkout primary" @click="cobrar" :disabled="ticket.length === 0">
                 <span class="icon">💰</span>
                 <span class="text">COBRAR AHORA</span>
+                <span class="shortcut-badge">F12</span>
               </button>
               
               <div class="extra-actions">
@@ -2874,6 +2996,38 @@ async function eliminarTodosLosDetalles() {
     padding: 0.08rem 0.2rem;
   }
   
+  .acceso-rapido-section {
+    padding: 0.6rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .acceso-rapido-title {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .acceso-rapido-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.4rem;
+  }
+  
+  .acceso-rapido-btn {
+    padding: 0.5rem 0.3rem;
+  }
+  
+  .acceso-code {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .acceso-name {
+    font-size: 0.6rem;
+  }
+  
+  .acceso-price {
+    font-size: 0.65rem;
+  }
+  
   /* Panel de cobro - más pequeño */
   .pos-right {
     height: 45dvh;
@@ -3278,13 +3432,22 @@ async function eliminarTodosLosDetalles() {
   }
   
   .checkout-actions-scroll .btn-checkout.primary {
-    height: 32px;
+    height: auto;
+    min-height: 32px;
     font-size: 0.6rem;
-    min-width: 90px;
+    min-width: 80px;
+    max-width: 140px;
     border-radius: 5px;
-    padding: 0 0.4rem;
+    padding: 0.3rem 0.4rem;
     border-width: 2px;
     box-shadow: 0 2px 0 var(--border-color);
+    white-space: normal;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary .text {
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.2;
   }
   
   .checkout-actions-scroll .btn-checkout.primary .icon {
@@ -3527,13 +3690,21 @@ async function eliminarTodosLosDetalles() {
   /* Botón principal COBRAR más visible */
   .checkout-actions-scroll .btn-checkout.primary {
     width: auto;
-    min-width: 150px;
-    height: 44px;
-    font-size: 0.85rem;
-    white-space: nowrap;
+    min-width: 130px;
+    max-width: 200px;
+    height: auto;
+    min-height: 40px;
+    font-size: 0.8rem;
+    white-space: normal;
     flex-shrink: 0;
     border-radius: 10px;
-    padding: 0 1rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary .text {
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.2;
   }
   
   .checkout-actions-scroll .btn-checkout.primary .icon {
@@ -4818,6 +4989,90 @@ async function eliminarTodosLosDetalles() {
   animation: float 3s ease-in-out infinite;
 }
 
+.acceso-rapido-section {
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.acceso-rapido-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.acceso-rapido-title .title-icon {
+  font-size: 1.1rem;
+}
+
+.acceso-rapido-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.5rem;
+}
+
+.acceso-rapido-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.6rem 0.4rem;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-primary) 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 3px 8px var(--shadow-color);
+  overflow: hidden;
+}
+
+.acceso-rapido-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+  box-shadow: 0 5px 12px var(--shadow-color);
+}
+
+.acceso-rapido-btn:active {
+  transform: translateY(0);
+}
+
+.acceso-code {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 900;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.acceso-name {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+.acceso-price {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--success-color);
+  font-family: monospace;
+}
+
 .empty-catalog {
   text-align: center;
   padding: 3rem 1rem;
@@ -4898,19 +5153,29 @@ async function eliminarTodosLosDetalles() {
   flex-direction: row;
   gap: 0.5rem;
   min-width: min-content;
+  align-items: center;
 }
 
 .checkout-actions-scroll .btn-checkout.primary {
   width: auto;
   min-width: 140px;
-  height: 42px;
-  white-space: nowrap;
+  max-width: 220px;
+  height: auto;
+  min-height: 42px;
+  white-space: normal;
   background: linear-gradient(180deg, var(--success-color) 0%, #166534 100%);
   border: 3px solid #4ade80;
   box-shadow: 0 4px 0 var(--border-color);
   transition: all 0.2s;
   position: relative;
   overflow: hidden;
+  padding: 0.5rem 0.8rem;
+}
+
+.checkout-actions-scroll .btn-checkout.primary .text {
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .checkout-actions-scroll .btn-checkout.primary::before {
@@ -4986,7 +5251,8 @@ async function eliminarTodosLosDetalles() {
 
 .btn-checkout.primary {
   width: 100%;
-  height: 55px;
+  height: auto;
+  min-height: 55px;
   background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
   color: var(--text-primary);
   border: var(--border-width-thick) solid var(--border-color);
@@ -5002,6 +5268,16 @@ async function eliminarTodosLosDetalles() {
   box-shadow: 0 4px 15px var(--shadow-color);
   transition: all 0.2s;
   text-transform: uppercase;
+  padding: 0.8rem 1rem;
+  overflow: hidden;
+}
+
+.btn-checkout.primary .text {
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.2;
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-checkout.primary:hover:not(:disabled) { 
@@ -5018,6 +5294,22 @@ async function eliminarTodosLosDetalles() {
 .btn-checkout.primary:disabled { 
   opacity: 0.5; 
   cursor: not-allowed; 
+}
+
+.shortcut-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 5px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.btn-checkout.primary:disabled .shortcut-badge {
+  opacity: 0.6;
 }
 
 .extra-actions { 
