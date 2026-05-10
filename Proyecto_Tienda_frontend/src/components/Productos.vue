@@ -49,6 +49,8 @@ const guardando = ref(false);
 const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
 const subcategoriaFiltro = ref<number | null>(null);
+const ordenStock = ref<'mayor' | 'menor' | null>(null);
+const filtroTipo = ref<'unidad' | 'gramaje' | null>(null);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
 const tabActiva = ref<'productos' | 'categorias' | 'subcategorias'>('productos');
 
@@ -211,7 +213,21 @@ const productosFiltrados = computed(() => {
     );
   }
   
-  return results.reverse();
+  if (filtroTipo.value === 'unidad') {
+    results = results.filter(p => !p.is_gramaje);
+  } else if (filtroTipo.value === 'gramaje') {
+    results = results.filter(p => p.is_gramaje);
+  }
+  
+  if (ordenStock.value === 'mayor') {
+    results.sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0));
+  } else if (ordenStock.value === 'menor') {
+    results.sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0));
+  } else {
+    results.reverse();
+  }
+  
+  return results;
 });
 
 const subcategoriasFiltradas = computed(() => {
@@ -423,6 +439,22 @@ onMounted(() => {
               {{ sub.nombre }}
             </option>
           </select>
+          <select 
+            v-model="ordenStock" 
+            class="category-filter"
+          >
+            <option :value="null">Stock: Todos</option>
+            <option value="mayor">Mayor stock</option>
+            <option value="menor">Menor stock</option>
+          </select>
+          <select 
+            v-model="filtroTipo" 
+            class="category-filter"
+          >
+            <option :value="null">Tipo: Todos</option>
+            <option value="unidad">📦 Unidad</option>
+            <option value="gramaje">⚖️ Gramaje</option>
+          </select>
           <div class="search-wrapper">
             <span class="search-icon">🔍</span>
             <input 
@@ -567,7 +599,10 @@ onMounted(() => {
                   </div>
                 </td>
                 <td class="col-stock text-center">
-                  <div class="stock-cell" :class="{ 'stock-critical': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) }">
+                  <div class="stock-cell" :class="{
+                    'stock-low': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) > 0 && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0),
+                    'stock-critical': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) === 0
+                  }">
                     <template v-if="esCategoriaGaming(producto.idCategoria)">
                       <span class="stock-icon">🎮</span>
                       <span class="stock-value rentable-text">Rentable</span>
@@ -615,9 +650,10 @@ onMounted(() => {
         <div class="table-footer" v-if="!cargando && productosFiltrados.length > 0">
           <span class="footer-count">
             {{ productosFiltrados.length }} producto{{ productosFiltrados.length !== 1 ? 's' : '' }}
-            <span v-if="terminoBusqueda.trim() || categoriaFiltro !== null" class="filter-indicator">
+            <span v-if="terminoBusqueda.trim() || categoriaFiltro !== null || filtroTipo !== null" class="filter-indicator">
               (filtrado
               <span v-if="categoriaFiltro !== null"> por: {{ obtenerNombreCategoria(categoriaFiltro) }}</span>
+              <span v-if="filtroTipo !== null">{{ categoriaFiltro !== null ? ',' : '' }} {{ filtroTipo === 'unidad' ? 'Unidad' : 'Gramaje' }}</span>
               )
             </span>
           </span>
@@ -1026,11 +1062,27 @@ onMounted(() => {
 }
 
 .producto-row.low-stock {
-  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 18%, transparent);
+  border-left: 4px solid var(--warning-color);
+}
+
+.producto-row.low-stock:hover {
+  background: color-mix(in srgb, var(--warning-color) 25%, transparent);
 }
 
 .producto-row.out-of-stock {
-  background: color-mix(in srgb, var(--error-color) 10%, transparent);
+  background: color-mix(in srgb, var(--error-color) 20%, transparent);
+  border-left: 4px solid var(--error-color);
+  animation: pulse-stock 2s ease-in-out infinite;
+}
+
+.producto-row.out-of-stock:hover {
+  background: color-mix(in srgb, var(--error-color) 30%, transparent);
+}
+
+@keyframes pulse-stock {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
 }
 
 .producto-row td {
@@ -1149,14 +1201,37 @@ onMounted(() => {
   font-weight: 800;
   font-family: monospace;
   font-size: 0.9rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
 }
 
 .stock-icon {
   font-size: 1rem;
 }
 
+.stock-cell.stock-low {
+  color: #000;
+  background: #fbbf24;
+  font-weight: 900;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
+  animation: pulse-stock-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-stock-warning {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+}
+
 .stock-cell.stock-critical {
-  color: var(--error-color);
+  color: #fff;
+  background: #dc2626;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  animation: pulse-stock-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-stock-badge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
 }
 
 .stock-value {
@@ -1377,6 +1452,21 @@ onMounted(() => {
   .col-tipo {
     display: none;
   }
+  
+  .tabs-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  
+  .tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .tab-btn {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1425,6 +1515,70 @@ onMounted(() => {
   .tabla-productos td {
     padding: 0.6rem 0.75rem;
   }
+  
+  .tabs-bar {
+    padding: 0 1rem;
+  }
+  
+  .tab-btn {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.8rem;
+  }
+  
+  .tab-icon {
+    font-size: 1rem;
+  }
+  
+  .icon-cell {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+  
+  .nombre-text {
+    font-size: 0.85rem;
+  }
+  
+  .nombre-id {
+    font-size: 0.65rem;
+  }
+  
+  .btn-action {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .btn-action .action-icon {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .acciones-cell {
+    gap: 0.35rem;
+  }
+  
+  .toast-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+  }
+  
+  .toast-notification {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+  
+  .toolbar-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .toolbar-right .category-filter,
+  .toolbar-right .search-wrapper,
+  .toolbar-right .import-export-group {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1434,6 +1588,143 @@ onMounted(() => {
   
   .btn-primary {
     padding: 0.6rem 0.875rem;
+  }
+  
+  .tab-text {
+    display: none;
+  }
+  
+  .tab-btn {
+    padding: 0.75rem;
+    justify-content: center;
+  }
+  
+  .tab-icon {
+    font-size: 1.2rem;
+    margin: 0;
+  }
+  
+  .tabs-bar {
+    justify-content: space-around;
+    padding: 0 0.5rem;
+  }
+  
+  .toolbar {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .toolbar-title {
+    font-size: 1.1rem;
+  }
+  
+  .title-icon {
+    font-size: 1.2rem;
+  }
+  
+  .toolbar-subtitle {
+    font-size: 0.7rem;
+  }
+  
+  .tabla-productos {
+    font-size: 0.8rem;
+  }
+  
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.5rem 0.5rem;
+  }
+  
+  .icon-cell {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  
+  .nombre-text {
+    font-size: 0.8rem;
+  }
+  
+  .nombre-id {
+    font-size: 0.6rem;
+  }
+  
+  .btn-action {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .btn-action .action-icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .acciones-cell {
+    gap: 0.25rem;
+  }
+  
+  .stock-cell {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+  }
+  
+  .stock-icon {
+    font-size: 0.85rem;
+  }
+  
+  .toast-container {
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+  }
+  
+  .toast-notification {
+    padding: 0.75rem 0.85rem;
+  }
+  
+  .toast-icon {
+    font-size: 1rem;
+  }
+  
+  .toast-message {
+    font-size: 0.8rem;
+  }
+  
+  .estado-loading,
+  .estado-empty {
+    padding: 2.5rem 0.5rem;
+  }
+  
+  .empty-icon {
+    font-size: 2.5rem;
+  }
+  
+  .empty-text {
+    font-size: 0.9rem;
+  }
+  
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+  }
+  
+  .category-filter,
+  .search-input {
+    font-size: 0.8rem;
+    padding: 0.5rem 2rem 0.5rem 0.7rem;
+  }
+  
+  .btn-secondary {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.7rem;
+  }
+  
+  .table-footer {
+    padding: 0.6rem 1rem;
+  }
+  
+  .footer-count {
+    font-size: 0.7rem;
   }
 }
 </style>

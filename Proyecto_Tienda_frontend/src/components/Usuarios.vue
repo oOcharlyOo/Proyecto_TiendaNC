@@ -97,9 +97,6 @@ const cargandoAsistencias = ref(false);
 const avatarPreview = ref<string | null>(null);
 const avatarBase64 = ref<string>('');
 const dragando = ref(false);
-const posicionAvatar = ref({ x: 0, y: 0 });
-const escalaAvatar = ref(1);
-const imgAvatar = ref<HTMLImageElement | null>(null);
 
 const form = ref<UsuarioForm>({
   usuario: '',
@@ -351,8 +348,6 @@ function abrirModalNuevo() {
   };
   avatarPreview.value = null;
   avatarBase64.value = '';
-  posicionAvatar.value = { x: 0, y: 0 };
-  escalaAvatar.value = 1;
   modalAbierto.value = true;
 }
 
@@ -370,8 +365,6 @@ function abrirModalEditar(usuario: Usuario) {
   };
   avatarPreview.value = usuario.avatar;
   avatarBase64.value = '';
-  posicionAvatar.value = { x: 0, y: 0 };
-  escalaAvatar.value = 1;
   modalAbierto.value = true;
 }
 
@@ -414,48 +407,8 @@ function procesarArchivo(file: File) {
     avatarBase64.value = result;
     avatarPreview.value = result;
     form.value.avatar = result;
-    posicionAvatar.value = { x: 0, y: 0 };
-    escalaAvatar.value = 1;
   };
   reader.readAsDataURL(file);
-}
-
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-
-function handleMouseDown(e: MouseEvent) {
-  if (!avatarPreview.value) return;
-  isDragging = true;
-  startX = e.clientX;
-  startY = e.clientY;
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-}
-
-function handleMouseMove(e: MouseEvent) {
-  if (!isDragging) return;
-  const dx = e.clientX - startX;
-  const dy = e.clientY - startY;
-  posicionAvatar.value = {
-    x: posicionAvatar.value.x + dx,
-    y: posicionAvatar.value.y + dy
-  };
-  startX = e.clientX;
-  startY = e.clientY;
-}
-
-function handleMouseUp() {
-  isDragging = false;
-  document.removeEventListener('mousemove', handleMouseMove);
-  document.removeEventListener('mouseup', handleMouseUp);
-}
-
-function handleWheel(e: WheelEvent) {
-  if (!avatarPreview.value) return;
-  e.preventDefault();
-  const delta = e.deltaY > 0 ? -0.1 : 0.1;
-  escalaAvatar.value = Math.max(0.5, Math.min(2, escalaAvatar.value + delta));
 }
 
 function formatAvatarUrl(url: string | null): string | undefined {
@@ -759,8 +712,8 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
             </button>
           </div>
         </div>
-      </div>
-    </div>
+                </div>
+              </div>
 
     <!-- Sección Ventas por Usuario (BETA) -->
     <div v-if="seccionActiva === 'ventas'" class="seccion-ventas">
@@ -1022,8 +975,6 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
                   @dragleave="handleDragLeave"
                   @drop="handleDrop"
                   @click="(($refs.fileInput as HTMLInputElement)?.click())"
-                  @mousedown="handleMouseDown"
-                  @wheel="handleWheel"
                 >
                   <input 
                     ref="fileInput"
@@ -1033,24 +984,15 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
                     style="display: none"
                   />
                   
-                  <div 
+                  <img 
                     v-if="avatarPreview" 
-                    class="avatar-preview-container"
-                  >
-                    <img 
-                      ref="imgAvatar"
-                      :src="avatarPreview" 
-                      class="avatar-preview"
-                      :style="{
-                        transform: `translate(${posicionAvatar.x}px, ${posicionAvatar.y}px) scale(${escalaAvatar})`
-                      }"
-                      draggable="false"
-                    />
-                  </div>
+                    :src="avatarPreview" 
+                    class="avatar-preview"
+                    draggable="false"
+                  />
                   <div v-else class="dropzone-placeholder">
                     <span class="drop-icon">📁</span>
-                    <span>Arrastra imagen</span>
-                    <small>Scroll para zoom</small>
+                    <span>Seleccionar imagen</span>
                   </div>
                 </div>
               </div>
@@ -1679,10 +1621,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .avatar-dropzone:hover, .avatar-dropzone.dragando {
@@ -1690,20 +1629,23 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
 }
 
-.avatar-preview-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
 .avatar-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .dropzone-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1711,6 +1653,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   color: var(--text-secondary);
   font-size: 0.8rem;
   text-align: center;
+  width: 100%;
 }
 
 .drop-icon { font-size: 2rem; }

@@ -1146,6 +1146,101 @@ onMounted(async () => {
   .col-desc {
     display: none;
   }
+  
+  .tabla-subcategorias th,
+  .tabla-subcategorias td {
+    padding: 0.6rem 0.75rem;
+  }
+  
+  .btn-action {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .btn-action .action-icon {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .acciones-cell {
+    gap: 0.35rem;
+  }
+  
+  .toast-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+  }
+  
+  .toast-notification {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-primary .btn-text {
+    display: none;
+  }
+  
+  .btn-primary {
+    padding: 0.6rem 0.875rem;
+  }
+  
+  .subcategorias-toolbar {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .toolbar-title {
+    font-size: 1.1rem;
+  }
+  
+  .tabla-subcategorias {
+    font-size: 0.8rem;
+  }
+  
+  .tabla-subcategorias th,
+  .tabla-subcategorias td {
+    padding: 0.5rem 0.5rem;
+  }
+  
+  .btn-action {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .btn-action .action-icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .acciones-cell {
+    gap: 0.25rem;
+  }
+  
+  .toast-container {
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+  }
+  
+  .toast-notification {
+    padding: 0.75rem 0.85rem;
+  }
+  
+  .toast-icon {
+    font-size: 1rem;
+  }
+  
+  .toast-message {
+    font-size: 0.8rem;
+  }
+  
+  .btn-secondary {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.7rem;
+  }
 }
 
 @media (max-width: 480px) {
