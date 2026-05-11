@@ -1377,7 +1377,7 @@ async function cargarHistorialVentasDia() {
   try {
     const fechaHoy = getFechaHoy();
     const data = await getJson<ApiRespuesta<{ cobroTotal?: number | string; gananciaTotal?: number | string; ventas?: VentaDTO[] }>>(
-      `/ventas/obtenerVentaPorDia/${fechaHoy}`
+      `/ventas/historialDia/${fechaHoy}`
     );
 
     historialCobroTotal.value = Number(data?.datos?.cobroTotal ?? 0);
@@ -1393,15 +1393,6 @@ async function cargarHistorialVentasDia() {
       }
     }
     historialUsuariosUnicos.value = Array.from(usuariosMap.entries()).map(([id, nombre]) => ({ idUsuario: id, nombre }));
-    
-    for (const venta of historialVentas.value) {
-      const detallesResp = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
-        `/ventasDetalle/porVenta/${venta.idVenta}`
-      );
-      const detalles = detallesResp?.datos || [];
-      const montoVenta = Number(venta.montoTotal ?? 0);
-      venta.tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
-    }
   } catch (_error) {
     historialCobroTotal.value = 0;
     historialGananciaTotal.value = 0;
