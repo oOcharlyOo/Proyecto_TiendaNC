@@ -469,6 +469,12 @@ const gramajeEditandoIndice = ref<number | null>(null);
 const gramajeEditandoCantidad = ref<number>(0);
 const gramajeEditandoPrecio = ref<number>(0);
 const modalCobroAbierto = ref(false);
+const modalDescripcionPendiente = ref(false);
+const descripcionPendienteTexto = ref('');
+const modalVentasPendientesAbierto = ref(false);
+const ventasPendientes = ref<any[]>([]);
+const ventaPendienteSeleccionada = ref<any>(null);
+const modalCobroPendienteAbierto = ref(false);
 const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
 const historialGananciaTotal = ref(0);
@@ -560,6 +566,8 @@ onMounted(() => {
   });
   
   window.addEventListener('keydown', manejarAtajosTeclado);
+  
+  cargarVentasPendientes();
 });
 
 onUnmounted(() => {
@@ -1303,6 +1311,145 @@ async function confirmarCobroTransferencia() {
 
 async function confirmarCobroTarjeta() {
   await procesarCobro('TARJETA');
+}
+
+function confirmarCobroPendiente() {
+  if (ticket.value.length === 0) {
+    mostrarMensaje('No hay productos en el ticket.', 'error');
+    return;
+  }
+  modalCobroAbierto.value = false;
+  descripcionPendienteTexto.value = '';
+  modalDescripcionPendiente.value = true;
+}
+
+async function guardarVentaPendiente() {
+  if (!descripcionPendienteTexto.value.trim()) {
+    mostrarMensaje('Debes escribir una descripción del motivo.', 'error');
+    return;
+  }
+
+  if (!ticketActual.value || ticketActual.value.items.length === 0) {
+    mostrarMensaje('No hay productos en el ticket.', 'error');
+    return;
+  }
+
+  try {
+    const montoTotal = totalVenta.value;
+    const ventaId = ticketActual.value.id;
+    const numTicket = ticketActual.value.numero;
+
+    await getJson<ApiRespuesta<any>>(`/ventas/actualizarVenta/${ventaId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ montoTotal }),
+    });
+
+    for (const item of ticketActual.value.items as (TicketItem | TicketItemPromocion)[]) {
+      if ((item as any).is_promocion && (item as any).promocion) {
+        const promo = (item as any).promocion;
+        for (const detalle of promo.detalles) {
+          const cantidad = Number(detalle.cantidad) || 0;
+          const subtotalDetalle = Number(detalle.subtotal) || 0;
+          const precioUnitario = cantidad > 0 ? subtotalDetalle / cantidad : 0;
+          await crearDetalleVenta(ventaId, {
+            id: detalle.id_producto,
+            nombre: detalle.nombre_producto || '',
+            dto: { idProducto: detalle.id_producto, nombre: '', precio_venta: Number(detalle.precio_unitario) || 0, codigoBarras: '' },
+            cantidad: cantidad,
+            precio: precioUnitario,
+            is_gramaje: cantidad < 1000,
+          });
+        }
+      } else {
+        await crearDetalleVenta(ventaId, item);
+      }
+    }
+
+    await getJson<ApiRespuesta<any>>(`/ventas/marcarPendiente/${ventaId}?descripcion=${encodeURIComponent(descripcionPendienteTexto.value.trim())}`, {
+      method: 'PUT',
+    });
+
+    tickets.value = tickets.value.filter(t => t.id !== ticketActual.value!.id);
+    if (tickets.value.length === 0) {
+      await crearNuevoTicket();
+    } else {
+      const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+      if (pendiente) {
+        ticketActualId.value = pendiente.id;
+      } else {
+        ticketActualId.value = tickets.value[0].id;
+      }
+    }
+
+    modalDescripcionPendiente.value = false;
+    descripcionPendienteTexto.value = '';
+    mostrarMensaje(`Venta guardada como pendiente. Ticket #${numTicket}`, 'ok');
+    await cargarVentasPendientes();
+  } catch (error) {
+    const detalle = error instanceof Error ? error.message : 'Error inesperado.';
+    mostrarMensaje(`No se pudo guardar: ${detalle}`, 'error');
+  }
+}
+
+async function cargarVentasPendientes() {
+  try {
+    const data = await getJson<ApiRespuesta<any[]>>('/ventas/buscarVentasEnProceso');
+    ventasPendientes.value = data?.datos ?? [];
+  } catch (_error) {
+    ventasPendientes.value = [];
+  }
+}
+
+function abrirModalPendientes() {
+  modalVentasPendientesAbierto.value = true;
+  cargarVentasPendientes();
+}
+
+function cobrarVentaPendiente(venta: any) {
+  ventaPendienteSeleccionada.value = venta;
+  modalVentasPendientesAbierto.value = false;
+  modalCobroPendienteAbierto.value = true;
+}
+
+async function confirmarCobroPendienteEfectivo(payload: { montoRecibido: number }) {
+  if (payload.montoRecibido < Number(ventaPendienteSeleccionada.value.montoTotal)) {
+    mostrarMensaje('El monto recibido es menor al total.', 'error');
+    return;
+  }
+  await procesarCobroPendiente('EFECTIVO');
+}
+
+async function confirmarCobroPendienteTransferencia() {
+  await procesarCobroPendiente('TRANSFERENCIA');
+}
+
+async function confirmarCobroPendienteTarjeta() {
+  await procesarCobroPendiente('TARJETA');
+}
+
+async function procesarCobroPendiente(metodoPago: string) {
+  if (!ventaPendienteSeleccionada.value) return;
+  const idUsuario = obtenerIdUsuarioSesion();
+  if (!idUsuario) {
+    mostrarMensaje('No se encontro sesion de usuario.', 'error');
+    return;
+  }
+  try {
+    const venta = ventaPendienteSeleccionada.value;
+    await getJson<ApiRespuesta<any>>(
+      `/ventas/cobrarVentaPendiente/${venta.idVenta}?idUsuario=${idUsuario}&metodoPago=${metodoPago}&montoTotal=${Number(venta.montoTotal)}`,
+      { method: 'PUT' }
+    );
+    mostrarMensaje(`Venta #${venta.numeroTicket} cobrada por ${formatoMoneda(Number(venta.montoTotal))} con ${metodoPago}.`, 'ok');
+    playSound('cash');
+    modalCobroPendienteAbierto.value = false;
+    ventaPendienteSeleccionada.value = null;
+    await cargarVentasPendientes();
+    await cargarTicketsDesdeBackend();
+  } catch (error) {
+    const detalle = error instanceof Error ? error.message : 'Error inesperado.';
+    mostrarMensaje(`No se pudo cobrar: ${detalle}`, 'error');
+  }
 }
 
 async function registrarEntradaEfectivo(payload: { montoEoS: number; descripcion: string }) {
@@ -2151,6 +2298,11 @@ async function eliminarTodosLosDetalles() {
           </button>
         </div>
       </nav>
+
+      <button class="btn-pendientes-ticket" @click="abrirModalPendientes" title="Ventas Pendientes">
+        <span class="pending-badge" v-if="ventasPendientes.length > 0">{{ ventasPendientes.length }}</span>
+        P
+      </button>
     </aside>
 
     <!-- PANEL CENTRAL: BUSCADOR Y CATÁLOGO -->
@@ -2529,8 +2681,79 @@ async function eliminarTodosLosDetalles() {
       @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null" 
       @add="agregarProductoGramaje" 
     />
-    <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" />
+    <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" @confirmar-pendiente="confirmarCobroPendiente" />
+    <CobroModal :open="modalCobroPendienteAbierto" :total="Number(ventaPendienteSeleccionada?.montoTotal) || 0" @close="modalCobroPendienteAbierto = false; ventaPendienteSeleccionada = null" @confirmar-efectivo="confirmarCobroPendienteEfectivo" @confirmar-transferencia="confirmarCobroPendienteTransferencia" @confirmar-tarjeta="confirmarCobroPendienteTarjeta" />
     <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />
+
+    <!-- Modal descripción pendiente -->
+    <div v-if="modalDescripcionPendiente" class="pos-modal-overlay" @click.self="modalDescripcionPendiente = false">
+      <div class="pos-modal-card animate-pop-in">
+        <div class="modal-corner tl"></div>
+        <div class="modal-corner tr"></div>
+        <div class="modal-corner bl"></div>
+        <div class="modal-corner br"></div>
+        
+        <header class="modal-h">
+          <h3>⏳ Venta Pendiente</h3>
+          <button class="close-x" @click="modalDescripcionPendiente = false">×</button>
+        </header>
+        <div class="modal-b">
+          <p class="pendiente-hint">Escribe la razón por la que esta venta queda pendiente:</p>
+          <textarea 
+            v-model="descripcionPendienteTexto" 
+            class="pendiente-textarea" 
+            placeholder="Ej: El cliente regresa en 30 minutos a pagar..."
+            rows="4"
+          ></textarea>
+          <div class="pendiente-actions">
+            <button class="btn-cancelar" @click="modalDescripcionPendiente = false">Cancelar</button>
+            <button class="btn-guardar" @click="guardarVentaPendiente">💾 Guardar Pendiente</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal ventas pendientes -->
+    <div v-if="modalVentasPendientesAbierto" class="pos-modal-overlay" @click.self="modalVentasPendientesAbierto = false">
+      <div class="pos-modal-card animate-pop-in">
+        <div class="modal-corner tl"></div>
+        <div class="modal-corner tr"></div>
+        <div class="modal-corner bl"></div>
+        <div class="modal-corner br"></div>
+        
+        <header class="modal-h">
+          <h3>📋 Ventas Pendientes</h3>
+          <button class="close-x" @click="modalVentasPendientesAbierto = false">×</button>
+        </header>
+        <div class="modal-b custom-scrollbar">
+          <div v-if="ventasPendientes.length === 0" class="empty-pendientes">
+            <span class="empty-icon">✅</span>
+            <p>No hay ventas pendientes</p>
+          </div>
+          <div v-else class="lista-pendientes">
+            <div v-for="v in ventasPendientes" :key="v.idVenta" class="pendiente-card">
+              <div class="pendiente-header">
+                <span class="pendiente-ticket">Ticket #{{ v.numeroTicket }}</span>
+                <span class="pendiente-monto">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
+              </div>
+              <div class="pendiente-meta">
+                <span class="pendiente-hora">{{ v.fechaVenta?.slice(11, 16) }}</span>
+                <span class="pendiente-cajero">{{ v.nombreUsuario }}</span>
+              </div>
+              <div class="pendiente-productos">
+                <div v-for="(d, i) in v.detalles" :key="i" class="producto-item">
+                  <span class="prod-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
+                  <span class="prod-name">{{ d.productoNombre }}</span>
+                  <span class="prod-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
+                </div>
+              </div>
+              <p class="pendiente-desc">{{ v.descripcionPendiente || 'Sin descripción' }}</p>
+              <button class="btn-cobrar-pendiente" @click="cobrarVentaPendiente(v)">💰 Cobrar Ahora</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <Transition name="toast">
       <div v-if="mensaje" class="toast-overlay">
@@ -3943,6 +4166,49 @@ async function eliminarTodosLosDetalles() {
 
 .ticket-nav-item:hover .btn-delete-ticket { display: flex; }
 
+.btn-pendientes-ticket {
+  width: 56px;
+  height: 56px;
+  margin: 0.5rem auto 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #c4a86b 0%, #8a7a4a 100%);
+  color: #2a1f0f;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-pendientes-ticket:hover {
+  border-color: #e74c3c;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+}
+
+.btn-pendientes-ticket .pending-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #e74c3c;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: bold;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  animation: badge-pulse 2s infinite;
+}
+
 /* Media queries para tickets */
 @media (max-width: 1199px) {
   .ticket-nav-item {
@@ -5228,6 +5494,11 @@ async function eliminarTodosLosDetalles() {
   box-shadow: 0 1px 0 var(--border-color);
 }
 
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
 .checkout-actions-scroll .btn-checkout.secondary {
   width: 42px;
   min-width: 42px;
@@ -5824,6 +6095,176 @@ async function eliminarTodosLosDetalles() {
 /* =========================================
    MODAL DETALLE RESPONSIVE
    ========================================= */
+
+/* Modal descripción pendiente */
+.pendiente-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  font-style: italic;
+}
+
+.pendiente-textarea {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pendiente-textarea:focus {
+  border-color: var(--accent-color);
+}
+
+.pendiente-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.pendiente-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+/* Lista de ventas pendientes */
+.empty-pendientes {
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-pendientes .empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.lista-pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pendiente-card {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  transition: all 0.2s;
+}
+
+.pendiente-card:hover {
+  border-color: var(--accent-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.pendiente-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.pendiente-ticket {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: var(--accent-color);
+}
+
+.pendiente-monto {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.pendiente-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.pendiente-productos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.15);
+  border-radius: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.producto-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.prod-qty {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+}
+
+.prod-name {
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.prod-price {
+  font-weight: bold;
+  color: var(--success-color);
+  font-size: 0.8rem;
+}
+
+.pendiente-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.1);
+  border-radius: 4px;
+  font-style: italic;
+}
+
+.btn-cobrar-pendiente {
+  width: 100%;
+  padding: 0.6rem;
+  background: linear-gradient(180deg, #7fa86b 0%, #5a7a45 100%);
+  border: 2px solid #4a6a35;
+  border-radius: 6px;
+  color: #1a2a0f;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cobrar-pendiente:hover {
+  background: linear-gradient(180deg, #8fb87a 0%, #6a8a55 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.btn-cobrar-pendiente:active {
+  transform: translateY(0);
+}
+
 @media (max-width: 768px) {
   .pos-modal-card {
     width: min(100%, 95vw) !important;

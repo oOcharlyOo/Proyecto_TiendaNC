@@ -11,6 +11,7 @@ const emit = defineEmits<{
   (event: 'confirmar-efectivo', payload: { montoRecibido: number }): void;
   (event: 'confirmar-transferencia'): void;
   (event: 'confirmar-tarjeta'): void;
+  (event: 'confirmar-pendiente'): void;
 }>();
 
 const montoRecibido = ref<number | null>(null);
@@ -42,8 +43,15 @@ function formatoMoneda(valor: number) {
 }
 
 function confirmarEfectivo() {
-  const recibido = Number(montoRecibido.value ?? 0);
+  const recibido = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : props.total;
   emit('confirmar-efectivo', { montoRecibido: recibido });
+}
+
+function manejarEnter(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    confirmarEfectivo();
+  }
 }
 
 function manejarTeclado(e: KeyboardEvent) {
@@ -58,6 +66,9 @@ function manejarTeclado(e: KeyboardEvent) {
   } else if (e.key === 'F4') {
     e.preventDefault();
     emit('confirmar-tarjeta');
+  } else if (e.key === 'F5') {
+    e.preventDefault();
+    emit('confirmar-pendiente');
   }
 }
 
@@ -113,6 +124,7 @@ onUnmounted(() => {
                   step="0.01" 
                   min="0" 
                   placeholder="0.00"
+                  @keydown.enter="manejarEnter"
                 >
               </div>
             </div>
@@ -143,6 +155,13 @@ onUnmounted(() => {
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Tarjeta</span>
                 <span class="btn-shortcut">F4</span>
+                <span class="btn-rune">◈</span>
+              </button>
+              
+              <button class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Pendiente</span>
+                <span class="btn-shortcut">F5</span>
                 <span class="btn-rune">◈</span>
               </button>
             </div>
@@ -450,7 +469,7 @@ onUnmounted(() => {
 
 .payment-buttons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
 }
 
@@ -574,6 +593,15 @@ onUnmounted(() => {
   background: linear-gradient(180deg, #c48a7b 0%, #9a6a5a 100%);
 }
 
+.pendiente {
+  background: linear-gradient(180deg, #c4a86b 0%, #8a7a4a 100%);
+  color: #3f3a1a;
+}
+
+.pendiente:hover {
+  background: linear-gradient(180deg, #d4b87b 0%, #9a8a5a 100%);
+}
+
 .cancel-btn {
   width: 100%;
   padding: 0.6rem;
@@ -625,7 +653,7 @@ onUnmounted(() => {
   }
   
   .payment-buttons {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.4rem;
   }
   

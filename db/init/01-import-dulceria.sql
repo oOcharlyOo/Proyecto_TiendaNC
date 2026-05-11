@@ -158,6 +158,7 @@ CREATE TABLE tiendadb.ventas (
     estatus VARCHAR(1) DEFAULT 'P',
     numero_ticket INT NOT NULL DEFAULT 0,
     metodo_pago VARCHAR(50) DEFAULT 'EFECTIVO',
+    descripcion_pendiente TEXT,
 
     CONSTRAINT fk_usuario_venta
         FOREIGN KEY(id_usuario) 
