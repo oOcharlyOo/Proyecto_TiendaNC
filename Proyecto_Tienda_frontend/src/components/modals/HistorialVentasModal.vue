@@ -13,6 +13,7 @@ type VentaResumen = {
   estatus?: string;
   fechaVenta?: string;
   tieneDiscrepancia?: boolean;
+  ganancia?: number | string;
 };
 
 const props = defineProps<{
@@ -40,1513 +41,228 @@ const correccionMensaje = ref('');
 
 const ventasFiltradas = computed(() => {
   let result = props.ventas;
-  
-  if (filtroUsuario.value !== 'todos') {
-    result = result.filter(v => v.idUsuario === filtroUsuario.value);
-  }
-  
-  if (filtroDiscrepancia.value === 'discrepancia') {
-    result = result.filter(v => v.tieneDiscrepancia);
-  }
-  
+  if (filtroUsuario.value !== 'todos') result = result.filter(v => v.idUsuario === filtroUsuario.value);
+  if (filtroDiscrepancia.value === 'discrepancia') result = result.filter(v => v.tieneDiscrepancia);
   return result;
 });
 
-const ventasConDiscrepancia = computed(() => {
-  return ventasFiltradas.value.filter(v => v.tieneDiscrepancia);
+const ventasConDiscrepancia = computed(() => ventasFiltradas.value.filter(v => v.tieneDiscrepancia));
+
+const cobroTotalFiltrado = computed(() => ventasFiltradas.value.reduce((sum, v) => sum + Number(v.montoTotal ?? 0), 0));
+
+const gananciasPorVendedor = computed(() => {
+  if (!props.usuariosUnicos?.length) return [];
+  return props.usuariosUnicos.map(u => {
+    const ventasU = ventasFiltradas.value.filter(v => v.idUsuario === u.idUsuario);
+    return {
+      idUsuario: u.idUsuario, nombre: u.nombre,
+      totalVentas: ventasU.length,
+      montoTotal: ventasU.reduce((s, v) => s + Number(v.montoTotal ?? 0), 0),
+      gananciaTotal: ventasU.reduce((s, v) => s + Number(v.ganancia ?? 0), 0)
+    };
+  }).sort((a, b) => b.gananciaTotal - a.gananciaTotal);
 });
 
-const cobroTotalFiltrado = computed(() => {
-  return ventasFiltradas.value.reduce((sum, v) => sum + Number(v.montoTotal ?? 0), 0);
-});
+const maxCobro = computed(() => gananciasPorVendedor.value.length ? Math.max(...gananciasPorVendedor.value.map(v => v.montoTotal)) : 0);
+const maxGanancia = computed(() => gananciasPorVendedor.value.length ? Math.max(...gananciasPorVendedor.value.map(v => v.gananciaTotal)) : 0);
+const todasSeleccionadas = computed(() => ventasConDiscrepancia.value.length > 0 && ventasConDiscrepancia.value.every(v => ventasSeleccionadas.value.has(v.idVenta)));
 
-const todasSeleccionadas = computed(() => {
-  return ventasConDiscrepancia.value.length > 0 && 
-         ventasConDiscrepancia.value.every(v => ventasSeleccionadas.value.has(v.idVenta));
-});
+function toggleSeleccion(id: number) { ventasSeleccionadas.value.has(id) ? ventasSeleccionadas.value.delete(id) : ventasSeleccionadas.value.add(id); }
+function seleccionarTodas() { todasSeleccionadas.value ? ventasSeleccionadas.value.clear() : ventasConDiscrepancia.value.forEach(v => ventasSeleccionadas.value.add(v.idVenta)); }
+function formatoMoneda(v: number) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v); }
+function formatoHora(f?: string) { if (!f) return 'N/D'; const d = new Date(f); return Number.isNaN(d.getTime()) ? 'N/D' : d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); }
+function getMetodoClase(m?: string) { if (!m) return 'efectivo'; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? 'transferencia' : u === 'TARJETA' ? 'tarjeta' : 'efectivo'; }
+function getMetodoIcono(m?: string) { if (!m) return ''; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? '📱' : u === 'TARJETA' ? '💳' : '💵'; }
+function getMetodoLabel(m?: string) { if (!m) return 'N/D'; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? 'Transferencia' : u === 'TARJETA' ? 'Tarjeta' : u === 'EFECTIVO' ? 'Efectivo' : m; }
 
-function toggleSeleccion(idVenta: number) {
-  if (ventasSeleccionadas.value.has(idVenta)) {
-    ventasSeleccionadas.value.delete(idVenta);
-  } else {
-    ventasSeleccionadas.value.add(idVenta);
-  }
-}
-
-function seleccionarTodas() {
-  if (todasSeleccionadas.value) {
-    ventasSeleccionadas.value.clear();
-  } else {
-    ventasConDiscrepancia.value.forEach(v => ventasSeleccionadas.value.add(v.idVenta));
-  }
-}
-
-function formatoMoneda(valor: number) {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN'
-  }).format(valor);
-}
-
-function formatoFecha(fecha?: string) {
-  if (!fecha) return 'N/D';
-  const parsed = new Date(fecha);
-  if (Number.isNaN(parsed.getTime())) return 'N/D';
-  return parsed.toLocaleString('es-MX');
-}
-
-function getMetodoClase(metodo?: string): string {
-  if (!metodo) return 'efectivo';
-  const m = metodo.toUpperCase();
-  if (m === 'TRANSFERENCIA') return 'transferencia';
-  if (m === 'TARJETA') return 'tarjeta';
-  return 'efectivo';
-}
-
-function getMetodoIcono(metodo?: string): string {
-  if (!metodo) return '💵';
-  const m = metodo.toUpperCase();
-  if (m === 'TRANSFERENCIA') return '📱';
-  if (m === 'TARJETA') return '💳';
-  return '💵';
-}
-
-function getMetodoLabel(metodo?: string): string {
-  if (!metodo) return 'N/D';
-  const m = metodo.toUpperCase();
-  if (m === 'TRANSFERENCIA') return 'Transferencia';
-  if (m === 'TARJETA') return 'Tarjeta';
-  if (m === 'EFECTIVO') return 'Efectivo';
-  return metodo;
-}
-
-function getEstatusIcono(estatus?: string): string {
-  if (!estatus) return '❓';
-  if (estatus === 'C' || estatus === 'F') return '✅';
-  if (estatus === 'P') return '⏳';
-  return '❌';
-}
-
-function getEstatusLabel(estatus?: string): string {
-  if (!estatus) return 'Inactivo';
-  if (estatus === 'C') return 'Completada';
-  if (estatus === 'F') return 'Finalizada';
-  if (estatus === 'P') return 'Pendiente';
-  return 'Inactiva';
-}
-
-function formatoHora(fecha?: string): string {
-  if (!fecha) return 'N/D';
-  const parsed = new Date(fecha);
-  if (Number.isNaN(parsed.getTime())) return 'N/D';
-  return parsed.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-}
-
-async function corregirSeleccionadas() {
-  const ids = Array.from(ventasSeleccionadas.value);
-  if (ids.length === 0) return;
-  
+async function corregir(ids: number[]) {
+  if (!ids.length) return;
   corrigiendo.value = true;
   correccionMensaje.value = '';
-  
   try {
-    const respuesta = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idVentas: ids })
-    });
-    
-    console.log('Status:', respuesta.status, 'OK:', respuesta.ok);
-    
-    const raw = await respuesta.text();
-    console.log('Raw response (first 300):', raw.substring(0, 300));
-    
-    let res: any;
-    try {
-      res = JSON.parse(raw);
-    } catch (parseErr) {
-      console.error('Parse error:', parseErr);
-      correccionMensaje.value = `❌ Respuesta inválida`;
-      return;
-    }
-    
-    console.log('Parsed response:', res);
-    
+    const r = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idVentas: ids }) });
+    const raw = await r.text();
+    let res: any; try { res = JSON.parse(raw); } catch { correccionMensaje.value = '❌ Respuesta inválida'; return; }
     if (res?.codigo === 200) {
-      const corregidos = res.datos?.filter((r: any) => r.corregido)?.length || 0;
-      const fallidos = res.datos?.filter((r: any) => !r.corregido)?.length || 0;
-      correccionMensaje.value = `✅ ${corregidos} corregidas${fallidos > 0 ? `, ${fallidos} sin cambios` : ''}`;
+      const ok = res.datos?.filter((x: any) => x.corregido)?.length || 0;
+      const fail = res.datos?.filter((x: any) => !x.corregido)?.length || 0;
+      correccionMensaje.value = `✅ ${ok} corregidas${fail > 0 ? `, ${fail} sin cambios` : ''}`;
       ventasSeleccionadas.value.clear();
       emit('ventas-corregidas');
-    } else {
-      correccionMensaje.value = `❌ Error: ${res?.mensaje || 'Error desconocido'}`;
-    }
-  } catch (e) {
-    console.error('Fetch error:', e);
-    correccionMensaje.value = `❌ Error: ${e instanceof Error ? e.message : 'Desconocido'}`;
-  } finally {
-    corrigiendo.value = false;
-    setTimeout(() => { correccionMensaje.value = ''; }, 5000);
-  }
-}
-
-async function corregirTodas() {
-  const ids = ventasConDiscrepancia.value.map(v => v.idVenta);
-  if (ids.length === 0) return;
-  
-  corrigiendo.value = true;
-  correccionMensaje.value = '';
-  
-  try {
-    const respuesta = await fetch(`${API_BASE}/ventasDetalle/corregirDiscrepancias`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idVentas: ids })
-    });
-    
-    console.log('Status:', respuesta.status, 'OK:', respuesta.ok);
-    
-    const raw = await respuesta.text();
-    console.log('Raw response (first 300):', raw.substring(0, 300));
-    
-    let res: any;
-    try {
-      res = JSON.parse(raw);
-    } catch (parseErr) {
-      console.error('Parse error:', parseErr);
-      correccionMensaje.value = `❌ Respuesta inválida`;
-      return;
-    }
-    
-    console.log('Parsed response:', res);
-    
-    if (res?.codigo === 200) {
-      const corregidos = res.datos?.filter((r: any) => r.corregido)?.length || 0;
-      const fallidos = res.datos?.filter((r: any) => !r.corregido)?.length || 0;
-      correccionMensaje.value = `✅ ${corregidos} corregidas${fallidos > 0 ? `, ${fallidos} sin cambios` : ''}`;
-      ventasSeleccionadas.value.clear();
-      emit('ventas-corregidas');
-    } else {
-      correccionMensaje.value = `❌ Error: ${res?.mensaje || 'Error desconocido'}`;
-    }
-  } catch (e) {
-    console.error('Fetch error:', e);
-    correccionMensaje.value = `❌ Error: ${e instanceof Error ? e.message : 'Desconocido'}`;
-  } finally {
-    corrigiendo.value = false;
-    setTimeout(() => { correccionMensaje.value = ''; }, 5000);
-  }
+    } else correccionMensaje.value = `❌ ${res?.mensaje || 'Error'}`;
+  } catch (e) { correccionMensaje.value = `❌ ${e instanceof Error ? e.message : 'Error'}`; }
+  finally { corrigiendo.value = false; setTimeout(() => correccionMensaje.value = '', 5000); }
 }
 </script>
 
 <template>
-  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
-    <section class="modal-card panel">
-      <div class="modal-corner tl"></div>
-      <div class="modal-corner tr"></div>
-      <div class="modal-corner bl"></div>
-      <div class="modal-corner br"></div>
-      
-      <button type="button" class="btn-cerrar-modal" @click="emit('close')" title="Cerrar">
-        ✕
-      </button>
-      
-      <header class="modal-header">
-        <div class="titulo-header">
-          <span class="emoji">📜</span>
-          <h3>Historial de Ventas del Día</h3>
+  <div v-if="open" class="hist-overlay" @click.self="emit('close')">
+    <section class="hist-modal">
+      <button class="hist-close" @click="emit('close')">✕</button>
+
+      <header class="hist-header">
+        <h2>📜 Historial de Ventas</h2>
+        <div class="hist-summary">
+          <div class="hist-sum-item"><span class="hist-sum-label">Ventas</span><span class="hist-sum-val">{{ ventasFiltradas.length }}</span></div>
+          <div class="hist-sum-item accent"><span class="hist-sum-label">Cobro Total</span><span class="hist-sum-val">{{ formatoMoneda(cobroTotalFiltrado) }}</span></div>
+          <div class="hist-sum-item profit"><span class="hist-sum-label">Ganancia</span><span class="hist-sum-val">{{ formatoMoneda(gananciaTotal) }}</span></div>
         </div>
       </header>
 
-      <div v-if="usuariosUnicos && usuariosUnicos.length > 0" class="filtro-usuario">
-        <label for="filtro-usuario">Filtrar por cajero:</label>
-        <select id="filtro-usuario" v-model="filtroUsuario">
-          <option value="todos">Todos</option>
-          <option v-for="u in usuariosUnicos" :key="u.idUsuario" :value="u.idUsuario">
-            {{ u.nombre }}
-          </option>
+      <div class="hist-filters">
+        <select v-if="usuariosUnicos?.length" v-model="filtroUsuario">
+          <option value="todos">Todos los cajeros</option>
+          <option v-for="u in usuariosUnicos" :key="u.idUsuario" :value="u.idUsuario">{{ u.nombre }}</option>
         </select>
+        <label class="hist-check"><input type="checkbox" v-model="filtroDiscrepancia" value="discrepancia"><span>⚠️ Solo discrepancias</span></label>
       </div>
 
-      <div class="filtro-discrepancia">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="filtroDiscrepancia" value="discrepancia" />
-          <span class="checkbox-text">⚠️ Solo discrepancias</span>
-        </label>
-      </div>
-
-      <div v-if="esAdmin && ventasConDiscrepancia.length > 0" class="correccion-admin">
-        <div class="correccion-header">
-          <span class="correccion-title">🔧 Corregir Discrepancias</span>
-          <button 
-            v-if="ventasSeleccionadas.size > 0" 
-            class="btn-corregir-sel" 
-            :disabled="corrigiendo"
-            @click="corregirSeleccionadas"
-          >
-            🔧 Corregir seleccionadas ({{ ventasSeleccionadas.size }})
-          </button>
-          <button 
-            class="btn-corregir-todas" 
-            :disabled="corrigiendo"
-            @click="corregirTodas"
-          >
-            ⚡ Corregir todas ({{ ventasConDiscrepancia.length }})
-          </button>
+      <div v-if="esAdmin && ventasConDiscrepancia.length > 0" class="hist-correccion">
+        <div class="hist-correccion-btns">
+          <button v-if="ventasSeleccionadas.size > 0" class="hist-btn corr" :disabled="corrigiendo" @click="corregir(Array.from(ventasSeleccionadas))">🔧 Seleccionadas ({{ ventasSeleccionadas.size }})</button>
+          <button class="hist-btn corr primary" :disabled="corrigiendo" @click="corregir(ventasConDiscrepancia.map(v => v.idVenta))">⚡ Todas ({{ ventasConDiscrepancia.length }})</button>
         </div>
-        <div v-if="ventasConDiscrepancia.length > 0" class="seleccion-todas">
-          <label class="checkbox-label">
-            <input type="checkbox" :checked="todasSeleccionadas" @change="seleccionarTodas" />
-            <span class="checkbox-text">Seleccionar todas</span>
-          </label>
-        </div>
-        <div v-if="correccionMensaje" class="correccion-msg">{{ correccionMensaje }}</div>
+        <label class="hist-check"><input type="checkbox" :checked="todasSeleccionadas" @change="seleccionarTodas"><span>Seleccionar todas</span></label>
+        <p v-if="correccionMensaje" class="hist-correccion-msg">{{ correccionMensaje }}</p>
       </div>
 
-      <div class="totales-wrap">
-        <article class="total-card">
-          <div class="card-icon">💎</div>
-          <div class="card-content">
-            <p>Cobro Total</p>
-            <strong>{{ formatoMoneda(cobroTotalFiltrado) }}</strong>
-          </div>
-        </article>
-        <article class="total-card profit">
-          <div class="card-icon">💰</div>
-          <div class="card-content">
-            <p>Ganancia Total</p>
-            <strong>{{ formatoMoneda(gananciaTotal) }}</strong>
-          </div>
-        </article>
-      </div>
-
-      <div class="tabla-wrap">
-        <p v-if="loading" class="estado loading">📡 Cargando historial...</p>
-        <p v-else-if="ventasFiltradas.length === 0" class="estado">📭 No hay ventas para hoy.</p>
-
-        <div v-else class="ventas-cards">
-          <div 
-            v-for="(venta, index) in ventasFiltradas" 
-            :key="venta.idVenta" 
-            class="venta-card" 
-            :class="{ 'row-discrepancia': venta.tieneDiscrepancia, 'seleccionada': ventasSeleccionadas.has(venta.idVenta) }"
-            :style="{ animationDelay: `${index * 30}ms` }"
-            @click="emit('ver-detalle', venta)"
-          >
-            <div class="card-header">
-              <span class="card-ticket">
-                <span v-if="venta.tieneDiscrepancia" class="discrepancia-badge" title="Discrepancia">⚠️</span>
-                <input 
-                  v-if="esAdmin && venta.tieneDiscrepancia" 
-                  type="checkbox" 
-                  class="card-checkbox"
-                  :checked="ventasSeleccionadas.has(venta.idVenta)"
-                  @click.stop
-                  @change="toggleSeleccion(venta.idVenta)"
-                />
-                Ticket #{{ venta.numeroTicket ?? venta.idVenta }}
-              </span>
-            </div>
-            <div class="card-monto">{{ formatoMoneda(Number(venta.montoTotal ?? 0)) }}</div>
-            <div class="card-info">
-              <div class="info-row">
-                <span class="info-label">Cajero:</span>
-                <span class="info-value">{{ venta.nombreUsuario || 'Cajero' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Pago:</span>
-                <span class="info-value pago-tag" :class="getMetodoClase(venta.metodoPago)">
-                  {{ getMetodoIcono(venta.metodoPago) }} {{ getMetodoLabel(venta.metodoPago) }}
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Estado:</span>
-                <span class="info-value estado-tag" :class="venta.estatus">
-                  {{ getEstatusIcono(venta.estatus) }} {{ getEstatusLabel(venta.estatus) }}
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Hora:</span>
-                <span class="info-value">{{ formatoHora(venta.fechaVenta) }}</span>
-              </div>
-            </div>
-            <div class="card-actions" @click.stop>
-              <button 
-                v-if="venta.estatus === 'C'" 
-                type="button" 
-                class="btn-cancelar-mini"
-                @click="emit('cancelar', venta)"
-              >
-                ❌
-              </button>
-              <button 
-                v-else
-                type="button" 
-                class="btn-ver-mini"
-                @click="emit('ver-detalle', venta)"
-              >
-                👁️
-              </button>
-            </div>
+      <div v-if="gananciasPorVendedor.length > 0" class="hist-vendedores">
+        <div v-for="v in gananciasPorVendedor" :key="v.idUsuario" class="hist-vendedor">
+          <div class="hist-vendedor-info"><span class="hist-vendedor-name">{{ v.nombre }}</span><span class="hist-vendedor-count">{{ v.totalVentas }} ventas</span></div>
+          <div class="hist-vendedor-bars">
+            <div class="hist-bar"><span class="hist-bar-label">Cobro</span><div class="hist-bar-track"><div class="hist-bar-fill cobro" :style="{ width: `${maxCobro > 0 ? (v.montoTotal / maxCobro) * 100 : 0}%` }"></div></div><span class="hist-bar-val">{{ formatoMoneda(v.montoTotal) }}</span></div>
+            <div class="hist-bar"><span class="hist-bar-label">Ganancia</span><div class="hist-bar-track"><div class="hist-bar-fill gain" :style="{ width: `${maxGanancia > 0 ? (v.gananciaTotal / maxGanancia) * 100 : 0}%` }"></div></div><span class="hist-bar-val">{{ formatoMoneda(v.gananciaTotal) }}</span></div>
           </div>
         </div>
       </div>
 
-      <footer class="modal-actions">
-        <button type="button" class="btn-cerrar" @click="emit('close')">
-          <span class="btn-icono">👋</span>
-          <span class="btn-texto">Cerrar</span>
-        </button>
-      </footer>
+      <div class="hist-table-wrap">
+        <p v-if="loading" class="hist-empty">📡 Cargando...</p>
+        <p v-else-if="!ventasFiltradas.length" class="hist-empty">📭 No hay ventas hoy.</p>
+        <table v-else class="hist-table">
+          <thead><tr><th>Ticket</th><th>Hora</th><th>Monto</th><th>Pago</th><th>Cajero</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="v in ventasFiltradas" :key="v.idVenta" class="hist-row" :class="{ 'row-disc': v.tieneDiscrepancia, 'row-sel': ventasSeleccionadas.has(v.idVenta) }" @click="emit('ver-detalle', v)">
+              <td class="hist-td-ticket">
+                <span v-if="v.tieneDiscrepancia" class="hist-disc">⚠</span>
+                <input v-if="esAdmin && v.tieneDiscrepancia" type="checkbox" class="hist-cb" :checked="ventasSeleccionadas.has(v.idVenta)" @click.stop @change="toggleSeleccion(v.idVenta)">
+                <span class="hist-ticket">#{{ v.numeroTicket ?? v.idVenta }}</span>
+              </td>
+              <td class="hist-td-hora">{{ formatoHora(v.fechaVenta) }}</td>
+              <td class="hist-td-monto">{{ formatoMoneda(Number(v.montoTotal ?? 0)) }}</td>
+              <td class="hist-td-pago"><span class="hist-badge-pago" :class="getMetodoClase(v.metodoPago)">{{ getMetodoIcono(v.metodoPago) }} {{ getMetodoLabel(v.metodoPago) }}</span></td>
+              <td class="hist-td-cajero">{{ v.nombreUsuario || 'Cajero' }}</td>
+              <td class="hist-td-act" @click.stop>
+                <button v-if="v.estatus === 'C'" class="hist-btn-icon cancel" @click="emit('cancelar', v)">✕</button>
+                <button v-else class="hist-btn-icon view" @click="emit('ver-detalle', v)">→</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="hist-footer"><button class="hist-btn-close" @click="emit('close')">Cerrar</button></footer>
     </section>
   </div>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgba(2, 4, 2, 0.92);
-  backdrop-filter: blur(4px);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  animation: fadeIn 150ms ease-out;
+.hist-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn 0.15s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.hist-modal { width: min(100%, 1100px); max-height: 92vh; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; position: relative; animation: slideUp 0.2s; min-height: 0; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.hist-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--bg-secondary); color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s; }
+.hist-close:hover { background: var(--error-color); color: white; }
+.hist-header { padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border-color); }
+.hist-header h2 { margin: 0 0 0.75rem; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
+.hist-summary { display: flex; gap: 0.75rem; }
+.hist-sum-item { flex: 1; display: flex; flex-direction: column; padding: 0.5rem 0.75rem; border-radius: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); }
+.hist-sum-item.accent { border-color: var(--accent-color); }
+.hist-sum-item.profit { border-color: var(--success-color); }
+.hist-sum-label { font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.hist-sum-val { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); font-family: "Courier New", monospace; }
+.hist-sum-item.accent .hist-sum-val { color: var(--accent-color); }
+.hist-sum-item.profit .hist-sum-val { color: var(--success-color); }
+.hist-filters { display: flex; gap: 0.75rem; padding: 0.6rem 1.5rem; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; align-items: center; }
+.hist-filters select { padding: 0.35rem 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.8rem; }
+.hist-check { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+.hist-check input { accent-color: var(--accent-color); }
+.hist-correccion { padding: 0.6rem 1.5rem; background: rgba(239,68,68,0.05); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.4rem; }
+.hist-correccion-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.hist-btn { padding: 0.35rem 0.7rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.hist-btn:hover:not(:disabled) { border-color: var(--accent-color); color: var(--accent-color); }
+.hist-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hist-btn.corr.primary { background: var(--accent-color); color: var(--bg-primary); border-color: var(--accent-color); }
+.hist-correccion-msg { margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--success-color); text-align: center; }
+.hist-vendedores { padding: 0.6rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.4rem; }
+.hist-vendedor { display: flex; align-items: center; gap: 1rem; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--bg-secondary); }
+.hist-vendedor-info { min-width: 120px; }
+.hist-vendedor-name { display: block; font-size: 0.8rem; font-weight: 600; }
+.hist-vendedor-count { font-size: 0.7rem; color: var(--text-secondary); }
+.hist-vendedor-bars { flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+.hist-bar { display: flex; align-items: center; gap: 0.4rem; }
+.hist-bar-label { font-size: 0.6rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; min-width: 50px; }
+.hist-bar-track { flex: 1; height: 5px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
+.hist-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.hist-bar-fill.cobro { background: var(--accent-color); }
+.hist-bar-fill.gain { background: var(--success-color); }
+.hist-bar-val { font-size: 0.7rem; font-weight: 700; font-family: "Courier New", monospace; min-width: 75px; text-align: right; }
+.hist-table-wrap { flex: 1; overflow-y: auto; min-height: 180px; min-height: 0; }
+.hist-empty { padding: 1.5rem; text-align: center; color: var(--text-secondary); }
+.hist-table { width: 100%; border-collapse: collapse; }
+.hist-table thead { position: sticky; top: 0; z-index: 5; }
+.hist-table th { padding: 0.5rem 0.75rem; font-size: 0.65rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; background: var(--bg-primary); border-bottom: 2px solid var(--border-color); text-align: left; }
+.hist-table th:nth-child(3), .hist-table th:nth-child(4) { text-align: center; }
+.hist-table th:last-child { width: 36px; text-align: center; }
+.hist-row { border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s; }
+.hist-row:hover { background: var(--bg-secondary); }
+.hist-row.row-disc { background: rgba(239,68,68,0.05); }
+.hist-row.row-disc:hover { background: rgba(239,68,68,0.1); }
+.hist-row.row-sel { background: rgba(59,130,246,0.1); }
+.hist-row td { padding: 0.5rem 0.75rem; font-size: 0.82rem; vertical-align: middle; }
+.hist-td-ticket { display: flex; align-items: center; gap: 0.35rem; }
+.hist-disc { width: 15px; height: 15px; border-radius: 50%; background: #ef4444; color: white; font-size: 0.6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hist-cb { width: 13px; height: 13px; accent-color: var(--accent-color); cursor: pointer; flex-shrink: 0; }
+.hist-ticket { font-weight: 700; color: var(--accent-color); font-family: "Courier New", monospace; }
+.hist-td-hora { font-family: "Courier New", monospace; color: var(--text-secondary); font-size: 0.78rem; }
+.hist-td-monto { font-weight: 700; color: var(--success-color); font-family: "Courier New", monospace; text-align: center; }
+.hist-badge-pago { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; }
+.hist-badge-pago.efectivo { background: rgba(34,197,94,0.1); color: #166534; }
+.hist-badge-pago.transferencia { background: rgba(59,130,246,0.1); color: #1d4ed8; }
+.hist-badge-pago.tarjeta { background: rgba(236,72,153,0.1); color: #be185d; }
+.hist-td-cajero { color: var(--text-secondary); font-size: 0.78rem; }
+.hist-td-act { text-align: center; }
+.hist-btn-icon { width: 26px; height: 26px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.hist-btn-icon.cancel { background: #ef4444; color: white; }
+.hist-btn-icon.cancel:hover { background: #dc2626; transform: scale(1.1); }
+.hist-btn-icon.view { background: var(--accent-color); color: var(--bg-primary); }
+.hist-btn-icon.view:hover { filter: brightness(1.15); transform: scale(1.1); }
+.hist-footer { padding: 0.6rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: center; }
+.hist-btn-close { padding: 0.5rem 1.5rem; border: none; border-radius: 8px; background: var(--accent-color); color: var(--bg-primary); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.hist-btn-close:hover { filter: brightness(1.1); }
+@media (max-width: 768px) {
+  .hist-overlay { padding: 0.5rem; align-items: flex-start; }
+  .hist-modal { max-height: 90vh; width: 100%; border-radius: 12px; }
+  .hist-header { padding: 0.8rem 1rem; }
+  .hist-header h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .hist-summary { flex-direction: column; gap: 0.4rem; }
+  .hist-sum-item { flex-direction: row; justify-content: space-between; padding: 0.4rem 0.5rem; }
+  .hist-sum-val { font-size: 0.9rem; }
+  .hist-filters { padding: 0.5rem 1rem; }
+  .hist-vendedores { padding: 0.5rem 1rem; }
+  .hist-vendedor { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+  .hist-vendedor-info { min-width: auto; }
+  .hist-correccion { padding: 0.5rem 1rem; }
+  .hist-correccion-btns { flex-direction: column; }
+  .hist-btn.corr { width: 100%; text-align: center; }
+  .hist-table th, .hist-table td { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
+  .hist-td-cajero, .hist-table th:nth-child(5) { display: none; }
+  .hist-footer { padding: 0.5rem 1rem; }
 }
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.modal-card {
-  width: min(100%, 920px);
-  max-height: 90vh;
-  background: linear-gradient(var(--bg-primary));
-  border: 4px solid var(--accent-color);
-  box-shadow: 
-    0 0 0 4px var(--border-color),
-    0 14px 0 var(--border-color),
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: relative;
-  overflow: visible;
-  animation: popIn 200ms ease-out;
-}
-
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.9) translateY(20px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.modal-corner {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.modal-corner::before,
-.modal-corner::after {
-  content: '';
-  position: absolute;
-  background: var(--accent-color);
-}
-
-.modal-corner.tl { top: 8px; left: 8px; }
-.modal-corner.tl::before { width: 20px; height: 3px; top: 0; left: 0; border-radius: 2px; }
-.modal-corner.tl::after { width: 3px; height: 20px; top: 0; left: 0; border-radius: 2px; }
-
-.modal-corner.tr { top: 8px; right: 8px; }
-.modal-corner.tr::before { width: 20px; height: 3px; top: 0; right: 0; border-radius: 2px; }
-.modal-corner.tr::after { width: 3px; height: 20px; top: 0; right: 0; border-radius: 2px; }
-
-.modal-corner.bl { bottom: 8px; left: 8px; }
-.modal-corner.bl::before { width: 20px; height: 3px; bottom: 0; left: 0; border-radius: 2px; }
-.modal-corner.bl::after { width: 3px; height: 20px; bottom: 0; left: 0; border-radius: 2px; }
-
-.modal-corner.br { bottom: -2px; right: -2px; }
-.modal-corner.br::before { width: 20px; height: 3px; bottom: 0; right: 0; border-radius: 2px; }
-.modal-corner.br::after { width: 3px; height: 20px; bottom: 0; right: 0; border-radius: 2px; }
-
-.modal-card::before {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 30%, transparent);
-  pointer-events: none;
-  border-radius: 8px;
-}
-
-.btn-cerrar-modal {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--accent-color);
-  background: var(--bg-secondary);
-  color: var(--accent-color);
-  font-size: 1rem;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.25s ease;
-  z-index: 20;
-}
-
-.btn-cerrar-modal:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
-  transform: rotate(90deg) scale(1.1);
-  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-color) 50%, transparent);
-}
-
-.modal-header {
-  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
-  padding-bottom: 0.5rem;
-}
-
-.titulo-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.emoji {
-  font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 var(--border-color);
-}
-
-.filtro-usuario {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-}
-
-.filtro-usuario label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.filtro-usuario select {
-  flex: 1;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.filtro-usuario select:focus {
-  outline: none;
-  border-color: var(--accent-color);
-}
-
-.filtro-discrepancia {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  background: #fef2f2;
-  border: 2px solid #ef4444;
-  border-radius: 8px;
-}
-
-.correccion-admin {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 2px solid var(--accent-color);
-  border-radius: 8px;
-}
-
-.correccion-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.correccion-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-corregir-sel {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
-  color: white;
-  border: 1px solid #d97706;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 150ms;
-}
-
-.btn-corregir-sel:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-.btn-corregir-sel:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-corregir-todas {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
-  color: var(--bg-primary);
-  border: 1px solid var(--accent-color);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 150ms;
-}
-
-.btn-corregir-todas:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-.btn-corregir-todas:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.seleccion-todas {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.correccion-msg {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--accent-color);
-  text-align: center;
-  padding: 0.25rem;
-  background: var(--bg-primary);
-  border-radius: 4px;
-}
-
-.card-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--accent-color);
-  margin-right: 0.25rem;
-}
-
-.venta-card.seleccionada {
-  border-color: var(--accent-color);
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #991b1b;
-}
-
-.checkbox-label input {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: #ef4444;
-}
-
-.checkbox-text {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.75rem;
-}
-
-.totales-wrap {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.total-card {
-  border: 3px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border-radius: 12px;
-}
-
-.total-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-}
-
-.total-card.profit {
-  border-color: var(--success-color);
-}
-
-.total-card.profit .card-icon {
-  font-size: 2rem;
-}
-
-.card-icon {
-  font-size: 2rem;
-}
-
-.card-content p {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  margin: 0 0 0.25rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-}
-
-.card-content strong {
-  font-size: 1.2rem;
-  font-family: "Courier New", monospace;
-  color: var(--success-color);
-}
-
-.tabla-wrap {
-  flex: 1;
-  overflow: auto;
-  border: 3px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  min-height: 200px;
-  border-radius: 12px;
-}
-
-.estado {
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-secondary);
-  font-family: "Courier New", monospace;
-  font-size: 1rem;
-}
-
-.estado.loading {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  justify-content: center;
-  align-items: center;
-  align-content: center;
-  text-align: center;
-  padding: 0.6rem 0.4rem;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.8rem;
-  font-family: "Courier New", monospace;
-}
-
-th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-primary);
-  color: var(--accent-color);
-  text-transform: uppercase;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.clickable-row {
-  cursor: pointer;
-  animation: slideIn 200ms ease-out backwards;
-  transition: background 0.2s;
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-.clickable-row:hover td {
-  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
-}
-
-.ticket-cell {
-  font-weight: bold;
-}
-
-.discrepancia-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  font-size: 0.75rem;
-  background: #ef4444;
-  color: white;
-  border-radius: 50%;
-  margin-right: 0.25rem;
-  cursor: help;
-}
-
-.row-discrepancia {
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-}
-
-.row-discrepancia:hover td {
-  background: color-mix(in srgb, #ef4444 20%, transparent);
-}
-
-.ventas-cards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  padding: 0.5rem;
-}
-
-.venta-card {
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  animation: slideIn 200ms ease-out backwards;
-}
-
-.venta-card:hover {
-  border-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.venta-card.row-discrepancia {
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-  border-color: #ef4444;
-}
-
-.venta-card.row-discrepancia:hover {
-  background: color-mix(in srgb, #ef4444 15%, transparent);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.25rem;
-}
-
-.card-ticket {
-  font-weight: bold;
-  font-size: 0.9rem;
-  color: var(--accent-color);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.card-monto {
-  font-weight: bold;
-  font-size: 1.25rem;
-  color: var(--success-color);
-  font-family: "Courier New", monospace;
-  text-align: center;
-  padding: 0.5rem 0;
-  border-top: 1px dashed var(--border-color);
-  border-bottom: 1px dashed var(--border-color);
-  margin: 0.5rem 0;
-}
-
-.card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8rem;
-}
-
-.info-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.info-value {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.pago-tag {
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border: 1px solid;
-  text-transform: uppercase;
-}
-
-.pago-tag.efectivo {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #22c55e;
-}
-
-.pago-tag.transferencia {
-  background: #dbeafe;
-  color: #1d4ed8;
-  border-color: #3b82f6;
-}
-
-.pago-tag.tarjeta {
-  background: #fce7f3;
-  color: #be185d;
-  border-color: #ec4899;
-}
-
-.estado-tag {
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border: 1px solid;
-  text-transform: uppercase;
-}
-
-.estado-tag.C,
-.estado-tag.F {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #22c55e;
-}
-
-.estado-tag.P {
-  background: #fef9c3;
-  color: #854d0e;
-  border-color: #ca8a04;
-}
-
-.estado-tag.I {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #ef4444;
-}
-
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.card-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  background: color-mix(in srgb, var(--border-color) 30%, transparent);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.card-tag .tag-icon {
-  font-size: 0.75rem;
-}
-
-.card-tag.cajero {
-  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
-  color: var(--accent-color);
-}
-
-.card-tag.pago.efectivo {
-  background: color-mix(in srgb, var(--success-color) 20%, transparent);
-  color: var(--success-color);
-}
-
-.card-tag.pago.transferencia {
-  background: color-mix(in srgb, #3b82f6 20%, transparent);
-  color: #3b82f6;
-}
-
-.card-tag.pago.tarjeta {
-  background: color-mix(in srgb, #ec4899 20%, transparent);
-  color: #ec4899;
-}
-
-.card-tag.estado.C,
-.card-tag.estado.F {
-  color: var(--success-color);
-}
-
-.card-tag.estado.P {
-  color: #ca8a04;
-}
-
-.card-tag.estado.I {
-  color: var(--error-color);
-}
-
-.card-tag.hora {
-  color: var(--text-secondary);
-}
-
-.card-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
-}
-
-.btn-cancelar-mini,
-.btn-ver-mini {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 2px solid var(--border-color);
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.btn-cancelar-mini {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  color: white;
-}
-
-.btn-cancelar-mini:hover {
-  filter: brightness(1.1);
-  transform: scale(1.1);
-}
-
-.btn-ver-mini {
-  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
-  color: white;
-}
-
-.btn-ver-mini:hover {
-  filter: brightness(1.1);
-  transform: scale(1.1);
-}
-
-.usuario-cell {
-  text-align: center;
-}
-
-.usuario-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.5rem;
-  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
-  color: var(--accent-color);
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.monto-cell {
-  color: var(--success-color);
-  font-weight: 600;
-}
-
-.metodo-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.metodo-badge.efectivo {
-  background: color-mix(in srgb, var(--success-color) 20%, transparent);
-  color: var(--success-color);
-}
-
-.metodo-badge.transferencia {
-  background: color-mix(in srgb, #3b82f6 20%, transparent);
-  color: #3b82f6;
-}
-
-.metodo-badge.tarjeta {
-  background: color-mix(in srgb, #ec4899 20%, transparent);
-  color: #ec4899;
-}
-
-.estatus-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-}
-
-.estatus-badge.C,
-.estatus-badge.F {
-  color: var(--success-color);
-}
-
-.estatus-badge.P {
-  color: #ca8a04;
-}
-
-.estatus-badge.I {
-  color: var(--error-color);
-}
-
-.fecha-cell {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-}
-
-.acciones-cell {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-}
-
-.btn-cancelar,
-.btn-ver {
-  padding: 0.4rem 0.6rem;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 150ms;
-  white-space: nowrap;
-}
-
-.btn-cancelar {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  color: white;
-}
-
-.btn-cancelar:hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
-}
-
-.btn-ver {
-  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%);
-  color: white;
-}
-
-.btn-ver:hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: center;
-  padding-top: 0.5rem;
-  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
-}
-
-.btn-cerrar {
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
-  color: var(--bg-primary);
-  border: 2px solid color-mix(in srgb, var(--accent-color) 60%, transparent);
-  padding: 0.8rem 2rem;
-  font-size: 0.9rem;
-  font-weight: 700;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  box-shadow: 
-    0 4px 0 color-mix(in srgb, var(--accent-color) 50%, black),
-    0 6px 12px rgba(0, 0, 0, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-cerrar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.4s ease;
-}
-
-.btn-cerrar:hover::before {
-  left: 100%;
-}
-
-.btn-cerrar:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 6px 0 color-mix(in srgb, var(--accent-color) 50%, black),
-    0 10px 20px rgba(0, 0, 0, 0.25);
-  filter: brightness(1.1);
-}
-
-.btn-cerrar:active {
-  transform: translateY(2px);
-  box-shadow: 
-    0 2px 0 color-mix(in srgb, var(--accent-color) 50%, black),
-    0 3px 6px rgba(0, 0, 0, 0.2);
-}
-
-.btn-icono {
-  font-size: 1.2rem;
-}
-
-@media (max-width: 700px) {
-  .modal-card {
-    padding: 1rem;
-    max-height: 95vh;
-  }
-  
-  .totales-wrap {
-    grid-template-columns: 1fr;
-  }
-  
-  th, td {
-    padding: 0.5rem 0.3rem;
-    font-size: 0.7rem;
-    justify-content: center;
-    align-items: center;
-    align-content: center;
-    text-align: center;
-  }
-  
-  .modal-header h3 {
-    font-size: 1rem;
-  }
-  
-  .emoji {
-    font-size: 1.2rem;
-  }
-  
-  .total-card {
-    padding: 0.75rem;
-  }
-  
-  .card-icon {
-    font-size: 1.5rem;
-  }
-  
-  .card-content strong {
-    font-size: 1rem;
-  }
-
-  .btn-cerrar .btn-texto {
-    display: none;
-  }
-  
-  .btn-cerrar {
-    padding: 0.6rem 1.2rem;
-    width: auto;
-    height: auto;
-  }
-  
-  .btn-cerrar:hover {
-    transform: scale(1.05);
-  }
-}
-
 @media (max-width: 480px) {
-  .btn-cerrar-modal {
-    width: 32px;
-    height: 32px;
-    font-size: 1rem;
-  }
-  
-  .ventas-cards {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-    padding: 0.25rem;
-  }
-  
-  .venta-card {
-    padding: 0.5rem;
-  }
-  
-  .card-header {
-    margin-bottom: 0.2rem;
-  }
-  
-  .card-ticket {
-    font-size: 0.8rem;
-  }
-  
-  .card-monto {
-    font-size: 1rem;
-    padding: 0.4rem 0;
-    margin: 0.4rem 0;
-  }
-  
-  .card-info {
-    gap: 0.25rem;
-  }
-  
-  .info-row {
-    font-size: 0.7rem;
-  }
-  
-  .pago-tag,
-  .estado-tag {
-    font-size: 0.65rem;
-    padding: 0.08rem 0.3rem;
-  }
-}
-
-@media (max-width: 360px) {
-  .modal-card {
-    padding: 0.75rem;
-  }
-  
-  .modal-header h3 {
-    font-size: 0.85rem;
-  }
-  
-  .totales-wrap {
-    gap: 0.5rem;
-  }
-  
-  .total-card {
-    padding: 0.5rem;
-  }
-  
-  .card-icon {
-    font-size: 1.2rem;
-  }
-  
-  .card-content p {
-    font-size: 0.6rem;
-  }
-  
-  .card-content strong {
-    font-size: 0.85rem;
-  }
-  
-  .venta-card {
-    padding: 0.4rem;
-  }
-  
-  .card-ticket {
-    font-size: 0.85rem;
-  }
-  
-  .card-monto {
-    font-size: 0.95rem;
-    padding: 0.35rem 0;
-    margin: 0.35rem 0;
-  }
-  
-  .card-info {
-    gap: 0.2rem;
-  }
-  
-  .info-row {
-    font-size: 0.65rem;
-  }
-  
-  .pago-tag,
-  .estado-tag {
-    font-size: 0.6rem;
-    padding: 0.05rem 0.2rem;
-  }
-  
-  .btn-cancelar-mini,
-  .btn-ver-mini {
-    width: 24px;
-    height: 24px;
-    font-size: 0.8rem;
-  }
-  
-  .btn-cerrar {
-    padding: 0.5rem 1rem;
-  }
-}
-
-@media (max-width: 320px) {
-  .modal-card {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    border-radius: 0;
-    border-width: 2px;
-  }
-  
-  .modal-header {
-    padding-bottom: 0.25rem;
-  }
-  
-  .modal-header h3 {
-    font-size: 0.8rem;
-  }
-  
-  .emoji {
-    font-size: 1rem;
-  }
-  
-  .totales-wrap {
-    grid-template-columns: 1fr;
-  }
-  
-  .total-card {
-    flex-direction: row;
-    padding: 0.4rem;
-    gap: 0.5rem;
-  }
-  
-  .card-icon {
-    font-size: 1rem;
-  }
-  
-  .card-content p {
-    font-size: 0.55rem;
-    margin: 0;
-  }
-  
-  .card-content strong {
-    font-size: 0.8rem;
-  }
-  
-  .tabla-wrap {
-    border-width: 2px;
-  }
-  
-  .ventas-cards {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.4rem;
-  }
-  
-  .venta-card {
-    padding: 0.35rem;
-    border-radius: 6px;
-  }
-  
-  .card-header {
-    margin-bottom: 0.35rem;
-  }
-  
-  .card-ticket {
-    font-size: 0.8rem;
-  }
-  
-  .card-monto {
-    font-size: 0.9rem;
-    padding: 0.3rem 0;
-    margin: 0.3rem 0;
-  }
-  
-  .card-info {
-    gap: 0.15rem;
-  }
-  
-  .info-row {
-    font-size: 0.6rem;
-  }
-  
-  .pago-tag,
-  .estado-tag {
-    font-size: 0.55rem;
-    padding: 0.05rem 0.15rem;
-  }
-  
-  .card-actions {
-    margin-top: 0.35rem;
-  }
-  
-  .btn-cancelar-mini,
-  .btn-ver-mini {
-    width: 22px;
-    height: 22px;
-    font-size: 0.7rem;
-  }
-  
-  .btn-cerrar-modal {
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
-    top: 8px;
-    right: 8px;
-  }
-  
-  .btn-cerrar {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.75rem;
-  }
-  
-  .discrepancia-badge {
-    width: 14px;
-    height: 14px;
-    font-size: 0.6rem;
-  }
-}
-
-@media (max-width: 320px) {
-  .ventas-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .hist-table th:nth-child(4), .hist-td-pago { display: none; }
+  .hist-summary { gap: 0.3rem; }
+  .hist-sum-label { font-size: 0.6rem; }
+  .hist-sum-val { font-size: 0.85rem; }
 }
 </style>

@@ -710,7 +710,16 @@ async function generarCorte() {
     ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
     ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
     totalTicketsDia.value = Number(corte.totalTickets || 0);
-    corteActual.value = corte;
+    
+    const montoInicialCorte = Number(corte.montoInicial || 0);
+    const otrosIngresosCorte = Number(corte.otrosIngresos || 0);
+    const totalEgresosCorte = Number(corte.totalEgresos || 0);
+    const saldoFinalEfectivo = montoInicialCorte + Number(ventasEfectivo.value || 0) + otrosIngresosCorte - totalEgresosCorte;
+    
+    corteActual.value = {
+      ...corte,
+      saldoFinalEfectivo
+    };
     reporteTitulo.value = 'Reporte del Corte Actual';
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
@@ -913,6 +922,7 @@ async function generarReporteDiario() {
           return idsVentasDia.includes(idVenta);
         });
         console.log('Detalles filtrados:', detallesDia);
+        detallesDiario.value = detallesDia;
         calcularProductosReporte(detallesDia, 'diario');
         console.log('Productos diario:', productosDiario.value);
         console.log('Productos unitarios diario:', productosUnitariosDiario.value);
@@ -974,10 +984,12 @@ const productosGranel = shallowRef<ProductoVendido[]>([]);
 const productosDiario = shallowRef<ProductoVendido[]>([]);
 const productosUnitariosDiario = shallowRef<ProductoVendido[]>([]);
 const productosGranelDiario = shallowRef<ProductoVendido[]>([]);
+const detallesDiario = shallowRef<VentaDetalleDTO[]>([]);
 
 const productosMensual = shallowRef<ProductoVendido[]>([]);
 const productosUnitariosMensual = shallowRef<ProductoVendido[]>([]);
 const productosGranelMensual = shallowRef<ProductoVendido[]>([]);
+const detallesMensual = shallowRef<VentaDetalleDTO[]>([]);
 
 function formatearCantidad(cantidad: number, isGramaje: boolean): string {
   if (!isGramaje) {
@@ -1035,12 +1047,14 @@ function calcularProductosReporte(detalles: VentaDetalleDTO[], tipo: 'diario' | 
   for (const d of detalles) {
     const nombre = d.productoNombre || 'Producto eliminado';
     const cantidad = Number(d.cantidad || 0);
-    let importe = Number(d.precioUnitarioVenta || 0) * cantidad;
     const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
     const isGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
 
+    let importe: number;
     if (isGramaje) {
-      importe = Math.round(importe * 100) / 100;
+      importe = Number(d.precioUnitarioVenta || 0);
+    } else {
+      importe = Number(d.precioUnitarioVenta || 0) * cantidad;
     }
 
     if (!productosMap.has(nombre)) {
@@ -1065,13 +1079,13 @@ function calcularProductosReporte(detalles: VentaDetalleDTO[], tipo: 'diario' | 
     productosUnitariosDiario.value = sortedUnitarios;
     productosGranelDiario.value = sortedGranel;
   } else {
-    // Obtener los mejores 10 de CADA categoría de forma independiente
     const sortedUnitarios = unitarios.sort((a, b) => b.cantidadTotal - a.cantidadTotal).slice(0, 10);
     const sortedGranel = granel.sort((a, b) => b.cantidadTotal - a.cantidadTotal).slice(0, 10);
     
     productosMensual.value = [...sortedUnitarios, ...sortedGranel];
     productosUnitariosMensual.value = sortedUnitarios;
     productosGranelMensual.value = sortedGranel;
+    detallesMensual.value = detalles;
   }
   
   return unitarios;
@@ -1296,6 +1310,101 @@ const chartOptionsDiarioCombinado = computed(() => {
 const chartOptionsDiarioUnitarios = computed(() => getChartOptions(productosUnitariosDiario.value));
 const chartOptionsDiarioGranel = computed(() => getChartOptions(productosGranelDiario.value));
 
+const uniqueHorariosDiario = computed(() => {
+  if (detallesDiario.value.length === 0) return [];
+  const horarios = new Set<string>();
+  for (const d of detallesDiario.value) {
+    const v = d.venta || (d as any).Venta;
+    if (v?.fechaVenta) {
+      const h = new Date(v.fechaVenta).getHours();
+      const slot = getHorarioSlot(h);
+      if (slot) horarios.add(slot);
+    }
+  }
+  const order = ['06:00 - 09:00', '09:00 - 12:00', '12:00 - 15:00', '15:00 - 18:00', '18:00 - 21:00'];
+  return Array.from(horarios).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+});
+
+function getDailyProductosPorHorario(horario: string, isGramaje: boolean) {
+  const map = new Map<string, { cantidad: number; monto: number }>();
+  for (const d of detallesDiario.value) {
+    const v = d.venta || (d as any).Venta;
+    if (!v?.fechaVenta) continue;
+    const h = new Date(v.fechaVenta).getHours();
+    const slot = getHorarioSlot(h);
+    if (slot !== horario) continue;
+    const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
+    const prodIsGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+    if (prodIsGramaje !== isGramaje) continue;
+    const nombre = d.productoNombre || 'Producto eliminado';
+    const entry = map.get(nombre) || { cantidad: 0, monto: 0 };
+    entry.cantidad += Number(d.cantidad || 0);
+    if (prodIsGramaje) {
+      entry.monto += Number(d.precioUnitarioVenta || 0);
+    } else {
+      entry.monto += Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0);
+    }
+    map.set(nombre, entry);
+  }
+  return Array.from(map.entries())
+    .map(([nombre, data]) => ({ nombreProducto: nombre, cantidadVendida: data.cantidad, totalVendido: data.monto, isGramaje }))
+    .sort((a, b) => b.cantidadVendida - a.cantidadVendida)
+    .slice(0, 5);
+}
+
+function buildDiarioTimelineChart(isGramaje: boolean) {
+  if (uniqueHorariosDiario.value.length === 0) return { labels: [], datasets: [] };
+  const topNamesSet = new Set<string>();
+  for (const horario of uniqueHorariosDiario.value) {
+    const prods = getDailyProductosPorHorario(horario, isGramaje);
+    prods.forEach(p => topNamesSet.add(p.nombreProducto));
+  }
+  const topNames = Array.from(topNamesSet).slice(0, 5);
+  if (topNames.length === 0) return { labels: [], datasets: [] };
+  const palette = ['#c99234', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6'];
+  const datasets = topNames.map((nombre, idx) => {
+    const data = uniqueHorariosDiario.value.map(horario => {
+      const prod = getDailyProductosPorHorario(horario, isGramaje).find(p => p.nombreProducto === nombre);
+      return prod ? prod.cantidadVendida : 0;
+    });
+    return {
+      label: nombre.length > 20 ? nombre.slice(0, 17) + '...' : nombre,
+      data,
+      backgroundColor: colorWithOpacity(palette[idx % palette.length], 0.8),
+      borderColor: palette[idx % palette.length],
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false
+    };
+  });
+  return { labels: uniqueHorariosDiario.value, datasets };
+}
+
+function getDiarioTimelineOptions(isGramaje: boolean) {
+  const isSmall = windowWidth.value < 600;
+  const isMedium = windowWidth.value >= 600 && windowWidth.value < 1024;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : 12;
+  const textColor = getChartTextColor();
+  const unitLabel = isGramaje ? 'Gramos (g)' : 'Piezas (pzs)';
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: isSmall ? 4 : 8 },
+    plugins: {
+      legend: { display: true, position: 'bottom' as const, labels: { color: textColor, font: { size: fontSize }, boxWidth: 12, padding: 8 } },
+      tooltip: {
+        titleFont: { size: fontSize + 1 }, bodyFont: { size: fontSize },
+        backgroundColor: 'rgba(30, 30, 40, 0.95)', borderColor: 'var(--accent-color)', borderWidth: 1, padding: 10, cornerRadius: 8,
+        callbacks: { label: (context: any) => isGramaje ? ` ${formatearCantidad(context.raw, true)}` : ` ${context.raw} pzs` }
+      }
+    },
+    scales: {
+      x: { ticks: { color: textColor, font: { size: fontSize } }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: !isSmall, text: 'Horario', color: textColor, font: { size: fontSize } } },
+      y: { beginAtZero: true, ticks: { color: textColor, font: { size: fontSize }, callback: (value: string | number) => isGramaje ? formatearCantidad(Number(value), true) : value }, grid: { color: 'rgba(255,255,255,0.08)' }, title: { display: !isSmall, text: unitLabel, color: textColor, font: { size: fontSize } } }
+    }
+  };
+}
+
 const chartDataMensualCombinado = computed(() => {
   const unitarios = productosUnitariosMensual.value;
   const granel = productosGranelMensual.value;
@@ -1350,6 +1459,144 @@ const chartOptionsMensualCombinado = computed(() => {
 
 const chartOptionsMensualUnitarios = computed(() => getChartOptions(productosUnitariosMensual.value));
 const chartOptionsMensualGranel = computed(() => getChartOptions(productosGranelMensual.value));
+
+const uniqueHorariosMensual = computed(() => {
+  if (detallesMensual.value.length === 0) return [];
+  const horarios = new Set<string>();
+  for (const d of detallesMensual.value) {
+    const v = d.venta || (d as any).Venta;
+    if (v?.fechaVenta) {
+      const h = new Date(v.fechaVenta).getHours();
+      const slot = getHorarioSlot(h);
+      horarios.add(slot);
+    }
+  }
+  return Array.from(horarios).sort((a, b) => {
+    const order = ['06:00 - 09:00', '09:00 - 12:00', '12:00 - 15:00', '15:00 - 18:00', '18:00 - 21:00'];
+    return order.indexOf(a) - order.indexOf(b);
+  });
+});
+
+function getHorarioSlot(hora: number): string {
+  if (hora >= 6 && hora < 9) return '06:00 - 09:00';
+  if (hora >= 9 && hora < 12) return '09:00 - 12:00';
+  if (hora >= 12 && hora < 15) return '12:00 - 15:00';
+  if (hora >= 15 && hora < 18) return '15:00 - 18:00';
+  if (hora >= 18 && hora < 21) return '18:00 - 21:00';
+  return '';
+}
+
+function getMonthlyProductosPorHorario(horario: string, isGramaje: boolean) {
+  const map = new Map<string, { cantidad: number; monto: number }>();
+  for (const d of detallesMensual.value) {
+    const v = d.venta || (d as any).Venta;
+    if (!v?.fechaVenta) continue;
+    const h = new Date(v.fechaVenta).getHours();
+    const slot = getHorarioSlot(h);
+    if (slot !== horario) continue;
+    const tipoPrecio = String(d.tipoPrecioAplicado || '').trim().toUpperCase();
+    const prodIsGramaje = tipoPrecio === 'VENTA_GRAMAJE' || d.productoIsGramaje === true;
+    if (prodIsGramaje !== isGramaje) continue;
+    const nombre = d.productoNombre || 'Producto eliminado';
+    const entry = map.get(nombre) || { cantidad: 0, monto: 0 };
+    entry.cantidad += Number(d.cantidad || 0);
+    if (prodIsGramaje) {
+      entry.monto += Number(d.precioUnitarioVenta || 0);
+    } else {
+      entry.monto += Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0);
+    }
+    map.set(nombre, entry);
+  }
+  return Array.from(map.entries())
+    .map(([nombre, data]) => ({ nombreProducto: nombre, cantidadVendida: data.cantidad, totalVendido: data.monto, isGramaje }))
+    .sort((a, b) => b.cantidadVendida - a.cantidadVendida)
+    .slice(0, 5);
+}
+
+function buildMensualTimelineChart(isGramaje: boolean) {
+  if (uniqueHorariosMensual.value.length === 0) return { labels: [], datasets: [] };
+
+  const topNamesSet = new Set<string>();
+  for (const horario of uniqueHorariosMensual.value) {
+    const prods = getMonthlyProductosPorHorario(horario, isGramaje);
+    prods.forEach(p => topNamesSet.add(p.nombreProducto));
+  }
+  const topNames = Array.from(topNamesSet).slice(0, 5);
+  if (topNames.length === 0) return { labels: [], datasets: [] };
+
+  const palette = ['#c99234', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6'];
+
+  const datasets = topNames.map((nombre, idx) => {
+    const data = uniqueHorariosMensual.value.map(horario => {
+      const prod = getMonthlyProductosPorHorario(horario, isGramaje).find(p => p.nombreProducto === nombre);
+      return prod ? prod.cantidadVendida : 0;
+    });
+    return {
+      label: nombre.length > 20 ? nombre.slice(0, 17) + '...' : nombre,
+      data,
+      backgroundColor: colorWithOpacity(palette[idx % palette.length], 0.8),
+      borderColor: palette[idx % palette.length],
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false
+    };
+  });
+
+  return { labels: uniqueHorariosMensual.value, datasets };
+}
+
+function getMensualTimelineOptions(isGramaje: boolean) {
+  const isSmall = windowWidth.value < 600;
+  const isMedium = windowWidth.value >= 600 && windowWidth.value < 1024;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : 12;
+  const textColor = getChartTextColor();
+  const unitLabel = isGramaje ? 'Gramos (g)' : 'Piezas (pzs)';
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: isSmall ? 4 : 8 },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom' as const,
+        labels: { color: textColor, font: { size: fontSize }, boxWidth: 12, padding: 8 }
+      },
+      tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
+        backgroundColor: 'rgba(30, 30, 40, 0.95)',
+        borderColor: 'var(--accent-color)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+        callbacks: {
+          label: (context: any) => {
+            const val = context.raw;
+            return isGramaje ? ` ${formatearCantidad(val, true)}` : ` ${val} pzs`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: textColor, font: { size: fontSize } },
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        title: { display: !isSmall, text: 'Horario', color: textColor, font: { size: fontSize } }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: textColor,
+          font: { size: fontSize },
+          callback: (value: string | number) => isGramaje ? formatearCantidad(Number(value), true) : value
+        },
+        grid: { color: 'rgba(255,255,255,0.08)' },
+        title: { display: !isSmall, text: unitLabel, color: textColor, font: { size: fontSize } }
+      }
+    }
+  };
+}
 
 function getChartOptions(productosList: ProductoVendido[]) {
   const isSmall = windowWidth.value < 600;
@@ -1467,9 +1714,108 @@ const uniqueHorarios = computed(() => {
   return [...new Set(reporteAnualData.value.productosPorHorario.map(p => p.horario))];
 });
 
-function getProductosPorHorario(horario: string) {
+function getProductosPorHorario(horario: string, isGramaje: boolean) {
   if (!reporteAnualData.value?.productosPorHorario) return [];
-  return reporteAnualData.value.productosPorHorario.filter(p => p.horario === horario).slice(0, 5);
+  return reporteAnualData.value.productosPorHorario
+    .filter(p => p.horario === horario && p.isGramaje === isGramaje)
+    .sort((a, b) => b.cantidadVendida - a.cantidadVendida)
+    .slice(0, 5);
+}
+
+function buildHorarioTimelineChart(isGramaje: boolean) {
+  if (!reporteAnualData.value?.productosPorHorario || uniqueHorarios.value.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  const allProds = reporteAnualData.value.productosPorHorario.filter(p => p.isGramaje === isGramaje);
+  if (allProds.length === 0) return { labels: [], datasets: [] };
+
+  const topNamesSet = new Set<string>();
+  for (const horario of uniqueHorarios.value) {
+    const prods = getProductosPorHorario(horario, isGramaje);
+    prods.forEach(p => topNamesSet.add(p.nombreProducto));
+  }
+  const topNames = Array.from(topNamesSet).slice(0, 5);
+  if (topNames.length === 0) return { labels: [], datasets: [] };
+
+  const palette = [
+    '#c99234',
+    '#e74c3c',
+    '#3498db',
+    '#2ecc71',
+    '#9b59b6'
+  ];
+
+  const datasets = topNames.map((nombre, idx) => {
+    const data = uniqueHorarios.value.map(horario => {
+      const prod = getProductosPorHorario(horario, isGramaje).find(p => p.nombreProducto === nombre);
+      return prod ? prod.cantidadVendida : 0;
+    });
+    return {
+      label: nombre.length > 20 ? nombre.slice(0, 17) + '...' : nombre,
+      data,
+      backgroundColor: colorWithOpacity(palette[idx % palette.length], 0.8),
+      borderColor: palette[idx % palette.length],
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false
+    };
+  });
+
+  return { labels: uniqueHorarios.value, datasets };
+}
+
+function getHorarioTimelineOptions(isGramaje: boolean) {
+  const isSmall = windowWidth.value < 600;
+  const isMedium = windowWidth.value >= 600 && windowWidth.value < 1024;
+  const fontSize = isSmall ? 9 : isMedium ? 10 : 12;
+  const textColor = getChartTextColor();
+  const unitLabel = isGramaje ? 'Gramos (g)' : 'Piezas (pzs)';
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: isSmall ? 4 : 8 },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom' as const,
+        labels: { color: textColor, font: { size: fontSize }, boxWidth: 12, padding: 8 }
+      },
+      tooltip: {
+        titleFont: { size: fontSize + 1 },
+        bodyFont: { size: fontSize },
+        backgroundColor: 'rgba(30, 30, 40, 0.95)',
+        borderColor: 'var(--accent-color)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+        callbacks: {
+          label: (context: any) => {
+            const val = context.raw;
+            return isGramaje ? ` ${formatearCantidad(val, true)}` : ` ${val} pzs`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: textColor, font: { size: fontSize } },
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        title: { display: !isSmall, text: 'Horario', color: textColor, font: { size: fontSize } }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: textColor,
+          font: { size: fontSize },
+          callback: (value: string | number) => isGramaje ? formatearCantidad(Number(value), true) : value
+        },
+        grid: { color: 'rgba(255,255,255,0.08)' },
+        title: { display: !isSmall, text: unitLabel, color: textColor, font: { size: fontSize } }
+      }
+    }
+  };
 }
 
 const annualMonthlyChartData = computed(() => {
@@ -1902,6 +2248,7 @@ async function generarReporteMensual() {
     productosMensual.value = [];
     productosUnitariosMensual.value = [];
     productosGranelMensual.value = [];
+    detallesMensual.value = [];
     mostrarMensaje(`Error al generar reporte mensual: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -2016,6 +2363,7 @@ async function generarReporteRangoFechas() {
     productosMensual.value = [];
     productosUnitariosMensual.value = [];
     productosGranelMensual.value = [];
+    detallesMensual.value = [];
     mostrarMensaje(`Error al generar reporte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally {
     cargandoMensual.value = false;
@@ -2798,6 +3146,44 @@ onMounted(() => {
         </div>
       </div>
 
+      <div v-if="uniqueHorariosDiario.length > 0" class="products-section">
+        <div class="products-panel">
+          <div class="panel-header">
+            <div class="panel-ornament left">⏰</div>
+            <div class="panel-title">
+              <h3>Productos por Horario</h3>
+            </div>
+            <div class="panel-ornament right">⚔</div>
+          </div>
+          
+          <div class="toggle-buttons">
+            <button :class="{ active: tipoGraficaDiaria === 'unitario' }" @click="tipoGraficaDiaria = 'unitario'">
+              📦 Unitarios
+            </button>
+            <button :class="{ active: tipoGraficaDiaria === 'gramaje' }" @click="tipoGraficaDiaria = 'gramaje'">
+              ⚖️ Granel
+            </button>
+          </div>
+
+          <div v-if="tipoGraficaDiaria === 'unitario' && buildDiarioTimelineChart(false).datasets?.length" class="chart-wrapper">
+            <div class="bar-chart-container" style="height: 300px;">
+              <Bar :data="buildDiarioTimelineChart(false)" :options="getDiarioTimelineOptions(false)" />
+            </div>
+          </div>
+          <div v-if="tipoGraficaDiaria === 'gramaje' && buildDiarioTimelineChart(true).datasets?.length" class="chart-wrapper">
+            <div class="bar-chart-container" style="height: 300px;">
+              <Bar :data="buildDiarioTimelineChart(true)" :options="getDiarioTimelineOptions(true)" />
+            </div>
+          </div>
+          
+          <div class="panel-footer">
+            <div class="footer-ornament">⏣</div>
+            <span class="footer-text">Timeline de ventas del día</span>
+            <div class="footer-ornament">⏣</div>
+          </div>
+        </div>
+      </div>
+
       <div class="close-shift-section" v-if="mostrarCerrarTurno">
         <button class="btn-cerrar-turno" type="button" :disabled="cargandoCerrarTurno" @click="cerrarTurno">
           <span class="btn-icon">🔒</span>
@@ -2836,323 +3222,275 @@ onMounted(() => {
       </section>
     </div>
 
-    <div v-if="modalMensualAbierto" class="modal-overlay" @click.self="modalMensualAbierto = false">
-      <section class="modal-card panel monthly-modal">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        <button type="button" class="btn-cerrar-modal" @click="modalMensualAbierto = false">✕</button>
-        
-        <div class="modal-content-scroll">
-        <div class="monthly-header">
+    <div v-if="modalMensualAbierto" class="monthly-overlay" @click.self="modalMensualAbierto = false">
+      <section class="monthly-modal-clean">
+        <button type="button" class="monthly-close" @click="modalMensualAbierto = false">✕</button>
+
+        <header class="monthly-header-clean">
           <h2>📊 Reporte Mensual</h2>
           <p>Selecciona un mes o rango de fechas para ver el rendimiento</p>
-        </div>
+        </header>
 
-        <div class="monthly-selector">
-          <div class="selector-section">
-            <label>📅 Rango de Fechas</label>
-            <div class="date-range">
-              <input v-model="fechaRangoInicio" type="date" placeholder="Inicio">
-              <span>→</span>
-              <input v-model="fechaRangoFin" type="date" placeholder="Fin">
-            </div>
-            <button type="button" :disabled="cargandoMensual" @click="generarReporteRangoFechas" class="btn-generate-range">
-              <span class="btn-text">{{ cargandoMensual ? 'Cargando...' : 'Ver Reporte' }}</span>
-              <span class="btn-icon">{{ cargandoMensual ? '⏳' : '📊' }}</span>
-            </button>
-          </div>
-
-          <div class="selector-divider">ó</div>
-
-          <div class="selector-section">
-            <label>📆 Mes Específico</label>
-            <div class="month-select">
-              <input v-model="mesMensual" type="month">
-              <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual" class="btn-generate-range">
-                <span class="btn-text">{{ cargandoMensual ? 'Cargando...' : 'Ver Reporte' }}</span>
-                <span class="btn-icon">{{ cargandoMensual ? '⏳' : '📊' }}</span>
+        <div class="monthly-scroll">
+          <div class="monthly-selector-clean">
+            <div class="monthly-select-section">
+              <label>📅 Rango de Fechas</label>
+              <div class="monthly-date-range">
+                <input v-model="fechaRangoInicio" type="date" placeholder="Inicio">
+                <span>→</span>
+                <input v-model="fechaRangoFin" type="date" placeholder="Fin">
+              </div>
+              <button type="button" :disabled="cargandoMensual" @click="generarReporteRangoFechas" class="monthly-btn-gen">
+                {{ cargandoMensual ? 'Cargando...' : 'Ver Reporte' }} 📊
               </button>
             </div>
-          </div>
-        </div>
 
-        <div class="monthly-results" v-if="mensualTotalVentas > 0 || mensualTotalGanancias > 0">
-          <div class="results-summary">
-            <div class="summary-card total">
-              <span class="summary-label">Ventas Totales</span>
-              <span class="summary-value">{{ formatoMoneda(mensualTotalVentas) }}</span>
-            </div>
-            <div class="summary-card">
-              <span class="summary-label">Transferencia</span>
-              <span class="summary-value">{{ formatoMoneda(mensualTotalTransferencia) }}</span>
-            </div>
-            <div class="summary-card tarjeta">
-              <span class="summary-label">Tarjeta</span>
-              <span class="summary-value">{{ formatoMoneda(mensualTotalTarjeta) }}</span>
-            </div>
-            <div class="summary-card profit">
-              <span class="summary-label">Ganancia</span>
-              <span class="summary-value">{{ formatoMonedaRedonda(mensualTotalGanancias) }}</span>
+            <div class="monthly-divider">ó</div>
+
+            <div class="monthly-select-section">
+              <label>📆 Mes Específico</label>
+              <div class="monthly-month-select">
+                <input v-model="mesMensual" type="month">
+                <button type="button" :disabled="cargandoMensual" @click="generarReporteMensual" class="monthly-btn-gen">
+                  {{ cargandoMensual ? 'Cargando...' : 'Ver Reporte' }} 📊
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="weekly-section" v-if="mensualSemanas.length > 0">
-            <h3>📈 Rendimiento Semanal</h3>
-            <div class="chart-container-weekly">
-              <Bar :data="weeklyChartData" :options="weeklyChartOptions" />
+          <div class="monthly-results-clean" v-if="mensualTotalVentas > 0 || mensualTotalGanancias > 0">
+            <div class="monthly-summary">
+              <div class="monthly-sum-card total">
+                <span class="monthly-sum-label">Ventas Totales</span>
+                <span class="monthly-sum-value">{{ formatoMoneda(mensualTotalVentas) }}</span>
+              </div>
+              <div class="monthly-sum-card">
+                <span class="monthly-sum-label">Transferencia</span>
+                <span class="monthly-sum-value">{{ formatoMoneda(mensualTotalTransferencia) }}</span>
+              </div>
+              <div class="monthly-sum-card tarjeta">
+                <span class="monthly-sum-label">Tarjeta</span>
+                <span class="monthly-sum-value">{{ formatoMoneda(mensualTotalTarjeta) }}</span>
+              </div>
+              <div class="monthly-sum-card profit">
+                <span class="monthly-sum-label">Ganancia</span>
+                <span class="monthly-sum-value">{{ formatoMonedaRedonda(mensualTotalGanancias) }}</span>
+              </div>
             </div>
-            <div class="weekly-cards">
-              <div v-for="w in mensualSemanas" :key="`week-${w.semana}`" class="week-card">
-                <div class="week-header">Semana {{ w.semana }}</div>
-                <div class="week-dates">{{ w.dias }}</div>
-                <div class="week-stats">
-                  <div class="week-stat">
-                    <span>Ventas</span>
-                    <strong>{{ formatoMoneda(w.ventas) }}</strong>
+
+            <div class="monthly-weekly-section" v-if="mensualSemanas.length > 0">
+              <h3>📈 Rendimiento Semanal</h3>
+              <div class="monthly-chart-box">
+                <Bar :data="weeklyChartData" :options="weeklyChartOptions" />
+              </div>
+              <div class="monthly-week-cards">
+                <div v-for="w in mensualSemanas" :key="`week-${w.semana}`" class="monthly-week-card">
+                  <div class="monthly-week-head">Semana {{ w.semana }}</div>
+                  <div class="monthly-week-dates">{{ w.dias }}</div>
+                  <div class="monthly-week-stats">
+                    <div class="monthly-week-stat">
+                      <span>Ventas</span>
+                      <strong>{{ formatoMoneda(w.ventas) }}</strong>
+                    </div>
+                    <div class="monthly-week-stat profit">
+                      <span>Ganancia</span>
+                      <strong>{{ formatoMonedaRedonda(w.ganancia) }}</strong>
+                    </div>
                   </div>
-                  <div class="week-stat profit">
-                    <span>Ganancia</span>
-                    <strong>{{ formatoMonedaRedonda(w.ganancia) }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="monthly-products-section" v-if="productosUnitariosMensual.length > 0 || productosGranelMensual.length > 0">
+              <h3>🏆 Productos Más Vendidos</h3>
+              <div class="monthly-products-toggle">
+                <button :class="{ active: tipoGraficaMensual === 'unitario' }" @click="tipoGraficaMensual = 'unitario'">📦 Unitarios</button>
+                <button :class="{ active: tipoGraficaMensual === 'gramaje' }" @click="tipoGraficaMensual = 'gramaje'">⚖️ Granel</button>
+              </div>
+              
+              <div v-if="tipoGraficaMensual === 'unitario' && productosUnitariosMensual.length > 0">
+                <div class="monthly-chart-box" style="height: 250px;">
+                  <Bar :data="buildMensualTimelineChart(false)" :options="getMensualTimelineOptions(false)" />
+                </div>
+                <div class="monthly-products-list">
+                  <div v-for="(producto, index) in productosUnitariosMensual" :key="`u-${producto.nombre}`" class="monthly-product-row">
+                    <span class="monthly-product-rank">{{ index + 1 }}</span>
+                    <span class="monthly-product-name">{{ producto.nombre }}</span>
+                    <span class="monthly-product-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+                    <span class="monthly-product-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="tipoGraficaMensual === 'gramaje' && productosGranelMensual.length > 0">
+                <div class="monthly-chart-box" style="height: 250px;">
+                  <Bar :data="buildMensualTimelineChart(true)" :options="getMensualTimelineOptions(true)" />
+                </div>
+                <div class="monthly-products-list">
+                  <div v-for="(producto, index) in productosGranelMensual" :key="`g-${producto.nombre}`" class="monthly-product-row">
+                    <span class="monthly-product-rank">{{ index + 1 }}</span>
+                    <span class="monthly-product-name">{{ producto.nombre }}</span>
+                    <span class="monthly-product-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
+                    <span class="monthly-product-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="products-section" v-if="productosUnitariosMensual.length > 0 || productosGranelMensual.length > 0">
-            <h3>🏆 Productos Más Vendidos</h3>
-            <div class="products-toggle">
-              <button :class="{ active: tipoGraficaMensual === 'unitario' }" @click="tipoGraficaMensual = 'unitario'">
-                📦 Unitarios
-              </button>
-              <button :class="{ active: tipoGraficaMensual === 'gramaje' }" @click="tipoGraficaMensual = 'gramaje'">
-                ⚖️ Granel
-              </button>
-            </div>
-            
-            <div v-if="tipoGraficaMensual === 'unitario' && productosUnitariosMensual.length > 0">
-              <div class="chart-container">
-                <Bar :data="chartDataMensualUnitarios" :options="chartOptionsMensualUnitarios" />
-              </div>
-              <div class="products-list">
-                <div v-for="(producto, index) in productosUnitariosMensual" :key="`u-${producto.nombre}`" class="product-row">
-                  <span class="product-rank">{{ index + 1 }}</span>
-                  <span class="product-name">{{ producto.nombre }}</span>
-                  <span class="product-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-                  <span class="product-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="tipoGraficaMensual === 'gramaje' && productosGranelMensual.length > 0">
-              <div class="chart-container">
-                <Bar :data="chartDataMensualGranel" :options="chartOptionsMensualGranel" />
-              </div>
-              <div class="products-list">
-                <div v-for="(producto, index) in productosGranelMensual" :key="`g-${producto.nombre}`" class="product-row">
-                  <span class="product-rank">{{ index + 1 }}</span>
-                  <span class="product-name">{{ producto.nombre }}</span>
-                  <span class="product-qty">{{ formatearCantidad(producto.cantidadTotal, producto.isGramaje) }}</span>
-                  <span class="product-amount">{{ formatoMonedaRedondeada(producto.montoTotal) }}</span>
-                </div>
-              </div>
-            </div>
+          <div class="monthly-empty" v-else>
+            <p>Selecciona un mes o rango de fechas y genera el reporte para ver los resultados</p>
           </div>
         </div>
 
-        <div v-else class="monthly-empty">
-          <p>Selecciona un mes o rango de fechas y genera el reporte para ver los resultados</p>
-        </div>
-        </div>
+        <footer class="monthly-footer"><button class="monthly-btn-close" @click="modalMensualAbierto = false">Cerrar</button></footer>
       </section>
     </div>
 
     <div v-if="modalHistorialAbierto" class="modal-overlay" @click.self="modalHistorialAbierto = false">
-      <div class="pergamino history-pergamino">
-        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
-        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-br"><div class="ornament"></div></div>
-        
-        <div class="pergamino-inner">
-          <header class="modal-header">
-            <div class="header-emblem">
-              <span class="emblem-icon">📜</span>
-            </div>
-            <h2>Historial de Ventas</h2>
-            <div class="header-line"></div>
-            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalHistorialAbierto = false">✕</button>
-          </header>
+      <div class="modern-modal modal-historial">
+        <header class="modern-modal-header">
+          <h3>Historial de Ventas</h3>
+          <button class="modern-close" @click="modalHistorialAbierto = false">×</button>
+        </header>
 
-          <div class="modal-body">
-            <div class="filter-section">
-              <div class="filter-row">
-                <div class="filter-select-wrap">
-                  <label>Luna</label>
-                  <select v-model="filtroMesHistorial" class="papiro-select">
-                    <option value="all">Todas</option>
-                    <option v-for="m in historialMeses" :key="`m-${m}`" :value="m">Mes {{ Number(m) + 1 }}</option>
-                  </select>
-                </div>
-                <div class="filter-select-wrap">
-                  <label>Sol</label>
-                  <select v-model="filtroDiaHistorial" class="papiro-select">
-                    <option value="all">Todos</option>
-                    <option v-for="d in historialDias" :key="`d-${d}`" :value="d">Día {{ d }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="filter-discrepancia">
-                <label class="checkbox-scroll">
-                  <input type="checkbox" v-model="filtroDiscrepanciaHistorial" />
-                  <span>⚠️ Discrepancias</span>
-                </label>
-              </div>
-              <div v-if="esAdministrador" class="correccion-historial">
-                <div class="correccion-header">
-                  <span class="correccion-title">🔧 Corregir</span>
-                  <button 
-                    v-if="ventasHistorialSeleccionadas.size > 0" 
-                    class="btn-corregir-sel" 
-                    :disabled="corrigiendoHistorial"
-                    @click="corregirVentasHistorial(Array.from(ventasHistorialSeleccionadas))"
-                  >
-                    🔧 ({{ ventasHistorialSeleccionadas.size }})
-                  </button>
-                  <button 
-                    class="btn-corregir-todas" 
-                    :disabled="corrigiendoHistorial"
-                    @click="corregirVentasHistorial(historialFiltrado.filter(v => v.venta.tieneDiscrepancia).map(v => v.venta.idVenta))"
-                  >
-                    ⚡ Todas
-                  </button>
-                  <label class="checkbox-scroll check-all">
-                    <input type="checkbox" :checked="historialFiltrado.filter(v => v.venta.tieneDiscrepancia).length > 0 && historialFiltrado.filter(v => v.venta.tieneDiscrepancia).every(v => ventasHistorialSeleccionadas.has(v.venta.idVenta))" @change="seleccionarTodasHistorial" />
-                    <span>Todo</span>
-                  </label>
-                </div>
-                <div v-if="correccionHistorialMsg" class="correccion-msg">{{ correccionHistorialMsg }}</div>
-              </div>
-              <div class="total-scroll-bar">
-                <span class="scroll-bar-label">⚜ Total del Período ⚜</span>
-                <span class="scroll-bar-amount">{{ formatoMoneda(historialTotalFiltrado) }}</span>
-              </div>
+        <div class="modern-modal-body">
+          <div class="historial-summary">
+            <div class="summary-card">
+              <span class="summary-label">Ventas</span>
+              <span class="summary-value">{{ historialFiltrado.length }}</span>
             </div>
-
-            <div class="entries-scroll">
-              <p v-if="cargandoHistorial" class="empty-text">📡 Cargando pergamino antiguo...</p>
-              <p v-else-if="historialFiltrado.length === 0" class="empty-text">📭 No hay ventas con el filtro actual.</p>
-
-              <div v-else class="scroll-entries">
-                <div v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="scroll-entry" :class="{ 'entry-discrepancia': v.venta.tieneDiscrepancia, 'entry-seleccionada': ventasHistorialSeleccionadas.has(v.venta.idVenta) }" @click="abrirDetalleVenta(v.venta.idVenta)">
-                  <div class="entry-left">
-                    <span class="entry-number">
-                      <span v-if="v.venta.tieneDiscrepancia" class="discrepancia-icon" title="Discrepancia">⚠️</span>
-                      <input 
-                        v-if="esAdministrador && v.venta.tieneDiscrepancia" 
-                        type="checkbox" 
-                        class="entry-checkbox"
-                        :checked="ventasHistorialSeleccionadas.has(v.venta.idVenta)"
-                        @click.stop
-                        @change="toggleSeleccionHistorial(v.venta.idVenta)"
-                      />
-                      {{ historialFiltrado.length - index }}
-                    </span>
-                    <div class="entry-info">
-                      <span class="entry-date">{{ formatoFecha(v.venta.fechaVenta) }}</span>
-                      <span class="metodo-scroll-pill" :class="getMetodoClase(v.venta.metodoPago)">
-                        {{ getMetodoIcono(v.venta.metodoPago) }} {{ v.venta.metodoPago || 'N/D' }}
-                      </span>
-                    </div>
-                  </div>
-                  <span class="entry-amount">{{ formatoMoneda(Number(v.venta.montoTotal || 0)) }}</span>
-                </div>
-              </div>
+            <div class="summary-card summary-total">
+              <span class="summary-label">Total Cobrado</span>
+              <span class="summary-value">{{ formatoMoneda(historialTotalFiltrado) }}</span>
             </div>
+          </div>
+
+          <div class="historial-filters">
+            <select v-model="filtroMesHistorial" class="filter-select">
+              <option value="all">Todos los meses</option>
+              <option v-for="m in historialMeses" :key="`m-${m}`" :value="m">Mes {{ Number(m) + 1 }}</option>
+            </select>
+            <select v-model="filtroDiaHistorial" class="filter-select">
+              <option value="all">Todos los días</option>
+              <option v-for="d in historialDias" :key="`d-${d}`" :value="d">Día {{ d }}</option>
+            </select>
+            <label class="filter-check">
+              <input type="checkbox" v-model="filtroDiscrepanciaHistorial">
+              <span>Solo discrepancias</span>
+            </label>
+          </div>
+
+          <div v-if="esAdministrador" class="historial-actions">
+            <button v-if="ventasHistorialSeleccionadas.size > 0" class="btn-action" :disabled="corrigiendoHistorial" @click="corregirVentasHistorial(Array.from(ventasHistorialSeleccionadas))">Corregir seleccionadas ({{ ventasHistorialSeleccionadas.size }})</button>
+            <button class="btn-action btn-action-primary" :disabled="corrigiendoHistorial" @click="corregirVentasHistorial(historialFiltrado.filter(v => v.venta.tieneDiscrepancia).map(v => v.venta.idVenta))">Corregir todas</button>
+            <label class="filter-check">
+              <input type="checkbox" :checked="historialFiltrado.filter(v => v.venta.tieneDiscrepancia).length > 0 && historialFiltrado.filter(v => v.venta.tieneDiscrepancia).every(v => ventasHistorialSeleccionadas.has(v.venta.idVenta))" @change="seleccionarTodasHistorial">
+              <span>Seleccionar todas</span>
+            </label>
+            <p v-if="correccionHistorialMsg" class="action-msg">{{ correccionHistorialMsg }}</p>
+          </div>
+
+          <div class="historial-table-wrap">
+            <p v-if="cargandoHistorial" class="empty-text">Cargando...</p>
+            <p v-else-if="historialFiltrado.length === 0" class="empty-text">No hay ventas con el filtro actual.</p>
+            <table v-else class="modern-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Monto</th>
+                  <th>Método</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(v, index) in historialFiltrado" :key="v.venta.idVenta" class="table-row" :class="{ 'row-warning': v.venta.tieneDiscrepancia, 'row-selected': ventasHistorialSeleccionadas.has(v.venta.idVenta) }" @click="abrirDetalleVenta(v.venta.idVenta)">
+                  <td class="td-num">
+                    <span v-if="v.venta.tieneDiscrepancia" class="warning-icon">⚠</span>
+                    <input v-if="esAdministrador && v.venta.tieneDiscrepancia" type="checkbox" class="row-checkbox" :checked="ventasHistorialSeleccionadas.has(v.venta.idVenta)" @click.stop @change="toggleSeleccionHistorial(v.venta.idVenta)">
+                    <span class="ticket-num">{{ historialFiltrado.length - index }}</span>
+                  </td>
+                  <td class="td-date">{{ formatoFecha(v.venta.fechaVenta) }}</td>
+                  <td class="td-amount">{{ formatoMoneda(Number(v.venta.montoTotal || 0)) }}</td>
+                  <td class="td-method">
+                    <span class="method-badge" :class="getMetodoClase(v.venta.metodoPago)">{{ getMetodoIcono(v.venta.metodoPago) }} {{ v.venta.metodoPago || 'N/D' }}</span>
+                  </td>
+                  <td class="td-action" @click.stop>
+                    <button class="btn-view" @click="abrirDetalleVenta(v.venta.idVenta)">→</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
 
     <div v-if="modalDetalleAbierto && ventaDetalleSeleccionada" class="modal-overlay" @click.self="modalDetalleAbierto = false">
-      <div class="pergamino detail-pergamino">
-        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
-        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-br"><div class="ornament"></div></div>
-        
-        <div class="pergamino-inner">
-          <header class="modal-header">
-            <div class="header-emblem">
-              <span class="emblem-icon">🧾</span>
-            </div>
-            <h2>Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h2>
-            <div class="header-line"></div>
-            <button v-if="esAdministrador && !ventaDetalleEditando" type="button" class="btn-editar-pergamino" @click="iniciarEdicionVentaDetalle">✏️ Editar</button>
+      <div class="modern-modal modal-detalle-venta">
+        <header class="modern-modal-header">
+          <h3>Venta #{{ ventaDetalleSeleccionada.numeroTicket || ventaDetalleSeleccionada.idVenta }}</h3>
+          <div class="header-actions">
+            <button v-if="esAdministrador && !ventaDetalleEditando" type="button" class="btn-edit-clean" @click="iniciarEdicionVentaDetalle">✎ Editar</button>
             <template v-if="esAdministrador && ventaDetalleEditando">
-              <button type="button" class="btn-guardar-pergamino" @click="guardarEdicionVentaDetalle">💾 Guardar</button>
-              <button type="button" class="btn-cancelar-pergamino" @click="cancelarEdicionVentaDetalle">Cancelar</button>
+              <button type="button" class="btn-save-clean" @click="guardarEdicionVentaDetalle">Guardar</button>
+              <button type="button" class="btn-cancel-clean" @click="cancelarEdicionVentaDetalle">Cancelar</button>
             </template>
-            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalDetalleAbierto = false">✕</button>
-          </header>
+            <button type="button" class="modern-close" @click="modalDetalleAbierto = false">×</button>
+          </div>
+        </header>
 
-          <div class="modal-body">
-            <div class="meta-badges">
-              <div class="meta-pill" :class="getMetodoClase(ventaDetalleSeleccionada.metodoPago)">
-                <span class="pill-rune">◈</span>
-                <span class="pill-icon">💳</span>
-                <span class="pill-text">{{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}</span>
-              </div>
-              <div class="meta-pill date-pill">
-                <span class="pill-rune">◈</span>
-                <span class="pill-icon">📅</span>
-                <span class="pill-text">{{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</span>
-              </div>
-            </div>
+        <div class="modern-modal-body">
+          <div class="detalle-meta-row">
+            <span class="meta-badge" :class="getMetodoClase(ventaDetalleSeleccionada.metodoPago)">
+              {{ ventaDetalleSeleccionada.metodoPago || 'N/D' }}
+            </span>
+            <span class="meta-date">{{ formatoFecha(ventaDetalleSeleccionada.fechaVenta) }}</span>
+            <span class="meta-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
+          </div>
 
-            <div class="section-title">⚜ Detalle de Productos ⚜</div>
-            
-            <div class="items-scroll">
-              <div v-for="(d, index) in ventaDetalleItems" :key="d.idVentaDetalle" class="item-card">
-                <div class="item-left">
-                  <span class="item-bullet">◆</span>
-                  <div class="item-info">
-                    <span class="item-name">{{ d.productoNombre || 'Producto eliminado' }}</span>
-                    <template v-if="ventaDetalleEditando && ventaDetalleItemEditando === index">
-                      <input v-model.number="ventaDetalleCantidadTemp" type="number" min="1" class="edit-input-small" />
-                      <input v-model.number="ventaDetallePrecioTemp" type="number" step="0.01" min="0" class="edit-input-small" />
-                      <button class="btn-confirm-item" @click="confirmarEditarItemDetalle(index)">✓</button>
-                      <button class="btn-cancel-item" @click="cancelarEditarItemDetalle">×</button>
-                    </template>
-                    <template v-else>
-                      <span class="item-calc">
-                        {{ d.cantidad }} {{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'gramos' : 'pzas' }}
-                      </span>
-                    </template>
+          <div class="detalle-section-title">Productos</div>
+          
+          <div class="detalle-items-list">
+            <div v-for="(d, index) in ventaDetalleItems" :key="d.idVentaDetalle" class="detalle-item-row">
+              <div class="detalle-item-info">
+                <span class="detalle-item-name">{{ d.productoNombre || 'Producto eliminado' }}</span>
+                <template v-if="ventaDetalleEditando && ventaDetalleItemEditando === index">
+                  <div class="edit-inline-row">
+                    <input v-model.number="ventaDetalleCantidadTemp" type="number" min="1" class="edit-input-clean" />
+                    <input v-model.number="ventaDetallePrecioTemp" type="number" step="0.01" min="0" class="edit-input-clean" />
+                    <button class="btn-confirm-clean" @click="confirmarEditarItemDetalle(index)">✓</button>
+                    <button class="btn-cancel-clean" @click="cancelarEditarItemDetalle">×</button>
                   </div>
-                </div>
-                <span class="item-price">
+                </template>
+                <template v-else>
+                  <span class="detalle-item-qty">
+                    {{ d.cantidad }} {{ d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? 'g' : 'pz' }}
+                  </span>
+                </template>
+              </div>
+              <div class="detalle-item-right">
+                <span class="detalle-item-price">
                   {{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}
-                  <template v-if="ventaDetalleEditando">
-                    <button class="btn-edit-item-pergamino" @click="iniciarEditarItemDetalle(index)" title="Editar">✏️</button>
-                    <button class="btn-delete-item-pergamino" @click="eliminarItemDetalle(index)" title="Eliminar">🗑️</button>
-                  </template>
                 </span>
+                <template v-if="ventaDetalleEditando">
+                  <button class="btn-icon-clean" @click="iniciarEditarItemDetalle(index)" title="Editar">✎</button>
+                  <button class="btn-icon-clean btn-icon-danger" @click="eliminarItemDetalle(index)" title="Eliminar">✕</button>
+                </template>
               </div>
             </div>
+          </div>
 
-            <div class="total-bar">
-              <span class="total-bar-label">Total a Pagar</span>
-              <template v-if="ventaDetalleEditando">
-                <input v-model.number="ventaDetalleMontoEditado" type="number" step="0.01" class="total-input-pergamino" />
-              </template>
-              <template v-else>
-                <span class="total-bar-amount">{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</span>
-                <button v-if="esAdministrador" class="btn-edit-total" @click="iniciarEdicionSoloTotal" title="Editar Total">✏️</button>
-              </template>
-            </div>
+          <div class="detalle-total-row">
+            <span>Total</span>
+            <template v-if="ventaDetalleEditando">
+              <input v-model.number="ventaDetalleMontoEditado" type="number" step="0.01" class="total-input-clean" />
+            </template>
+            <template v-else>
+              <strong>{{ formatoMoneda(Number(ventaDetalleSeleccionada.montoTotal || 0)) }}</strong>
+              <button v-if="esAdministrador" class="btn-icon-clean" @click="iniciarEdicionSoloTotal" title="Editar Total">✎</button>
+            </template>
           </div>
         </div>
       </div>
@@ -3476,193 +3814,126 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="modalAnualAbierto" class="modal-overlay" @click.self="modalAnualAbierto = false">
-      <div class="pergamino annual-pergamino">
-        <div class="corner-decor corner-tl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-tr"><div class="ornament"></div></div>
-        <div class="corner-decor corner-bl"><div class="ornament"></div></div>
-        <div class="corner-decor corner-br"><div class="ornament"></div></div>
-        
-        <div class="pergamino-inner annual-inner">
-          <header class="annual-header">
-            <div class="header-emblem">
-              <span class="emblem-icon">📜</span>
-            </div>
-            <h2>Reporte Anual del Año {{ anioReporte }}</h2>
-            <div class="header-line"></div>
-            <div class="annual-actions-row">
-              <select v-model="anioReporte" class="papiro-select">
-                <option v-for="year in [2024, 2025, 2026, 2027]" :key="year" :value="year">{{ year }}</option>
-              </select>
-              <button type="button" @click="generarReporteAnual" class="refresh-btn">🔄</button>
-            </div>
-            <button type="button" class="btn-cerrar-modal pergamino-close" @click="modalAnualAbierto = false">✕</button>
-          </header>
+    <div v-if="modalAnualAbierto" class="annual-overlay" @click.self="modalAnualAbierto = false">
+      <section class="annual-modal">
+        <button type="button" class="annual-close" @click="modalAnualAbierto = false">✕</button>
 
-          <div v-if="reporteAnualData" class="annual-content-scroll">
-          <div class="annual-kpis">
-            <div class="kpi-card kpi-main">
-              <div class="kpi-icon-wrapper success">
-                <span class="kpi-icon">💰</span>
-              </div>
-              <div class="kpi-info">
-                <p class="kpi-label">Ingresos Totales</p>
-                <p class="kpi-value">{{ formatoMoneda(reporteAnualData.ventasTotales) }}</p>
-              </div>
-            </div>
+        <header class="annual-header-clean">
+          <h2>📜 Reporte Anual</h2>
+          <div class="annual-actions">
+            <select v-model="anioReporte" class="annual-year-select">
+              <option v-for="year in [2024, 2025, 2026, 2027]" :key="year" :value="year">{{ year }}</option>
+            </select>
+            <button type="button" class="annual-refresh" @click="generarReporteAnual" :disabled="cargandoMensual">🔄</button>
+          </div>
+        </header>
 
-            <div class="kpi-card">
-              <div class="kpi-icon-wrapper efectivo">
-                <span class="kpi-icon">💵</span>
-              </div>
-              <div class="kpi-info">
-                <p class="kpi-label">Efectivo</p>
-                <p class="kpi-value">{{ formatoMoneda(reporteAnualData.ventasEfectivo) }}</p>
-              </div>
+        <div class="annual-scroll" v-if="reporteAnualData">
+          <div class="annual-kpis-clean">
+            <div class="annual-kpi main">
+              <span class="annual-kpi-label">Ingresos Totales</span>
+              <span class="annual-kpi-value">{{ formatoMoneda(reporteAnualData.ventasTotales) }}</span>
             </div>
-
-            <div class="kpi-card">
-              <div class="kpi-icon-wrapper transferencia">
-                <span class="kpi-icon">📱</span>
-              </div>
-              <div class="kpi-info">
-                <p class="kpi-label">Transferencia</p>
-                <p class="kpi-value">{{ formatoMoneda(reporteAnualData.ventasTransferencia) }}</p>
-              </div>
+            <div class="annual-kpi efectivo">
+              <span class="annual-kpi-label">💵 Efectivo</span>
+              <span class="annual-kpi-value">{{ formatoMoneda(reporteAnualData.ventasEfectivo) }}</span>
             </div>
-
-            <div class="kpi-card">
-              <div class="kpi-icon-wrapper tarjeta">
-                <span class="kpi-icon">💳</span>
-              </div>
-              <div class="kpi-info">
-                <p class="kpi-label">Tarjeta</p>
-                <p class="kpi-value">{{ formatoMoneda(reporteAnualData.ventasTarjeta) }}</p>
-              </div>
+            <div class="annual-kpi transferencia">
+              <span class="annual-kpi-label">📱 Transferencia</span>
+              <span class="annual-kpi-value">{{ formatoMoneda(reporteAnualData.ventasTransferencia) }}</span>
             </div>
-
-            <div class="kpi-card kpi-gain">
-              <div class="kpi-icon-wrapper gain">
-                <span class="kpi-icon">📈</span>
-              </div>
-              <div class="kpi-info">
-                <p class="kpi-label">Ganancia Total</p>
-                <p class="kpi-value">{{ formatoMonedaRedonda(reporteAnualData.gananciaTotal) }}</p>
-              </div>
+            <div class="annual-kpi tarjeta">
+              <span class="annual-kpi-label">💳 Tarjeta</span>
+              <span class="annual-kpi-value">{{ formatoMoneda(reporteAnualData.ventasTarjeta) }}</span>
+            </div>
+            <div class="annual-kpi ganancia">
+              <span class="annual-kpi-label">📈 Ganancia</span>
+              <span class="annual-kpi-value">{{ formatoMonedaRedonda(reporteAnualData.gananciaTotal) }}</span>
             </div>
           </div>
 
-          <div class="annual-charts-grid" v-if="reporteAnualData.meses && reporteAnualData.meses.length > 0">
-            <div class="chart-card chart-full">
-              <div class="chart-header">
-                <h3 class="chart-title">📈 Ventas por Mes</h3>
-                <p class="chart-subtitle">Evolución de los ingresos generados mes a mes</p>
-              </div>
-              <div class="chart-body">
-                <Bar :data="annualMonthlyChartData" :options="annualMonthlyChartOptions" />
-              </div>
+          <div class="annual-chart-section" v-if="reporteAnualData.meses && reporteAnualData.meses.length > 0">
+            <h3>📈 Ventas por Mes</h3>
+            <div class="annual-chart-box">
+              <Bar :data="annualMonthlyChartData" :options="annualMonthlyChartOptions" />
             </div>
+          </div>
 
-            <div class="chart-card" v-if="reporteAnualData.ventasPorHorario && reporteAnualData.ventasPorHorario.length > 0">
-              <div class="chart-header">
-                <h3 class="chart-title">⏰ Horarios Pico</h3>
-                <p class="chart-subtitle">Volumen de transacciones por hora</p>
-              </div>
-              <div class="horario-mini-grid">
-                <div v-for="horario in reporteAnualData.ventasPorHorario" :key="horario.horario" class="horario-mini-card">
-                  <span class="horario-mini-time">{{ horario.horario }}</span>
-                  <span class="horario-mini-sales">{{ formatoMonedaRedondeada(horario.totalVentas) }}</span>
-                  <span class="horario-mini-count">{{ horario.numeroVentas }} ventas</span>
-                </div>
+          <div class="annual-horario-section" v-if="reporteAnualData.ventasPorHorario && reporteAnualData.ventasPorHorario.length > 0">
+            <h3>⏰ Horarios Pico</h3>
+            <div class="annual-horario-grid">
+              <div v-for="h in reporteAnualData.ventasPorHorario" :key="h.horario" class="annual-horario-card">
+                <span class="annual-horario-time">{{ h.horario }}</span>
+                <span class="annual-horario-amount">{{ formatoMonedaRedondeada(h.totalVentas) }}</span>
+                <span class="annual-horario-count">{{ h.numeroVentas }} ventas</span>
               </div>
             </div>
           </div>
 
           <div class="annual-table-section" v-if="reporteAnualData.meses && reporteAnualData.meses.length > 0">
-            <div class="table-header">
-              <h3 class="table-title">📅 Resumen Mensual</h3>
-            </div>
-            <div class="months-table-modern">
-              <div class="month-row-modern header">
-                <span>Mes</span>
-                <span>Ventas</span>
-                <span>Ganancia</span>
-                <span>Cambio</span>
+            <h3>📅 Resumen Mensual</h3>
+            <div class="annual-months-table">
+              <div class="annual-month-row head">
+                <span>Mes</span><span>Ventas</span><span>Ganancia</span><span>Cambio</span>
               </div>
-              <div v-for="mes in reporteAnualData.meses" :key="mes.mes" class="month-row-modern">
-                <span class="month-name">{{ mes.nombreMes }}</span>
-                <span class="month-sales">{{ formatoMonedaRedondeada(mes.ventas) }}</span>
-                <span class="month-gain">{{ formatoMonedaRedondeada(mes.ganancia) }}</span>
-                <span :class="['month-change', mes.porcentajeCambio >= 0 ? 'positive' : 'negative']">
-                  <span class="change-icon">{{ mes.porcentajeCambio >= 0 ? '↑' : '↓' }}</span>
-                  {{ Math.abs(mes.porcentajeCambio).toFixed(1) }}%
+              <div v-for="mes in reporteAnualData.meses" :key="mes.mes" class="annual-month-row">
+                <span class="annual-month-name">{{ mes.nombreMes }}</span>
+                <span class="annual-month-sales">{{ formatoMonedaRedondeada(mes.ventas) }}</span>
+                <span class="annual-month-gain">{{ formatoMonedaRedondeada(mes.ganancia) }}</span>
+                <span :class="['annual-month-change', mes.porcentajeCambio >= 0 ? 'up' : 'down']">
+                  {{ mes.porcentajeCambio >= 0 ? '↑' : '↓' }} {{ Math.abs(mes.porcentajeCambio).toFixed(1) }}%
                 </span>
               </div>
             </div>
           </div>
 
-          <div class="annual-products-section" v-if="reporteAnualData.productosPorHorario && reporteAnualData.productosPorHorario.length > 0">
-            <div class="table-header">
-              <h3 class="table-title">⚔️ Top Productos por Horario</h3>
-            </div>
-            <div class="products-grid">
-              <div v-for="horario in uniqueHorarios" :key="horario" class="product-group">
-                <h4 class="product-group-title">🕐 {{ horario }}</h4>
-                <div class="product-list-modern">
-                  <div v-for="(prod, idx) in getProductosPorHorario(horario)" :key="prod.nombreProducto" class="product-row">
-                    <span class="product-rank">{{ idx + 1 }}</span>
-                    <span class="product-name">{{ prod.nombreProducto }}</span>
-                    <span class="product-qty">{{ formatearCantidad(prod.cantidadVendida, prod.isGramaje) }}</span>
-                  </div>
-                </div>
-              </div>
+          <div class="annual-products-section" v-if="uniqueHorarios.length > 0 && buildHorarioTimelineChart(false).datasets?.length">
+            <h3>⚔️ Top Productos Unitarios por Horario</h3>
+            <div class="annual-chart-box" style="height: 300px;">
+              <Bar :data="buildHorarioTimelineChart(false)" :options="getHorarioTimelineOptions(false)" />
             </div>
           </div>
 
-          <div class="annual-top-products-section" v-if="reporteAnualData.topProductosGranel?.length || reporteAnualData.topProductosUnitarios?.length">
-            <div class="top-products-header">
-              <div class="triforce-divider">⏣</div>
-              <h3 class="top-products-title">🏆 Heroes of the Realm - Top 5</h3>
-              <div class="triforce-divider">⏣</div>
+          <div class="annual-products-section" v-if="uniqueHorarios.length > 0 && buildHorarioTimelineChart(true).datasets?.length">
+            <h3>⚖️ Top Productos a Granel por Horario</h3>
+            <div class="annual-chart-box" style="height: 300px;">
+              <Bar :data="buildHorarioTimelineChart(true)" :options="getHorarioTimelineOptions(true)" />
             </div>
-            
-            <div class="top-products-grid">
-              <div class="top-products-card granel" v-if="reporteAnualData.topProductosGranel?.length">
-                <div class="card-emblem">⚖️</div>
-                <h4 class="card-title">🥇 Granel Masters</h4>
-                <p class="card-subtitle">Los guerreros del peso</p>
-                <div class="top-list">
-                  <div v-for="(prod, idx) in reporteAnualData.topProductosGranel" :key="prod.nombreProducto" class="top-item">
-                    <span class="top-rank" :class="`rank-${idx + 1}`">{{ ['①','②','③','④','⑤'][idx] }}</span>
-                    <span class="top-name">{{ prod.nombreProducto }}</span>
-                    <span class="top-qty">{{ formatearCantidad(prod.cantidadVendida, true) }}</span>
+          </div>
+
+          <div class="annual-top-section" v-if="reporteAnualData.topProductosGranel?.length || reporteAnualData.topProductosUnitarios?.length">
+            <h3>🏆 Top 5 Productos</h3>
+            <div class="annual-top-grid">
+              <div class="annual-top-card" v-if="reporteAnualData.topProductosGranel?.length">
+                <h4>⚖️ Granel</h4>
+                <div class="annual-top-list">
+                  <div v-for="(prod, idx) in reporteAnualData.topProductosGranel" :key="prod.nombreProducto" class="annual-top-item">
+                    <span class="annual-top-rank" :class="`rank-${idx + 1}`">{{ idx + 1 }}</span>
+                    <span class="annual-top-name">{{ prod.nombreProducto }}</span>
+                    <span class="annual-top-qty">{{ formatearCantidad(prod.cantidadVendida, true) }}</span>
                   </div>
                 </div>
               </div>
-              
-              <div class="top-products-card unitarios" v-if="reporteAnualData.topProductosUnitarios?.length">
-                <div class="card-emblem">🗡️</div>
-                <h4 class="card-title">🏹 Unit Heroes</h4>
-                <p class="card-subtitle">Los defensores de unidades</p>
-                <div class="top-list">
-                  <div v-for="(prod, idx) in reporteAnualData.topProductosUnitarios" :key="prod.nombreProducto" class="top-item">
-                    <span class="top-rank" :class="`rank-${idx + 1}`">{{ ['①','②','③','④','⑤'][idx] }}</span>
-                    <span class="top-name">{{ prod.nombreProducto }}</span>
-                    <span class="top-qty">{{ formatearCantidad(prod.cantidadVendida, false) }}</span>
+              <div class="annual-top-card" v-if="reporteAnualData.topProductosUnitarios?.length">
+                <h4>📦 Unitarios</h4>
+                <div class="annual-top-list">
+                  <div v-for="(prod, idx) in reporteAnualData.topProductosUnitarios" :key="prod.nombreProducto" class="annual-top-item">
+                    <span class="annual-top-rank" :class="`rank-${idx + 1}`">{{ idx + 1 }}</span>
+                    <span class="annual-top-name">{{ prod.nombreProducto }}</span>
+                    <span class="annual-top-qty">{{ formatearCantidad(prod.cantidadVendida, false) }}</span>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <div class="triforce-footer">🛡️ 🗡️ 🛡️</div>
           </div>
         </div>
-        <div v-else class="annual-loading-modern">
-          <div class="loading-spinner"></div>
-          <p>Cargando datos del pergamino...</p>
+
+        <div class="annual-empty" v-else>
+          <p>Selecciona un año y genera el reporte para ver los resultados</p>
         </div>
-        </div>
-      </div>
+
+        <footer class="annual-footer"><button class="annual-btn-close" @click="modalAnualAbierto = false">Cerrar</button></footer>
+      </section>
     </div>
 
     <section class="backup-section">
@@ -4860,7 +5131,7 @@ onMounted(() => {
   text-align: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
   position: relative;
 }
 
@@ -4872,7 +5143,7 @@ onMounted(() => {
   width: 34px;
   height: 34px;
   background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border: 3px solid var(--accent-color);
+  border: 2px solid var(--accent-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -4882,7 +5153,6 @@ onMounted(() => {
 
 .detail-pergamino .emblem-icon {
   font-size: 1.1rem;
-  filter: drop-shadow(0 1px 1px var(--border-color));
 }
 
 .detail-pergamino .modal-header h2 {
@@ -4893,12 +5163,11 @@ onMounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: bold;
-  text-shadow: 2px 2px 0 var(--border-color);
 }
 
 .detail-pergamino .header-line {
   margin-top: 0.5rem;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
 }
 
@@ -4908,22 +5177,22 @@ onMounted(() => {
   right: -8px;
   width: 30px;
   height: 30px;
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
+  background: #ef4444;
+  border: 1px solid #dc2626;
   border-radius: 50%;
-  color: var(--text-primary);
+  color: white;
   font-size: 0.85rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px var(--shadow-color);
+  box-shadow: 0 2px 0 #b91c1c;
 }
 
 .detail-pergamino .pergamino-close:hover {
-  transform: scale(1.15);
-  filter: brightness(1.2);
+  background: #dc2626;
+  transform: scale(1.1);
 }
 
 .detail-pergamino .modal-body {
@@ -5113,17 +5382,456 @@ onMounted(() => {
   text-shadow: 1px 1px 0 var(--bg-primary);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .detail-pergamino {
     width: min(100%, 95vw);
+    max-height: 90vh;
+    border-radius: 10px;
+  }
+  
+  .detail-pergamino .pergamino-inner {
+    padding: 1rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.6rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 1.05rem;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 30px;
+    height: 30px;
+    top: -8px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 1rem;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 28px;
+    height: 28px;
+    top: -6px;
+    right: -6px;
+    font-size: 0.8rem;
+  }
+  
+  .meta-badges {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .meta-pill {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
   }
   
   .items-scroll {
-    max-height: 250px;
+    max-height: 280px;
+  }
+  
+  .total-bar {
+    padding: 0.5rem 0.6rem;
+  }
+  
+  .total-bar-label {
+    font-size: 0.7rem;
   }
   
   .total-bar-amount {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .detail-pergamino {
+    width: min(100%, 96vw);
+    max-height: 88vh;
+    border-radius: 8px;
+  }
+  
+  .detail-pergamino .pergamino-inner {
+    padding: 0.85rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.5rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 28px;
+    height: 28px;
+    top: -7px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 0.9rem;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 26px;
+    height: 26px;
+    top: -5px;
+    right: -5px;
+    font-size: 0.75rem;
+  }
+  
+  .meta-badges {
+    gap: 0.4rem;
+  }
+  
+  .meta-pill {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.55rem;
+  }
+  
+  .items-scroll {
+    max-height: 240px;
+  }
+  
+  .detalle-item {
+    padding: 0.5rem 0.55rem;
+  }
+  
+  .detalle-item-name {
+    font-size: 0.75rem;
+  }
+  
+  .detalle-item-meta {
+    font-size: 0.65rem;
+  }
+  
+  .detalle-item-amount {
+    font-size: 0.75rem;
+  }
+  
+  .total-bar {
+    padding: 0.45rem 0.55rem;
+  }
+  
+  .total-bar-label {
+    font-size: 0.65rem;
+  }
+  
+  .total-bar-amount {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-pergamino {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 95vh;
+    border-radius: 6px;
+  }
+  
+  .detail-pergamino .pergamino-inner {
+    padding: 0.75rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 0.88rem;
+    letter-spacing: 0.06em;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 26px;
+    height: 26px;
+    top: -6px;
+    border-width: 2px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 0.85rem;
+  }
+  
+  .detail-pergamino .header-line {
+    margin-top: 0.3rem;
+    height: 1px;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 24px;
+    height: 24px;
+    top: -4px;
+    right: -4px;
+    font-size: 0.7rem;
+    border-width: 1px;
+  }
+  
+  .meta-badges {
+    gap: 0.35rem;
+  }
+  
+  .meta-pill {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.5rem;
+    border-width: 1px;
+  }
+  
+  .items-scroll {
+    max-height: 200px;
+  }
+  
+  .detalle-item {
+    padding: 0.45rem 0.5rem;
+    border-radius: 5px;
+    border-width: 1px;
+  }
+  
+  .detalle-item-name {
+    font-size: 0.7rem;
+  }
+  
+  .detalle-item-meta {
+    font-size: 0.6rem;
+  }
+  
+  .detalle-item-amount {
+    font-size: 0.7rem;
+  }
+  
+  .total-bar {
+    padding: 0.4rem 0.5rem;
+    border-radius: 5px;
+    border-width: 1px;
+  }
+  
+  .total-bar-label {
+    font-size: 0.6rem;
+  }
+  
+  .total-bar-amount {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .detail-pergamino {
+    max-height: 96vh;
+    border-radius: 4px;
+  }
+  
+  .detail-pergamino .pergamino-inner {
+    padding: 0.65rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.35rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 0.82rem;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 24px;
+    height: 24px;
+    top: -5px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 0.8rem;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 22px;
+    height: 22px;
+    font-size: 0.65rem;
+  }
+  
+  .meta-badges {
+    gap: 0.3rem;
+  }
+  
+  .meta-pill {
+    font-size: 0.55rem;
+    padding: 0.18rem 0.45rem;
+  }
+  
+  .items-scroll {
+    max-height: 180px;
+  }
+  
+  .detalle-item {
+    padding: 0.4rem 0.45rem;
+  }
+  
+  .detalle-item-name {
+    font-size: 0.65rem;
+  }
+  
+  .detalle-item-meta {
+    font-size: 0.55rem;
+  }
+  
+  .detalle-item-amount {
+    font-size: 0.65rem;
+  }
+  
+  .total-bar {
+    padding: 0.35rem 0.45rem;
+  }
+  
+  .total-bar-label {
+    font-size: 0.55rem;
+  }
+  
+  .total-bar-amount {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .detail-pergamino .pergamino-inner {
+    padding: 0.55rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.3rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 0.78rem;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 22px;
+    height: 22px;
+    top: -4px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 0.75rem;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 20px;
+    height: 20px;
+    font-size: 0.6rem;
+  }
+  
+  .meta-pill {
+    font-size: 0.5rem;
+    padding: 0.15rem 0.4rem;
+  }
+  
+  .items-scroll {
+    max-height: 160px;
+  }
+  
+  .detalle-item {
+    padding: 0.35rem 0.4rem;
+  }
+  
+  .detalle-item-name {
+    font-size: 0.6rem;
+  }
+  
+  .detalle-item-meta {
+    font-size: 0.5rem;
+  }
+  
+  .detalle-item-amount {
+    font-size: 0.6rem;
+  }
+  
+  .total-bar {
+    padding: 0.3rem 0.4rem;
+  }
+  
+  .total-bar-label {
+    font-size: 0.5rem;
+  }
+  
+  .total-bar-amount {
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .detail-pergamino .pergamino-inner {
+    padding: 0.5rem;
+  }
+  
+  .detail-pergamino .modal-header {
+    margin-bottom: 0.3rem;
+    padding-bottom: 0.25rem;
+  }
+  
+  .detail-pergamino .modal-header h2 {
+    font-size: 0.72rem;
+  }
+  
+  .detail-pergamino .header-emblem {
+    width: 20px;
+    height: 20px;
+    top: -3px;
+  }
+  
+  .detail-pergamino .emblem-icon {
+    font-size: 0.7rem;
+  }
+  
+  .detail-pergamino .pergamino-close {
+    width: 18px;
+    height: 18px;
+    font-size: 0.55rem;
+  }
+  
+  .meta-pill {
+    font-size: 0.45rem;
+    padding: 0.12rem 0.35rem;
+  }
+  
+  .items-scroll {
+    max-height: 140px;
+  }
+  
+  .detalle-item {
+    padding: 0.3rem 0.35rem;
+  }
+  
+  .detalle-item-name {
+    font-size: 0.55rem;
+  }
+  
+  .detalle-item-meta {
+    font-size: 0.45rem;
+  }
+  
+  .detalle-item-amount {
+    font-size: 0.55rem;
+  }
+  
+  .total-bar {
+    padding: 0.25rem 0.35rem;
+  }
+  
+  .total-bar-label {
+    font-size: 0.45rem;
+  }
+  
+  .total-bar-amount {
+    font-size: 0.75rem;
   }
 }
 
@@ -5336,49 +6044,59 @@ onMounted(() => {
 }
 
 /* =========================================
-   MODAL CARD - ESTILO PAPIRO/PERGAMINO
-   ========================================= */
-.modal-card {
-  width: min(100%, 600px);
-  max-height: none;
-  background: var(--bg-panel) !important;
-  border: none !important;
-  padding: 0 !important;
-  gap: 0 !important;
-  overflow: visible;
-  animation: fadeSlideIn 200ms ease-out !important;
-  position: relative;
-  margin: 1rem auto;
-  box-shadow: none !important;
+    MODERN MODAL - ESTILO MINIMALISTA
+    ========================================= */
+.modern-modal {
+  width: min(95vw, 960px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px var(--shadow-color);
+  animation: fadeSlideIn 200ms ease-out;
 }
 
-/* Marco decorativo exterior */
-.modal-card::before {
-  content: '' !important;
-  position: absolute !important;
-  inset: 0 !important;
-  border: 4px solid var(--accent-color) !important;
-  border-radius: 16px !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  box-shadow: 
-    inset 0 0 0 2px var(--border-color),
-    inset 0 0 0 6px var(--bg-panel),
-    inset 0 0 0 8px color-mix(in srgb, var(--accent-color) 60%, transparent),
-    0 8px 32px var(--shadow-color),
-    0 0 0 1px var(--border-color) !important;
+.modern-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
 }
 
-/* Marco decorativo interior punteado */
-.modal-card::after {
-  content: '' !important;
-  position: absolute !important;
-  inset: 12px !important;
-  border: 2px dashed var(--border-color) !important;
-  border-radius: 8px !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  opacity: 0.5 !important;
+.modern-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modern-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.modern-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modern-modal-body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
 /* Esquinas decorativas */
@@ -5873,780 +6591,859 @@ onMounted(() => {
   box-shadow: 0 8px 32px var(--shadow-color) !important;
 }
 
-.annual-pergamino {
+/* =========================================
+   ANNUAL REPORT MODAL - CLEAN DESIGN
+   ========================================= */
+.annual-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.15s;
+}
+
+.annual-modal {
   width: min(100%, 1100px);
-  max-height: 90vh;
+  max-height: 92vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.annual-pergamino .pergamino-inner {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.annual-pergamino .annual-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  flex: 1;
+  position: relative;
+  animation: slideUp 0.2s;
   min-height: 0;
 }
 
-.annual-header {
-  text-align: center;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--bg-panel);
-  position: relative;
+.annual-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.annual-close:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.annual-header-clean {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
-.annual-header .header-emblem {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 34px;
-  height: 34px;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border: 3px solid var(--accent-color);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px var(--shadow-color);
-}
-
-.annual-header .emblem-icon {
-  font-size: 1.1rem;
-  filter: drop-shadow(0 1px 1px var(--border-color));
-}
-
-.annual-header h2 {
-  margin: 0;
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-  font-size: 1.4rem;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: bold;
-  text-shadow: 2px 2px 0 var(--border-color);
-}
-
-.annual-header .header-line {
-  margin-top: 0.5rem;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
-}
-
-.annual-actions-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
-.annual-pergamino .papiro-select {
-  padding: 0.4rem 0.6rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  border-radius: 6px;
+.annual-header-clean h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
   color: var(--text-primary);
+}
+
+.annual-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.annual-year-select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
   font-family: "Courier New", monospace;
-  font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.annual-pergamino .papiro-select:hover {
+.annual-year-select:focus {
   border-color: var(--accent-color);
+  outline: none;
 }
 
-.refresh-btn {
+.annual-refresh {
   padding: 0.4rem 0.6rem;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.refresh-btn:hover {
-  transform: scale(1.1);
-}
-
-.annual-pergamino .pergamino-close {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 30px;
-  height: 30px;
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: 1rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px var(--shadow-color);
 }
 
-.annual-pergamino .pergamino-close:hover {
-  transform: scale(1.15);
-  filter: brightness(1.2);
+.annual-refresh:hover:not(:disabled) {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: var(--bg-primary);
 }
 
-.annual-content-scroll {
+.annual-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.annual-scroll {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding-right: 0.25rem;
+  padding: 1rem 1.5rem;
 }
 
-.annual-content-scroll::-webkit-scrollbar {
+.annual-scroll::-webkit-scrollbar {
   width: 8px;
 }
 
-.annual-content-scroll::-webkit-scrollbar-track {
+.annual-scroll::-webkit-scrollbar-track {
   background: var(--bg-primary);
   border-radius: 4px;
 }
 
-.annual-content-scroll::-webkit-scrollbar-thumb {
+.annual-scroll::-webkit-scrollbar-thumb {
   background: var(--bg-panel);
   border-radius: 4px;
 }
 
+.annual-kpis-clean {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.annual-kpi {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.annual-kpi.main {
+  grid-column: span 2;
+  border-color: var(--accent-color);
+}
+
+.annual-kpi.efectivo { border-color: #22c55e; }
+.annual-kpi.transferencia { border-color: #3b82f6; }
+.annual-kpi.tarjeta { border-color: #ec4899; }
+.annual-kpi.ganancia { border-color: var(--success-color); }
+
+.annual-kpi-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.annual-kpi-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+}
+
+.annual-kpi.main .annual-kpi-value {
+  color: var(--accent-color);
+}
+
+.annual-chart-section,
+.annual-horario-section,
+.annual-table-section,
+.annual-products-section,
+.annual-top-section {
+  margin-bottom: 1.25rem;
+}
+
+.annual-chart-section h3,
+.annual-horario-section h3,
+.annual-table-section h3,
+.annual-products-section h3,
+.annual-top-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.annual-chart-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.annual-horario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.annual-horario-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.6rem;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.annual-horario-time {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.annual-horario-amount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+}
+
+.annual-horario-count {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.annual-months-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.annual-month-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.annual-month-row:last-child {
+  border-bottom: none;
+}
+
+.annual-month-row.head {
+  background: var(--bg-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.annual-month-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.annual-month-sales,
+.annual-month-gain {
+  font-size: 0.85rem;
+  font-family: "Courier New", monospace;
+  font-weight: 600;
+}
+
+.annual-month-gain {
+  color: var(--success-color);
+}
+
+.annual-month-change {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+}
+
+.annual-month-change.up { color: #22c55e; }
+.annual-month-change.down { color: #ef4444; }
+
+.annual-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.annual-top-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.annual-top-card h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.annual-top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.annual-top-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-primary);
+}
+
+.annual-top-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--bg-primary);
+  background: var(--accent-color);
+}
+
+.annual-top-rank.rank-1 { background: #fbbf24; }
+.annual-top-rank.rank-2 { background: #9ca3af; }
+.annual-top-rank.rank-3 { background: #d97706; }
+
+.annual-top-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annual-top-qty {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: "Courier New", monospace;
+}
+
+.annual-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.annual-footer {
+  padding: 0.6rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.annual-btn-close {
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.annual-btn-close:hover {
+  filter: brightness(1.1);
+}
+
 /* =========================================
-   MONTHLY MODAL - ESTILO PAPIRO/PERGAMINO
+   MONTHLY REPORT MODAL - CLEAN DESIGN
    ========================================= */
-.monthly-modal {
-  width: min(100%, 800px) !important;
-  max-height: 85vh !important;
-  max-width: 100% !important;
-  margin: 1rem auto !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  background: var(--bg-panel) !important;
-  border: none !important;
-  position: relative !important;
-  box-shadow: none !important;
-}
-
-/* Marco decorativo exterior */
-.monthly-modal::before {
-  content: '' !important;
-  position: absolute !important;
-  inset: 0 !important;
-  border: 4px solid var(--accent-color) !important;
-  border-radius: 16px !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  box-shadow: 
-    inset 0 0 0 2px var(--border-color),
-    inset 0 0 0 6px var(--bg-panel),
-    inset 0 0 0 8px color-mix(in srgb, var(--accent-color) 60%, transparent),
-    0 8px 32px var(--shadow-color),
-    0 0 0 1px var(--border-color) !important;
-}
-
-/* Marco decorativo interior */
-.monthly-modal::after {
-  content: '' !important;
-  position: absolute !important;
-  inset: 12px !important;
-  border: 2px dashed var(--border-color) !important;
-  border-radius: 8px !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  opacity: 0.5 !important;
-}
-
-/* Esquinas decorativas */
-.monthly-modal .modal-corner {
-  position: absolute !important;
-  width: 40px !important;
-  height: 40px !important;
-  pointer-events: none !important;
-  z-index: 10 !important;
-}
-
-.monthly-modal .modal-corner::before,
-.monthly-modal .modal-corner::after {
-  content: '' !important;
-  position: absolute !important;
-  background: var(--accent-color) !important;
-  border-radius: 2px !important;
-}
-
-.monthly-modal .modal-corner.tl {
-  top: 16px !important;
-  left: 16px !important;
-}
-.monthly-modal .modal-corner.tl::before {
-  width: 25px !important;
-  height: 3px !important;
-  top: 0 !important;
-  left: 0 !important;
-}
-.monthly-modal .modal-corner.tl::after {
-  width: 3px !important;
-  height: 25px !important;
-  top: 0 !important;
-  left: 0 !important;
-}
-
-.monthly-modal .modal-corner.tr {
-  top: 16px !important;
-  right: 16px !important;
-}
-.monthly-modal .modal-corner.tr::before {
-  width: 25px !important;
-  height: 3px !important;
-  top: 0 !important;
-  right: 0 !important;
-}
-.monthly-modal .modal-corner.tr::after {
-  width: 3px !important;
-  height: 25px !important;
-  top: 0 !important;
-  right: 0 !important;
-}
-
-.monthly-modal .modal-corner.bl {
-  bottom: 16px !important;
-  left: 16px !important;
-}
-.monthly-modal .modal-corner.bl::before {
-  width: 25px !important;
-  height: 3px !important;
-  bottom: 0 !important;
-  left: 0 !important;
-}
-.monthly-modal .modal-corner.bl::after {
-  width: 3px !important;
-  height: 25px !important;
-  bottom: 0 !important;
-  left: 0 !important;
-}
-
-.monthly-modal .modal-corner.br {
-  bottom: 16px !important;
-  right: 16px !important;
-}
-.monthly-modal .modal-corner.br::before {
-  width: 25px !important;
-  height: 3px !important;
-  bottom: 0 !important;
-  right: 0 !important;
-}
-.monthly-modal .modal-corner.br::after {
-  width: 3px !important;
-  height: 25px !important;
-  bottom: 0 !important;
-  right: 0 !important;
-}
-
-.monthly-modal .btn-cerrar-modal {
-  position: absolute !important;
-  top: 20px !important;
-  right: 20px !important;
-  z-index: 20 !important;
-  width: 36px !important;
-  height: 36px !important;
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 50% !important;
-  color: var(--text-primary) !important;
-  font-size: 1.2rem !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  transition: all 0.2s !important;
-}
-
-.monthly-modal .btn-cerrar-modal:hover {
-  background: var(--error-color) !important;
-  border-color: var(--error-color) !important;
-  color: white !important;
-  transform: scale(1.1) !important;
-}
-
-/* Contenedor interno scrolleable */
-.monthly-modal .modal-content-scroll {
-  max-height: calc(85vh - 24px) !important;
-  overflow-y: auto !important;
-  padding: 24px !important;
-}
-
-.monthly-modal .modal-content-scroll::-webkit-scrollbar {
-  width: 8px !important;
-}
-
-.monthly-modal .modal-content-scroll::-webkit-scrollbar-track {
-  background: var(--bg-secondary) !important;
-  border-radius: 4px !important;
-}
-
-.monthly-modal .modal-content-scroll::-webkit-scrollbar-thumb {
-  background: var(--accent-color) !important;
-  border-radius: 4px !important;
-}
-
-/* Header del modal */
-.monthly-header {
-  text-align: center !important;
-  margin-bottom: 1.5rem !important;
-  padding-bottom: 1rem !important;
-  border-bottom: 3px double var(--border-color) !important;
-  position: relative !important;
-}
-
-.monthly-header::after {
-  content: '' !important;
-  position: absolute !important;
-  bottom: -8px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  width: 60px !important;
-  height: 3px !important;
-  background: var(--accent-color) !important;
-  border-radius: 2px !important;
-}
-
-.monthly-header h2 {
-  margin: 0 0 0.5rem 0 !important;
-  font-size: 1.6rem !important;
-  font-family: var(--font-family) !important;
-  color: var(--accent-color) !important;
-  text-shadow: 1px 1px 2px var(--shadow-color) !important;
-  letter-spacing: 0.05em !important;
-}
-
-.monthly-header p {
-  margin: 0 !important;
-  color: var(--text-secondary) !important;
-  font-size: 0.9rem !important;
-  font-style: italic !important;
-}
-
-/* Selector section */
-.monthly-selector {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1.5rem !important;
-  margin-bottom: 1.5rem !important;
-}
-
-.selector-section {
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  padding: 1.25rem !important;
-  position: relative !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0,0,0,0.1),
-    0 2px 8px var(--shadow-color) !important;
-}
-
-.selector-section::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 8px !important;
-  left: 8px !important;
-  right: 8px !important;
-  bottom: 8px !important;
-  border: 1px dashed var(--border-color) !important;
-  border-radius: 8px !important;
-  pointer-events: none !important;
-  opacity: 0.3 !important;
-}
-
-.selector-section label {
-  display: block !important;
-  font-weight: 700 !important;
-  margin-bottom: 0.75rem !important;
-  color: var(--accent-color) !important;
-  font-size: 1rem !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-}
-
-/* Date inputs */
-.date-range {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-  flex-wrap: wrap !important;
-  margin-bottom: 1rem !important;
-}
-
-.date-range input {
-  flex: 1 !important;
-  min-width: 120px !important;
-  padding: 0.75rem !important;
-  background: var(--bg-primary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  color: var(--text-primary) !important;
-  font-size: 0.9rem !important;
-  font-family: inherit !important;
-  transition: all 0.2s !important;
-}
-
-.date-range input:focus {
-  outline: none !important;
-  border-color: var(--accent-color) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
-}
-
-.date-range span {
-  color: var(--text-secondary) !important;
-  font-weight: bold !important;
-  font-size: 1.2rem !important;
-}
-
-/* Divisor */
-.selector-divider {
-  text-align: center !important;
-  color: var(--text-secondary) !important;
-  font-weight: bold !important;
-  font-size: 1rem !important;
-  position: relative !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 1rem !important;
-}
-
-.selector-divider::before,
-.selector-divider::after {
-  content: '' !important;
-  flex: 1 !important;
-  height: 2px !important;
-  background: linear-gradient(90deg, transparent, var(--border-color), transparent) !important;
-}
-
-/* Month select */
-.month-select {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0.75rem !important;
-}
-
-.month-select input {
-  padding: 0.75rem !important;
-  background: var(--bg-primary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  color: var(--text-primary) !important;
-  font-size: 0.9rem !important;
-  font-family: inherit !important;
-  transition: all 0.2s !important;
-}
-
-.month-select input:focus {
-  outline: none !important;
-  border-color: var(--accent-color) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
-}
-
-/* Botón generar */
-.btn-generate-range {
-  width: 100% !important;
-  padding: 1rem 1.5rem !important;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%) !important;
-  color: var(--bg-primary) !important;
-  border: 3px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  font-weight: bold !important;
-  font-size: 1rem !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.75rem !important;
-  transition: all 0.3s !important;
-  box-shadow: 
-    0 4px 0 var(--border-color),
-    0 6px 12px var(--shadow-color) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-.btn-generate-range::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: -100% !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
-  transition: left 0.5s !important;
-}
-
-.btn-generate-range:hover::before {
-  left: 100% !important;
-}
-
-.btn-generate-range:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 
-    0 6px 0 var(--border-color),
-    0 10px 20px var(--shadow-color) !important;
-  filter: brightness(1.1) !important;
-}
-
-.btn-generate-range:active {
-  transform: translateY(2px) !important;
-  box-shadow: 
-    0 2px 0 var(--border-color),
-    0 4px 8px var(--shadow-color) !important;
-}
-
-/* Results section */
-.monthly-results {
-  margin-top: 1rem !important;
-}
-
-.results-summary {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 1rem !important;
-  margin-bottom: 1.5rem !important;
-}
-
-.summary-card {
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  padding: 1rem !important;
-  text-align: center !important;
-  transition: all 0.2s !important;
-  position: relative !important;
-}
-
-.summary-card:hover {
-  transform: translateY(-2px) !important;
-  border-color: var(--accent-color) !important;
-  box-shadow: 0 4px 12px var(--shadow-color) !important;
-}
-
-.summary-card.total {
-  grid-column: span 2 !important;
-  background: linear-gradient(135deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%) !important;
-  border-color: var(--border-color) !important;
-}
-
-.summary-card.total .summary-label,
-.summary-card.total .summary-value {
-  color: var(--bg-primary) !important;
+.monthly-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.15s;
+}
+
+.monthly-modal-clean {
+  width: min(100%, 800px);
+  max-height: 92vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  animation: slideUp 0.2s;
+  min-height: 0;
+}
+
+.monthly-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.monthly-close:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.annual-header-clean {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.annual-header-clean h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.monthly-header-clean {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.monthly-header-clean h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.monthly-header-clean p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.monthly-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 1rem 1.5rem;
+}
+
+.monthly-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.monthly-scroll::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.monthly-scroll::-webkit-scrollbar-thumb {
+  background: var(--bg-panel);
+  border-radius: 4px;
+}
+
+.monthly-selector-clean {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.monthly-select-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.monthly-select-section label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.monthly-date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.monthly-date-range input {
+  flex: 1;
+  min-width: 100px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.monthly-date-range input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.monthly-date-range span {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.monthly-month-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.monthly-month-select input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.monthly-month-select input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.monthly-btn-gen {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.monthly-btn-gen:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.monthly-btn-gen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.monthly-divider {
+  text-align: center;
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  position: relative;
+}
+
+.monthly-divider::before,
+.monthly-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.monthly-divider::before { left: 0; }
+.monthly-divider::after { right: 0; }
+
+.monthly-results-clean {
+  margin-top: 0.5rem;
+}
+
+.monthly-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.monthly-sum-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.monthly-sum-card.total {
+  grid-column: span 2;
+  border-color: var(--accent-color);
+  background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 70%, black));
+}
+
+.monthly-sum-card.total .monthly-sum-label,
+.monthly-sum-card.total .monthly-sum-value {
+  color: var(--bg-primary);
 }
 
-.summary-card.tarjeta {
-  border-color: #ec4899 !important;
+.monthly-sum-card.tarjeta { border-color: #ec4899; }
+.monthly-sum-card.profit { border-color: var(--success-color); }
+
+.monthly-sum-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.monthly-sum-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+}
+
+.monthly-weekly-section h3,
+.monthly-products-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.monthly-weekly-section {
+  margin-bottom: 1.25rem;
 }
 
-.summary-card.profit {
-  border-color: var(--success-color) !important;
+.monthly-chart-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.summary-label {
-  display: block !important;
-  font-size: 0.75rem !important;
-  color: var(--text-secondary) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  margin-bottom: 0.25rem !important;
+.monthly-week-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
 }
 
-.summary-value {
-  display: block !important;
-  font-weight: bold !important;
-  color: var(--text-primary) !important;
-}
-
-/* Weekly section */
-.weekly-section h3 {
-  text-align: center !important;
-  color: var(--accent-color) !important;
-  margin: 0 0 1rem 0 !important;
-  font-size: 1.2rem !important;
+.monthly-week-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.6rem;
 }
 
-.chart-container-weekly {
-  max-height: 300px !important;
-  margin-bottom: 1rem !important;
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  padding: 1rem !important;
+.monthly-week-head {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  text-align: center;
+  margin-bottom: 0.15rem;
 }
 
-.weekly-cards {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
-  gap: 1rem !important;
-}
-
-.week-card {
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 10px !important;
-  padding: 1rem !important;
-  transition: all 0.2s !important;
-}
-
-.week-card:hover {
-  transform: scale(1.02) !important;
-  border-color: var(--accent-color) !important;
-}
+.monthly-week-dates {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border-color);
+}
 
-.week-header {
-  font-weight: bold !important;
-  color: var(--accent-color) !important;
-  text-align: center !important;
-  margin-bottom: 0.25rem !important;
-}
-
-.week-dates {
-  font-size: 0.8rem !important;
-  color: var(--text-secondary) !important;
-  text-align: center !important;
-  margin-bottom: 0.75rem !important;
-  padding-bottom: 0.5rem !important;
-  border-bottom: 1px solid var(--border-color) !important;
-}
-
-.week-stats {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0.5rem !important;
-}
-
-.week-stat {
-  display: flex !important;
-  justify-content: space-between !important;
-  font-size: 0.85rem !important;
+.monthly-week-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.week-stat span {
-  color: var(--text-secondary) !important;
+.monthly-week-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
 }
 
-.week-stat strong {
-  color: var(--text-primary) !important;
+.monthly-week-stat span {
+  color: var(--text-secondary);
 }
 
-.week-stat.profit strong {
-  color: var(--success-color) !important;
+.monthly-week-stat strong {
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
 }
 
-/* Products section */
-.products-section h3 {
-  text-align: center !important;
-  color: var(--accent-color) !important;
-  margin: 0 0 1rem 0 !important;
-  font-size: 1.2rem !important;
+.monthly-week-stat.profit strong {
+  color: var(--success-color);
 }
 
-.products-toggle {
-  display: flex !important;
-  gap: 0.5rem !important;
-  margin-bottom: 1rem !important;
-  justify-content: center !important;
+.monthly-products-section {
+  margin-bottom: 1rem;
 }
 
-.products-toggle button {
-  padding: 0.75rem 1.5rem !important;
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  color: var(--text-primary) !important;
-  cursor: pointer !important;
-  transition: all 0.2s !important;
+.monthly-products-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  justify-content: center;
 }
 
-.products-toggle button.active {
-  background: var(--accent-color) !important;
-  border-color: var(--accent-color) !important;
-  color: var(--bg-primary) !important;
+.monthly-products-toggle button {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.chart-container {
-  max-height: 300px !important;
-  margin-bottom: 1rem !important;
-  background: var(--bg-secondary) !important;
-  border: 2px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  padding: 1rem !important;
+.monthly-products-toggle button.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--bg-primary);
 }
 
-.products-list {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0.5rem !important;
-  max-height: 250px !important;
-  overflow-y: auto !important;
+.monthly-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.product-row {
-  display: grid !important;
-  grid-template-columns: 30px 1fr auto auto !important;
-  gap: 0.75rem !important;
-  padding: 0.75rem !important;
-  background: var(--bg-secondary) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  align-items: center !important;
+.monthly-product-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
 }
 
-.product-rank {
-  width: 28px !important;
-  height: 28px !important;
-  background: var(--accent-color) !important;
-  color: var(--bg-primary) !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-weight: bold !important;
-  font-size: 0.8rem !important;
+.monthly-product-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--bg-primary);
+  background: var(--accent-color);
 }
 
-.product-name {
-  color: var(--text-primary) !important;
-  font-weight: 500 !important;
+.monthly-product-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.product-qty {
-  color: var(--text-secondary) !important;
-  font-size: 0.85rem !important;
+.monthly-product-qty {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: "Courier New", monospace;
 }
 
-.product-amount {
-  color: var(--success-color) !important;
-  font-weight: bold !important;
+.monthly-product-amount {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success-color);
+  font-family: "Courier New", monospace;
 }
 
-/* Empty state */
 .monthly-empty {
-  text-align: center !important;
-  padding: 2rem !important;
-  color: var(--text-secondary) !important;
-  font-style: italic !important;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.monthly-footer {
+  padding: 0.6rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.monthly-btn-close {
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.monthly-btn-close:hover {
+  filter: brightness(1.1);
 }
 
 .annual-header-modern {
@@ -6947,6 +7744,31 @@ onMounted(() => {
   border: 2px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 4px 6px var(--shadow-color);
+  margin-bottom: 1.5rem;
+}
+
+.horario-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.horario-chart-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.horario-chart-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .table-header {
@@ -7378,6 +8200,20 @@ onMounted(() => {
   .annual-products-section {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .horario-charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .horario-chart-card {
+    padding: 0.5rem !important;
+  }
+
+  .horario-chart-title {
+    font-size: 0.75rem !important;
   }
 
   .months-table-modern {
@@ -8171,419 +9007,539 @@ onMounted(() => {
   font-size: 1.1rem;
 }
 
-.history-pergamino {
-  width: min(100%, 580px);
-  max-height: 85vh;
-  overflow: hidden;
+/* =========================================
+    HISTORIAL DE VENTAS - MODERN MODAL
+    ========================================= */
+.modern-modal.modal-historial {
+  width: min(95vw, 960px);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-}
-
-.history-pergamino .pergamino-inner {
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
   overflow: hidden;
 }
 
-.history-pergamino .modal-header {
-  text-align: center;
+.modern-modal.modal-historial .modern-modal-body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.historial-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.summary-card.summary-total {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-secondary));
+}
+
+.summary-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: "Courier New", monospace;
+}
+
+.summary-card.summary-total .summary-value {
+  color: var(--accent-color);
+}
+
+.historial-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--bg-panel);
-  position: relative;
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.history-pergamino .header-emblem {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 34px;
-  height: 34px;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border: 3px solid var(--accent-color);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px var(--shadow-color);
-}
-
-.history-pergamino .emblem-icon {
-  font-size: 1.1rem;
-  filter: drop-shadow(0 1px 1px var(--border-color));
-}
-
-.history-pergamino .modal-header h2 {
-  margin: 0;
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-  font-size: 1.1rem;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: bold;
-  text-shadow: 2px 2px 0 var(--border-color);
-}
-
-.history-pergamino .header-line {
-  margin-top: 0.4rem;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
-}
-
-.history-pergamino .pergamino-close {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 30px;
-  height: 30px;
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px var(--shadow-color);
-}
-
-.history-pergamino .pergamino-close:hover {
-  transform: scale(1.15);
-  filter: brightness(1.2);
-}
-
-.history-pergamino .modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.filter-select {
   flex: 1;
-  min-height: 0;
+  min-width: 120px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
 }
 
-.filter-section {
-  flex-shrink: 0;
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
 }
 
-.filter-row {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.6rem;
-}
-
-.filter-discrepancia {
+.filter-check {
   display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.correccion-historial {
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  background: var(--bg-secondary);
-  border: 2px solid var(--accent-color);
+.filter-check input {
+  accent-color: var(--accent-color);
+}
+
+.historial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(239, 68, 68, 0.05);
   border-radius: 8px;
 }
 
-.correccion-header {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.correccion-title {
+.btn-action {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-corregir-sel {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
-  color: white;
-  border: 1px solid #d97706;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 150ms;
-}
-
-.btn-corregir-sel:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.btn-corregir-sel:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-corregir-todas {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 80%, black) 100%);
-  color: var(--bg-primary);
-  border: 1px solid var(--accent-color);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 150ms;
-}
-
-.btn-corregir-todas:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.btn-corregir-todas:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.check-all { margin-left: auto; }
-
-.correccion-msg {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-color);
-  text-align: center;
-  padding: 0.2rem;
-  background: var(--bg-primary);
-  border-radius: 4px;
-  margin-top: 0.3rem;
-}
-
-.entry-checkbox {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: var(--accent-color);
-  margin-right: 0.2rem;
-}
-
-.entry-seleccionada {
-  border-color: var(--accent-color) !important;
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent) !important;
-}
-
-.checkbox-scroll {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-  font-size: 0.75rem;
-  color: #991b1b;
-  background: #fef2f2;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #ef4444;
-}
-
-.checkbox-scroll input {
-  width: 12px;
-  height: 12px;
-  accent-color: #ef4444;
-  cursor: pointer;
-}
-
-.filter-select-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.filter-select-wrap label {
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-}
-
-.papiro-select {
-  padding: 0.4rem 0.55rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--bg-panel);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-family: "Courier New", monospace;
-  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.papiro-select:hover {
+.btn-action:hover:not(:disabled) {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-action.btn-action-primary {
+  background: var(--accent-color);
+  color: white;
   border-color: var(--accent-color);
 }
 
-.papiro-select:focus {
-  outline: none;
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent);
+.btn-action.btn-action-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-.total-scroll-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.45rem 0.7rem;
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, black) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 3px 0 var(--border-color);
-}
-
-.scroll-bar-label {
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-  font-size: 0.7rem;
-  color: var(--border-color);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: bold;
-}
-
-.scroll-bar-amount {
-  font-family: 'Courier New', monospace;
-  font-size: 1rem;
-  font-weight: bold;
-  color: var(--border-color);
-  text-shadow: 1px 1px 0 var(--bg-primary);
-}
-
-.entries-scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding-right: 0.25rem;
-}
-
-.entries-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.entries-scroll::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-  border-radius: 4px;
-}
-
-.entries-scroll::-webkit-scrollbar-thumb {
-  background: var(--bg-panel);
-  border-radius: 4px;
-}
-
-.empty-text {
-  text-align: center;
-  padding: 2rem;
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.scroll-entries {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-.scroll-entry {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.6rem 0.7rem;
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--bg-panel);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.scroll-entry:hover {
-  border-color: var(--accent-color);
-  transform: translateX(4px);
-  box-shadow: 3px 3px 0 var(--border-color);
-}
-
-.scroll-entry.entry-discrepancia {
-  border-color: #ef4444;
-}
-
-.scroll-entry.entry-discrepancia:hover {
-  border-color: #dc2626;
-}
-
-.discrepancia-icon {
-  display: inline-flex;
-  margin-right: 0.25rem;
+.action-msg {
+  width: 100%;
+  margin: 0;
   font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--success-color);
+  text-align: center;
 }
 
-.scroll-entry .entry-left {
+.historial-table-wrap {
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.modern-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.modern-table th {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--border-color);
+  text-align: left;
+}
+
+.modern-table th:nth-child(3),
+.modern-table th:nth-child(4) {
+  text-align: center;
+}
+
+.modern-table th:last-child {
+  width: 40px;
+  text-align: center;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.table-row:hover {
+  background: var(--bg-secondary);
+}
+
+.table-row.row-warning {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.table-row.row-warning:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.table-row.row-selected {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.modern-table td {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  vertical-align: middle;
+}
+
+.td-num {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.4rem;
 }
 
-.scroll-entry .entry-number {
-  width: 28px;
-  height: 28px;
-  display: flex;
+.warning-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: white;
+  font-size: 0.6rem;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: var(--zelda-gold);
+  flex-shrink: 0;
 }
 
-.scroll-entry .entry-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+.row-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.scroll-entry .entry-date {
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+.ticket-num {
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: "Courier New", monospace;
+}
+
+.td-date {
+  font-family: "Courier New", monospace;
+  color: var(--text-muted);
   font-size: 0.8rem;
-  color: var(--text-primary);
 }
 
-.metodo-scroll-pill {
+.td-amount {
+  font-weight: 700;
+  color: var(--success-color);
+  font-family: "Courier New", monospace;
+  text-align: center;
+}
+
+.method-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  font-size: 0.65rem;
-  padding: 0.15rem 0.4rem;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
   border-radius: 4px;
+  font-size: 0.7rem;
   font-weight: 600;
-  width: fit-content;
+  text-transform: uppercase;
 }
 
-.metodo-scroll-pill.efectivo {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 60%, black) 100%);
-  color: var(--text-primary);
+.method-badge.efectivo {
+  background: rgba(34, 197, 94, 0.1);
+  color: #166534;
 }
 
-.metodo-scroll-pill.transfer {
-  background: linear-gradient(180deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 60%, black) 100%);
-  color: var(--border-color);
+.method-badge.transferencia {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
 }
 
-.metodo-scroll-pill.tarjeta {
-  background: linear-gradient(180deg, #c71585 0%, #8a1055 100%);
-  color: var(--text-primary);
+.method-badge.tarjeta {
+  background: rgba(236, 72, 153, 0.1);
+  color: #be185d;
 }
 
-.scroll-entry .entry-amount {
-  font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
-  font-weight: bold;
-  color: var(--success-color);
+.td-action {
+  text-align: center;
 }
 
-@media (max-width: 600px) {
-  .history-pergamino {
-    width: min(100%, 95vw);
-    max-height: 90vh;
+.btn-view {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-view:hover {
+  filter: brightness(1.15);
+  transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
+  .modern-modal.modal-historial {
+    width: min(98vw, 960px);
+    max-height: 92vh;
   }
-  
-  .filter-row {
+  .modern-modal.modal-historial .modern-modal-body {
+    padding: 0.75rem 1rem;
+  }
+  .historial-summary {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .summary-card {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+  }
+  .historial-filters {
+    gap: 0.4rem;
+  }
+  .filter-select {
+    min-width: 100px;
+    font-size: 0.75rem;
+  }
+  .historial-actions {
     flex-direction: column;
+    align-items: stretch;
+  }
+  .btn-action {
+    width: 100%;
+    text-align: center;
+  }
+  .modern-table th,
+  .modern-table td {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-table th:nth-child(4),
+  .td-method {
+    display: none;
+  }
+  .historial-summary {
+    gap: 0.4rem;
+  }
+  .summary-card {
+    padding: 0.4rem 0.6rem;
+  }
+  .summary-label {
+    font-size: 0.65rem;
+  }
+  .summary-value {
+    font-size: 0.95rem;
+  }
+  .historial-filters {
+    gap: 0.35rem;
+  }
+  .filter-select {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.5rem;
+  }
+  .filter-check {
+    font-size: 0.75rem;
+  }
+  .btn-action {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+  }
+  .modern-table th,
+  .modern-table td {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  .td-date {
+    font-size: 0.72rem;
+  }
+  .td-amount {
+    font-size: 0.8rem;
+  }
+  .method-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+  }
+  .btn-view {
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .modern-modal.modal-historial .modern-modal-body {
+    padding: 0.6rem 0.75rem;
+  }
+  .summary-label {
+    font-size: 0.6rem;
+  }
+  .summary-value {
+    font-size: 0.9rem;
+  }
+  .historial-filters {
+    gap: 0.3rem;
+  }
+  .filter-select {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.4rem;
+  }
+  .filter-check {
+    font-size: 0.7rem;
+  }
+  .btn-action {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .modern-table th,
+  .modern-table td {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.7rem;
+  }
+  .td-date {
+    font-size: 0.68rem;
+  }
+  .td-amount {
+    font-size: 0.75rem;
+  }
+  .method-badge {
+    font-size: 0.6rem;
+    padding: 0.12rem 0.3rem;
+  }
+  .btn-view {
+    width: 24px;
+    height: 24px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .summary-label {
+    font-size: 0.55rem;
+  }
+  .summary-value {
+    font-size: 0.85rem;
+  }
+  .historial-filters {
+    gap: 0.25rem;
+  }
+  .filter-select {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.35rem;
+  }
+  .filter-check {
+    font-size: 0.65rem;
+  }
+  .btn-action {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.45rem;
+  }
+  .modern-table th,
+  .modern-table td {
+    padding: 0.3rem 0.35rem;
+    font-size: 0.65rem;
+  }
+  .td-date {
+    font-size: 0.62rem;
+  }
+  .td-amount {
+    font-size: 0.7rem;
+  }
+  .method-badge {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.25rem;
+  }
+  .btn-view {
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .summary-label {
+    font-size: 0.5rem;
+  }
+  .summary-value {
+    font-size: 0.8rem;
+  }
+  .historial-filters {
+    gap: 0.2rem;
+  }
+  .filter-select {
+    font-size: 0.55rem;
+    padding: 0.2rem 0.3rem;
+  }
+  .filter-check {
+    font-size: 0.6rem;
+  }
+  .btn-action {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.4rem;
+  }
+  .modern-table th,
+  .modern-table td {
+    padding: 0.25rem 0.3rem;
+    font-size: 0.6rem;
+  }
+  .td-date {
+    font-size: 0.58rem;
+  }
+  .td-amount {
+    font-size: 0.65rem;
+  }
+  .method-badge {
+    font-size: 0.5rem;
+    padding: 0.08rem 0.2rem;
+  }
+  .btn-view {
+    width: 20px;
+    height: 20px;
+    font-size: 0.65rem;
   }
 }
 
@@ -8593,6 +9549,14 @@ onMounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.egresos-pergamino .pergamino-inner {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .entradas-pergamino {
@@ -10076,6 +11040,10 @@ th {
   .products-grid {
     overflow-x: hidden !important;
   }
+
+  .horario-charts-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .backup-section {
@@ -10233,6 +11201,537 @@ th {
   
   .backup-actions {
     justify-content: center;
+  }
+}
+
+/* =========================================
+   ANNUAL MODAL - RESPONSIVE BREAKPOINTS
+   ========================================= */
+@media (max-width: 768px) {
+  .annual-overlay { padding: 0.5rem; align-items: flex-start; }
+  .annual-modal { max-height: 90vh; width: 100%; border-radius: 12px; }
+  .annual-header-clean { padding: 0.8rem 1rem; }
+  .annual-header-clean h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .annual-scroll { padding: 0.75rem 1rem; }
+  .annual-kpis-clean { grid-template-columns: repeat(2, 1fr); }
+  .annual-kpi.main { grid-column: span 2; }
+  .annual-horario-grid { grid-template-columns: repeat(2, 1fr); }
+  .annual-top-grid { grid-template-columns: 1fr; }
+  .annual-footer { padding: 0.5rem 1rem; }
+}
+
+@media (max-width: 600px) {
+  .annual-kpis-clean { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .annual-kpi { padding: 0.5rem; }
+  .annual-kpi-label { font-size: 0.65rem; }
+  .annual-kpi-value { font-size: 0.95rem; }
+  .annual-month-row { grid-template-columns: 1fr auto auto; gap: 0.5rem; padding: 0.5rem; }
+  .annual-month-row.head span:nth-child(3),
+  .annual-month-row .annual-month-gain { display: none; }
+  .annual-chart-section h3,
+  .annual-horario-section h3,
+  .annual-table-section h3,
+  .annual-products-section h3,
+  .annual-top-section h3 { font-size: 0.9rem; }
+}
+
+@media (max-width: 480px) {
+  .annual-header-clean h2 { font-size: 0.95rem; }
+  .annual-year-select { font-size: 0.8rem; padding: 0.3rem 0.5rem; }
+  .annual-kpis-clean { grid-template-columns: 1fr; }
+  .annual-kpi.main { grid-column: span 1; }
+  .annual-horario-grid { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .annual-horario-card { padding: 0.4rem; }
+  .annual-horario-time { font-size: 0.75rem; }
+  .annual-horario-amount { font-size: 0.7rem; }
+  .annual-horario-count { font-size: 0.65rem; }
+  .annual-month-row { grid-template-columns: 1fr auto auto; font-size: 0.8rem; }
+  .annual-month-name { font-size: 0.8rem; }
+  .annual-month-sales, .annual-month-gain { font-size: 0.75rem; }
+  .annual-month-change { font-size: 0.7rem; }
+  .annual-top-item { grid-template-columns: 20px 1fr auto; gap: 0.4rem; padding: 0.3rem 0.4rem; }
+  .annual-top-rank { width: 18px; height: 18px; font-size: 0.6rem; }
+  .annual-top-name { font-size: 0.75rem; }
+  .annual-top-qty { font-size: 0.7rem; }
+}
+
+@media (max-width: 400px) {
+  .annual-overlay { padding: 0.25rem; }
+  .annual-modal { border-radius: 10px; }
+  .annual-header-clean { padding: 0.6rem 0.75rem; }
+  .annual-header-clean h2 { font-size: 0.85rem; }
+  .annual-scroll { padding: 0.5rem 0.75rem; }
+  .annual-kpi-label { font-size: 0.6rem; }
+  .annual-kpi-value { font-size: 0.85rem; }
+  .annual-horario-grid { grid-template-columns: 1fr; }
+  .annual-month-row { padding: 0.4rem 0.5rem; gap: 0.4rem; }
+  .annual-chart-box { padding: 0.5rem; }
+}
+
+@media (max-width: 360px) {
+  .annual-header-clean h2 { font-size: 0.8rem; }
+  .annual-close { width: 28px; height: 28px; font-size: 0.9rem; top: 8px; right: 8px; }
+  .annual-kpi { padding: 0.4rem; }
+  .annual-kpi-value { font-size: 0.8rem; }
+  .annual-month-row { font-size: 0.75rem; }
+  .annual-month-name { font-size: 0.75rem; }
+  .annual-month-sales { font-size: 0.7rem; }
+  .annual-top-card { padding: 0.5rem; }
+  .annual-top-card h4 { font-size: 0.8rem; }
+}
+
+@media (max-width: 320px) {
+  .annual-overlay { padding: 0.15rem; }
+  .annual-modal { border-radius: 8px; }
+  .annual-header-clean { padding: 0.5rem 0.6rem; }
+  .annual-header-clean h2 { font-size: 0.75rem; }
+  .annual-scroll { padding: 0.4rem 0.6rem; }
+  .annual-kpis-clean { gap: 0.4rem; }
+  .annual-kpi-label { font-size: 0.55rem; }
+  .annual-kpi-value { font-size: 0.75rem; }
+  .annual-horario-card { padding: 0.3rem; }
+  .annual-horario-time { font-size: 0.7rem; }
+  .annual-btn-close { padding: 0.4rem 1rem; font-size: 0.75rem; }
+}
+
+/* =========================================
+   MONTHLY MODAL - RESPONSIVE BREAKPOINTS
+   ========================================= */
+@media (max-width: 768px) {
+  .monthly-overlay { padding: 0.5rem; align-items: flex-start; }
+  .monthly-modal-clean { max-height: 90vh; width: 100%; border-radius: 12px; }
+  .monthly-header-clean { padding: 0.8rem 1rem; }
+  .monthly-header-clean h2 { font-size: 1rem; }
+  .monthly-header-clean p { font-size: 0.75rem; }
+  .monthly-scroll { padding: 0.75rem 1rem; }
+  .monthly-summary { grid-template-columns: 1fr 1fr; }
+  .monthly-sum-card.total { grid-column: span 2; }
+  .monthly-week-cards { grid-template-columns: repeat(2, 1fr); }
+  .monthly-footer { padding: 0.5rem 1rem; }
+}
+
+@media (max-width: 600px) {
+  .monthly-select-section { padding: 0.75rem; }
+  .monthly-select-section label { font-size: 0.75rem; }
+  .monthly-date-range { gap: 0.4rem; }
+  .monthly-date-range input { min-width: 80px; padding: 0.4rem; font-size: 0.8rem; }
+  .monthly-btn-gen { padding: 0.5rem; font-size: 0.8rem; }
+  .monthly-summary { gap: 0.5rem; }
+  .monthly-sum-card { padding: 0.5rem; }
+  .monthly-sum-label { font-size: 0.6rem; }
+  .monthly-sum-value { font-size: 0.9rem; }
+  .monthly-week-cards { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .monthly-week-card { padding: 0.5rem; }
+  .monthly-week-head { font-size: 0.75rem; }
+  .monthly-week-dates { font-size: 0.65rem; }
+  .monthly-week-stat { font-size: 0.7rem; }
+  .monthly-products-toggle button { padding: 0.35rem 0.75rem; font-size: 0.75rem; }
+}
+
+@media (max-width: 480px) {
+  .monthly-header-clean h2 { font-size: 0.95rem; }
+  .monthly-header-clean p { font-size: 0.7rem; }
+  .monthly-date-range { flex-direction: column; align-items: stretch; }
+  .monthly-date-range span { text-align: center; }
+  .monthly-month-select input { padding: 0.4rem; font-size: 0.8rem; }
+  .monthly-summary { grid-template-columns: 1fr; }
+  .monthly-sum-card.total { grid-column: span 1; }
+  .monthly-week-cards { grid-template-columns: 1fr; }
+  .monthly-product-row { grid-template-columns: 20px 1fr auto auto; gap: 0.4rem; padding: 0.4rem; }
+  .monthly-product-rank { width: 18px; height: 18px; font-size: 0.6rem; }
+  .monthly-product-name { font-size: 0.75rem; }
+  .monthly-product-qty, .monthly-product-amount { font-size: 0.7rem; }
+}
+
+@media (max-width: 400px) {
+  .monthly-overlay { padding: 0.25rem; }
+  .monthly-modal-clean { border-radius: 10px; }
+  .monthly-header-clean { padding: 0.6rem 0.75rem; }
+  .monthly-header-clean h2 { font-size: 0.85rem; }
+  .monthly-scroll { padding: 0.5rem 0.75rem; }
+  .monthly-select-section { padding: 0.6rem; }
+  .monthly-select-section label { font-size: 0.7rem; }
+  .monthly-date-range input { padding: 0.35rem; font-size: 0.75rem; }
+  .monthly-btn-gen { padding: 0.4rem; font-size: 0.75rem; }
+  .monthly-sum-card { padding: 0.4rem; }
+  .monthly-sum-label { font-size: 0.55rem; }
+  .monthly-sum-value { font-size: 0.8rem; }
+  .monthly-week-card { padding: 0.4rem; }
+  .monthly-week-head { font-size: 0.7rem; }
+  .monthly-week-dates { font-size: 0.6rem; }
+  .monthly-week-stat { font-size: 0.65rem; }
+}
+
+@media (max-width: 360px) {
+  .monthly-header-clean h2 { font-size: 0.8rem; }
+  .monthly-close { width: 28px; height: 28px; font-size: 0.9rem; top: 8px; right: 8px; }
+  .monthly-sum-value { font-size: 0.75rem; }
+  .monthly-week-head { font-size: 0.65rem; }
+  .monthly-week-dates { font-size: 0.55rem; }
+  .monthly-week-stat { font-size: 0.6rem; }
+  .monthly-products-toggle button { padding: 0.3rem 0.5rem; font-size: 0.7rem; }
+}
+
+@media (max-width: 320px) {
+  .monthly-overlay { padding: 0.15rem; }
+  .monthly-modal-clean { border-radius: 8px; }
+  .monthly-header-clean { padding: 0.5rem 0.6rem; }
+  .monthly-header-clean h2 { font-size: 0.75rem; }
+  .monthly-header-clean p { font-size: 0.65rem; }
+  .monthly-scroll { padding: 0.4rem 0.6rem; }
+  .monthly-select-section { padding: 0.5rem; }
+  .monthly-select-section label { font-size: 0.65rem; }
+  .monthly-date-range input { padding: 0.3rem; font-size: 0.7rem; }
+  .monthly-btn-gen { padding: 0.35rem; font-size: 0.7rem; }
+  .monthly-sum-label { font-size: 0.5rem; }
+  .monthly-sum-value { font-size: 0.7rem; }
+  .monthly-btn-close { padding: 0.4rem 1rem; font-size: 0.75rem; }
+}
+
+/* Modal detalle venta minimalista */
+.modern-modal.modal-detalle-venta {
+  max-width: 520px;
+  width: min(95vw, 520px);
+}
+
+.modern-modal.modal-detalle-venta .modern-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modern-modal.modal-detalle-venta .modern-modal-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modern-modal.modal-detalle-venta .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modern-modal.modal-detalle-venta .modern-modal-body {
+  padding: 1rem 1.25rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detalle-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meta-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meta-badge.efectivo {
+  background: color-mix(in srgb, var(--success-color) 15%, transparent);
+  color: var(--success-color);
+}
+
+.meta-badge.tarjeta {
+  background: color-mix(in srgb, #3b82f6 15%, transparent);
+  color: #3b82f6;
+}
+
+.meta-badge.transferencia {
+  background: color-mix(in srgb, #8b5cf6 15%, transparent);
+  color: #8b5cf6;
+}
+
+.meta-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.meta-amount {
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.detalle-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.detalle-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.detalle-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+
+.detalle-item-row:nth-child(odd) {
+  background: var(--bg-secondary);
+}
+
+.detalle-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.detalle-item-name {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 0.15rem;
+}
+
+.detalle-item-qty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.edit-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.edit-input-clean {
+  width: 60px;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.edit-input-clean:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.detalle-item-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.detalle-item-price {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--success-color);
+  white-space: nowrap;
+}
+
+.btn-icon-clean {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-icon-clean:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-icon-danger:hover {
+  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+  color: var(--error-color);
+}
+
+.detalle-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-top: 2px solid var(--border-color);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.detalle-total-row strong {
+  font-size: 1.1rem;
+  color: var(--accent-color);
+}
+
+.total-input-clean {
+  width: 100px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--accent-color);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.total-input-clean:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.btn-edit-clean {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-edit-clean:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
+.btn-save-clean {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--success-color);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-save-clean:hover {
+  opacity: 0.9;
+}
+
+.btn-cancel-clean {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-cancel-clean:hover {
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+.btn-confirm-clean {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: var(--success-color);
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .modern-modal.modal-detalle-venta {
+    width: min(98vw, 520px);
+    max-height: 90vh;
+  }
+  .modern-modal.modal-detalle-venta .modern-modal-header {
+    padding: 0.75rem 1rem;
+  }
+  .modern-modal.modal-detalle-venta .modern-modal-header h3 {
+    font-size: 0.9rem;
+  }
+  .modern-modal.modal-detalle-venta .modern-modal-body {
+    padding: 0.75rem 1rem;
+  }
+  .detalle-meta-row {
+    gap: 0.5rem;
+  }
+  .meta-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+  .meta-date {
+    font-size: 0.75rem;
+  }
+  .meta-amount {
+    font-size: 0.9rem;
+  }
+  .detalle-item-name {
+    font-size: 0.8rem;
+  }
+  .detalle-item-price {
+    font-size: 0.8rem;
+  }
+  .detalle-total-row {
+    font-size: 0.9rem;
+  }
+  .detalle-total-row strong {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-modal.modal-detalle-venta .header-actions {
+    gap: 0.3rem;
+  }
+  .btn-edit-clean,
+  .btn-save-clean,
+  .btn-cancel-clean {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  .detalle-meta-row {
+    flex-wrap: wrap;
+  }
+  .meta-amount {
+    margin-left: 0;
+    width: 100%;
+    text-align: right;
+    margin-top: 0.25rem;
   }
 }
 </style>

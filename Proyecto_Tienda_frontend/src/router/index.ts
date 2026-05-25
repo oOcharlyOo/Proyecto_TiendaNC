@@ -5,9 +5,9 @@ import Ventas from '../components/Ventas.vue';
 import Productos from "@/components/Productos.vue";
 import Inventario from "@/components/Inventario.vue";
 import Corte from "@/components/Corte.vue";
-import Usuarios from "@/components/Usuarios.vue";
 import Finanzas from "@/components/Finanzas.vue";
 import Rental from "@/components/Rental.vue";
+import Usuarios from "@/components/Usuarios.vue";
 
 const AUTH_KEY = 'isAuth';
 

@@ -135,6 +135,7 @@ type VentaDTO = {
   metodoPago?: string;
   fechaVenta?: string;
   tieneDiscrepancia?: boolean;
+  ganancia?: number | string;
 };
 
 type VentaDetalleDTO = {
@@ -161,6 +162,8 @@ type Producto = {
   dto: ProductoDTO;
   is_gramaje?: boolean;
   idCategoria?: number;
+  idProducto?: number;
+  precio_venta?: number;
 };
 
 type TicketItem = Producto & {
@@ -309,9 +312,6 @@ async function cargarTicketsDesdeBackend() {
         }
         
         tickets.value.sort((a, b) => a.numero - b.numero);
-        
-        const maxTicket = Math.max(...ventasPendientes.map(v => Number(v.numeroTicket ?? 0)));
-        ticketDelDia.value = String(maxTicket);
         
         if (ticketActualId.value === null || !tickets.value.find(t => t.id === ticketActualId.value)) {
           const pendiente = tickets.value.find(t => t.estado === 'pendiente');
@@ -469,6 +469,7 @@ const gramajeEditandoIndice = ref<number | null>(null);
 const gramajeEditandoCantidad = ref<number>(0);
 const gramajeEditandoPrecio = ref<number>(0);
 const modalCobroAbierto = ref(false);
+const modalPromocionesAbierto = ref(false);
 const modalDescripcionPendiente = ref(false);
 const descripcionPendienteTexto = ref('');
 const modalVentasPendientesAbierto = ref(false);
@@ -478,17 +479,65 @@ const modalCobroPendienteAbierto = ref(false);
 const historialCargando = ref(false);
 const historialCobroTotal = ref(0);
 const historialGananciaTotal = ref(0);
-const historialVentas = ref<VentaDTO[]>([]);
+const historialVentas = ref<any[]>([]);
 const historialUsuariosUnicos = ref<{ idUsuario: number; nombre: string }[]>([]);
 const historialDetalleCargando = ref(false);
-const historialVentaDetalle = ref<VentaDetalleDTO[]>([]);
-const historialVentaSeleccionada = ref<VentaDTO | { idVenta: number; numeroTicket?: number; fechaVenta?: string; montoTotal?: number | string; metodoPago?: string; estatus?: string; nombreUsuario?: string } | null>(null);
+const historialVentaDetalle = ref<any[]>([]);
+const historialVentaSeleccionada = ref<any>(null);
 const historialVentaTieneDiscrepancia = ref(false);
+const historialDiscrepanciaMonto = ref(0);
 const modalDetalleVentaAbierto = ref(false);
-const ticketVisibleMobile = ref(false); 
+const ticketVisibleMobile = ref(false);
 const isKeyboardVisible = ref(false);
-const promocionesActivas = ref<PromocionDTO[]>([]);
-const modalPromocionesAbierto = ref(false);
+const modalAgregarPendienteAbierto = ref(false);
+const agregarPendienteBusqueda = ref('');
+const agregarPendienteInput = ref<HTMLInputElement | null>(null);
+const agregarPendienteScannerActivo = ref(false);
+const agregarPendienteProductos = ref<any[]>([]);
+
+const provisionSemanalTotal = ref(0);
+const provisionSemanalStatus = ref<'ok' | 'warning' | 'danger'>('ok');
+const provisionStatusClass = computed(() => {
+  return {
+    'status-ok': provisionSemanalStatus.value === 'ok',
+    'status-warning': provisionSemanalStatus.value === 'warning',
+    'status-danger': provisionSemanalStatus.value === 'danger'
+  };
+});
+
+const promocionesActivas = ref<any[]>([]);
+
+const productosFiltradosBusqueda = computed(() => {
+  if (!agregarPendienteBusqueda.value) return [];
+  const q = agregarPendienteBusqueda.value.toLowerCase();
+  return productos.value.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    (p.codigo_barras || '').toLowerCase().includes(q)
+  ).slice(0, 10);
+});
+
+function buscarYAgregarPendiente() {
+  if (!agregarPendienteBusqueda.value) return;
+  const prod = productosFiltradosBusqueda.value[0];
+  if (prod) agregarProductoAPendiente(prod);
+}
+
+const ventasPendientesAgrupadas = computed(() => {
+  return ventasPendientes.value.map(v => {
+    if (!v.detalles || v.detalles.length === 0) return v;
+    const grouped: Record<string, any> = {};
+    for (const d of v.detalles) {
+      const key = `${d.productoNombre}_${d.precioUnitarioVenta}_${d.isGramaje}`;
+      if (grouped[key]) {
+        grouped[key].cantidad += d.cantidad || 1;
+        grouped[key].subtotal = Number(grouped[key].cantidad) * Number(d.precioUnitarioVenta || 0);
+      } else {
+        grouped[key] = { ...d, cantidad: d.cantidad || 1, subtotal: Number(d.cantidad || 1) * Number(d.precioUnitarioVenta || 0) };
+      }
+    }
+    return { ...v, detallesAgrupados: Object.values(grouped) };
+  });
+});
 
 const esAdmin = computed(() => {
   return Number(localStorage.getItem('tipoUsuario') || 2) === 1;
@@ -501,6 +550,9 @@ const cantidadTemporal = ref(0);
 const precioTemporal = ref(0);
 const totalManualEditado = ref(false);
 const montoTotalInput = ref(0);
+const busquedaEditar = ref('');
+const resultadosEditar = ref<Producto[]>([]);
+const cargandoBusquedaEditar = ref(false);
 
 async function cargarPromocionesActivas() {
   try {
@@ -579,6 +631,20 @@ onUnmounted(() => {
 });
 
 function manejarAtajosTeclado(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (modalDetalleVentaAbierto.value) { cerrarDetalleVenta(); return; }
+    if (modalCobroPendienteAbierto.value) { modalCobroPendienteAbierto.value = false; ventaPendienteSeleccionada.value = null; return; }
+    if (modalVentasPendientesAbierto.value) { modalVentasPendientesAbierto.value = false; return; }
+    if (modalDescripcionPendiente.value) { modalDescripcionPendiente.value = false; return; }
+    if (modalCobroAbierto.value) { modalCobroAbierto.value = false; return; }
+    if (modalGramajeAbierto.value) { modalGramajeAbierto.value = false; modalProductoGramaje.value = null; gramajeEditandoDesdeHistorial.value = false; gramajeEditandoIndice.value = null; return; }
+    if (modalHistorialAbierto.value) { modalHistorialAbierto.value = false; return; }
+    if (modalSalidaAbierto.value) { modalSalidaAbierto.value = false; return; }
+    if (modalEntradaAbierto.value) { modalEntradaAbierto.value = false; return; }
+    if (modalPromocionesAbierto.value) { modalPromocionesAbierto.value = false; return; }
+    if (scannerActivo.value) { stopScanner(); return; }
+  }
+
   if (e.key === 'F12') {
     e.preventDefault();
     if (ticket.value.length > 0 && !modalCobroAbierto.value) {
@@ -773,11 +839,44 @@ const productosAccesoRapido = computed(() => {
   });
 });
 
+async function cargarSiguienteTicket() {
+  try {
+    const res = await getJson<ApiRespuesta<number>>('/ventas/siguienteNumeroTicket');
+    if (res?.datos !== undefined && res.datos !== null) {
+      ticketDelDia.value = String(res.datos);
+    }
+  } catch (e) {
+    console.error('Error al cargar siguiente ticket:', e);
+  }
+}
+
+async function cargarProvisionSemanal() {
+  try {
+    const res = await getJson<ApiRespuesta<any>>('/pedidos-proveedor/provision-semanal');
+    if (res?.datos) {
+      provisionSemanalTotal.value = res.datos.reduce((sum: number, d: any) => sum + (d.montoRequerido || 0), 0);
+      const cajaActual = Number(localStorage.getItem('saldoCaja') || 0);
+      const transferencias = Number(localStorage.getItem('saldoTransferencias') || 0);
+      if (cajaActual >= provisionSemanalTotal.value) {
+        provisionSemanalStatus.value = 'ok';
+      } else if (cajaActual + transferencias >= provisionSemanalTotal.value) {
+        provisionSemanalStatus.value = 'warning';
+      } else {
+        provisionSemanalStatus.value = 'danger';
+      }
+    }
+  } catch (e) {
+    console.error('Error al cargar provision semanal:', e);
+  }
+}
+
 onMounted(async () => {
   await cargarProductos();
   await cargarCategorias();
   await cargarTicketsDesdeBackend();
+  await cargarSiguienteTicket();
   await cargarPromocionesActivas();
+  await cargarProvisionSemanal();
 });
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -1291,6 +1390,7 @@ async function procesarCobro(metodoPago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA
     playSound('cash');
     modalCobroAbierto.value = false;
     await cargarTicketsDesdeBackend();
+    await cargarSiguienteTicket();
   } catch (error) {
     const detalle = error instanceof Error ? error.message : 'Error inesperado.';
     mostrarMensaje(`No se pudo cobrar: ${detalle}`, 'error');
@@ -1400,6 +1500,32 @@ async function cargarVentasPendientes() {
   }
 }
 
+function editarDescripcionPendiente(venta: any) {
+  ventaPendienteSeleccionada.value = venta;
+  descripcionPendienteTexto.value = venta.descripcionPendiente || '';
+  modalVentasPendientesAbierto.value = false;
+  modalDescripcionPendiente.value = true;
+}
+
+async function guardarEdicionDescripcion() {
+  if (!ventaPendienteSeleccionada.value) return;
+  try {
+    await getJson<ApiRespuesta<any>>(`/ventas/marcarPendiente/${ventaPendienteSeleccionada.value.idVenta}?descripcion=${encodeURIComponent(descripcionPendienteTexto.value.trim())}`, {
+      method: 'PUT',
+    });
+    modalDescripcionPendiente.value = false;
+    descripcionPendienteTexto.value = '';
+    const ventaEditada = ventaPendienteSeleccionada.value;
+    ventaPendienteSeleccionada.value = null;
+    await cargarVentasPendientes();
+    modalVentasPendientesAbierto.value = true;
+    mostrarMensaje('Descripción actualizada.', 'ok');
+  } catch (error) {
+    const detalle = error instanceof Error ? error.message : 'Error inesperado.';
+    mostrarMensaje(`No se pudo actualizar: ${detalle}`, 'error');
+  }
+}
+
 function abrirModalPendientes() {
   modalVentasPendientesAbierto.value = true;
   cargarVentasPendientes();
@@ -1409,6 +1535,94 @@ function cobrarVentaPendiente(venta: any) {
   ventaPendienteSeleccionada.value = venta;
   modalVentasPendientesAbierto.value = false;
   modalCobroPendienteAbierto.value = true;
+}
+
+function agregarAVentaPendiente(venta: any) {
+  ventaPendienteSeleccionada.value = venta;
+  agregarPendienteBusqueda.value = '';
+  agregarPendienteProductos.value = [];
+  agregarPendienteScannerActivo.value = false;
+  modalVentasPendientesAbierto.value = false;
+  modalAgregarPendienteAbierto.value = true;
+  nextTick(() => {
+    agregarPendienteInput.value?.focus();
+  });
+}
+
+function agregarProductoAPendiente(prod: any) {
+  agregarPendienteProductos.value.push({
+    idProducto: prod.idProducto || prod.id,
+    productoNombre: prod.nombre,
+    cantidad: 1,
+    precioUnitarioVenta: prod.precio_venta || prod.precio,
+    isGramaje: prod.is_gramaje || false,
+    codigoBarras: prod.codigo_barras || '',
+    tipoPrecioAplicado: 'NORMAL'
+  });
+  agregarPendienteBusqueda.value = '';
+}
+
+function quitarProductoPendiente(idx: number) {
+  agregarPendienteProductos.value.splice(idx, 1);
+}
+
+async function confirmarAgregarPendiente() {
+  if (!ventaPendienteSeleccionada.value || agregarPendienteProductos.value.length === 0) return;
+  try {
+    const response = await getJson<ApiRespuesta<any>>(`/ventas/agregarProductosAPendiente/${ventaPendienteSeleccionada.value.idVenta}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(agregarPendienteProductos.value)
+    });
+    if (response.codigo === 200) {
+      modalAgregarPendienteAbierto.value = false;
+      agregarPendienteProductos.value = [];
+      await cargarVentasPendientes();
+      mostrarMensaje('Productos agregados a la venta pendiente.', 'ok');
+    } else {
+      mostrarMensaje(response.mensaje || 'Error al agregar productos', 'error');
+    }
+  } catch (e: any) {
+    mostrarMensaje('Error de red: ' + e.message, 'error');
+  }
+}
+
+function startScannerPendiente() {
+  if (agregarPendienteScannerActivo.value) {
+    stopScannerPendiente();
+    return;
+  }
+  agregarPendienteScannerActivo.value = true;
+  setTimeout(() => {
+    const targetElement = document.querySelector('#scanner-interactive-pendiente');
+    if (!targetElement || typeof (window as any).Quagga === 'undefined') return;
+    (window as any).Quagga.init(
+      {
+        inputStream: { name: 'Live', type: 'LiveStream', target: targetElement, constraints: { facingMode: 'environment' } },
+        decoder: { readers: ['ean_reader', 'ean_8_reader', 'code_128_reader', 'upc_reader'] },
+        locate: true,
+      },
+      (err: any) => {
+        if (err) { agregarPendienteScannerActivo.value = false; return; }
+        (window as any).Quagga.start();
+      }
+    );
+    (window as any).Quagga.onDetected((data: any) => {
+      const code = data.codeResult.code;
+      const prod = productos.value.find(p => p.codigo_barras === code || p.idProducto?.toString() === code);
+      if (prod) {
+        agregarProductoAPendiente(prod);
+      }
+    });
+  }, 200);
+}
+
+function stopScannerPendiente() {
+  if (typeof (window as any).Quagga !== 'undefined') {
+    (window as any).Quagga.stop();
+    (window as any).Quagga.offDetected(() => {});
+  }
+  agregarPendienteScannerActivo.value = false;
 }
 
 async function confirmarCobroPendienteEfectivo(payload: { montoRecibido: number }) {
@@ -1436,16 +1650,18 @@ async function procesarCobroPendiente(metodoPago: string) {
   }
   try {
     const venta = ventaPendienteSeleccionada.value;
-    await getJson<ApiRespuesta<any>>(
+    const res = await getJson<ApiRespuesta<any>>(
       `/ventas/cobrarVentaPendiente/${venta.idVenta}?idUsuario=${idUsuario}&metodoPago=${metodoPago}&montoTotal=${Number(venta.montoTotal)}`,
       { method: 'PUT' }
     );
-    mostrarMensaje(`Venta #${venta.numeroTicket} cobrada por ${formatoMoneda(Number(venta.montoTotal))} con ${metodoPago}.`, 'ok');
+    const nuevoTicket = res?.datos?.numeroTicket || venta.numeroTicket;
+    mostrarMensaje(`Venta cobrada. Ticket #${nuevoTicket} - ${formatoMoneda(Number(venta.montoTotal))} con ${metodoPago}.`, 'ok');
     playSound('cash');
     modalCobroPendienteAbierto.value = false;
     ventaPendienteSeleccionada.value = null;
     await cargarVentasPendientes();
     await cargarTicketsDesdeBackend();
+    await cargarSiguienteTicket();
   } catch (error) {
     const detalle = error instanceof Error ? error.message : 'Error inesperado.';
     mostrarMensaje(`No se pudo cobrar: ${detalle}`, 'error');
@@ -1530,7 +1746,11 @@ async function cargarHistorialVentasDia() {
     historialCobroTotal.value = Number(data?.datos?.cobroTotal ?? 0);
     historialGananciaTotal.value = Number(data?.datos?.gananciaTotal ?? 0);
     historialVentas.value = Array.isArray(data?.datos?.ventas) 
-      ? data.datos.ventas.sort((a, b) => (b.idVenta ?? 0) - (a.idVenta ?? 0))
+      ? data.datos.ventas.sort((a, b) => {
+          const dateA = a.fechaVenta ? new Date(a.fechaVenta).getTime() : 0;
+          const dateB = b.fechaVenta ? new Date(b.fechaVenta).getTime() : 0;
+          return dateB - dateA;
+        })
       : [];
     
     const usuariosMap = new Map<number, string>();
@@ -1550,7 +1770,7 @@ async function cargarHistorialVentasDia() {
   }
 }
 
-function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): boolean {
+function calcularDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): number {
   const sumaDetalles = detalles.reduce((sum, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
@@ -1560,8 +1780,14 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
     return sum + (precio * cantidad);
   }, 0);
   
-  const discrepancia = Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
-  return discrepancia;
+  const diferencia = Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100;
+  return Math.round(diferencia * 100) / 100;
+}
+
+function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): boolean {
+  const diferencia = calcularDiscrepancia(detalles, montoTotal);
+  const umbral = Math.max(0.50, Math.round(montoTotal * 0.01 * 100) / 100);
+  return Math.abs(diferencia) > umbral && detalles.length > 0;
 }
 
 function salidaEfectivo() {
@@ -1591,8 +1817,10 @@ async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket
     historialVentaDetalle.value = detalles;
     
     const montoVenta = Number(venta.montoTotal ?? 0);
+    const diferencia = calcularDiscrepancia(detalles, montoVenta);
     const tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
     historialVentaTieneDiscrepancia.value = tieneDiscrepancia;
+    historialDiscrepanciaMonto.value = diferencia;
     
     const idx = historialVentas.value.findIndex(v => v.idVenta === venta.idVenta);
     if (idx !== -1) {
@@ -1632,6 +1860,8 @@ function cerrarDetalleVenta() {
   modalDetalleVentaAbierto.value = false;
   historialVentaSeleccionada.value = null;
   historialVentaDetalle.value = [];
+  historialVentaTieneDiscrepancia.value = false;
+  historialDiscrepanciaMonto.value = 0;
 }
 
 async function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }) {
@@ -2081,6 +2311,10 @@ function calcularSubtotal(d: VentaDetalleDTO): number {
   return Math.round(precio * cantidad);
 }
 
+function calcularSubtotalVenta(): number {
+  return historialVentaDetalle.value.reduce((sum, d) => sum + calcularSubtotal(d), 0);
+}
+
 function calcularNuevoTotal(): number {
   const total = historialVentaDetalle.value.reduce((sum, d) => {
     return sum + calcularSubtotal(d);
@@ -2194,6 +2428,65 @@ function cancelarEdicionDetalle() {
   modoEdicionDetalle.value = false;
   detalleEditandoIndex.value = null;
   totalManualEditado.value = false;
+  busquedaEditar.value = '';
+  resultadosEditar.value = [];
+}
+
+async function buscarProductoEditar() {
+  const termino = busquedaEditar.value.trim();
+  if (!termino) {
+    resultadosEditar.value = [];
+    return;
+  }
+  cargandoBusquedaEditar.value = true;
+  try {
+    const producto = await buscarProductoPorCodigoBarras(termino);
+    if (producto) {
+      resultadosEditar.value = [producto];
+    } else {
+      const resultado = await buscarProducto(termino);
+      resultadosEditar.value = resultado ? [resultado] : [];
+    }
+  } catch (e) {
+    resultadosEditar.value = [];
+  } finally {
+    cargandoBusquedaEditar.value = false;
+  }
+}
+
+async function agregarProductoADetalle(producto: Producto) {
+  if (!historialVentaSeleccionada.value) return;
+  
+  try {
+    const precioUnitario = producto.precio_venta || 0;
+    const resp = await getJson<ApiRespuesta<unknown>>(
+      '/ventasDetalle/crearVentaDetalle',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          Venta: { idVenta: historialVentaSeleccionada.value.idVenta },
+          Producto: { idProducto: producto.idProducto },
+          cantidad: 1,
+          precioUnitarioVenta: precioUnitario,
+          tipoPrecioAplicado: producto.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA'
+        })
+      }
+    );
+    
+    if (producto.is_gramaje) {
+      modalProductoGramaje.value = producto;
+      gramajeEditandoDesdeHistorial.value = true;
+      gramajeEditandoIndice.value = historialVentaDetalle.value.length;
+      setTimeout(() => { modalGramajeAbierto.value = true; }, 100);
+    }
+    
+    mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
+    busquedaEditar.value = '';
+    resultadosEditar.value = [];
+    await verDetalleVenta(historialVentaSeleccionada.value);
+  } catch (error) {
+    mostrarMensaje('Error al agregar producto', 'error');
+  }
 }
 
 async function eliminarDetalleVenta(index: number) {
@@ -2376,6 +2669,10 @@ async function eliminarTodosLosDetalles() {
             </div>
           </div>
         </div>
+        <div v-if="provisionSemanalTotal > 0" class="provision-total-badge" :class="provisionStatusClass">
+          <span class="provision-label">Total por apartar (7 días)</span>
+          <span class="provision-amount">{{ formatoMoneda(provisionSemanalTotal) }}</span>
+        </div>
       </header>
 
         <!-- ÁREA DE PRODUCTOS RÁPIDOS / RESULTADOS -->
@@ -2478,7 +2775,7 @@ async function eliminarTodosLosDetalles() {
                 <div class="item-info">
                   <h4 class="item-name">
                     <span v-if="asAny(item).is_promocion" class="promo-badge">❧</span>
-                    {{ item.nombre }}
+                    <span class="item-name-inner">{{ item.nombre }}</span>
                   </h4>
                   <div class="item-meta" v-if="asAny(item).is_promocion">
                     <span class="promo-contents">{{ asAny(item).promocion.detalles.map((d: any) => `${d.cantidad >= 1000 ? (d.cantidad / 1000) + 'kg' : d.cantidad + 'pza'} ${d.nombre_producto}`).join(', ') }}</span>
@@ -2519,6 +2816,19 @@ async function eliminarTodosLosDetalles() {
 
           <div v-if="ticket.length === 0" class="empty-ticket-msg">
             <p>No hay productos en esta cuenta</p>
+          </div>
+
+          <!-- Zelda sprites dentro del ticket -->
+          <div class="zelda-sprites-overlay" aria-hidden="true">
+            <div class="link-sprite">
+              <div class="link-frame frame1"></div>
+              <div class="link-frame frame2"></div>
+            </div>
+
+            <div class="octo-sprite">
+              <div class="octo-frame frame1"></div>
+              <div class="octo-frame frame2"></div>
+            </div>
           </div>
         </div>
 
@@ -2563,109 +2873,161 @@ async function eliminarTodosLosDetalles() {
     <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalidaEfectivo" />
     <HistorialVentasModal :open="modalHistorialAbierto" :loading="historialCargando" :cobro-total="historialCobroTotal" :ganancia-total="historialGananciaTotal" :ventas="historialVentas" :usuarios-unicos="historialUsuariosUnicos" :es-admin="esAdmin" @close="modalHistorialAbierto = false" @ver-detalle="verDetalleVenta" @cancelar="cancelarVentaDesdeHistorial" @ventas-corregidas="onVentasCorregidas" />
     
-    <!-- Detalle de venta modal custom -->
+    <!-- Detalle de venta modal optimizado -->
     <div v-if="modalDetalleVentaAbierto" class="pos-modal-overlay" @click.self="cerrarDetalleVenta">
-      <div class="pos-modal-card animate-pop-in">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        
-        <header class="modal-h">
-          <h3>🔍 Detalle de Venta #{{ historialVentaSeleccionada?.numeroTicket }}</h3>
+      <div class="pos-modal-card detalle-modal animate-pop-in">
+        <header class="detalle-header">
+          <div class="header-left">
+            <span class="ticket-badge">#{{ historialVentaSeleccionada?.numeroTicket }}</span>
+            <h3>Detalle de Venta</h3>
+          </div>
           <div class="modal-actions">
-            <button v-if="historialVentaTieneDiscrepancia" class="btn-warning" title="La suma de detalles no coincide con el total">⚠️ Discrepancia</button>
-            <button v-if="esAdmin && !modoEdicionDetalle" class="btn-editar" @click="iniciarEdicionDetalle">✏️ Editar</button>
+            <button v-if="historialVentaTieneDiscrepancia" class="btn-discrepancia" :title="`Detalles suman ${formatoMonedaRedondeada(calcularSubtotalVenta())}, registrado: ${formatoMonedaRedondeada(Number(historialVentaSeleccionada?.montoTotal))}, diferencia: ${formatoMonedaRedondeada(Math.abs(historialDiscrepanciaMonto))}`">
+              <span class="disc-icon">⚠</span>
+              <span class="disc-text">{{ formatoMonedaRedondeada(Math.abs(historialDiscrepanciaMonto)) }}</span>
+            </button>
+            <button v-if="esAdmin && !modoEdicionDetalle" class="btn-edit" @click="iniciarEdicionDetalle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Editar
+            </button>
             <template v-if="modoEdicionDetalle">
-              <button class="btn-guardar" @click="guardarCambiosDetalle">💾 Guardar</button>
-              <button class="btn-cancelar" @click="cancelarEdicionDetalle">Cancelar</button>
+              <button class="btn-save" @click="guardarCambiosDetalle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                Guardar
+              </button>
+              <button class="btn-cancel-edit" @click="cancelarEdicionDetalle">Cancelar</button>
             </template>
-            <button class="close-x" @click="cerrarDetalleVenta">×</button>
+            <button class="btn-close" @click="cerrarDetalleVenta">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
         </header>
-        <div class="modal-b custom-scrollbar">
-          <div class="venta-info-grid">
-            <div class="info-card fecha-card">
-              <div class="info-icon">📅</div>
-              <div class="info-content">
-                <span class="info-label">Fecha</span>
-                <span class="info-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(0, 10) }}</span>
+        
+        <div class="detalle-body custom-scrollbar">
+          <div class="detalle-summary">
+            <div class="summary-row">
+              <div class="summary-item">
+                <span class="summary-label">Fecha</span>
+                <span class="summary-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(0, 10) }}</span>
               </div>
-            </div>
-            <div class="info-card hora-card">
-              <div class="info-icon">🕐</div>
-              <div class="info-content">
-                <span class="info-label">Hora</span>
-                <span class="info-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(11, 16) }}</span>
+              <div class="summary-item">
+                <span class="summary-label">Hora</span>
+                <span class="summary-value">{{ historialVentaSeleccionada?.fechaVenta?.slice(11, 16) }}</span>
               </div>
-            </div>
-            <div class="info-card cajero-card">
-              <div class="info-icon">👤</div>
-              <div class="info-content">
-                <span class="info-label">Cajero</span>
-                <span class="info-value">{{ historialVentaSeleccionada?.nombreUsuario || 'Cajero' }}</span>
+              <div class="summary-item">
+                <span class="summary-label">Cajero</span>
+                <span class="summary-value">{{ historialVentaSeleccionada?.nombreUsuario || 'Cajero' }}</span>
               </div>
-            </div>
-            <div class="info-card">
-              <div class="info-icon">💳</div>
-              <div class="info-content">
-                <span class="info-label">Método</span>
-                <span class="info-value method-badge" :class="getMetodoClase(historialVentaSeleccionada?.metodoPago)">
+              <div class="summary-item">
+                <span class="summary-label">Método</span>
+                <span class="method-badge" :class="getMetodoClase(historialVentaSeleccionada?.metodoPago)">
                   {{ historialVentaSeleccionada?.metodoPago }}
                 </span>
               </div>
             </div>
-          </div>
-          <div class="total-card">
-            <div class="total-label">
-              <span class="total-icon">💰</span>
-              <span>Total de la Venta</span>
-            </div>
-            <template v-if="!modoEdicionDetalle">
-              <div class="total-value">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</div>
-            </template>
-            <template v-else>
-              <div class="total-edit-wrapper">
-                <span class="currency-prefix">$</span>
-                <input 
-                  v-model.number="montoTotalInput" 
-                  type="number" 
-                  min="0" 
-                  step="1" 
-                  class="total-input"
-                  :class="{ 'manual-edited': totalManualEditado }"
-                  @input="onTotalManualChange"
-                />
-                <span v-if="totalManualEditado" class="edit-indicator" title="Total modificado manualmente">✏️</span>
-              </div>
-            </template>
-          </div>
-          <div class="items-header">
-            <span>🛒 Productos ({{ historialVentaDetalle.length }})</span>
-            <button v-if="esAdmin && modoEdicionDetalle && historialVentaDetalle.length > 0" class="btn-eliminar-todos" @click="eliminarTodosLosDetalles" title="Eliminar todos los productos">
-              🗑️ Eliminar todo
-            </button>
-          </div>
-          <div class="detalle-items-list">
-            <div v-for="(d, i) in historialVentaDetalle" :key="i" class="d-item">
-              <span class="d-name" :title="(d.producto || d.Producto)?.nombre">{{ (d.producto || d.Producto)?.nombre }}</span>
-              
-              <template v-if="detalleEditandoIndex === i">
-                <input v-model.number="cantidadTemporal" type="number" min="1" class="edit-input" />
-                <input v-model.number="precioTemporal" type="number" step="0.01" min="0" class="edit-input" />
-                <button class="btn-confirm" @click="confirmarEdicionItem(i)">✓</button>
-                <button class="btn-cancel" @click="cancelarEdicionItem">×</button>
+            
+            <div class="total-section">
+              <template v-if="!modoEdicionDetalle">
+                <div class="total-amount">{{ formatoMoneda(Number(historialVentaSeleccionada?.montoTotal)) }}</div>
+                <div v-if="historialVentaSeleccionada?.ganancia" class="profit-text">Ganancia: {{ formatoMonedaRedondeada(Number(historialVentaSeleccionada?.ganancia)) }}</div>
               </template>
               <template v-else>
-                <span class="d-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? iniciarEditarItem(i) : null">
-                  {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
-                </span>
-                <strong class="d-sub">{{ formatoMonedaRedondeada(calcularSubtotal(d)) }}</strong>
-                <div class="d-actions">
-                  <button v-if="esAdmin && modoEdicionDetalle" class="btn-edit-item" @click="iniciarEditarItem(i)" title="Editar">✏️</button>
-                  <button v-if="esAdmin && modoEdicionDetalle" class="btn-delete-item" @click="eliminarDetalleVenta(i)" title="Eliminar">🗑️</button>
+                <div class="total-edit-row">
+                  <span class="currency">$</span>
+                  <input v-model.number="montoTotalInput" type="number" min="0" step="1" class="total-input" :class="{ 'manual-edited': totalManualEditado }" @input="onTotalManualChange" />
+                  <span v-if="totalManualEditado" class="edit-dot" title="Total modificado manualmente">●</span>
                 </div>
               </template>
+            </div>
+          </div>
+          
+          <div v-if="historialVentaTieneDiscrepancia" class="discrepancia-alert" :class="historialDiscrepanciaMonto > 0 ? 'alert-faltante' : 'alert-sobrante'">
+            <div class="alert-icon">⚠</div>
+            <div class="alert-content">
+              <div class="alert-row">
+                <span class="alert-label">Suma detalles:</span>
+                <span class="alert-value">{{ formatoMonedaRedondeada(calcularSubtotalVenta()) }}</span>
+              </div>
+              <div class="alert-row">
+                <span class="alert-label">Registrado:</span>
+                <span class="alert-value">{{ formatoMonedaRedondeada(Number(historialVentaSeleccionada?.montoTotal)) }}</span>
+              </div>
+              <div class="alert-diff">
+                {{ historialDiscrepanciaMonto > 0 ? 'Faltan' : 'Sobran' }} {{ formatoMonedaRedondeada(Math.abs(historialDiscrepanciaMonto)) }}
+              </div>
+            </div>
+          </div>
+          
+          <div class="productos-section">
+            <div class="productos-header">
+              <span class="prod-title">Productos</span>
+              <span class="prod-count">{{ historialVentaDetalle.length }}</span>
+              <button v-if="esAdmin && modoEdicionDetalle && historialVentaDetalle.length > 0" class="btn-clear-all" @click="eliminarTodosLosDetalles" title="Eliminar todos">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Eliminar todo
+              </button>
+            </div>
+            
+            <div v-if="modoEdicionDetalle" class="agregar-producto-section">
+              <div class="agregar-input-wrap">
+                <svg class="agregar-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input v-model="busquedaEditar" @input="buscarProductoEditar" type="text" class="agregar-input" placeholder="Buscar por código o nombre..." />
+                <button v-if="busquedaEditar" class="agregar-clear" @click="busquedaEditar = ''; resultadosEditar = []">✕</button>
+              </div>
+              <div v-if="resultadosEditar.length > 0" class="agregar-resultados">
+                <div v-for="p in resultadosEditar" :key="p.idProducto" class="agregar-resultado" @click="agregarProductoADetalle(p)">
+                  <span class="agregar-prod-name">{{ p.nombre }}</span>
+                  <span class="agregar-prod-info">
+                    <span v-if="p.is_gramaje" class="agregar-badge-gramaje">Gramaje</span>
+                    <span class="agregar-prod-price">{{ formatoMonedaRedondeada(p.precio_venta || 0) }}</span>
+                  </span>
+                </div>
+              </div>
+              <div v-if="busquedaEditar && !cargandoBusquedaEditar && resultadosEditar.length === 0" class="agregar-vacio">
+                No se encontraron productos
+              </div>
+            </div>
+            
+            <div class="productos-list">
+              <div v-for="(d, i) in historialVentaDetalle" :key="i" class="producto-item">
+                <div class="prod-info">
+                  <span class="prod-name" :title="(d.producto || d.Producto)?.nombre">{{ (d.producto || d.Producto)?.nombre }}</span>
+                  <template v-if="detalleEditandoIndex === i">
+                    <div class="edit-controls">
+                      <label class="edit-label">Cantidad:</label>
+                      <input v-model.number="cantidadTemporal" type="number" min="1" class="edit-qty" placeholder="Cant" />
+                      <label class="edit-label">Precio:</label>
+                      <input v-model.number="precioTemporal" type="number" step="0.01" min="0" class="edit-price" placeholder="$" />
+                      <button class="btn-ok" @click="confirmarEdicionItem(i)" title="Guardar cambios">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span class="btn-label">Guardar</span>
+                      </button>
+                      <button class="btn-x" @click="cancelarEdicionItem" title="Cancelar edición">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <span class="btn-label">Cancelar</span>
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="prod-meta">
+                      <span class="prod-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? iniciarEditarItem(i) : null">
+                        {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
+                      </span>
+                      <span class="prod-subtotal">{{ formatoMonedaRedondeada(calcularSubtotal(d)) }}</span>
+                    </div>
+                    <div v-if="esAdmin && modoEdicionDetalle" class="prod-actions">
+                      <button class="btn-action btn-action-edit" @click="iniciarEditarItem(i)" title="Editar cantidad y precio">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        <span>Editar</span>
+                      </button>
+                      <button class="btn-action btn-action-delete" @click="eliminarDetalleVenta(i)" title="Eliminar producto de la venta">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2694,11 +3056,11 @@ async function eliminarTodosLosDetalles() {
         <div class="modal-corner br"></div>
         
         <header class="modal-h">
-          <h3>⏳ Venta Pendiente</h3>
+          <h3>⏳ {{ ventaPendienteSeleccionada ? 'Editar Descripción' : 'Venta Pendiente' }}</h3>
           <button class="close-x" @click="modalDescripcionPendiente = false">×</button>
         </header>
         <div class="modal-b">
-          <p class="pendiente-hint">Escribe la razón por la que esta venta queda pendiente:</p>
+          <p class="pendiente-hint">{{ ventaPendienteSeleccionada ? 'Modifica la descripción de la venta pendiente:' : 'Escribe la razón por la que esta venta queda pendiente:' }}</p>
           <textarea 
             v-model="descripcionPendienteTexto" 
             class="pendiente-textarea" 
@@ -2707,7 +3069,7 @@ async function eliminarTodosLosDetalles() {
           ></textarea>
           <div class="pendiente-actions">
             <button class="btn-cancelar" @click="modalDescripcionPendiente = false">Cancelar</button>
-            <button class="btn-guardar" @click="guardarVentaPendiente">💾 Guardar Pendiente</button>
+            <button class="btn-guardar" @click="ventaPendienteSeleccionada ? guardarEdicionDescripcion() : guardarVentaPendiente()">💾 {{ ventaPendienteSeleccionada ? 'Actualizar' : 'Guardar' }}</button>
           </div>
         </div>
       </div>
@@ -2715,41 +3077,81 @@ async function eliminarTodosLosDetalles() {
 
     <!-- Modal ventas pendientes -->
     <div v-if="modalVentasPendientesAbierto" class="pos-modal-overlay" @click.self="modalVentasPendientesAbierto = false">
-      <div class="pos-modal-card animate-pop-in">
-        <div class="modal-corner tl"></div>
-        <div class="modal-corner tr"></div>
-        <div class="modal-corner bl"></div>
-        <div class="modal-corner br"></div>
-        
-        <header class="modal-h">
-          <h3>📋 Ventas Pendientes</h3>
+      <div class="pos-modal-card modal-pendientes animate-pop-in">
+        <header class="modal-header-clean">
+          <h3>Ventas Pendientes</h3>
           <button class="close-x" @click="modalVentasPendientesAbierto = false">×</button>
         </header>
-        <div class="modal-b custom-scrollbar">
-          <div v-if="ventasPendientes.length === 0" class="empty-pendientes">
-            <span class="empty-icon">✅</span>
+        <div class="modal-body-clean custom-scrollbar">
+          <div v-if="ventasPendientes.length === 0" class="empty-state">
+            <span class="empty-icon">✓</span>
             <p>No hay ventas pendientes</p>
           </div>
-          <div v-else class="lista-pendientes">
-            <div v-for="v in ventasPendientes" :key="v.idVenta" class="pendiente-card">
-              <div class="pendiente-header">
-                <span class="pendiente-ticket">Ticket #{{ v.numeroTicket }}</span>
-                <span class="pendiente-monto">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
+          <div v-else class="pendientes-list">
+            <div v-for="v in ventasPendientesAgrupadas" :key="v.idVenta" class="pendiente-row">
+              <div class="pendiente-main">
+                <span class="pendiente-ticket">#{{ v.numeroTicket }}</span>
+                <span class="pendiente-amount">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
               </div>
-              <div class="pendiente-meta">
-                <span class="pendiente-hora">{{ v.fechaVenta?.slice(11, 16) }}</span>
-                <span class="pendiente-cajero">{{ v.nombreUsuario }}</span>
+              <div class="pendiente-sub">
+                <span>{{ v.fechaVenta?.slice(11, 16) }}</span>
+                <span class="separator">·</span>
+                <span>{{ v.nombreUsuario }}</span>
               </div>
-              <div class="pendiente-productos">
-                <div v-for="(d, i) in v.detalles" :key="i" class="producto-item">
-                  <span class="prod-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
-                  <span class="prod-name">{{ d.productoNombre }}</span>
-                  <span class="prod-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
+              <div v-if="v.descripcionPendiente" class="pendiente-desc-box">
+                <span class="desc-text">{{ v.descripcionPendiente }}</span>
+                <button class="btn-edit-desc" @click="editarDescripcionPendiente(v)" title="Editar descripción">✎</button>
+              </div>
+              <div v-if="v.detallesAgrupados && v.detallesAgrupados.length > 0" class="pendiente-detalles">
+                <div v-for="(d, i) in v.detallesAgrupados" :key="i" class="detalle-item">
+                  <span class="detalle-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
+                  <span class="detalle-name">{{ d.productoNombre }}</span>
+                  <span class="detalle-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
                 </div>
               </div>
-              <p class="pendiente-desc">{{ v.descripcionPendiente || 'Sin descripción' }}</p>
-              <button class="btn-cobrar-pendiente" @click="cobrarVentaPendiente(v)">💰 Cobrar Ahora</button>
+              <div class="pendiente-actions">
+                <button class="btn-add-pendiente" @click="agregarAVentaPendiente(v)" title="Agregar productos">+</button>
+                <button class="btn-cobrar-pendiente" @click="cobrarVentaPendiente(v)">Cobrar</button>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal agregar productos a pendiente -->
+    <div v-if="modalAgregarPendienteAbierto" class="pos-modal-overlay" @click.self="modalAgregarPendienteAbierto = false">
+      <div class="pos-modal-card modal-agregar-pendiente animate-pop-in">
+        <header class="modal-header-clean">
+          <h3>Agregar a Ticket #{{ ventaPendienteSeleccionada?.numeroTicket }}</h3>
+          <button class="close-x" @click="modalAgregarPendienteAbierto = false">×</button>
+        </header>
+        <div class="modal-body-clean custom-scrollbar">
+          <div class="agregar-pendiente-search">
+            <input ref="agregarPendienteInput" v-model="agregarPendienteBusqueda" type="text" placeholder="Buscar o escanear producto..." @keyup.enter="buscarYAgregarPendiente">
+            <button class="btn-scanner-mini" @click="startScannerPendiente" :class="{ active: agregarPendienteScannerActivo }">📷</button>
+          </div>
+          <div v-if="agregarPendienteScannerActivo" class="scanner-mini-viewport">
+            <div id="scanner-interactive-pendiente"></div>
+          </div>
+          <div class="agregar-pendiente-results">
+            <div v-for="prod in productosFiltradosBusqueda" :key="prod.idProducto" class="result-item" @click="agregarProductoAPendiente(prod)">
+              <span class="result-name">{{ prod.nombre }}</span>
+              <span class="result-price">{{ formatoMoneda(prod.precio_venta ?? 0) }}</span>
+            </div>
+          </div>
+          <div v-if="agregarPendienteProductos.length > 0" class="agregar-pendiente-ticket">
+            <h4>Productos a agregar</h4>
+            <div v-for="(p, idx) in agregarPendienteProductos" :key="idx" class="ticket-item">
+              <span class="ticket-item-name">{{ p.productoNombre }}</span>
+              <span class="ticket-item-qty">{{ p.cantidad }} × {{ formatoMoneda(Number(p.precioUnitarioVenta)) }}</span>
+              <button class="btn-remove-mini" @click="quitarProductoPendiente(idx)">✕</button>
+            </div>
+            <div class="ticket-total">
+              <span>Total:</span>
+              <strong>{{ formatoMoneda(agregarPendienteProductos.reduce((s, p) => s + Number(p.precioUnitarioVenta) * p.cantidad, 0)) }}</strong>
+            </div>
+            <button class="btn-confirmar-agregar" @click="confirmarAgregarPendiente">Confirmar</button>
           </div>
         </div>
       </div>
@@ -3080,7 +3482,6 @@ async function eliminarTodosLosDetalles() {
     transform: translateY(0);
   }
   
-  /* Cuando el teclado está activo - ocultar panel de cobro */
   .pos-right.keyboard-active {
     display: none !important;
   }
@@ -3309,7 +3710,18 @@ async function eliminarTodosLosDetalles() {
   }
   
   .qty-control {
-    transform: scale(0.65);
+    gap: 0;
+  }
+  
+  .qty-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 0.85rem;
+  }
+  
+  .qty-val {
+    width: 26px;
+    font-size: 0.7rem;
   }
   
   .item-subtotal {
@@ -3609,9 +4021,9 @@ async function eliminarTodosLosDetalles() {
   }
   
   .btn-remove-item {
-    width: 16px;
-    height: 16px;
-    font-size: 0.8rem;
+    width: 26px;
+    height: 26px;
+    font-size: 0.95rem;
     top: 4px;
     right: 4px;
   }
@@ -3692,7 +4104,7 @@ async function eliminarTodosLosDetalles() {
   }
   
   .cashier-badge {
-    font-size: 0.45rem;
+    font-size: 0.7rem;
     padding: 0.15rem 0.4rem;
     margin-top: 0.2rem;
   }
@@ -3848,6 +4260,1242 @@ async function eliminarTodosLosDetalles() {
   }
 }
 
+/* =========================================
+   MÓVILES GRANDES (600px) - iPad Mini, Pixel 7
+   ========================================= */
+@media (max-width: 600px) {
+  .pos-center {
+    padding: 0.4rem;
+  }
+  
+  .catalog-header {
+    padding: 0.5rem;
+  }
+  
+  .input-wrapper {
+    padding: 0.3rem 0.4rem;
+    gap: 0.25rem;
+  }
+  
+  .input-wrapper input {
+    font-size: 0.8rem;
+  }
+  
+  .category-filter-select {
+    min-width: 70px;
+    max-width: 90px;
+    font-size: 0.65rem;
+    padding: 0.2rem 1.2rem 0.2rem 0.35rem;
+  }
+  
+  .tool-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.9rem;
+  }
+  
+  .catalog-grid {
+    padding: 0.4rem;
+  }
+  
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.35rem;
+  }
+  
+  .product-card {
+    padding: 0.35rem;
+    border-radius: 8px;
+  }
+  
+  .product-icon {
+    font-size: 1.5rem;
+  }
+  
+.product-name {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  max-height: 2.4rem;
+  word-break: break-word;
+}
+  
+  .product-price-tag {
+    font-size: 0.7rem;
+    padding: 0.18rem 0.4rem;
+  }
+  
+  .stock-badge {
+    font-size: 0.5rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .acceso-rapido-section {
+    padding: 0.5rem;
+  }
+  
+  .acceso-rapido-grid {
+    grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+    gap: 0.35rem;
+  }
+  
+  .acceso-rapido-btn {
+    padding: 0.4rem 0.25rem;
+  }
+  
+  .acceso-code {
+    font-size: 0.7rem;
+  }
+  
+  .acceso-name {
+    font-size: 0.6rem;
+  }
+  
+  .acceso-price {
+    font-size: 0.65rem;
+  }
+  
+  .pos-right {
+    height: 50dvh;
+  }
+  
+  .mobile-ticket-trigger {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  
+  .trigger-info .icon {
+    font-size: 1rem;
+  }
+  
+  .trigger-total {
+    font-size: 1rem;
+  }
+  
+  .checkout-container {
+    padding: 0.5rem;
+  }
+  
+  .checkout-header {
+    padding: 0.3rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .header-title h3 {
+    font-size: 0.85rem;
+  }
+  
+  .btn-clear-all {
+    font-size: 0.6rem;
+    padding: 0.18rem 0.4rem;
+  }
+  
+  .ticket-items-list {
+    gap: 0.35rem;
+  }
+  
+  .ticket-item-row {
+    padding: 0.4rem;
+  }
+  
+  .item-name {
+    font-size: 0.75rem;
+  }
+  
+  .item-meta {
+    font-size: 0.6rem;
+  }
+  
+  .qty-control {
+    transform: scale(0.7);
+  }
+  
+  .item-subtotal {
+    font-size: 0.75rem;
+  }
+  
+  .btn-remove-item {
+    width: 20px;
+    height: 20px;
+    font-size: 0.85rem;
+  }
+  
+  .summary-row {
+    font-size: 0.7rem;
+  }
+  
+  .summary-row.total {
+    font-size: 1.05rem;
+  }
+  
+  .checkout-actions-scroll {
+    padding: 0.35rem 0.2rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary {
+    height: 38px;
+    font-size: 0.75rem;
+    min-width: 120px;
+    border-radius: 8px;
+    padding: 0 0.6rem;
+  }
+  
+  .checkout-actions-scroll .extra-actions {
+    gap: 0.35rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.secondary {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  
+  .cashier-badge {
+    font-size: 0.55rem;
+    padding-top: 0.2rem;
+  }
+  
+  .promo-carousel {
+    padding: 0.5rem;
+    margin: 0.3rem;
+  }
+  
+  .hero-title {
+    font-size: 0.8rem;
+  }
+  
+  .card-image {
+    width: 80px;
+  }
+  
+  .promo-name {
+    font-size: 0.85rem;
+  }
+  
+  .price-promo {
+    font-size: 1rem;
+  }
+  
+  .btn-agregar {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.65rem;
+  }
+  
+  .carousel-btn {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+/* =========================================
+   MÓVILES PEQUEÑOS (400px) - iPhone SE, Galaxy A52
+   ========================================= */
+@media (max-width: 400px) {
+  .pos-center {
+    padding: 0.3rem;
+  }
+  
+  .tickets-bar-mobile {
+    padding: 0.25rem 0.2rem;
+    min-height: 38px;
+  }
+  
+  .tickets-bar-scroll {
+    gap: 0.25rem;
+  }
+  
+  .btn-add-ticket-mini {
+    min-width: 32px;
+    height: 32px;
+    border-radius: 5px;
+    font-size: 0.95rem;
+  }
+  
+  .ticket-chip {
+    min-width: 36px;
+    height: 32px;
+    padding: 0.15rem 0.35rem;
+    border-radius: 5px;
+  }
+  
+  .chip-num {
+    font-size: 0.6rem;
+  }
+  
+  .chip-total, .chip-status {
+    font-size: 0.38rem;
+  }
+  
+  .catalog-header {
+    padding: 0.35rem;
+  }
+  
+  .input-wrapper {
+    padding: 0.22rem 0.28rem;
+    gap: 0.18rem;
+    border-radius: 5px;
+  }
+  
+  .input-wrapper input {
+    font-size: 0.72rem;
+  }
+  
+  .category-filter-select {
+    min-width: 60px;
+    max-width: 75px;
+    font-size: 0.58rem;
+    padding: 0.12rem 0.9rem 0.12rem 0.25rem;
+  }
+  
+  .input-wrapper input::placeholder {
+    font-size: 0.55rem;
+  }
+  
+  .search-icon {
+    font-size: 0.7rem;
+  }
+  
+  .tool-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+  }
+  
+  .catalog-grid {
+    padding: 0.25rem;
+  }
+  
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.28rem;
+  }
+  
+  .product-card {
+    padding: 0.28rem;
+    border-radius: 6px;
+    gap: 0.18rem;
+    border-width: 1px;
+  }
+  
+  .product-icon {
+    font-size: 1.3rem;
+  }
+  
+  .product-name {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+  
+  .product-price-tag {
+    font-size: 0.7rem;
+    padding: 0.12rem 0.3rem;
+    border-radius: 5px;
+    border-width: 1px;
+  }
+  
+  .stock-badge {
+    font-size: 0.55rem;
+    padding: 0.06rem 0.18rem;
+  }
+  
+  .acceso-rapido-section {
+    padding: 0.4rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .acceso-rapido-title {
+    font-size: 0.7rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .acceso-rapido-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 0.3rem;
+  }
+  
+  .acceso-rapido-btn {
+    padding: 0.35rem 0.2rem;
+  }
+  
+  .acceso-code {
+    font-size: 0.65rem;
+    padding: 0.08rem 0.25rem;
+  }
+  
+  .acceso-name {
+    font-size: 0.55rem;
+  }
+  
+  .acceso-price {
+    font-size: 0.6rem;
+  }
+  
+  .pos-right {
+    height: 48dvh;
+  }
+  
+  .mobile-ticket-trigger {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    min-height: 34px;
+  }
+  
+  .trigger-info {
+    gap: 0.3rem;
+  }
+  
+  .trigger-info .icon {
+    font-size: 0.85rem;
+  }
+  
+  .trigger-total {
+    font-size: 0.9rem;
+  }
+  
+  .chevron {
+    font-size: 0.75rem;
+  }
+  
+  .checkout-container {
+    padding: 0.35rem;
+  }
+  
+  .checkout-header {
+    padding: 0.22rem;
+    margin-bottom: 0.22rem;
+  }
+  
+  .header-title h3 {
+    font-size: 0.72rem;
+  }
+  
+  .header-title .icon {
+    font-size: 0.85rem;
+  }
+  
+  .header-title {
+    gap: 0.2rem;
+  }
+  
+  .btn-clear-all {
+    font-size: 0.52rem;
+    padding: 0.12rem 0.3rem;
+    border-width: 1px;
+  }
+  
+  .ticket-items-list {
+    flex: 1;
+    min-height: 45px;
+    gap: 0.25rem;
+    padding-right: 0.2rem;
+  }
+  
+  .ticket-item-row {
+    padding: 0.28rem;
+    border-width: 1px;
+    border-radius: 6px;
+  }
+  
+  .item-name {
+    font-size: 0.8rem;
+    padding-right: 1.5rem;
+  }
+  
+  .item-meta {
+    font-size: 0.52rem;
+    gap: 0.22rem;
+  }
+  
+  .unit-price {
+    font-size: 0.52rem;
+  }
+  
+  .mayoreo-toggle {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.25rem;
+    gap: 0.18rem;
+  }
+  
+  .qty-control {
+    transform: scale(0.58);
+    border-width: 1px;
+  }
+  
+  .qty-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 0.85rem;
+  }
+  
+  .qty-val {
+    width: 32px;
+    font-size: 0.72rem;
+  }
+  
+  .item-subtotal {
+    font-size: 0.62rem;
+  }
+  
+  .btn-remove-item {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+    top: 4px;
+    right: 4px;
+  }
+  
+  .checkout-footer {
+    padding-top: 0.25rem;
+    gap: 0.25rem;
+  }
+  
+  .summary-row {
+    font-size: 0.58rem;
+  }
+  
+  .summary-row.total {
+    font-size: 0.95rem;
+    padding-top: 0.18rem;
+    margin-top: 0.18rem;
+  }
+  
+  .total-amount {
+    font-size: 0.95rem;
+  }
+  
+  .checkout-actions-scroll {
+    padding: 0.22rem 0.12rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary {
+    height: auto;
+    min-height: 34px;
+    font-size: 0.62rem;
+    min-width: 90px;
+    max-width: 150px;
+    border-radius: 5px;
+    padding: 0.25rem 0.45rem;
+    border-width: 2px;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary .icon {
+    font-size: 0.72rem;
+  }
+  
+  .checkout-actions-scroll .extra-actions {
+    gap: 0.22rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.secondary {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    font-size: 0.78rem;
+    border-radius: 5px;
+    border-width: 2px;
+  }
+  
+  .cashier-badge {
+    font-size: 0.48rem;
+    padding: 0.12rem 0.35rem;
+    margin-top: 0.18rem;
+  }
+  
+  .promo-carousel {
+    padding: 0.35rem;
+    margin: 0.2rem;
+    border-width: 2px;
+    border-radius: 8px;
+  }
+  
+  .hero-section {
+    gap: 0.35rem;
+  }
+  
+  .hero-icon {
+    font-size: 0.9rem;
+  }
+  
+  .hero-title {
+    font-size: 0.7rem;
+  }
+  
+  .hero-subtitle {
+    display: none;
+  }
+  
+  .hero-decor {
+    font-size: 0.7rem;
+  }
+  
+  .card-inner {
+    padding: 0.4rem;
+    gap: 0.4rem;
+  }
+  
+  .card-image {
+    width: 65px;
+  }
+  
+  .image-placeholder {
+    font-size: 1.3rem;
+  }
+  
+  .placeholder-text {
+    display: none;
+  }
+  
+  .promo-name {
+    font-size: 0.72rem;
+  }
+  
+  .promo-description {
+    display: none;
+  }
+  
+  .products-title {
+    font-size: 0.58rem;
+  }
+  
+  .products-list {
+    gap: 0.12rem;
+  }
+  
+  .product-item {
+    font-size: 0.58rem;
+    padding: 0.12rem 0.25rem;
+    gap: 0.25rem;
+  }
+  
+  .product-qty {
+    min-width: 28px;
+    font-size: 0.52rem;
+  }
+  
+  .price-original {
+    display: none;
+  }
+  
+  .price-promo-container {
+    padding: 0.18rem 0.4rem;
+  }
+  
+  .price-promo {
+    font-size: 0.85rem;
+  }
+  
+  .btn-agregar {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.58rem;
+    gap: 0.2rem;
+    border-width: 2px;
+  }
+  
+  .btn-icon {
+    font-size: 0.75rem;
+  }
+  
+  .btn-text {
+    display: none;
+  }
+  
+  .btn-agregar::after {
+    content: 'Agregar';
+  }
+  
+  .btn-decor {
+    display: none;
+  }
+  
+  .carousel-btn {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .carousel-btn.prev {
+    left: -3px;
+  }
+  
+  .carousel-btn.next {
+    right: -3px;
+  }
+  
+  .card-badge-container {
+    top: -5px;
+    right: -5px;
+  }
+  
+  .card-badge {
+    padding: 0.12rem 0.35rem;
+    font-size: 0.5rem;
+    border-width: 2px;
+  }
+  
+  .carousel-footer {
+    margin-top: 0.4rem;
+    padding-top: 0.35rem;
+  }
+  
+  .carousel-dots {
+    gap: 0.25rem;
+  }
+  
+  .dot {
+    width: 5px;
+    height: 5px;
+  }
+  
+  .carousel-counter {
+    font-size: 0.55rem;
+  }
+}
+
+/* =========================================
+   MÓVILES MUY PEQUEÑOS (360px) - Pixel 5, Galaxy S20
+   ========================================= */
+@media (max-width: 360px) {
+  .pos-center {
+    padding: 0.25rem;
+  }
+  
+  .tickets-bar-mobile {
+    padding: 0.2rem 0.15rem;
+    min-height: 34px;
+  }
+  
+  .tickets-bar-scroll {
+    gap: 0.2rem;
+  }
+  
+  .btn-add-ticket-mini {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  
+  .ticket-chip {
+    min-width: 32px;
+    height: 28px;
+    padding: 0.12rem 0.28rem;
+  }
+  
+  .chip-num {
+    font-size: 0.55rem;
+  }
+  
+  .chip-total, .chip-status {
+    font-size: 0.35rem;
+  }
+  
+  .catalog-header {
+    padding: 0.28rem;
+  }
+  
+  .input-wrapper {
+    padding: 0.18rem 0.22rem;
+    gap: 0.15rem;
+  }
+  
+  .input-wrapper input {
+    font-size: 0.68rem;
+  }
+  
+  .category-filter-select {
+    min-width: 55px;
+    max-width: 70px;
+    font-size: 0.55rem;
+    padding: 0.1rem 0.8rem 0.1rem 0.2rem;
+  }
+  
+  .tool-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+  
+  .catalog-grid {
+    padding: 0.2rem;
+  }
+  
+  .products-grid {
+    gap: 0.22rem;
+  }
+  
+  .product-card {
+    padding: 0.22rem;
+    gap: 0.15rem;
+  }
+  
+  .product-icon {
+    font-size: 1.2rem;
+  }
+  
+  .product-name {
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+  
+  .product-price-tag {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .stock-badge {
+    font-size: 0.38rem;
+    padding: 0.05rem 0.15rem;
+  }
+  
+  .acceso-rapido-section {
+    padding: 0.35rem;
+  }
+  
+  .acceso-rapido-grid {
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 0.25rem;
+  }
+  
+  .acceso-rapido-btn {
+    padding: 0.3rem 0.18rem;
+  }
+  
+  .acceso-code {
+    font-size: 0.6rem;
+  }
+  
+  .acceso-name {
+    font-size: 0.5rem;
+  }
+  
+  .acceso-price {
+    font-size: 0.55rem;
+  }
+  
+  .pos-right {
+    height: 46dvh;
+  }
+  
+  .mobile-ticket-trigger {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    min-height: 32px;
+  }
+  
+  .trigger-total {
+    font-size: 0.85rem;
+  }
+  
+  .checkout-container {
+    padding: 0.3rem;
+  }
+  
+  .checkout-header {
+    padding: 0.18rem;
+  }
+  
+  .header-title h3 {
+    font-size: 0.68rem;
+  }
+  
+  .btn-clear-all {
+    font-size: 0.48rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .ticket-items-list {
+    gap: 0.2rem;
+    min-height: 40px;
+  }
+  
+  .ticket-item-row {
+    padding: 0.22rem;
+  }
+  
+  .item-name {
+    font-size: 0.75rem;
+    padding-right: 1.5rem;
+  }
+  
+  .item-meta {
+    font-size: 0.48rem;
+  }
+  
+  .qty-control {
+    gap: 0;
+  }
+  
+  .qty-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.9rem;
+  }
+  
+  .qty-val {
+    width: 28px;
+    font-size: 0.75rem;
+  }
+  
+  .item-subtotal {
+    font-size: 0.58rem;
+  }
+  
+  .btn-remove-item {
+    width: 26px;
+    height: 26px;
+    font-size: 0.95rem;
+    top: 4px;
+    right: 4px;
+  }
+  
+  .summary-row {
+    font-size: 0.52rem;
+  }
+  
+  .summary-row.total {
+    font-size: 0.88rem;
+  }
+  
+  .checkout-actions-scroll {
+    padding: 0.18rem 0.1rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary {
+    min-height: 30px;
+    font-size: 0.58rem;
+    min-width: 80px;
+    padding: 0.2rem 0.35rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.secondary {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.72rem;
+  }
+  
+  .cashier-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    margin-top: 0.2rem;
+  }
+  
+  .promo-carousel {
+    padding: 0.3rem;
+    margin: 0.15rem;
+  }
+  
+  .hero-title {
+    font-size: 0.65rem;
+  }
+  
+  .card-image {
+    width: 55px;
+  }
+  
+  .promo-name {
+    font-size: 0.65rem;
+  }
+  
+  .price-promo {
+    font-size: 0.78rem;
+  }
+  
+  .btn-agregar {
+    padding: 0.2rem 0.35rem;
+    font-size: 0.52rem;
+  }
+  
+  .carousel-btn {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .dot {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .carousel-counter {
+    font-size: 0.5rem;
+  }
+}
+
+/* =========================================
+   MÓVILES EXTRA PEQUEÑOS (320px) - iPhone 5/SE antiguo
+   ========================================= */
+@media (max-width: 320px) {
+  .pos-center {
+    padding: 0.2rem;
+  }
+  
+  .tickets-bar-mobile {
+    padding: 0.15rem 0.1rem;
+    min-height: 30px;
+  }
+  
+  .tickets-bar-scroll {
+    gap: 0.15rem;
+  }
+  
+  .btn-add-ticket-mini {
+    min-width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+  
+  .ticket-chip {
+    min-width: 28px;
+    height: 26px;
+    padding: 0.1rem 0.22rem;
+  }
+  
+  .chip-num {
+    font-size: 0.5rem;
+  }
+  
+  .chip-total, .chip-status {
+    font-size: 0.3rem;
+  }
+  
+  .catalog-header {
+    padding: 0.22rem;
+  }
+  
+  .input-wrapper {
+    padding: 0.15rem 0.18rem;
+    gap: 0.12rem;
+  }
+  
+  .input-wrapper input {
+    font-size: 0.62rem;
+  }
+  
+  .category-filter-select {
+    min-width: 50px;
+    max-width: 65px;
+    font-size: 0.5rem;
+    padding: 0.08rem 0.7rem 0.08rem 0.18rem;
+  }
+  
+  .tool-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+  }
+  
+  .catalog-grid {
+    padding: 0.15rem;
+  }
+  
+  .products-grid {
+    gap: 0.18rem;
+  }
+  
+  .product-card {
+    padding: 0.18rem;
+    gap: 0.12rem;
+  }
+  
+  .product-icon {
+    font-size: 1.1rem;
+  }
+  
+  .product-name {
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+  
+  .product-price-tag {
+    font-size: 0.5rem;
+    padding: 0.08rem 0.2rem;
+  }
+  
+  .stock-badge {
+    font-size: 0.35rem;
+    padding: 0.04rem 0.12rem;
+  }
+  
+  .acceso-rapido-section {
+    padding: 0.28rem;
+  }
+  
+  .acceso-rapido-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.2rem;
+  }
+  
+  .acceso-rapido-btn {
+    padding: 0.25rem 0.15rem;
+  }
+  
+  .acceso-code {
+    font-size: 0.55rem;
+  }
+  
+  .acceso-name {
+    font-size: 0.45rem;
+  }
+  
+  .acceso-price {
+    font-size: 0.5rem;
+  }
+  
+  .pos-right {
+    height: 44dvh;
+  }
+  
+  .mobile-ticket-trigger {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.65rem;
+    min-height: 28px;
+  }
+  
+  .trigger-total {
+    font-size: 0.8rem;
+  }
+  
+  .checkout-container {
+    padding: 0.25rem;
+  }
+  
+  .checkout-header {
+    padding: 0.15rem;
+  }
+  
+  .header-title h3 {
+    font-size: 0.62rem;
+  }
+  
+  .btn-clear-all {
+    font-size: 0.45rem;
+    padding: 0.08rem 0.2rem;
+  }
+  
+  .ticket-items-list {
+    gap: 0.15rem;
+    min-height: 35px;
+  }
+  
+  .ticket-item-row {
+    padding: 0.18rem;
+  }
+  
+  .item-name {
+    font-size: 0.72rem;
+    padding-right: 1.5rem;
+  }
+  
+  .item-meta {
+    font-size: 0.42rem;
+  }
+  
+  .qty-control {
+    gap: 0;
+  }
+  
+  .qty-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 0.8rem;
+  }
+  
+  .qty-val {
+    width: 24px;
+    font-size: 0.68rem;
+  }
+  
+  .item-subtotal {
+    font-size: 0.52rem;
+  }
+  
+  .btn-remove-item {
+    width: 14px;
+    height: 14px;
+    font-size: 0.72rem;
+  }
+  
+  .summary-row {
+    font-size: 0.48rem;
+  }
+  
+  .summary-row.total {
+    font-size: 0.82rem;
+  }
+  
+  .checkout-actions-scroll {
+    padding: 0.15rem 0.08rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.primary {
+    min-height: 28px;
+    font-size: 0.52rem;
+    min-width: 70px;
+    padding: 0.18rem 0.3rem;
+  }
+  
+  .checkout-actions-scroll .btn-checkout.secondary {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.68rem;
+  }
+  
+  .cashier-badge {
+    font-size: 0.62rem;
+    padding: 0.15rem 0.4rem;
+    margin-top: 0.2rem;
+  }
+  
+  .promo-carousel {
+    padding: 0.25rem;
+    margin: 0.12rem;
+  }
+  
+  .hero-title {
+    font-size: 0.58rem;
+  }
+  
+  .card-image {
+    width: 48px;
+  }
+  
+  .promo-name {
+    font-size: 0.58rem;
+  }
+  
+  .price-promo {
+    font-size: 0.72rem;
+  }
+  
+  .btn-agregar {
+    padding: 0.18rem 0.3rem;
+    font-size: 0.48rem;
+  }
+  
+  .carousel-btn {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .dot {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .carousel-counter {
+    font-size: 0.45rem;
+  }
+}
+
 /* Estilos base para barra de tickets (oculta en pantallas grandes) */
 .tickets-bar-mobile {
   display: none;
@@ -3856,22 +5504,21 @@ async function eliminarTodosLosDetalles() {
 /* ACTIVADOR TICKET MÓVIL */
 .mobile-ticket-trigger {
   display: none;
-  background: linear-gradient(180deg, var(--gradient-panel-start) 0%, var(--gradient-panel-end) 100%);
-  border-top: var(--border-width) solid var(--accent-color);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--accent-color);
   color: var(--accent-color);
-  padding: 0.9rem 1.5rem;
+  padding: 0.7rem 1.2rem;
   justify-content: space-between;
   align-items: center;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 -4px 15px var(--shadow-color), inset 0 1px 0 color-mix(in srgb, var(--accent-color) 30%, transparent);
-  border-radius: 16px 16px 0 0;
+  border-radius: 12px 12px 0 0;
   width: 100%;
   box-sizing: border-box;
 }
 
 .trigger-info { display: flex; align-items: center; gap: 0.5rem; }
-.trigger-total { font-size: 1.2rem; font-family: 'HyliaSerif', monospace; color: var(--success-color); text-shadow: 1px 1px 0 var(--border-color); }
+.trigger-total { font-size: 1.1rem; color: var(--success-color); font-weight: 700; }
 
 @media (max-width: 480px) {
   .mobile-ticket-trigger {
@@ -3972,7 +5619,7 @@ async function eliminarTodosLosDetalles() {
    ========================================= */
 .pos-sidebar {
   background: var(--bg-secondary);
-  border-right: var(--border-width) solid var(--border-color);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   padding: 0.8rem 0.4rem;
@@ -4014,70 +5661,37 @@ async function eliminarTodosLosDetalles() {
   gap: 0.5rem;
   margin-bottom: 1.5rem;
   text-align: center;
-  position: relative;
-}
-
-.sidebar-header::before {
-  content: '❧';
-  position: absolute;
-  top: -10px;
-  font-size: 1.2rem;
-  color: var(--accent-color);
-  opacity: 0.4;
-  animation: float 3s ease-in-out infinite;
 }
 
 .sidebar-header h3 { 
   font-size: 0.7rem; 
   text-transform: uppercase; 
   color: var(--accent-color);
-  font-family: 'HyliaSerifBeta', serif;
+  font-weight: 700;
   letter-spacing: 0.1em;
-  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 .btn-add-ticket {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
-  border: 3px solid var(--accent-color);
-  background: linear-gradient(180deg, var(--accent-color) 0%, #92400e 100%);
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-color);
   color: var(--bg-primary);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
-  box-shadow: 0 4px 0 var(--border-color);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-add-ticket::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  transition: left 0.5s;
-}
-
-.btn-add-ticket:hover::before {
-  left: 100%;
+  transition: all 0.15s;
 }
 
 .btn-add-ticket:hover { 
-  transform: translateY(-3px);
-  box-shadow: 0 7px 0 var(--border-color);
   filter: brightness(1.1);
 }
 
 .btn-add-ticket:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--border-color);
+  transform: scale(0.95);
 }
 
 .tickets-list {
@@ -4131,15 +5745,19 @@ async function eliminarTodosLosDetalles() {
   gap: 2px;
 }
 .ticket-num { 
-  font-weight: bold; 
-  font-size: 0.85rem; 
+  font-weight: 600; 
+  font-size: 0.8rem; 
   color: var(--accent-color); 
 }
-.ticket-total { 
-  font-size: 0.6rem; 
-  color: var(--success-color); 
-  font-weight: bold; 
+.ticket-nav-item .ticket-total {
+  display: block;
+  font-size: 0.55rem;
+  color: var(--success-color);
+  font-weight: 600;
   white-space: nowrap;
+  padding: 0;
+  margin-top: 0;
+  border-top: none;
 }
 .ticket-status { 
   font-size: 0.45rem; 
@@ -4149,16 +5767,16 @@ async function eliminarTodosLosDetalles() {
 
 .btn-delete-ticket {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
-  color: var(--text-primary);
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background: var(--error-color);
+  color: white;
   border-radius: 50%;
-  border: 2px solid var(--border-color);
-  font-size: 11px;
-  font-weight: bold;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
   display: none;
   align-items: center;
   justify-content: center;
@@ -4167,45 +5785,42 @@ async function eliminarTodosLosDetalles() {
 .ticket-nav-item:hover .btn-delete-ticket { display: flex; }
 
 .btn-pendientes-ticket {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   margin: 0.5rem auto 0.75rem;
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
-  background: linear-gradient(180deg, #c4a86b 0%, #8a7a4a 100%);
-  color: #2a1f0f;
-  font-size: 1.5rem;
-  font-weight: bold;
-  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--accent-color);
+  font-size: 1.2rem;
+  font-weight: 700;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s;
+  transition: all 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .btn-pendientes-ticket:hover {
-  border-color: #e74c3c;
-  transform: scale(1.1);
-  box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
 }
 
 .btn-pendientes-ticket .pending-badge {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #e74c3c;
+  background: var(--error-color);
   color: white;
-  font-size: 0.65rem;
-  font-weight: bold;
-  min-width: 18px;
-  height: 18px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   animation: badge-pulse 2s infinite;
 }
 
@@ -4244,9 +5859,58 @@ async function eliminarTodosLosDetalles() {
 }
 
 .catalog-header {
-  padding: 1rem 1.5rem;
-  background: linear-gradient(to bottom, var(--bg-secondary), var(--bg-primary));
-  border-bottom: var(--border-width) solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-bar-pos {
+  flex: 1;
+}
+
+.provision-total-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid;
+  min-width: 160px;
+  text-align: right;
+}
+
+.provision-total-badge.status-ok {
+  background: rgba(39, 174, 96, 0.08);
+  border-color: var(--success-color, #27ae60);
+  color: var(--success-color, #27ae60);
+}
+
+.provision-total-badge.status-warning {
+  background: rgba(52, 152, 219, 0.08);
+  border-color: var(--info-color, #3498db);
+  color: var(--info-color, #3498db);
+}
+
+.provision-total-badge.status-danger {
+  background: rgba(231, 76, 60, 0.08);
+  border-color: var(--error-color, #e74c3c);
+  color: var(--error-color, #e74c3c);
+}
+
+.provision-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.provision-amount {
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .pos-hero-section::before {
@@ -4311,6 +5975,36 @@ async function eliminarTodosLosDetalles() {
   50% { transform: translateY(-8px); }
 }
 
+@keyframes linkWalk {
+  0% { left: -100px; opacity: 1; }
+  100% { left: calc(100% + 100px); opacity: 1; }
+}
+
+@keyframes linkSwing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes linkSwing2 {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes octoWalk {
+  0% { left: -100px; }
+  100% { left: calc(100% + 100px); }
+}
+
+@keyframes octoSwing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes octoSwing2 {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
 .catalog-header {
   padding: 1rem 1.5rem;
   background: linear-gradient(to bottom, var(--bg-secondary), var(--bg-primary));
@@ -4327,24 +6021,23 @@ async function eliminarTodosLosDetalles() {
   display: flex;
   align-items: center;
   background: var(--bg-secondary);
-  border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 12px;
-  padding: 0.5rem 1rem;
-  gap: 0.8rem;
-  box-shadow: 0 4px 15px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  gap: 0.5rem;
   box-sizing: border-box;
 }
 
 .category-filter-select {
   background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.4rem 2rem 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.35rem 2rem 0.35rem 0.5rem;
   color: var(--text-primary);
   font-size: 0.8rem;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b0a890' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -4357,7 +6050,6 @@ async function eliminarTodosLosDetalles() {
 .category-filter-select:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 25%, transparent);
 }
 
 .category-filter-select option {
@@ -4369,7 +6061,7 @@ async function eliminarTodosLosDetalles() {
   .input-wrapper {
     padding: 0.4rem 0.6rem;
     gap: 0.4rem;
-    border-radius: 10px;
+    border-radius: 8px;
     flex-wrap: wrap;
   }
   .input-wrapper input {
@@ -4388,11 +6080,20 @@ async function eliminarTodosLosDetalles() {
     height: 36px;
     font-size: 1rem;
   }
+  .catalog-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .provision-total-badge {
+    align-items: center;
+    text-align: center;
+    min-width: auto;
+    width: 100%;
+  }
 }
 
 .input-wrapper:focus-within { 
   border-color: var(--accent-color); 
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-color) 30%, var(--shadow-color));
 }
 
 .input-wrapper input {
@@ -4400,7 +6101,7 @@ async function eliminarTodosLosDetalles() {
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: 1rem;
   outline: none;
 }
 
@@ -4412,16 +6113,16 @@ async function eliminarTodosLosDetalles() {
 
 .tool-btn {
   background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
-  width: 42px;
-  height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  width: 38px;
+  height: 38px;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.15s;
   color: var(--text-primary);
 }
 
@@ -4431,21 +6132,14 @@ async function eliminarTodosLosDetalles() {
 }
 
 .btn-mic.is-recording { 
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%); 
-  color: var(--text-primary);
-  animation: pulse 1.5s infinite; 
+  background: var(--error-color); 
+  color: white;
 }
 
 .btn-promo:hover {
-  background: linear-gradient(135deg, var(--accent-color) 0%, #92400e 100%);
+  background: var(--accent-color);
   border-color: var(--accent-color);
   color: var(--bg-primary);
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--error-color) 70%, transparent); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 10px color-mix(in srgb, var(--error-color) 70%, transparent); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--error-color) 70%, transparent); }
 }
 
 /* Sugerencias */
@@ -4455,24 +6149,23 @@ async function eliminarTodosLosDetalles() {
   left: 0;
   right: 0;
   background: var(--bg-secondary);
-  border: var(--border-width-thick) solid var(--accent-color);
+  border: 1px solid var(--accent-color);
   border-top: none;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 8px 8px;
   max-height: 400px;
   overflow-y: auto;
   z-index: 100;
-  box-shadow: 0 10px 25px var(--shadow-color);
 }
 
 .result-item {
   width: 100%;
-  padding: 0.9rem 1.2rem;
+  padding: 0.7rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: transparent;
   border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
@@ -4481,15 +6174,15 @@ async function eliminarTodosLosDetalles() {
 
 .result-item:last-child {
   border-bottom: none;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 8px 8px;
 }
 
 .result-item:hover, .result-item.is-active { 
-  background: color-mix(in srgb, var(--accent-color) 20%, var(--bg-secondary)); 
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)); 
 }
 
 .res-info { display: flex; flex-direction: column; gap: 2px; }
-.res-name { font-weight: bold; font-size: 1rem; }
+.res-name { font-weight: 600; font-size: 0.95rem; }
 .res-code { font-size: 0.75rem; color: var(--text-secondary); }
 .res-price { 
   color: var(--success-color); 
@@ -4658,8 +6351,8 @@ async function eliminarTodosLosDetalles() {
 }
 
 .product-card {
-  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border-radius: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
   padding: 0.8rem;
   display: flex;
   flex-direction: column;
@@ -4667,99 +6360,72 @@ async function eliminarTodosLosDetalles() {
   text-align: center;
   gap: 0.5rem;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.15s;
   cursor: pointer;
   box-sizing: border-box;
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
 }
 
 @media (max-width: 767px) {
   .product-card {
     padding: 0.6rem;
-    border-radius: 10px;
+    border-radius: 8px;
     gap: 0.4rem;
   }
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
   border-color: var(--accent-color);
-  box-shadow: 
-    0 8px 20px var(--shadow-color),
-    0 0 30px color-mix(in srgb, var(--accent-color) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-secondary));
 }
 
 .product-card:active {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px var(--shadow-color);
+  transform: scale(0.97);
 }
-
-.card-glow {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(circle at center, var(--accent-color), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-}
-
-.product-card:hover .card-glow { opacity: 0.15; }
 
 .product-icon { 
   font-size: 2.5rem; 
-  filter: drop-shadow(2px 2px 0 var(--shadow-color));
-  transition: transform 0.2s;
+  transition: transform 0.15s;
 }
 
 .product-card:hover .product-icon {
-  transform: scale(1.1);
-  animation: bounce-icon 0.5s ease;
-}
-
-@keyframes bounce-icon {
-  0%, 100% { transform: scale(1.1) translateY(0); }
-  50% { transform: scale(1.1) translateY(-5px); }
+  transform: scale(1.05);
 }
 
 .product-name { 
   font-size: 0.9rem; 
-  font-weight: bold; 
+  font-weight: 600; 
   line-height: 1.2; 
-  height: 2.2rem; 
   overflow: hidden;
   color: var(--text-primary);
-  text-shadow: 1px 1px 0 var(--shadow-color);
 }
 
 .product-price-tag {
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  background: var(--success-color);
   color: white;
-  padding: 0.3rem 0.9rem;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 1rem;
-  border: 2px solid #4ade80;
-  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+  padding: 0.25rem 0.7rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
   font-family: "Courier New", monospace;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .stock-badge {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
-  font-weight: bold;
+  font-weight: 600;
 }
-.in-stock { background: color-mix(in srgb, var(--success-color) 20%, transparent); color: var(--text-primary); border: 1px solid var(--success-color); }
-.low-stock { background: color-mix(in srgb, var(--error-color) 20%, transparent); color: var(--error-color); border: 1px solid var(--error-color); }
-.stock-badge.rentable { background: color-mix(in srgb, #7c3aed 20%, transparent); color: #a78bfa; border: 1px solid #7c3aed; }
+.in-stock { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
+.low-stock { background: color-mix(in srgb, var(--error-color) 15%, transparent); color: var(--error-color); }
+.stock-badge.rentable { background: color-mix(in srgb, #7c3aed 15%, transparent); color: #a78bfa; }
 
 /* =========================================
    RIGHT PANEL: CHECKOUT
    ========================================= */
 .pos-right {
   background: var(--bg-secondary);
-  border-left: var(--border-width-thick) solid var(--border-color);
+  border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -4819,10 +6485,6 @@ async function eliminarTodosLosDetalles() {
 
 .parchment-bg {
   background-color: var(--bg-secondary);
-  background-image: 
-    linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.02) 100%),
-    radial-gradient(circle at 2px 2px, var(--border-color) 1px, transparent 0);
-  background-size: 100% 100%, 20px 20px;
 }
 
 .checkout-header {
@@ -4831,31 +6493,15 @@ async function eliminarTodosLosDetalles() {
   align-items: center;
   margin-bottom: 0.8rem;
   padding-bottom: 0.6rem;
-  border-bottom: 2px dashed var(--border-color);
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  position: relative;
-}
-
-.checkout-header::before {
-  content: '❧';
-  position: absolute;
-  left: 50%;
-  bottom: -12px;
-  transform: translateX(-50%);
-  font-size: 1rem;
-  color: var(--accent-color);
-  opacity: 0.4;
-  background: var(--bg-secondary);
-  padding: 0 0.5rem;
 }
 
 .header-title { display: flex; align-items: center; gap: 0.4rem; }
 .header-title h3 { 
-  font-family: 'HyliaSerifBeta', serif; 
   color: var(--accent-color); 
   font-size: 1.1rem;
-  text-shadow: 2px 2px 0 var(--border-color);
-  letter-spacing: 0.05em;
+  font-weight: 700;
 }
 
 @media (max-width: 991px) {
@@ -4870,66 +6516,108 @@ async function eliminarTodosLosDetalles() {
 
 .btn-clear-all {
   font-size: 0.7rem;
-  font-weight: bold;
-  background: linear-gradient(180deg, var(--error-color) 0%, #991b1b 100%);
-  border: 2px solid var(--border-color);
+  font-weight: 600;
+  background: var(--error-color);
+  border: none;
   color: white;
-  padding: 0.3rem 0.7rem;
-  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 5px;
   cursor: pointer;
   text-transform: uppercase;
-  box-shadow: 0 3px 0 var(--border-color);
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .btn-clear-all:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 0 var(--border-color);
   filter: brightness(1.1);
 }
 
 .btn-clear-all:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--border-color);
+  transform: scale(0.97);
 }
 
 .ticket-items-list {
   flex: 1;
   min-height: 100px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   padding-right: 0.5rem;
   box-sizing: border-box;
+  position: relative;
 }
 
 .ticket-item-row {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
-  padding: 0.7rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.6rem;
   position: relative;
-  transition: all 0.2s;
+  transition: all 0.15s;
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.6rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ticket-item-row:hover {
+  border-color: var(--accent-color);
+}
+
+.ticket-item-row.is-promo {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-primary));
+}
+
+.ticket-item-row.is-promo .item-name {
+  color: var(--accent-color);
+}
+
+.item-main { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.4rem; 
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.item-name { 
+  font-size: 0.9rem; 
+  font-weight: 600; 
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+  width: 100%;
+}
+
+.item-name-inner {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .item-image {
   flex-shrink: 0;
-  width: 50px;
-  height: 50px;
-  min-width: 50px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 6px;
   overflow: hidden;
-  border: 2px solid var(--accent-color);
-  box-shadow: 0 2px 8px var(--shadow-color);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  background: var(--bg-secondary);
 }
 
 .item-image img {
@@ -4939,37 +6627,20 @@ async function eliminarTodosLosDetalles() {
 }
 
 .promo-placeholder {
-  font-size: 1.8rem;
-  color: var(--accent-color);
-}
-
-.ticket-item-row:hover { 
-  border-color: var(--accent-color); 
-  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-color) 20%, transparent);
-  transform: translateX(3px);
-}
-
-.ticket-item-row.is-promo {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)) 100%);
-  border-color: var(--accent-color);
-  border-width: 2px;
-}
-
-.ticket-item-row.is-promo .item-name {
+  font-size: 1.5rem;
   color: var(--accent-color);
 }
 
 .promo-badge {
   margin-right: 0.3rem;
   font-size: 1rem;
-  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .promo-contents {
   font-size: 0.7rem;
   color: var(--text-secondary);
   display: block;
-  max-width: 180px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4986,22 +6657,6 @@ async function eliminarTodosLosDetalles() {
   font-family: "Courier New", monospace;
 }
 
-.item-main { 
-  display: flex; 
-  flex-direction: column; 
-  gap: 0.4rem; 
-}
-.item-name { 
-  font-size: 0.9rem; 
-  font-weight: bold; 
-  color: var(--text-primary);
-  padding-right: 1.5rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  text-shadow: 1px 1px 0 var(--shadow-color);
-}
 .item-meta { 
   display: flex; 
   align-items: center; 
@@ -5014,20 +6669,20 @@ async function eliminarTodosLosDetalles() {
 .mayoreo-toggle {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   color: var(--accent-color);
   cursor: pointer;
-  font-weight: bold;
-  font-size: 0.75rem;
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
-  padding: 0.2rem 0.6rem;
+  font-weight: 600;
+  font-size: 0.7rem;
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  padding: 0.15rem 0.5rem;
   border-radius: 4px;
   border: 1px solid var(--accent-color);
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .mayoreo-toggle:hover {
-  background: color-mix(in srgb, var(--accent-color) 25%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 18%, transparent);
 }
 
 .mayoreo-toggle input {
@@ -5039,6 +6694,8 @@ async function eliminarTodosLosDetalles() {
   justify-content: space-between;
   align-items: center;
   margin-top: 0.3rem;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .qty-control {
@@ -5047,8 +6704,7 @@ async function eliminarTodosLosDetalles() {
   background: var(--bg-secondary);
   border-radius: 6px;
   overflow: hidden;
-  border: 2px solid var(--border-color);
-  box-shadow: 0 2px 5px var(--shadow-color);
+  border: 1px solid var(--border-color);
 }
 
 .qty-btn {
@@ -5106,11 +6762,12 @@ async function eliminarTodosLosDetalles() {
 }
 
 .item-subtotal { 
-  font-weight: 900; 
+  font-weight: 700; 
   color: var(--success-color); 
   font-size: 0.95rem;
   font-family: "Courier New", monospace;
-  text-shadow: 1px 1px 0 var(--shadow-color);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Media queries para items del ticket en panel derecho */
@@ -5178,50 +6835,39 @@ async function eliminarTodosLosDetalles() {
 
 .btn-remove-item {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  background: transparent;
-  border: none;
+  top: 4px;
+  right: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   color: var(--error-color);
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   cursor: pointer;
-  opacity: 0.6;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
 }
 
-.btn-remove-item:hover { 
-  opacity: 1;
-  background: color-mix(in srgb, var(--error-color) 20%, transparent);
-  border-radius: 4px;
+.btn-remove-item:hover,
+.btn-remove-item:active { 
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
 }
 
 .checkout-footer {
   margin-top: auto;
   padding-top: 1rem;
-  border-top: 3px double var(--border-color);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
   flex-shrink: 0;
-  position: relative;
-}
-
-.checkout-footer::before {
-  content: '⚔';
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.9rem;
-  color: var(--accent-color);
-  opacity: 0.4;
-  background: var(--bg-secondary);
-  padding: 0 0.75rem;
 }
 
 .empty-ticket-msg {
@@ -5243,7 +6889,6 @@ async function eliminarTodosLosDetalles() {
 .empty-ticket-icon {
   font-size: 3rem;
   opacity: 0.4;
-  animation: float 3s ease-in-out infinite;
 }
 
 .acceso-rapido-section {
@@ -5254,17 +6899,16 @@ async function eliminarTodosLosDetalles() {
 .acceso-rapido-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.95rem;
-  font-weight: 800;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--accent-color);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .acceso-rapido-title .title-icon {
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .acceso-rapido-grid {
@@ -5279,36 +6923,33 @@ async function eliminarTodosLosDetalles() {
   align-items: center;
   justify-content: center;
   gap: 0.2rem;
-  padding: 0.6rem 0.4rem;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-primary) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
+  padding: 0.5rem 0.4rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 3px 8px var(--shadow-color);
+  transition: all 0.15s;
   overflow: hidden;
 }
 
 .acceso-rapido-btn:hover {
-  transform: translateY(-2px);
   border-color: var(--accent-color);
-  box-shadow: 0 5px 12px var(--shadow-color);
+  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-secondary));
 }
 
 .acceso-rapido-btn:active {
-  transform: translateY(0);
+  transform: scale(0.97);
 }
 
 .acceso-code {
   display: inline-block;
-  padding: 0.15rem 0.4rem;
+  padding: 0.1rem 0.35rem;
   background: var(--accent-color);
   color: var(--bg-primary);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 900;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
   font-family: monospace;
-  letter-spacing: 0.05em;
 }
 
 .acceso-name {
@@ -5325,7 +6966,7 @@ async function eliminarTodosLosDetalles() {
 
 .acceso-price {
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--success-color);
   font-family: monospace;
 }
@@ -5348,7 +6989,6 @@ async function eliminarTodosLosDetalles() {
 .empty-icon {
   font-size: 4rem;
   opacity: 0.3;
-  animation: float 3s ease-in-out infinite;
 }
 
 .summary-table { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -5361,31 +7001,14 @@ async function eliminarTodosLosDetalles() {
 .summary-row.total {
   font-size: 1.4rem;
   color: var(--accent-color);
-  border-top: 2px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   padding-top: 0.4rem;
   margin-top: 0.3rem;
-  position: relative;
-}
-
-.summary-row.total::before {
-  content: '❧';
-  position: absolute;
-  left: 50%;
-  top: -10px;
-  transform: translateX(-50%);
-  font-size: 0.8rem;
-  color: var(--accent-color);
-  opacity: 0.5;
-  background: var(--bg-secondary);
-  padding: 0 0.5rem;
 }
 
 .total-amount { 
-  font-family: 'HyliaSerifBeta', serif; 
-  font-weight: 900; 
+  font-weight: 700; 
   color: var(--success-color);
-  text-shadow: 2px 2px 0 var(--border-color);
-  letter-spacing: 0.02em;
 }
 
 @media (max-width: 991px) {
@@ -5420,12 +7043,9 @@ async function eliminarTodosLosDetalles() {
   height: auto;
   min-height: 42px;
   white-space: normal;
-  background: linear-gradient(180deg, var(--success-color) 0%, #166534 100%);
-  border: 3px solid #4ade80;
-  box-shadow: 0 4px 0 var(--border-color);
-  transition: all 0.2s;
-  position: relative;
-  overflow: hidden;
+  background: var(--success-color);
+  border: none;
+  transition: all 0.15s;
   padding: 0.5rem 0.8rem;
 }
 
@@ -5435,37 +7055,18 @@ async function eliminarTodosLosDetalles() {
   line-height: 1.2;
 }
 
-.checkout-actions-scroll .btn-checkout.primary::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  transition: left 0.5s;
-}
-
-.checkout-actions-scroll .btn-checkout.primary:hover::before {
-  left: 100%;
-}
-
 .checkout-actions-scroll .btn-checkout.primary:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 7px 0 var(--border-color);
   filter: brightness(1.1);
 }
 
 .checkout-actions-scroll .btn-checkout.primary:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--border-color);
+  transform: scale(0.97);
 }
 
 .checkout-actions-scroll .btn-checkout.primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 .checkout-actions-scroll .extra-actions {
@@ -5478,25 +7079,16 @@ async function eliminarTodosLosDetalles() {
 
 .checkout-actions-scroll .extra-actions .btn-checkout.secondary {
   background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  box-shadow: 0 3px 0 var(--border-color);
-  transition: all 0.2s;
+  border: 1px solid var(--border-color);
+  transition: all 0.15s;
 }
 
 .checkout-actions-scroll .extra-actions .btn-checkout.secondary:hover {
   border-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 0 var(--border-color);
 }
 
 .checkout-actions-scroll .extra-actions .btn-checkout.secondary:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--border-color);
-}
-
-@keyframes badge-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+  transform: scale(0.95);
 }
 
 .checkout-actions-scroll .btn-checkout.secondary {
@@ -5514,24 +7106,21 @@ async function eliminarTodosLosDetalles() {
 .btn-checkout.primary {
   width: 100%;
   height: auto;
-  min-height: 55px;
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  color: var(--text-primary);
-  border: var(--border-width-thick) solid var(--border-color);
-  border-radius: 10px;
-  font-size: 1.1rem;
-  font-weight: 900;
-  letter-spacing: 1px;
+  min-height: 50px;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  box-shadow: 0 4px 15px var(--shadow-color);
-  transition: all 0.2s;
-  text-transform: uppercase;
-  padding: 0.8rem 1rem;
-  overflow: hidden;
+  gap: 0.5rem;
+  transition: all 0.15s;
+  transition: all 0.15s;
+  padding: 0.7rem 1rem;
 }
 
 .btn-checkout.primary .text {
@@ -5543,14 +7132,11 @@ async function eliminarTodosLosDetalles() {
 }
 
 .btn-checkout.primary:hover:not(:disabled) { 
-  transform: translateY(-2px); 
   filter: brightness(1.1); 
-  box-shadow: 0 6px 20px var(--shadow-color);
 }
 
 .btn-checkout.primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 10px var(--shadow-color);
+  transform: scale(0.98);
 }
 
 .btn-checkout.primary:disabled { 
@@ -5561,13 +7147,11 @@ async function eliminarTodosLosDetalles() {
 .shortcut-badge {
   display: inline-block;
   padding: 0.15rem 0.4rem;
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
   font-size: 0.65rem;
-  font-weight: 900;
+  font-weight: 700;
   font-family: monospace;
-  letter-spacing: 0.05em;
 }
 
 .btn-checkout.primary:disabled .shortcut-badge {
@@ -5582,16 +7166,25 @@ async function eliminarTodosLosDetalles() {
 
 .btn-checkout.secondary {
   height: 42px;
-  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  border: var(--border-width) solid var(--border-color);
-  border-radius: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   color: var(--text-primary);
   font-size: 1.1rem;
+  transition: all 0.15s;
+}
+
+.btn-checkout.secondary:hover {
+  border-color: var(--accent-color);
+}
+
+.btn-checkout.secondary:active {
+  transform: scale(0.95);
 }
 
 @media (max-width: 991px) {
   .btn-checkout.primary {
-    height: 50px;
+    height: 48px;
     font-size: 1rem;
   }
   .btn-checkout.secondary {
@@ -5628,24 +7221,17 @@ async function eliminarTodosLosDetalles() {
   justify-content: center;
   gap: 0.4rem;
   margin-top: 0.5rem;
-  font-weight: bold;
+  font-weight: 600;
   background: var(--bg-primary);
-  padding: 0.4rem 0.8rem;
-  border-radius: 20px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
 }
 .cashier-badge .dot { 
-  width: 8px; 
-  height: 8px; 
+  width: 7px; 
+  height: 7px; 
   background: var(--success-color);
   border-radius: 50%;
-  box-shadow: 0 0 8px var(--success-color);
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.2); opacity: 0.8; }
 }
 
 /* =========================================
@@ -5663,125 +7249,58 @@ async function eliminarTodosLosDetalles() {
 }
 
 .pos-modal-card {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 50%, var(--bg-secondary) 100%);
-  border: 4px solid var(--accent-color);
-  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
   width: min(100%, 600px);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: visible;
-  box-shadow: 
-    0 0 0 2px var(--border-color),
-    0 0 0 4px var(--accent-color),
-    0 8px 0 var(--border-color),
-    0 12px 0 color-mix(in srgb, var(--border-color) 80%, black),
-    0 16px 30px var(--shadow-color),
-    inset 0 0 60px color-mix(in srgb, var(--accent-color) 10%, transparent);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
   position: relative;
   animation: popIn 200ms ease-out;
 }
 
-.pos-modal-card::before {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border: 2px dashed color-mix(in srgb, var(--accent-color) 40%, transparent);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.pos-modal-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: 
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      color-mix(in srgb, var(--accent-color) 3%, transparent) 2px,
-      color-mix(in srgb, var(--accent-color) 3%, transparent) 4px
-    );
-  pointer-events: none;
-  border-radius: 8px;
-}
-
 @keyframes popIn {
-  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
 }
-
-.modal-corner {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.modal-corner::before,
-.modal-corner::after {
-  content: '';
-  position: absolute;
-  background: var(--accent-color);
-  border-radius: 2px;
-  box-shadow: 1px 1px 0 var(--border-color);
-}
-
-.modal-corner.tl { top: 10px; left: 10px; }
-.modal-corner.tl::before { width: 25px; height: 4px; top: 0; left: 0; }
-.modal-corner.tl::after { width: 4px; height: 25px; top: 0; left: 0; }
-
-.modal-corner.tr { top: 10px; right: 10px; }
-.modal-corner.tr::before { width: 25px; height: 4px; top: 0; right: 0; }
-.modal-corner.tr::after { width: 4px; height: 25px; top: 0; right: 0; }
-
-.modal-corner.bl { bottom: 10px; left: 10px; }
-.modal-corner.bl::before { width: 25px; height: 4px; bottom: 0; left: 0; }
-.modal-corner.bl::after { width: 4px; height: 25px; bottom: 0; left: 0; }
-
-.modal-corner.br { bottom: 10px; right: 10px; }
-.modal-corner.br::before { width: 25px; height: 4px; bottom: 0; right: 0; }
-.modal-corner.br::after { width: 4px; height: 25px; bottom: 0; right: 0; }
 
 .modal-h {
-  padding: 1.25rem 1.5rem;
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border-bottom: 3px solid var(--accent-color);
+  padding: 1rem 1.25rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--border-color) 50%, transparent);
 }
 
 .modal-h h3 {
   color: var(--accent-color);
-  text-shadow: 2px 2px 0 var(--border-color);
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .close-x {
-  background: linear-gradient(180deg, var(--accent-color) 0%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-  color: var(--btn-text, var(--bg-primary));
-  width: 34px;
-  height: 34px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  box-shadow: 0 2px 0 var(--border-color);
 }
 
 .close-x:hover {
-  background: linear-gradient(180deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 70%, black) 100%);
+  background: var(--error-color);
   border-color: var(--error-color);
-  transform: translateY(-1px);
+  color: white;
 }
 
 .modal-b { 
@@ -5815,245 +7334,789 @@ async function eliminarTodosLosDetalles() {
 }
 
 .meta-box:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent),
-    0 5px 0 var(--border-color),
-    0 8px 15px var(--shadow-color);
+  border-color: var(--accent-color);
 }
 
 .meta-box.total {
-  background: linear-gradient(180deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
+  background: var(--success-color);
   border-color: var(--success-color);
-  box-shadow: 
-    inset 0 0 0 2px color-mix(in srgb, var(--success-color) 30%, white),
-    0 3px 0 color-mix(in srgb, var(--success-color) 50%, black);
 }
 
 .meta-box.total span,
 .meta-box.total strong {
-  color: var(--text-primary);
+  color: white;
 }
 
 .meta-icon {
   font-size: 1.5rem;
   margin-bottom: 0.25rem;
-  filter: drop-shadow(1px 1px 0 var(--border-color));
 }
 
 .meta-box span { 
   font-size: 0.8rem; 
   text-transform: uppercase; 
   color: var(--text-secondary); 
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 .meta-box strong {
   color: var(--accent-color);
   font-size: 1.1rem;
-  font-weight: 800;
+  font-weight: 700;
   word-break: break-word;
   line-height: 1.3;
 }
 
 .meta-box .txt-pos {
-  color: var(--text-primary) !important;
-  text-shadow: 1px 1px 0 color-mix(in srgb, var(--success-color) 50%, black);
-  font-size: 1.25rem !important;
+  color: white !important;
+  font-size: 1.2rem !important;
 }
 
-.venta-info-grid {
+/* =========================================
+   MODAL DETALLE DE VENTA OPTIMIZADO
+   ========================================= */
+.detalle-modal {
+  width: min(100%, 520px);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.detalle-modal::before,
+.detalle-modal::after {
+  display: none;
+}
+
+.detalle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.6rem;
+  background: var(--accent-color);
+  color: var(--btn-text, var(--bg-primary));
+  font-size: 0.75rem;
+  font-weight: 800;
+  border-radius: 6px;
+  font-family: "Courier New", monospace;
+}
+
+.detalle-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-discrepancia {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: color-mix(in srgb, #f59e0b 15%, var(--bg-primary));
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f59e0b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-discrepancia:hover {
+  background: color-mix(in srgb, #f59e0b 25%, var(--bg-primary));
+}
+
+.disc-icon {
+  font-size: 1rem;
+}
+
+.disc-text {
+  font-family: "Courier New", monospace;
+}
+
+.btn-edit,
+.btn-save,
+.btn-cancel-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-edit {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.btn-edit:hover {
+  background: var(--accent-color);
+  color: var(--btn-text, var(--bg-primary));
+  border-color: var(--accent-color);
+}
+
+.btn-save {
+  background: var(--success-color);
+  color: white;
+  border-color: var(--success-color);
+}
+
+.btn-save:hover {
+  opacity: 0.9;
+}
+
+.btn-cancel-edit {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.btn-cancel-edit:hover {
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+.btn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #ef4444;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 0 #b91c1c;
+}
+
+.btn-close:hover {
+  background: #dc2626;
+  border-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 #991b1b;
+}
+
+.btn-close:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.detalle-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  max-height: calc(90vh - 60px);
+}
+
+.detalle-summary {
+  margin-bottom: 1.25rem;
+}
+
+.summary-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
-.info-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-}
-
-.info-card.fecha-card {
-  border-color: var(--accent-color);
-  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
-}
-
-.info-card.hora-card {
-  border-color: #8b5cf6;
-  background: color-mix(in srgb, #8b5cf6 10%, var(--bg-primary));
-}
-
-.info-card.cajero-card {
-  border-color: #06b6d4;
-  background: color-mix(in srgb, #06b6d4 10%, var(--bg-primary));
-}
-
-.info-icon {
-  font-size: 1.5rem;
-}
-
-.info-content {
+.summary-item {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
-.info-label {
-  font-size: 0.7rem;
+.summary-label {
+  font-size: 0.65rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.info-value {
-  font-size: 0.9rem;
+.summary-value {
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.total-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, var(--success-color) 0%, color-mix(in srgb, var(--success-color) 70%, black) 100%);
-  border: 3px solid var(--border-color);
-  border-radius: 12px;
-  margin-bottom: 1rem;
+.total-section {
+  background: var(--success-color);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
 }
 
-.total-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: color-mix(in srgb, white 80%, transparent);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.total-icon {
-  font-size: 1.25rem;
-}
-
-.total-value {
-  font-size: 2rem;
-  font-weight: 900;
+.total-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
   font-family: "Courier New", monospace;
   color: white;
-  text-shadow: 2px 2px 0 color-mix(in srgb, black 30%, transparent);
 }
 
-.total-edit-wrapper {
+.profit-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 0.25rem;
+}
+
+.total-edit-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  background: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bg-primary);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
 }
 
-.total-input {
-  width: 100px;
-  padding: 0.5rem;
+.total-edit-row .currency {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--success-color);
+}
+
+.total-edit-row .total-input {
+  width: 120px;
+  padding: 0.4rem;
   font-size: 1.25rem;
   font-weight: 700;
   font-family: "Courier New", monospace;
   border: 2px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 6px;
   text-align: right;
+  background: var(--bg-secondary);
+  color: var(--success-color);
 }
 
-.total-input:focus {
+.total-edit-row .total-input:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: var(--success-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-color) 20%, transparent);
 }
 
-.currency-prefix {
+.edit-dot {
+  font-size: 0.75rem;
+  color: var(--accent-color);
+}
+
+.discrepancia-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  border: 1px solid;
+}
+
+.alert-faltante {
+  background: color-mix(in srgb, #ef4444 8%, var(--bg-primary));
+  border-color: #ef4444;
+}
+
+.alert-sobrante {
+  background: color-mix(in srgb, #f59e0b 8%, var(--bg-primary));
+  border-color: #f59e0b;
+}
+
+.alert-icon {
   font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.alert-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.alert-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.alert-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.alert-value {
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  color: var(--text-primary);
+}
+
+.alert-diff {
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: "Courier New", monospace;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px dashed color-mix(in srgb, var(--border-color) 50%, transparent);
+}
+
+.alert-faltante .alert-diff {
+  color: #ef4444;
+}
+
+.alert-sobrante .alert-diff {
+  color: #f59e0b;
+}
+
+.productos-section {
+  margin-top: 1rem;
+}
+
+.productos-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 0.75rem;
+}
+
+.prod-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.prod-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.4rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-secondary);
 }
 
-.edit-indicator {
-  font-size: 1rem;
-}
-
-.items-header {
-  margin-bottom: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 3px solid var(--border-color);
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--accent-color);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-shadow: 2px 2px 0 var(--border-color);
-}
-
-.detalle-items-list { 
-  display: flex; 
-  flex-direction: column; 
-  gap: 0.6rem; 
-}
-
-.d-item {
-  display: grid; 
-  grid-template-columns: 1fr auto 120px;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color);
+.btn-clear-all {
+  margin-left: auto;
+  display: flex;
   align-items: center;
-  transition: all 0.2s;
-  border-radius: 8px;
-  background: var(--bg-secondary);
-}
-
-.d-item:hover {
-  background: var(--bg-panel);
-  transform: translateX(4px);
-}
-
-.d-item:last-child {
-  border-bottom: none;
-}
-
-.d-name { 
-  font-weight: 700;
-  font-size: 1rem;
-  line-height: 1.4;
-  color: var(--text-primary);
-}
-
-.d-item:hover .d-name {
-  color: var(--accent-color);
-}
-
-.d-qty { 
-  color: var(--text-primary); 
-  font-size: 0.9rem;
-  background: var(--bg-primary);
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  border: 2px solid var(--border-color);
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--error-color);
+  border-radius: 5px;
+  font-size: 0.75rem;
   font-weight: 600;
+  color: var(--error-color);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear-all:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.agregar-producto-section {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--accent-color);
+  border-radius: 8px;
+}
+
+.agregar-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.agregar-search-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.agregar-input {
+  flex: 1;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.agregar-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.agregar-input::placeholder {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.agregar-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.agregar-clear:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.agregar-resultados {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.agregar-resultado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.agregar-resultado:hover {
+  border-color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 8%, var(--bg-primary));
+  transform: translateX(2px);
+}
+
+.agregar-prod-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.d-sub { 
-  text-align: right; 
+.agregar-prod-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.agregar-badge-gramaje {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.35rem;
+  background: color-mix(in srgb, #8b5cf6 15%, var(--bg-primary));
+  color: #8b5cf6;
+  border: 1px solid #8b5cf6;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.agregar-prod-price {
+  font-size: 0.78rem;
   font-weight: 800;
-  color: var(--success-color);
   font-family: "Courier New", monospace;
-  font-size: 1rem;
+  color: var(--success-color);
+}
+
+.agregar-vacio {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.productos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.producto-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  transition: all 0.2s;
+}
+
+.producto-item:hover {
+  border-color: var(--accent-color);
+  background: var(--bg-panel);
+}
+
+.prod-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prod-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.prod-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.prod-qty {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  padding: 0.3rem 0.6rem;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+}
+
+.prod-qty.editable {
+  cursor: pointer;
+}
+
+.prod-qty.editable:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.prod-subtotal {
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-family: "Courier New", monospace;
+  color: var(--success-color);
+}
+
+.prod-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: transparent;
+}
+
+.btn-action svg {
+  flex-shrink: 0;
+}
+
+.btn-action-edit {
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-action-edit:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-action-delete {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-action-delete:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.edit-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.edit-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.edit-qty,
+.edit-price {
+  width: 70px;
+  padding: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.edit-qty:focus,
+.edit-price:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.btn-ok,
+.btn-x {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.btn-ok {
+  background: #22c55e;
+  color: white;
+  border-color: #16a34a;
+  box-shadow: 0 2px 0 #15803d;
+}
+
+.btn-ok:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 #15803d;
+}
+
+.btn-ok:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.btn-x {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.btn-x:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #dc2626;
+}
+
+.btn-label {
+  white-space: nowrap;
+}
+
+.prod-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: transparent;
+}
+
+.btn-action svg {
+  flex-shrink: 0;
+}
+
+.btn-action-edit {
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-action-edit:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-action-delete {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-action-delete:hover {
+  background: #ef4444;
+  color: white;
 }
 
 /* =========================================
@@ -6134,37 +8197,64 @@ async function eliminarTodosLosDetalles() {
 }
 
 /* Lista de ventas pendientes */
-.empty-pendientes {
-  text-align: center;
-  padding: 2rem;
+/* Modal pendientes minimalista */
+.modal-pendientes {
+  max-width: 480px;
 }
 
-.empty-pendientes .empty-icon {
-  font-size: 3rem;
+.modal-header-clean {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header-clean h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-body-clean {
+  padding: 1rem 1.25rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+}
+
+.empty-state .empty-icon {
+  font-size: 2rem;
   display: block;
   margin-bottom: 0.5rem;
+  color: var(--success-color);
 }
 
-.lista-pendientes {
+.pendientes-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
-.pendiente-card {
+.pendiente-row {
   background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 0.75rem;
-  transition: all 0.2s;
+  transition: border-color 0.15s;
 }
 
-.pendiente-card:hover {
+.pendiente-row:hover {
   border-color: var(--accent-color);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-.pendiente-header {
+.pendiente-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -6172,97 +8262,359 @@ async function eliminarTodosLosDetalles() {
 }
 
 .pendiente-ticket {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 0.9rem;
   color: var(--accent-color);
 }
 
-.pendiente-monto {
-  font-weight: bold;
-  font-size: 1.1rem;
+.pendiente-amount {
+  font-weight: 600;
+  font-size: 1rem;
   color: var(--text-primary);
 }
 
-.pendiente-meta {
+.pendiente-sub {
   display: flex;
-  gap: 1rem;
+  gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.pendiente-productos {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  background: rgba(0,0,0,0.15);
-  border-radius: 4px;
-  max-height: 120px;
-  overflow-y: auto;
+.pendiente-sub .separator {
+  opacity: 0.5;
 }
 
-.producto-item {
+.pendiente-desc-box {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
 }
 
-.prod-qty {
+.pendiente-desc-box .desc-text {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-edit-desc {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.btn-edit-desc:hover {
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.pendiente-detalles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.detalle-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+}
+
+.detalle-item:nth-child(odd) {
+  background: var(--bg-secondary);
+}
+
+.detalle-qty {
   background: var(--accent-color);
   color: var(--bg-primary);
-  padding: 0.1rem 0.4rem;
+  padding: 0.1rem 0.3rem;
   border-radius: 3px;
   font-size: 0.7rem;
-  font-weight: bold;
-  min-width: 40px;
+  font-weight: 600;
+  min-width: 35px;
   text-align: center;
 }
 
-.prod-name {
-  color: var(--text-primary);
+.detalle-name {
   flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.prod-price {
-  font-weight: bold;
+.detalle-price {
   color: var(--success-color);
-  font-size: 0.8rem;
+  font-weight: 600;
+  font-size: 0.75rem;
 }
 
-.pendiente-desc {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin: 0 0 0.75rem 0;
-  padding: 0.5rem;
-  background: rgba(0,0,0,0.1);
-  border-radius: 4px;
+.pendiente-desc-inline {
   font-style: italic;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pendiente-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .btn-cobrar-pendiente {
-  width: 100%;
-  padding: 0.6rem;
-  background: linear-gradient(180deg, #7fa86b 0%, #5a7a45 100%);
-  border: 2px solid #4a6a35;
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--success-color);
+  border: none;
   border-radius: 6px;
-  color: #1a2a0f;
-  font-weight: bold;
+  color: white;
+  font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity 0.15s;
 }
 
 .btn-cobrar-pendiente:hover {
-  background: linear-gradient(180deg, #8fb87a 0%, #6a8a55 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  opacity: 0.9;
 }
 
 .btn-cobrar-pendiente:active {
-  transform: translateY(0);
+  transform: scale(0.98);
+}
+
+.btn-add-pendiente {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-color);
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-add-pendiente:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
+.btn-add-pendiente:active {
+  transform: scale(0.95);
+}
+
+/* Modal agregar pendiente minimalista */
+.modal-agregar-pendiente {
+  max-width: 500px;
+}
+
+.agregar-pendiente-search {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.agregar-pendiente-search input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.agregar-pendiente-search input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.btn-scanner-mini {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-scanner-mini:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
+.btn-scanner-mini.active {
+  background: var(--accent-color);
+  color: white;
+}
+
+.scanner-mini-viewport {
+  width: 100%;
+  height: 180px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  background: #000;
+}
+
+.agregar-pendiente-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.result-item:hover {
+  background: var(--bg-secondary);
+}
+
+.result-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 0.5rem;
+}
+
+.result-price {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--success-color);
+}
+
+.agregar-pendiente-ticket {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.75rem;
+}
+
+.agregar-pendiente-ticket h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+}
+
+.ticket-item-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-item-qty {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.btn-remove-mini {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--error-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.btn-remove-mini:hover {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.ticket-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.ticket-total strong {
+  color: var(--accent-color);
+  font-size: 1rem;
+}
+
+.btn-confirmar-agregar {
+  width: 100%;
+  padding: 0.7rem;
+  margin-top: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-color);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-confirmar-agregar:hover {
+  opacity: 0.9;
+}
+
+.btn-confirmar-agregar:active {
+  transform: scale(0.98);
 }
 
 @media (max-width: 768px) {
@@ -6270,6 +8622,10 @@ async function eliminarTodosLosDetalles() {
     width: min(100%, 95vw) !important;
     max-height: 92vh;
     border-radius: 16px;
+  }
+  
+  .detalle-modal {
+    width: min(100%, 95vw);
   }
   
   .modal-h {
@@ -6282,6 +8638,134 @@ async function eliminarTodosLosDetalles() {
   
   .modal-b {
     padding: 1rem 1.25rem;
+  }
+  
+  .detalle-header {
+    padding: 0.85rem 1rem;
+  }
+  
+  .detalle-header h3 {
+    font-size: 0.9rem;
+  }
+  
+  .ticket-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .modal-actions {
+    gap: 0.4rem;
+  }
+  
+  .btn-discrepancia,
+  .btn-edit,
+  .btn-save,
+  .btn-cancel-edit {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
+  
+  .btn-close {
+    width: 20px;
+    height: 20px;
+    background: #ef4444;
+    border-color: #dc2626;
+  }
+  
+  .btn-close svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .detalle-body {
+    padding: 0.55rem;
+  }
+  
+  .btn-close svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .method-badge {
+    font-size: 0.8rem !important;
+    padding: 0.25rem 0.6rem;
+  }
+  
+  .modal-h {
+    padding: 0.75rem 1rem;
+  }
+  
+  .detalle-body {
+    padding: 1rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  
+  .summary-label {
+    font-size: 0.6rem;
+  }
+  
+  .summary-value {
+    font-size: 0.8rem;
+  }
+  
+  .total-section {
+    padding: 0.85rem;
+  }
+  
+  .total-amount {
+    font-size: 1.5rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 100px;
+    font-size: 1.1rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.75rem;
+    gap: 0.6rem;
+  }
+  
+  .alert-icon {
+    font-size: 1.1rem;
+  }
+  
+  .alert-row {
+    font-size: 0.7rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.75rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .prod-title {
+    font-size: 0.8rem;
+  }
+  
+  .producto-item {
+    padding: 0.65rem;
+  }
+  
+  .prod-name {
+    font-size: 0.85rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.85rem;
   }
   
   .venta-meta-grid {
@@ -6395,6 +8879,293 @@ async function eliminarTodosLosDetalles() {
   }
 }
 
+/* Móviles grandes (600px y menos) */
+@media (max-width: 600px) {
+  .detalle-modal {
+    width: min(100%, 96vw);
+    border-radius: 12px;
+  }
+  
+  .detalle-header {
+    padding: 0.75rem 0.85rem;
+  }
+  
+  .detalle-header h3 {
+    font-size: 0.9rem;
+  }
+  
+  .ticket-badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.45rem;
+  }
+  
+  .modal-actions {
+    gap: 0.35rem;
+  }
+  
+  .btn-discrepancia {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.7rem;
+  }
+  
+  .btn-discrepancia .disc-text {
+    display: none;
+  }
+  
+  .btn-edit,
+  .btn-save,
+  .btn-cancel-edit {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.7rem;
+  }
+  
+  .btn-edit svg,
+  .btn-save svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .btn-close {
+    width: 28px;
+    height: 28px;
+    background: #ef4444;
+    border-color: #dc2626;
+  }
+  
+  .btn-close svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .detalle-body {
+    padding: 0.85rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .summary-item {
+    gap: 0.2rem;
+  }
+  
+  .summary-label {
+    font-size: 0.55rem;
+  }
+  
+  .summary-value {
+    font-size: 0.75rem;
+  }
+  
+  .total-section {
+    padding: 0.75rem;
+  }
+  
+  .total-amount {
+    font-size: 1.35rem;
+  }
+  
+  .profit-text {
+    font-size: 0.7rem;
+  }
+  
+  .total-edit-row {
+    padding: 0.35rem 0.5rem;
+    gap: 0.4rem;
+  }
+  
+  .total-edit-row .currency {
+    font-size: 1rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 90px;
+    font-size: 1rem;
+    padding: 0.3rem;
+  }
+  
+  .edit-dot {
+    font-size: 0.65rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.65rem;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+  
+  .alert-icon {
+    font-size: 1rem;
+    margin-top: 0;
+  }
+  
+  .alert-row {
+    font-size: 0.65rem;
+  }
+  
+  .alert-label {
+    font-size: 0.6rem;
+  }
+  
+  .alert-value {
+    font-size: 0.7rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.7rem;
+    margin-top: 0.2rem;
+    padding-top: 0.2rem;
+  }
+  
+  .productos-section {
+    margin-top: 0.75rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .prod-title {
+    font-size: 0.75rem;
+  }
+  
+  .prod-count {
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.6rem;
+    padding: 0 0.3rem;
+  }
+  
+  .btn-clear-all {
+    padding: 0.25rem 0.45rem;
+    font-size: 0.65rem;
+  }
+  
+  .btn-clear-all svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .agregar-producto-section {
+    padding: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .agregar-input {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.45rem;
+  }
+  
+  .agregar-search-icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .agregar-resultado {
+    padding: 0.35rem 0.45rem;
+  }
+  
+  .agregar-prod-name {
+    font-size: 0.72rem;
+  }
+  
+  .agregar-prod-price {
+    font-size: 0.72rem;
+  }
+  
+  .agregar-badge-gramaje {
+    font-size: 0.55rem;
+    padding: 0.12rem 0.3rem;
+  }
+  
+  .productos-list {
+    gap: 0.4rem;
+  }
+  
+  .producto-item {
+    padding: 0.6rem;
+    border-radius: 6px;
+  }
+  
+  .prod-info {
+    gap: 0.4rem;
+  }
+  
+  .prod-name {
+    font-size: 0.8rem;
+    line-height: 1.25;
+  }
+  
+  .prod-meta {
+    gap: 0.35rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.8rem;
+  }
+  
+  .prod-actions {
+    gap: 0.3rem;
+    margin-top: 0.2rem;
+  }
+  
+  .btn-action {
+    padding: 0.25rem 0.45rem;
+    font-size: 0.62rem;
+  }
+  
+  .btn-action svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .edit-controls {
+    gap: 0.3rem;
+  }
+  
+  .edit-label {
+    font-size: 0.62rem;
+  }
+  
+  .edit-qty,
+  .edit-price {
+    width: 60px;
+    padding: 0.28rem;
+    font-size: 0.72rem;
+    border-radius: 4px;
+  }
+  
+  .btn-ok,
+  .btn-x {
+    padding: 0.28rem 0.5rem;
+    font-size: 0.62rem;
+  }
+  
+  .btn-ok svg,
+  .btn-x svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .btn-label {
+    display: none;
+  }
+  
+  .method-badge {
+    font-size: 0.8rem !important;
+    padding: 0.25rem 0.65rem;
+  }
+}
+
 @media (max-width: 480px) {
   .pos-modal-card {
     width: 100vw !important;
@@ -6402,6 +9173,12 @@ async function eliminarTodosLosDetalles() {
     max-height: 100vh;
     border-radius: 0;
     margin: 0;
+  }
+  
+  .detalle-modal {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
   }
   
   .pos-modal-overlay {
@@ -6428,6 +9205,112 @@ async function eliminarTodosLosDetalles() {
   
   .modal-b {
     padding: 0.75rem 1rem;
+  }
+  
+  .detalle-header {
+    padding: 0.75rem 0.85rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .header-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .detalle-header h3 {
+    font-size: 0.9rem;
+  }
+  
+  .modal-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .btn-discrepancia .disc-text {
+    display: none;
+  }
+  
+  .btn-edit span:not(:first-child),
+  .btn-save span:not(:first-child) {
+    display: none;
+  }
+  
+  .detalle-body {
+    padding: 0.85rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .summary-label {
+    font-size: 0.6rem;
+  }
+  
+  .summary-value {
+    font-size: 0.75rem;
+  }
+  
+  .total-section {
+    padding: 0.75rem;
+  }
+  
+  .total-amount {
+    font-size: 1.35rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 90px;
+    font-size: 1rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.65rem;
+    gap: 0.5rem;
+  }
+  
+  .alert-icon {
+    font-size: 1rem;
+  }
+  
+  .alert-row {
+    font-size: 0.65rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.7rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .prod-title {
+    font-size: 0.75rem;
+  }
+  
+  .btn-clear-all span:not(:first-child) {
+    display: none;
+  }
+  
+  .producto-item {
+    padding: 0.6rem;
+  }
+  
+  .prod-name {
+    font-size: 0.8rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.8rem;
   }
   
   .venta-meta-grid {
@@ -6487,7 +9370,513 @@ async function eliminarTodosLosDetalles() {
   }
 }
 
+/* Móviles pequeños (400px y menos) */
+@media (max-width: 400px) {
+  .detalle-header {
+    padding: 0.6rem 0.65rem;
+  }
+  
+  .detalle-header h3 {
+    font-size: 0.8rem;
+  }
+  
+  .ticket-badge {
+    font-size: 0.55rem;
+    padding: 0.15rem 0.35rem;
+  }
+  
+  .modal-actions {
+    gap: 0.25rem;
+  }
+  
+  .btn-discrepancia {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.6rem;
+  }
+  
+  .btn-edit,
+  .btn-save,
+  .btn-cancel-edit {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.6rem;
+  }
+  
+  .btn-edit svg,
+  .btn-save svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .btn-close {
+    width: 24px;
+    height: 24px;
+    background: #ef4444;
+    border-color: #dc2626;
+  }
+  
+  .btn-close svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .detalle-body {
+    padding: 0.65rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+    margin-bottom: 0.55rem;
+  }
+  
+  .summary-label {
+    font-size: 0.45rem;
+  }
+  
+  .summary-value {
+    font-size: 0.65rem;
+  }
+  
+  .total-section {
+    padding: 0.55rem;
+  }
+  
+  .total-amount {
+    font-size: 1.15rem;
+  }
+  
+  .profit-text {
+    font-size: 0.6rem;
+  }
+  
+  .total-edit-row {
+    padding: 0.25rem 0.4rem;
+    gap: 0.3rem;
+  }
+  
+  .total-edit-row .currency {
+    font-size: 0.9rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 70px;
+    font-size: 0.9rem;
+    padding: 0.2rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.5rem;
+    gap: 0.4rem;
+    margin-bottom: 0.65rem;
+  }
+  
+  .alert-icon {
+    font-size: 0.85rem;
+  }
+  
+  .alert-row {
+    font-size: 0.55rem;
+  }
+  
+  .alert-label {
+    font-size: 0.5rem;
+  }
+  
+  .alert-value {
+    font-size: 0.6rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.6rem;
+  }
+  
+  .productos-section {
+    margin-top: 0.55rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .prod-title {
+    font-size: 0.65rem;
+  }
+  
+  .prod-count {
+    min-width: 14px;
+    height: 14px;
+    font-size: 0.5rem;
+  }
+  
+  .btn-clear-all {
+    padding: 0.18rem 0.35rem;
+    font-size: 0.55rem;
+  }
+  
+  .agregar-producto-section {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .agregar-input {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.4rem;
+  }
+  
+  .agregar-search-icon {
+    width: 13px;
+    height: 13px;
+  }
+  
+  .agregar-resultado {
+    padding: 0.3rem 0.4rem;
+  }
+  
+  .agregar-prod-name {
+    font-size: 0.68rem;
+  }
+  
+  .agregar-prod-price {
+    font-size: 0.68rem;
+  }
+  
+  .agregar-badge-gramaje {
+    font-size: 0.5rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .productos-list {
+    gap: 0.3rem;
+  }
+  
+  .producto-item {
+    padding: 0.5rem;
+  }
+  
+  .prod-info {
+    gap: 0.3rem;
+  }
+  
+  .prod-name {
+    font-size: 0.7rem;
+  }
+  
+  .prod-meta {
+    gap: 0.25rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.35rem;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.7rem;
+  }
+  
+  .prod-actions {
+    gap: 0.2rem;
+  }
+  
+  .btn-action {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.58rem;
+  }
+  
+  .btn-action svg {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .edit-controls {
+    gap: 0.2rem;
+  }
+  
+  .edit-label {
+    font-size: 0.55rem;
+  }
+  
+  .edit-qty,
+  .edit-price {
+    width: 55px;
+    padding: 0.18rem;
+    font-size: 0.62rem;
+  }
+  
+  .btn-ok,
+  .btn-x {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.58rem;
+  }
+  
+  .btn-ok svg,
+  .btn-x svg {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .btn-label {
+    display: none;
+  }
+  
+  .method-badge {
+    font-size: 0.7rem !important;
+    padding: 0.18rem 0.5rem;
+  }
+}
+
+/* Móviles muy pequeños (360px y menos) */
 @media (max-width: 360px) {
+  .detalle-header {
+    padding: 0.55rem 0.6rem;
+  }
+  
+  .detalle-header h3 {
+    font-size: 0.75rem;
+  }
+  
+  .ticket-badge {
+    font-size: 0.5rem;
+    padding: 0.12rem 0.3rem;
+  }
+  
+  .modal-actions {
+    gap: 0.2rem;
+  }
+  
+  .btn-discrepancia {
+    padding: 0.2rem 0.35rem;
+    font-size: 0.55rem;
+  }
+  
+  .btn-edit,
+  .btn-save,
+  .btn-cancel-edit {
+    padding: 0.2rem 0.35rem;
+    font-size: 0.55rem;
+  }
+  
+  .btn-edit svg,
+  .btn-save svg {
+    width: 11px;
+    height: 11px;
+  }
+  
+  .btn-close {
+    width: 22px;
+    height: 22px;
+    background: #ef4444;
+    border-color: #dc2626;
+  }
+  
+  .btn-close svg {
+    width: 13px;
+    height: 13px;
+  }
+  
+  .detalle-body {
+    padding: 0.6rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .summary-label {
+    font-size: 0.4rem;
+  }
+  
+  .summary-value {
+    font-size: 0.6rem;
+  }
+  
+  .total-section {
+    padding: 0.5rem;
+  }
+  
+  .total-amount {
+    font-size: 1.05rem;
+  }
+  
+  .profit-text {
+    font-size: 0.55rem;
+  }
+  
+  .total-edit-row {
+    padding: 0.2rem 0.35rem;
+    gap: 0.25rem;
+  }
+  
+  .total-edit-row .currency {
+    font-size: 0.85rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 65px;
+    font-size: 0.85rem;
+    padding: 0.18rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.45rem;
+    gap: 0.35rem;
+    margin-bottom: 0.55rem;
+  }
+  
+  .alert-icon {
+    font-size: 0.8rem;
+  }
+  
+  .alert-row {
+    font-size: 0.5rem;
+  }
+  
+  .alert-label {
+    font-size: 0.45rem;
+  }
+  
+  .alert-value {
+    font-size: 0.55rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.55rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.35rem;
+  }
+  
+  .prod-title {
+    font-size: 0.6rem;
+  }
+  
+  .prod-count {
+    min-width: 13px;
+    height: 13px;
+    font-size: 0.45rem;
+  }
+  
+  .btn-clear-all {
+    padding: 0.15rem 0.3rem;
+    font-size: 0.5rem;
+  }
+  
+  .agregar-producto-section {
+    padding: 0.45rem;
+    margin-bottom: 0.45rem;
+  }
+  
+  .agregar-input {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.35rem;
+  }
+  
+  .agregar-search-icon {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .agregar-resultado {
+    padding: 0.25rem 0.35rem;
+  }
+  
+  .agregar-prod-name {
+    font-size: 0.62rem;
+  }
+  
+  .agregar-prod-price {
+    font-size: 0.62rem;
+  }
+  
+  .agregar-badge-gramaje {
+    font-size: 0.45rem;
+    padding: 0.08rem 0.2rem;
+  }
+  
+  .productos-list {
+    gap: 0.25rem;
+  }
+  
+  .producto-item {
+    padding: 0.45rem;
+  }
+  
+  .prod-info {
+    gap: 0.25rem;
+  }
+  
+  .prod-name {
+    font-size: 0.65rem;
+  }
+  
+  .prod-meta {
+    gap: 0.2rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.55rem;
+    padding: 0.12rem 0.3rem;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.65rem;
+  }
+  
+  .prod-actions {
+    gap: 0.15rem;
+  }
+  
+  .btn-action {
+    padding: 0.18rem 0.35rem;
+    font-size: 0.52rem;
+  }
+  
+  .btn-action svg {
+    width: 9px;
+    height: 9px;
+  }
+  
+  .edit-controls {
+    gap: 0.15rem;
+  }
+  
+  .edit-label {
+    font-size: 0.5rem;
+  }
+  
+  .edit-qty,
+  .edit-price {
+    width: 50px;
+    padding: 0.15rem;
+    font-size: 0.58rem;
+  }
+  
+  .btn-ok,
+  .btn-x {
+    padding: 0.18rem 0.4rem;
+    font-size: 0.52rem;
+  }
+  
+  .btn-ok svg,
+  .btn-x svg {
+    width: 9px;
+    height: 9px;
+  }
+  
+  .btn-label {
+    display: none;
+  }
+  
+  .method-badge {
+    font-size: 0.65rem !important;
+    padding: 0.15rem 0.4rem;
+  }
+  
   .venta-meta-grid {
     gap: 0.5rem;
   }
@@ -6522,19 +9911,257 @@ async function eliminarTodosLosDetalles() {
     max-width: 110px;
     font-size: 0.85rem;
   }
+}
+
+/* Móviles extra pequeños (320px y menos) */
+@media (max-width: 320px) {
+  .detalle-header {
+    padding: 0.5rem 0.55rem;
+  }
   
-  .d-qty {
+  .detalle-header h3 {
+    font-size: 0.7rem;
+  }
+  
+  .ticket-badge {
+    font-size: 0.45rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .modal-actions {
+    gap: 0.15rem;
+  }
+  
+  .btn-discrepancia {
+    padding: 0.18rem 0.3rem;
+    font-size: 0.5rem;
+  }
+  
+  .btn-edit,
+  .btn-save,
+  .btn-cancel-edit {
+    padding: 0.18rem 0.3rem;
+    font-size: 0.5rem;
+  }
+  
+  .btn-edit svg,
+  .btn-save svg {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .btn-close {
+    width: 30px;
+    height: 30px;
+    background: #ef4444;
+    border-color: #dc2626;
+  }
+  
+  .btn-close svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .detalle-body {
+    padding: 0.55rem;
+  }
+  
+  .summary-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    margin-bottom: 0.45rem;
+  }
+  
+  .summary-label {
+    font-size: 0.38rem;
+  }
+  
+  .summary-value {
+    font-size: 0.55rem;
+  }
+  
+  .total-section {
+    padding: 0.45rem;
+  }
+  
+  .total-amount {
+    font-size: 0.95rem;
+  }
+  
+  .profit-text {
+    font-size: 0.5rem;
+  }
+  
+  .total-edit-row {
+    padding: 0.18rem 0.3rem;
+    gap: 0.2rem;
+  }
+  
+  .total-edit-row .currency {
+    font-size: 0.8rem;
+  }
+  
+  .total-edit-row .total-input {
+    width: 60px;
+    font-size: 0.8rem;
+    padding: 0.15rem;
+  }
+  
+  .discrepancia-alert {
+    padding: 0.4rem;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .alert-icon {
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
   }
   
-  .d-sub {
-    font-size: 0.85rem;
+  .alert-row {
+    font-size: 0.45rem;
   }
   
-  .items-header {
-    font-size: 0.85rem;
-    padding: 0.5rem 0;
+  .alert-label {
+    font-size: 0.4rem;
+  }
+  
+  .alert-value {
+    font-size: 0.5rem;
+  }
+  
+  .alert-diff {
+    font-size: 0.5rem;
+  }
+  
+  .productos-header {
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .prod-title {
+    font-size: 0.55rem;
+  }
+  
+  .prod-count {
+    min-width: 12px;
+    height: 12px;
+    font-size: 0.4rem;
+  }
+  
+  .btn-clear-all {
+    padding: 0.12rem 0.25rem;
+    font-size: 0.45rem;
+  }
+  
+  .agregar-producto-section {
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .agregar-input {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.3rem;
+  }
+  
+  .agregar-search-icon {
+    width: 11px;
+    height: 11px;
+  }
+  
+  .agregar-resultado {
+    padding: 0.2rem 0.3rem;
+  }
+  
+  .agregar-prod-name {
+    font-size: 0.58rem;
+  }
+  
+  .agregar-prod-price {
+    font-size: 0.58rem;
+  }
+  
+  .agregar-badge-gramaje {
+    font-size: 0.4rem;
+    padding: 0.06rem 0.18rem;
+  }
+  
+  .productos-list {
+    gap: 0.2rem;
+  }
+  
+  .producto-item {
+    padding: 0.4rem;
+  }
+  
+  .prod-info {
+    gap: 0.2rem;
+  }
+  
+  .prod-name {
+    font-size: 0.6rem;
+  }
+  
+  .prod-meta {
+    gap: 0.15rem;
+  }
+  
+  .prod-qty {
+    font-size: 0.5rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .prod-subtotal {
+    font-size: 0.6rem;
+  }
+  
+  .prod-actions {
+    gap: 0.12rem;
+  }
+  
+  .btn-action {
+    padding: 0.15rem 0.3rem;
+    font-size: 0.48rem;
+  }
+  
+  .btn-action svg {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .edit-controls {
+    gap: 0.12rem;
+  }
+  
+  .edit-label {
+    font-size: 0.45rem;
+  }
+  
+  .edit-qty,
+  .edit-price {
+    width: 45px;
+    padding: 0.12rem;
+    font-size: 0.52rem;
+  }
+  
+  .btn-ok,
+  .btn-x {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.48rem;
+  }
+  
+  .btn-ok svg,
+  .btn-x svg {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .btn-label {
+    display: none;
+  }
+  
+  .method-badge {
+    font-size: 0.6rem !important;
+    padding: 0.12rem 0.35rem;
   }
 }
 
@@ -6605,43 +10232,41 @@ async function eliminarTodosLosDetalles() {
 .toast-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 28px;
+  gap: 10px;
+  padding: 12px 24px;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  border: 2px solid;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid;
   animation: toastPop 0.3s ease-out;
 }
 
 .toast-ok {
-  background: linear-gradient(135deg, #1a4d2e 0%, #2d7a46 100%);
+  background: #1a4d2e;
   color: #ffffff;
   border-color: #4ade80;
 }
 
 .toast-error {
-  background: linear-gradient(135deg, #4d1a1a 0%, #7a2d2d 100%);
+  background: #4d1a1a;
   color: #ffffff;
   border-color: #f87171;
 }
 
 .toast-info {
-  background: linear-gradient(135deg, #1a2f4d 0%, #2d4a7a 100%);
+  background: #1a2f4d;
   color: #ffffff;
   border-color: #60a5fa;
 }
 
 .toast-icon {
-  font-size: 1.2rem;
-  width: 28px;
-  height: 28px;
+  font-size: 1.1rem;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
 }
 
 .toast-text {
@@ -6905,5 +10530,85 @@ async function eliminarTodosLosDetalles() {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+.ticket-items-list {
+  position: relative;
+}
+
+.zelda-sprites-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.link-sprite {
+  position: absolute;
+  bottom: 8%;
+  width: 90px;
+  height: 65px;
+  animation: linkWalk 12s linear infinite;
+  opacity: 0;
+  animation-fill-mode: forwards;
+  animation-delay: 3s;
+}
+
+.link-frame {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: linkSwing 0.8s steps(1) infinite;
+}
+
+.frame1 {
+  background-image: url('@/assets/img/1.png');
+  background-size: 90px 65px;
+}
+
+.frame2 {
+  background-image: url('@/assets/img/2.png');
+  background-size: 50px 65px;
+  animation: linkSwing2 0.8s steps(1) infinite;
+}
+
+.octo-sprite {
+  position: absolute;
+  bottom: 8%;
+  left: -50px;
+  width: 50px;
+  height: 50px;
+  animation: octoWalk 12s linear infinite;
+}
+
+.octo-frame {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: octoSwing 0.6s steps(1) infinite;
+}
+
+.octo-sprite .frame1 {
+  background-image: url('@/assets/img/octo1.png');
+  background-size: 50px 50px;
+}
+
+.octo-sprite .frame2 {
+  background-image: url('@/assets/img/octo2.png');
+  background-size: 50px 50px;
+  animation: octoSwing2 0.6s steps(1) infinite;
+}
+
+@media (max-width: 768px) {
+  .link-sprite {
+    animation-delay: 5s;
+  }
 }
 </style>

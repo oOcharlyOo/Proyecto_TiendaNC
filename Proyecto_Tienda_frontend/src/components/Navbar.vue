@@ -570,6 +570,7 @@ function cerrarSesion() {
 .link-icon.rupee::before { content: '💎'; font-size: 11px; }
 .link-icon.triforce::before { content: '🔺'; font-size: 11px; }
 .link-icon.clock::before { content: '⏱️'; font-size: 11px; }
+.link-icon.truck::before { content: '🚚'; font-size: 11px; }
 .link-icon.folder::before { content: '📂'; font-size: 11px; }
 
 .link-text {

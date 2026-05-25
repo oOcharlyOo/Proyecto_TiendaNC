@@ -174,7 +174,11 @@ async function cargarVentasPorUsuario() {
     );
     const data = await res.json();
     if (data.codigo === 200) {
-      ventasPorUsuario.value = data.datos || [];
+      ventasPorUsuario.value = (data.datos || []).filter((item: any) => {
+        const usuarioId = item.usuario?.idUsuario || item.usuario?.id;
+        const usuario = usuarios.value.find(u => u.idUsuario === usuarioId);
+        return usuario && usuario.id_tipo_usuario !== 3;
+      });
       if (ventasPorUsuario.value.length > 0) {
         setTimeout(() => triggerConfetti(), 300);
       }
@@ -222,10 +226,15 @@ async function cargarAsistencias() {
         
         datos = {
           ...datos,
-          usuarios: datos.usuarios.map((u: any) => ({
-            ...u,
-            horasPorDia: horasPorUsuario[u.idUsuario] || {}
-          }))
+          usuarios: datos.usuarios
+            .filter((u: any) => {
+              const usuario = usuarios.value.find(usr => usr.idUsuario === u.idUsuario);
+              return usuario && usuario.id_tipo_usuario !== 3;
+            })
+            .map((u: any) => ({
+              ...u,
+              horasPorDia: horasPorUsuario[u.idUsuario] || {}
+            }))
         };
       }
       
@@ -534,7 +543,7 @@ function getHorasDelDia(usuario: UsuarioDiasData, dia: number): number {
 function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trabajadores: {nombre: string; horas: number}[]; esVacio: boolean; horasTotales: number}> {
   if (!diasTrabajados.value) return [];
   
-  const { mes, anio, totalDiasMes, usuarios } = diasTrabajados.value;
+  const { mes, anio, totalDiasMes, usuarios: usuariosAsistencia } = diasTrabajados.value;
   const hoy = new Date();
   const esMesActual = hoy.getFullYear() === anio && (hoy.getMonth() + 1) === mes;
   
@@ -543,7 +552,7 @@ function getDiasCalendario(): Array<{numero: number | null; esHoy: boolean; trab
   const offsetSemana = diaSemanaInicio === 0 ? 6 : diaSemanaInicio - 1;
   
   const diasMap: Map<number, {nombre: string; horas: number}[]> = new Map();
-  usuarios.forEach(usuario => {
+  usuariosAsistencia.forEach(usuario => {
     Object.entries(usuario.diasCompletos).forEach(([diaStr, nombre]) => {
       const dia = parseInt(diaStr, 10);
       const horas = getHorasDelDia(usuario, dia);

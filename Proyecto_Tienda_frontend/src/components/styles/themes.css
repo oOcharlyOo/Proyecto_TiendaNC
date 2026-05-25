@@ -395,42 +395,62 @@
   opacity: 0.7;
 }
 
-/* ---------- Scrollbar styles (Ocultos pero funcionales) ---------- */
+/* ---------- Scrollbar styles (Ocultos por defecto) ---------- */
 /* Webkit (Chrome, Safari, Edge) */
-[data-theme] ::-webkit-scrollbar,
-.custom-scrollbar::-webkit-scrollbar {
+[data-theme] ::-webkit-scrollbar {
   width: 0;
   height: 0;
   background: transparent;
 }
 
-[data-theme] ::-webkit-scrollbar-track,
-.custom-scrollbar::-webkit-scrollbar-track {
+[data-theme] ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-[data-theme] ::-webkit-scrollbar-thumb,
-.custom-scrollbar::-webkit-scrollbar-thumb {
+[data-theme] ::-webkit-scrollbar-thumb {
   background: transparent;
   border: none;
 }
 
-[data-theme] ::-webkit-scrollbar-thumb:hover,
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+[data-theme] ::-webkit-scrollbar-thumb:hover {
   background: transparent;
 }
 
 /* Firefox */
-[data-theme],
-.custom-scrollbar {
+[data-theme] {
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
 
 /* IE y Edge antiguos */
-[data-theme] *,
-.custom-scrollbar * {
+[data-theme] * {
   -ms-overflow-style: none;
+}
+
+/* ---------- Scrollbar Zelda para .custom-scrollbar ---------- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
+  border: 2px solid var(--border-color);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.05);
+}
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-color) var(--border-color);
 }
 
 /* Clase utilitaria para elementos que necesitan scroll visible */

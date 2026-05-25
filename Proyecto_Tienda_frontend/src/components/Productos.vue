@@ -4,6 +4,8 @@ import ProductoFormModal from './modals/Productos/ProductoFormModal.vue';
 import ProductoScannerModal from './modals/Productos/ProductoScannerModal.vue';
 import Categorias from './Categorias.vue';
 import Subcategorias from './Subcategorias.vue';
+import Proveedores from './Proveedores.vue';
+import ReporteVentas from './ReporteVentas.vue';
 
 type ApiRespuesta<T> = {
   codigo: number;
@@ -48,16 +50,22 @@ const cargando = ref(false);
 const guardando = ref(false);
 const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
-const subcategoriaFiltro = ref<number | null>(null);
+const subcategoriaFiltro = ref<number | string | null>(null);
 const ordenStock = ref<'mayor' | 'menor' | null>(null);
 const filtroTipo = ref<'unidad' | 'gramaje' | null>(null);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
-const tabActiva = ref<'productos' | 'categorias' | 'subcategorias'>('productos');
+const tabActiva = ref<'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte'>('productos');
 
 const modalFormOpen = ref(false);
 const modalScannerOpen = ref(false);
 const selectedProduct = ref<ProductoDTO | null>(null);
 const scannerCode = ref('');
+
+const selectedProductos = ref<Set<number>>(new Set());
+const modalCategoriaOpen = ref(false);
+const nuevaCategoria = ref<number | null>(null);
+const nuevaSubcategoria = ref<number | null>(null);
+const cambiandoCategoria = ref(false);
 
 let scannerBuffer = '';
 let scannerTimer: ReturnType<typeof setTimeout> | null = null;
@@ -206,7 +214,16 @@ const productosFiltrados = computed(() => {
   
   const sub = subcategoriaFiltro.value;
   if (sub !== null) {
-    results = results.filter(p => p.idSubcategoria === sub);
+    if (sub === 'general') {
+      const generalSub = subcategorias.value.find(s => s.nombre.toLowerCase() === 'general');
+      if (generalSub) {
+        results = results.filter(p => p.idSubcategoria === generalSub.idSubcategoria);
+      } else {
+        results = results.filter(p => p.idSubcategoria === null || p.idSubcategoria === undefined);
+      }
+    } else {
+      results = results.filter(p => p.idSubcategoria === sub);
+    }
   }
   
   const termino = terminoBusqueda.value.trim().toLowerCase();
@@ -413,6 +430,65 @@ function handleScannerApply(code: string) {
   modalScannerOpen.value = false;
 }
 
+function toggleSeleccionProducto(id: number) {
+  const s = new Set(selectedProductos.value);
+  if (s.has(id)) {
+    s.delete(id);
+  } else {
+    s.add(id);
+  }
+  selectedProductos.value = s;
+}
+
+function toggleSeleccionTodos() {
+  if (selectedProductos.value.size === productosFiltrados.value.length) {
+    selectedProductos.value = new Set();
+  } else {
+    selectedProductos.value = new Set(productosFiltrados.value.map(p => p.idProducto!).filter(Boolean));
+  }
+}
+
+function abrirModalCategoria() {
+  if (selectedProductos.value.size === 0) return;
+  nuevaCategoria.value = null;
+  nuevaSubcategoria.value = null;
+  modalCategoriaOpen.value = true;
+}
+
+async function aplicarCambioCategoria() {
+  if (selectedProductos.value.size === 0) return;
+  if (nuevaCategoria.value === null && nuevaSubcategoria.value === null) {
+    mostrarToast('Selecciona al menos una categoría o subcategoría.', 'error');
+    return;
+  }
+  cambiandoCategoria.value = true;
+  try {
+    const body = {
+      ids: Array.from(selectedProductos.value),
+      idCategoria: nuevaCategoria.value,
+      idSubcategoria: nuevaSubcategoria.value
+    };
+    const data = await fetchApi<ApiRespuesta<number>>(
+      `${API_BASE}/productos/actualizarCategoriaMasiva`,
+      { method: 'PUT', body: JSON.stringify(body) }
+    );
+    if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo actualizar.');
+    mostrarToast(`${data.datos} producto(s) actualizado(s).`, 'ok');
+    selectedProductos.value = new Set();
+    modalCategoriaOpen.value = false;
+    await cargarProductos();
+  } catch (error) {
+    mostrarToast(`Error al actualizar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
+  } finally {
+    cambiandoCategoria.value = false;
+  }
+}
+
+const subcategoriasParaModal = computed(() => {
+  if (nuevaCategoria.value === null) return subcategorias.value;
+  return subcategorias.value.filter(s => s.idCategoria === nuevaCategoria.value);
+});
+
 onMounted(() => {
   cargarProductos();
   cargarCategorias();
@@ -508,9 +584,10 @@ function procesarEscaneoProductos(codigo: string) {
             v-model="subcategoriaFiltro" 
             class="category-filter"
             :disabled="categoriaFiltro === null"
-            @change="subcategoriaFiltro = subcategoriaFiltro ? Number(subcategoriaFiltro) : null"
+            @change="subcategoriaFiltro = subcategoriaFiltro === 'general' ? 'general' : (subcategoriaFiltro ? Number(subcategoriaFiltro) : null)"
           >
             <option :value="null">{{ categoriaFiltro === null ? 'Selecciona categoría' : 'Todas las subcategorías' }}</option>
+            <option value="general">General</option>
             <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
               {{ sub.nombre }}
             </option>
@@ -595,6 +672,24 @@ function procesarEscaneoProductos(codigo: string) {
           <span class="tab-icon">📂</span>
           <span class="tab-text">Subcategorías</span>
         </button>
+        <button 
+          type="button" 
+          class="tab-btn" 
+          :class="{ active: tabActiva === 'proveedores' }"
+          @click="tabActiva = 'proveedores'"
+        >
+          <span class="tab-icon">🚚</span>
+          <span class="tab-text">Proveedores</span>
+        </button>
+        <button 
+          type="button" 
+          class="tab-btn" 
+          :class="{ active: tabActiva === 'reporte' }"
+          @click="tabActiva = 'reporte'"
+        >
+          <span class="tab-icon">📊</span>
+          <span class="tab-text">Reporte Ventas</span>
+        </button>
       </div>
 
       <div v-if="tabActiva === 'productos'" class="tab-content">
@@ -622,6 +717,14 @@ function procesarEscaneoProductos(codigo: string) {
           <table v-else class="tabla-productos">
             <thead>
               <tr>
+                <th class="col-check">
+                  <input 
+                    type="checkbox" 
+                    class="row-checkbox"
+                    :checked="productosFiltrados.length > 0 && selectedProductos.size === productosFiltrados.length"
+                    @change="toggleSeleccionTodos"
+                  >
+                </th>
                 <th class="col-icon">Icono</th>
                 <th class="col-nombre">Nombre del Producto</th>
                 <th class="col-categoria">Categoría</th>
@@ -640,9 +743,18 @@ function procesarEscaneoProductos(codigo: string) {
                 class="producto-row"
                 :class="{ 
                   'low-stock': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0,
-                  'out-of-stock': Number(producto.stock || 0) === 0
+                  'out-of-stock': Number(producto.stock || 0) === 0,
+                  'selected': selectedProductos.has(producto.idProducto!)
                 }"
               >
+                <td class="col-check">
+                  <input 
+                    type="checkbox" 
+                    class="row-checkbox"
+                    :checked="selectedProductos.has(producto.idProducto!)"
+                    @change="toggleSeleccionProducto(producto.idProducto!)"
+                  >
+                </td>
                 <td class="col-icon">
                   <div class="icon-cell">
                     {{ obtenerEmojiDulce(producto.idProducto) }}
@@ -723,6 +835,17 @@ function procesarEscaneoProductos(codigo: string) {
           </table>
         </div>
 
+        <div v-if="selectedProductos.size > 0" class="bulk-action-bar">
+          <div class="bulk-info">
+            <span class="bulk-count">{{ selectedProductos.size }} producto(s) seleccionado(s)</span>
+            <button type="button" class="btn-clear-selection" @click="selectedProductos = new Set()">✕ Deseleccionar</button>
+          </div>
+          <button type="button" class="btn-bulk-action" @click="abrirModalCategoria">
+            <span class="btn-icon">🏷️</span>
+            <span class="btn-text">Cambiar Categoría</span>
+          </button>
+        </div>
+
         <div class="table-footer" v-if="!cargando && productosFiltrados.length > 0">
           <span class="footer-count">
             {{ productosFiltrados.length }} producto{{ productosFiltrados.length !== 1 ? 's' : '' }}
@@ -740,8 +863,16 @@ function procesarEscaneoProductos(codigo: string) {
         <Categorias @categorias-changed="cargarCategorias" />
       </div>
 
-      <div v-else class="tab-content">
+      <div v-else-if="tabActiva === 'subcategorias'" class="tab-content">
         <Subcategorias />
+      </div>
+
+      <div v-else-if="tabActiva === 'proveedores'" class="tab-content tab-proveedores">
+        <Proveedores />
+      </div>
+
+      <div v-else-if="tabActiva === 'reporte'" class="tab-content tab-reporte">
+        <ReporteVentas />
       </div>
     </section>
 
@@ -763,6 +894,44 @@ function procesarEscaneoProductos(codigo: string) {
       @apply="handleScannerApply"
       @close="modalScannerOpen = false"
     />
+
+    <div v-if="modalCategoriaOpen" class="modal-overlay" @click.self="modalCategoriaOpen = false">
+      <div class="modal-dialog modal-categoria">
+        <div class="modal-header">
+          <h3 class="modal-title">🏷️ Cambiar Categoría</h3>
+          <button type="button" class="modal-close" @click="modalCategoriaOpen = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Se actualizará la categoría de <strong>{{ selectedProductos.size }} producto(s)</strong> seleccionado(s).
+          </p>
+          <div class="form-group">
+            <label class="form-label">Nueva Categoría</label>
+            <select v-model="nuevaCategoria" class="form-select">
+              <option :value="null">— Sin cambiar —</option>
+              <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+                {{ cat.nombre }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nueva Subcategoría</label>
+            <select v-model="nuevaSubcategoria" class="form-select">
+              <option :value="null">— Sin cambiar —</option>
+              <option v-for="sub in subcategoriasParaModal" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
+                {{ sub.nombre }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" @click="modalCategoriaOpen = false">Cancelar</button>
+          <button type="button" class="btn-primary" @click="aplicarCambioCategoria" :disabled="cambiandoCategoria">
+            {{ cambiandoCategoria ? 'Aplicando...' : 'Aplicar Cambio' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <input 
       ref="fileInputRef" 
@@ -882,6 +1051,14 @@ function procesarEscaneoProductos(codigo: string) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.tab-proveedores {
+  overflow-y: auto;
+}
+
+.tab-reporte {
+  overflow-y: auto;
 }
 
 .toolbar-title {
@@ -1159,6 +1336,135 @@ function procesarEscaneoProductos(codigo: string) {
 @keyframes pulse-stock {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
+}
+
+.col-check {
+  width: 40px;
+  text-align: center;
+}
+
+.row-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.producto-row.selected {
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border-left: 4px solid var(--accent-color);
+}
+
+.producto-row.selected:hover {
+  background: color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+  background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-panel));
+  border: 2px solid var(--accent-color);
+  border-radius: 10px;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bulk-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bulk-count {
+  font-weight: 700;
+  color: var(--accent-color);
+  font-size: 0.9rem;
+}
+
+.btn-clear-selection {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.btn-clear-selection:hover {
+  color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 10%, transparent);
+}
+
+.btn-bulk-action {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-bulk-action:hover {
+  filter: brightness(1.15);
+}
+
+.modal-categoria {
+  max-width: 420px;
+}
+
+.modal-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+
+.form-select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .producto-row td {
@@ -1585,6 +1891,19 @@ function procesarEscaneoProductos(codigo: string) {
   .col-precio,
   .col-stock {
     display: none;
+  }
+  
+  .bulk-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .bulk-info {
+    justify-content: center;
+  }
+  
+  .btn-bulk-action {
+    justify-content: center;
   }
   
   .tabla-productos th,

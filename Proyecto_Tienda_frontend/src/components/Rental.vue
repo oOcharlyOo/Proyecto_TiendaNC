@@ -62,13 +62,13 @@ const estaciones = ref<Estacion[]>([]);
 const categorias = ref<{ idCategoria: number; nombre: string }[]>([]);
 
 const gamingCategoryId = computed(() => {
-  const cat = categorias.value.find(c => c.nombre.toLowerCase() === 'gaming');
+  const cat = categorias.value.find(c => c.nombre === 'Gaming' || c.nombre === 'gaming');
   return cat ? cat.idCategoria : null;
 });
 
 const productosDisponibles = computed(() => {
   const gamingId = gamingCategoryId.value;
-  return productosInventario.value.filter(p => Number(p.stock) > 0 && p.idCategoria === gamingId);
+  return productosInventario.value.filter(p => p.idCategoria === gamingId);
 });
 const ticker = ref(0);
 

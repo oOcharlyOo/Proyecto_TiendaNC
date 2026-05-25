@@ -124,6 +124,8 @@ CREATE TABLE tiendadb.productos (
     stock INT NOT NULL,
     precio_mayoreo DECIMAL(10, 2),
     is_gramaje BOOLEAN DEFAULT FALSE,
+    requiere_envase BOOLEAN DEFAULT FALSE,
+    precio_envase DECIMAL(10, 2) DEFAULT 0,
     estatus VARCHAR(1) DEFAULT 'A',
 
     CONSTRAINT fk_categoria_producto
@@ -173,6 +175,7 @@ CREATE TABLE tiendadb.ventas_detalle (
     cantidad INT NOT NULL,
     precio_unitario_venta DECIMAL(10, 2) NOT NULL,
     tipo_precio_aplicado VARCHAR(50) DEFAULT 'VENTA',
+    cobro_envase DECIMAL(10, 2) DEFAULT 0,
 
     CONSTRAINT fk_venta_detalle
         FOREIGN KEY(id_venta)
