@@ -267,6 +267,15 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION tiendadb.cleanup_ventas_pendientes_huerfanas()
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM tiendadb.ventas
+    WHERE estatus = 'P'
+      AND fecha_venta < NOW() - INTERVAL '24 hours';
+END;
+$$;
+
 -- Inserciones iniciales
 INSERT INTO tiendadb.tipos_usuario (nombre, descripcion) VALUES 
 ('Administrador', 'Usuario con todos los privilegios'),

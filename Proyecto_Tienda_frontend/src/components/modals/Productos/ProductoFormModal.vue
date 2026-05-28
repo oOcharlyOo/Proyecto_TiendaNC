@@ -27,6 +27,8 @@ type ProductoPayload = {
   is_gramaje: boolean;
   idCategoria?: number;
   idSubcategoria?: number | null;
+  requiere_envase?: boolean;
+  precio_envase?: number;
 };
 
 const props = defineProps<{
@@ -56,7 +58,9 @@ const form = ref<ProductoPayload>({
   precio_mayoreo: null,
   is_gramaje: false,
   idCategoria: 1,
-  idSubcategoria: null
+  idSubcategoria: null,
+  requiere_envase: false,
+  precio_envase: 0
 });
 
 watch(
@@ -97,7 +101,9 @@ function setFormFromData() {
     precio_mayoreo: null,
     is_gramaje: false,
     idCategoria: 1,
-    idSubcategoria: null
+    idSubcategoria: null,
+    requiere_envase: false,
+    precio_envase: 0
   };
     return;
   }
@@ -114,7 +120,9 @@ function setFormFromData() {
     precio_mayoreo: source.precio_mayoreo ?? null,
     is_gramaje: Boolean(source.is_gramaje),
     idCategoria: source.idCategoria || 1,
-    idSubcategoria: source.idSubcategoria ?? null
+    idSubcategoria: source.idSubcategoria ?? null,
+    requiere_envase: Boolean(source.requiere_envase),
+    precio_envase: Number(source.precio_envase || 0)
   };
 }
 
@@ -232,6 +240,17 @@ const esCategoriaGaming = computed(() => {
                 <span class="checkbox-custom"></span>
                 <span class="checkbox-label">Usa gramaje <span class="hint">(peso en gramos)</span></span>
               </label>
+            </div>
+            <div class="stock-field checkbox-field">
+              <label class="check-row">
+                <input v-model="form.requiere_envase" type="checkbox" class="checkbox-input">
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-label">Requiere envase <span class="hint">(cobro adicional)</span></span>
+              </label>
+            </div>
+            <div v-if="form.requiere_envase" class="stock-field">
+              <label>Precio del envase ($) <span class="required">*</span></label>
+              <input v-model.number="form.precio_envase" type="number" step="0.01" min="0" required class="input-field">
             </div>
           </div>
         </div>

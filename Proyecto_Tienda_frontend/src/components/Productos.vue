@@ -39,6 +39,8 @@ type ProductoDTO = {
   is_gramaje: boolean;
   idCategoria?: number;
   idSubcategoria?: number | null;
+  requiere_envase?: boolean;
+  precio_envase?: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -733,6 +735,7 @@ function procesarEscaneoProductos(codigo: string) {
                 <th class="col-precio text-right">Precio Venta</th>
                 <th class="col-stock text-center">Stock</th>
                 <th class="col-tipo text-center">Tipo</th>
+                <th class="col-envase text-center">Envase</th>
                 <th class="col-acciones text-center">Acciones</th>
               </tr>
             </thead>
@@ -805,6 +808,12 @@ function procesarEscaneoProductos(codigo: string) {
                   <span class="tipo-badge tipo-rentable" v-if="esCategoriaGaming(producto.idCategoria)">🎮 Rentable</span>
                   <span class="tipo-badge" v-else-if="producto.is_gramaje">⚖️ Gramaje</span>
                   <span class="tipo-badge tipo-normal" v-else>📦 Unidad</span>
+                </td>
+                <td class="col-envase text-center">
+                  <span class="envase-badge envase-si" v-if="producto.requiere_envase">
+                    🧴 {{ formatoMoneda(producto.precio_envase || 0) }}
+                  </span>
+                  <span class="envase-badge envase-no" v-else>—</span>
                 </td>
                 <td class="col-acciones text-center">
                   <div class="acciones-cell">
@@ -1647,6 +1656,28 @@ function procesarEscaneoProductos(codigo: string) {
   background: color-mix(in srgb, #7c3aed 15%, transparent);
   color: #7c3aed;
   border-color: #7c3aed;
+}
+
+.envase-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.envase-badge.envase-si {
+  background: color-mix(in srgb, var(--warning-color) 15%, transparent);
+  color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.envase-badge.envase-no {
+  color: var(--text-secondary);
+  opacity: 0.4;
 }
 
 .acciones-cell {

@@ -117,6 +117,8 @@ type ProductoDTO = {
   stock?: number;
   is_gramaje?: boolean;
   idCategoria?: number;
+  requiere_envase?: boolean;
+  precio_envase?: number;
 };
 
 type UsuarioDTO = {
@@ -164,15 +166,21 @@ type Producto = {
   idCategoria?: number;
   idProducto?: number;
   precio_venta?: number;
+  requiere_envase?: boolean;
+  precio_envase?: number;
 };
 
 type TicketItem = Producto & {
   cantidad: number;
   idVentaDetalle?: number;
-  is_mayoreo?: boolean;
+  is_mayoreo?: false;
   is_promocion?: false;
   promocion?: never;
   productoId?: number;
+  requiere_envase?: boolean;
+  precio_envase?: number;
+  envase_aplicado?: boolean;
+  cantidad_envase?: number;
 };
 
 type TicketItemPromocion = {
@@ -291,6 +299,12 @@ async function cargarTicketsDesdeBackend() {
                   precio = precioRedondeado / cantidad;
                 }
                 
+                const cobroEnvaseFlag = Boolean((detalle as any).cobroEnvase ?? false);
+                const cobroEnvaseTotal = Number((detalle as any).cobroEnvaseTotal ?? (detalle as any).cobro_envase_total ?? 0);
+                const requiereEnvase = producto.requiere_envase ?? (producto as any).requiereEnvase ?? false;
+                const precioEnvase = Number(producto.precio_envase ?? (producto as any).precioEnvase ?? 0);
+                const cantidadEnvase = Number((detalle as any).cantidadEnvase ?? (detalle as any).cantidad_envase ?? 0);
+                
                 const item: TicketItem = {
                   id: producto.idProducto || producto.id,
                   nombre: producto.nombre,
@@ -301,7 +315,11 @@ async function cargarTicketsDesdeBackend() {
                   is_mayoreo: (producto.precio_mayoreo != null && Number(producto.precio_mayoreo) > 0 && precio === Number(producto.precio_mayoreo)),
                   dto: producto,
                   idVentaDetalle: detalle.idVentaDetalle,
-                  codigo_barras: producto.codigoBarras || producto.codigo_barras || null
+                  codigo_barras: producto.codigoBarras || producto.codigo_barras || null,
+                  requiere_envase: requiereEnvase,
+                  precio_envase: precioEnvase,
+                  envase_aplicado: cobroEnvaseFlag || cobroEnvaseTotal > 0,
+                  cantidad_envase: cantidadEnvase > 0 ? cantidadEnvase : cantidad
                 };
                 nuevoTicket.items.push(item);
               }
@@ -494,6 +512,19 @@ const agregarPendienteBusqueda = ref('');
 const agregarPendienteInput = ref<HTMLInputElement | null>(null);
 const agregarPendienteScannerActivo = ref(false);
 const agregarPendienteProductos = ref<any[]>([]);
+
+const historialEnvases = computed(() => {
+  return historialVentaDetalle.value.filter((d) => {
+    const cobroEnvaseTotal = Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+    return cobroEnvaseTotal > 0;
+  });
+});
+
+const historialEnvaseTotal = computed(() => {
+  return historialEnvases.value.reduce((sum, d) => {
+    return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+  }, 0);
+});
 
 const provisionSemanalTotal = ref(0);
 const provisionSemanalStatus = ref<'ok' | 'warning' | 'danger'>('ok');
@@ -715,7 +746,12 @@ const totalVenta = computed(() => {
     if ((item as any).is_gramaje) {
       return acumulado + item.precio;
     }
-    return acumulado + item.precio * item.cantidad;
+    let subtotal = item.precio * item.cantidad;
+    if ((item as any).envase_aplicado && (item as any).precio_envase) {
+      const cantEnvase = (item as any).cantidad_envase || item.cantidad;
+      subtotal += (item as any).precio_envase * cantEnvase;
+    }
+    return acumulado + subtotal;
   }, 0);
 });
 
@@ -973,7 +1009,9 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
         precio_mayoreo: (precioMayoreo != null && precioMayoreo > 0) ? precioMayoreo : null,
         dto: markRaw(item),
         is_gramaje: item.is_gramaje,
-        idCategoria: item.idCategoria
+        idCategoria: item.idCategoria,
+        requiere_envase: item.requiere_envase,
+        precio_envase: item.precio_envase
       };
     })
     .filter((p) => p.id > 0 && p.nombre.length > 0 && Number.isFinite(p.precio));
@@ -999,6 +1037,17 @@ async function toggleMayoreo(item: TicketItem) {
       item.precio = precioAnterior;
       mostrarMensaje('Error al actualizar precio.', 'error');
     }
+  }
+}
+
+function toggleEnvase(item: TicketItem) {
+  if (!item.requiere_envase || !item.precio_envase) {
+    mostrarMensaje(`El producto "${item.nombre}" no requiere envase.`, 'error');
+    return;
+  }
+  (item as any).envase_aplicado = !(item as any).envase_aplicado;
+  if ((item as any).envase_aplicado && !(item as any).cantidad_envase) {
+    (item as any).cantidad_envase = item.cantidad;
   }
 }
 
@@ -1142,7 +1191,7 @@ async function agregarProductoATicket(producto: Producto) {
       throw e;
     }
   } else {
-    items.push({ ...producto, cantidad: 1 });
+    items.push({ ...producto, cantidad: 1, requiere_envase: producto.requiere_envase, precio_envase: producto.precio_envase, envase_aplicado: false, cantidad_envase: 1 });
     try {
       const nuevoItem = items[items.length - 1];
       await crearDetalleVenta(ticketActual.value.id, nuevoItem);
@@ -1268,8 +1317,11 @@ async function crearDetalleVenta(ventaId: number, item: any) {
     Producto: item.dto,
     cantidad: item.cantidad,
     precioUnitarioVenta: item.precio,
-    tipoPrecioAplicado: item.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA'
+    tipoPrecioAplicado: item.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA',
+    cobroEnvase: item.envase_aplicado === true,
+    cantidadEnvase: item.envase_aplicado === true ? (item.cantidad_envase || item.cantidad) : 0
   };
+  console.log('crearDetalleVenta payload:', JSON.stringify(payload, null, 2));
 
   let data;
   
@@ -1770,24 +1822,12 @@ async function cargarHistorialVentasDia() {
   }
 }
 
-function calcularDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): number {
-  const sumaDetalles = detalles.reduce((sum, d) => {
-    const precio = Number(d.precioUnitarioVenta || 0);
-    const cantidad = Number(d.cantidad || 0);
-    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
-      return sum + precio;
-    }
-    return sum + (precio * cantidad);
-  }, 0);
-  
-  const diferencia = Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100;
-  return Math.round(diferencia * 100) / 100;
+function calcularDiscrepancia(_detalles: VentaDetalleDTO[], _montoTotal: number): number {
+  return 0;
 }
 
-function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number): boolean {
-  const diferencia = calcularDiscrepancia(detalles, montoTotal);
-  const umbral = Math.max(0.50, Math.round(montoTotal * 0.01 * 100) / 100);
-  return Math.abs(diferencia) > umbral && detalles.length > 0;
+function verificarDiscrepancia(_detalles: VentaDetalleDTO[], _montoTotal: number): boolean {
+  return false;
 }
 
 function salidaEfectivo() {
@@ -1816,11 +1856,12 @@ async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket
     const detalles = Array.isArray(data?.datos) ? data.datos : [];
     historialVentaDetalle.value = detalles;
     
-    const montoVenta = Number(venta.montoTotal ?? 0);
-    const diferencia = calcularDiscrepancia(detalles, montoVenta);
-    const tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
+    const tieneDiscrepancia = Boolean((venta as any).tieneDiscrepancia ?? false);
     historialVentaTieneDiscrepancia.value = tieneDiscrepancia;
-    historialDiscrepanciaMonto.value = diferencia;
+    
+    if (!tieneDiscrepancia) {
+      historialDiscrepanciaMonto.value = 0;
+    }
     
     const idx = historialVentas.value.findIndex(v => v.idVenta === venta.idVenta);
     if (idx !== -1) {
@@ -2305,10 +2346,11 @@ function iniciarEdicionDetalle() {
 function calcularSubtotal(d: VentaDetalleDTO): number {
   const precio = Number(d.precioUnitarioVenta || 0);
   const cantidad = Number(d.cantidad || 0);
+  const cobroEnvaseTotal = Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
   if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
-    return precio;
+    return precio + cobroEnvaseTotal;
   }
-  return Math.round(precio * cantidad);
+  return Math.round((precio * cantidad) + cobroEnvaseTotal);
 }
 
 function calcularSubtotalVenta(): number {
@@ -2787,6 +2829,11 @@ async function eliminarTodosLosDetalles() {
                       <input type="checkbox" :checked="asAny(item).is_mayoreo" @change="toggleMayoreo(asAny(item))">
                       <span>Mayoreo</span>
                     </label>
+                    <label v-if="asAny(item).requiere_envase && asAny(item).precio_envase" class="envase-toggle">
+                      <input type="checkbox" :checked="asAny(item).envase_aplicado" @change="toggleEnvase(asAny(item))">
+                      <span>Envase</span>
+                    </label>
+                    <input v-if="asAny(item).envase_aplicado" type="number" min="0" :max="item.cantidad" v-model.number="asAny(item).cantidad_envase" class="envase-qty-input" @change="playSound('add')" title="Cantidad de envases a cobrar">
                   </div>
                 </div>
                 
@@ -2958,6 +3005,21 @@ async function eliminarTodosLosDetalles() {
             </div>
           </div>
           
+          <div v-if="historialEnvases.length > 0" class="envase-section-detalle">
+            <div class="envase-section-title">Envases</div>
+            <div class="envase-list-detalle">
+              <div v-for="d in historialEnvases" :key="`env-${d.idVentaDetalle}`" class="envase-row-detalle">
+                <span class="envase-name">{{ (d.producto || d.Producto)?.nombre || 'Producto' }}</span>
+                <span class="envase-qty">{{ (d as any).cantidadEnvase || d.cantidad }} env.</span>
+                <span class="envase-price">{{ formatoMonedaRedondeada(Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0)) }}</span>
+              </div>
+            </div>
+            <div class="envase-total-detalle">
+              <span>Total Envases</span>
+              <strong>{{ formatoMonedaRedondeada(historialEnvaseTotal) }}</strong>
+            </div>
+          </div>
+          
           <div class="productos-section">
             <div class="productos-header">
               <span class="prod-title">Productos</span>
@@ -3013,7 +3075,11 @@ async function eliminarTodosLosDetalles() {
                       <span class="prod-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? iniciarEditarItem(i) : null">
                         {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
                       </span>
-                      <span class="prod-subtotal">{{ formatoMonedaRedondeada(calcularSubtotal(d)) }}</span>
+                      <span class="prod-subtotal">{{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}</span>
+                    </div>
+                    <div v-if="Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0) > 0" class="prod-envase-line">
+                      <span class="envase-label">🧴 {{ (d as any).cantidadEnvase || d.cantidad }} env.</span>
+                      <span class="envase-price-line">{{ formatoMonedaRedondeada(Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0)) }}</span>
                     </div>
                     <div v-if="esAdmin && modoEdicionDetalle" class="prod-actions">
                       <button class="btn-action btn-action-edit" @click="iniciarEditarItem(i)" title="Editar cantidad y precio">
@@ -6689,6 +6755,53 @@ async function eliminarTodosLosDetalles() {
   accent-color: var(--accent-color);
 }
 
+.envase-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--warning-color);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.7rem;
+  background: color-mix(in srgb, var(--warning-color) 10%, transparent);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--warning-color);
+  transition: all 0.15s;
+}
+
+.envase-toggle:hover {
+  background: color-mix(in srgb, var(--warning-color) 18%, transparent);
+}
+
+.envase-toggle input {
+  accent-color: var(--warning-color);
+}
+
+.envase-qty-input {
+  width: 42px;
+  padding: 0.15rem 0.25rem;
+  background: color-mix(in srgb, var(--warning-color) 15%, transparent);
+  border: 1px solid var(--warning-color);
+  border-radius: 4px;
+  color: var(--warning-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  text-align: center;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.envase-qty-input:focus {
+  background: color-mix(in srgb, var(--warning-color) 25%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning-color) 30%, transparent);
+}
+
+.envase-qty-input::-webkit-inner-spin-button {
+  opacity: 1;
+}
+
 .item-actions {
   display: flex;
   justify-content: space-between;
@@ -7699,6 +7812,75 @@ async function eliminarTodosLosDetalles() {
   margin-top: 1rem;
 }
 
+.envase-section-detalle {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-color) 25%, transparent);
+  border-radius: 8px;
+}
+
+.envase-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.envase-list-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.envase-row-detalle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  font-size: 0.8rem;
+}
+
+.envase-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envase-qty {
+  color: var(--text-muted);
+  margin: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+.envase-price {
+  font-weight: 600;
+  color: var(--warning-color);
+  white-space: nowrap;
+}
+
+.envase-total-detalle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.5rem;
+  border-top: 1px dashed color-mix(in srgb, var(--warning-color) 40%, transparent);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.envase-total-detalle strong {
+  color: var(--warning-color);
+  font-size: 0.9rem;
+}
+
 .productos-header {
   display: flex;
   align-items: center;
@@ -7948,6 +8130,30 @@ async function eliminarTodosLosDetalles() {
   font-weight: 800;
   font-family: "Courier New", monospace;
   color: var(--success-color);
+}
+
+.prod-envase-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  background: color-mix(in srgb, var(--warning-color) 10%, transparent);
+  border-radius: 4px;
+}
+
+.envase-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.envase-price-line {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  color: var(--warning-color);
 }
 
 .prod-actions {

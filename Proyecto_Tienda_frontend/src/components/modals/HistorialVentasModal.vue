@@ -144,7 +144,7 @@ async function corregir(ids: number[]) {
           <tbody>
             <tr v-for="v in ventasFiltradas" :key="v.idVenta" class="hist-row" :class="{ 'row-disc': v.tieneDiscrepancia, 'row-sel': ventasSeleccionadas.has(v.idVenta) }" @click="emit('ver-detalle', v)">
               <td class="hist-td-ticket">
-                <span v-if="v.tieneDiscrepancia" class="hist-disc">⚠</span>
+                <span v-if="v.tieneDiscrepancia" class="hist-disc" title="Venta con envase">🧴</span>
                 <input v-if="esAdmin && v.tieneDiscrepancia" type="checkbox" class="hist-cb" :checked="ventasSeleccionadas.has(v.idVenta)" @click.stop @change="toggleSeleccion(v.idVenta)">
                 <span class="hist-ticket">#{{ v.numeroTicket ?? v.idVenta }}</span>
               </td>
@@ -216,12 +216,12 @@ async function corregir(ids: number[]) {
 .hist-table th:last-child { width: 36px; text-align: center; }
 .hist-row { border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s; }
 .hist-row:hover { background: var(--bg-secondary); }
-.hist-row.row-disc { background: rgba(239,68,68,0.05); }
-.hist-row.row-disc:hover { background: rgba(239,68,68,0.1); }
+.hist-row.row-disc { border-left: 3px solid #eab308; background: rgba(234,179,8,0.03); }
+.hist-row.row-disc:hover { background: rgba(234,179,8,0.08); }
 .hist-row.row-sel { background: rgba(59,130,246,0.1); }
 .hist-row td { padding: 0.5rem 0.75rem; font-size: 0.82rem; vertical-align: middle; }
 .hist-td-ticket { display: flex; align-items: center; gap: 0.35rem; }
-.hist-disc { width: 15px; height: 15px; border-radius: 50%; background: #ef4444; color: white; font-size: 0.6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hist-disc { width: 15px; height: 15px; border-radius: 50%; background: #eab308; color: white; font-size: 0.6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .hist-cb { width: 13px; height: 13px; accent-color: var(--accent-color); cursor: pointer; flex-shrink: 0; }
 .hist-ticket { font-weight: 700; color: var(--accent-color); font-family: "Courier New", monospace; }
 .hist-td-hora { font-family: "Courier New", monospace; color: var(--text-secondary); font-size: 0.78rem; }

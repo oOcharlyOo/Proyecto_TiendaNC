@@ -140,6 +140,10 @@ type VentaDetalleDTO = {
   producto?: { idProducto?: number; nombre?: string; precio_venta?: number; is_gramaje?: boolean; codigoBarras?: string; codigo_barras?: string };
   Producto?: { idProducto?: number; nombre?: string; precio_venta?: number; is_gramaje?: boolean; codigoBarras?: string; codigo_barras?: string };
   idProducto?: number;
+  cobro_envase?: number;
+  cobroEnvase?: boolean;
+  cobroEnvaseTotal?: number;
+  cantidadEnvase?: number;
 };
 
 type ApartadoDTO = {
@@ -342,10 +346,31 @@ function verificarDiscrepancia(detalles: VentaDetalleDTO[], montoTotal: number):
   const sumaDetalles = detalles.reduce((sum: number, d) => {
     const precio = Number(d.precioUnitarioVenta || 0);
     const cantidad = Number(d.cantidad || 0);
-    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
-      return sum + precio;
+    let cobroEnvaseTotal = Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+    
+    const requiereEnvase = (d as any).requiere_envase ?? (d.producto || d.Producto)?.requiere_envase ?? false;
+    const precioEnvase = Number((d as any).precio_envase ?? (d.producto || d.Producto)?.precio_envase ?? 0);
+    
+    if (cobroEnvaseTotal === 0 && requiereEnvase && precioEnvase > 0) {
+      const posibleEnvase = precioEnvase * cantidad;
+      const sumaSinEnvase = detalles.reduce((s: number, dd: VentaDetalleDTO) => {
+        const pp = Number(dd.precioUnitarioVenta || 0);
+        const cc = Number(dd.cantidad || 0);
+        const ce = Number((dd as any).cobroEnvaseTotal ?? (dd as any).cobro_envase_total ?? 0);
+        return s + (dd.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? pp : pp * cc) + ce;
+      }, 0);
+      if (Math.round((sumaSinEnvase + posibleEnvase) * 100) / 100 === Math.round(montoTotal * 100) / 100) {
+        cobroEnvaseTotal = posibleEnvase;
+      }
     }
-    return sum + (precio * cantidad);
+    
+    let subtotal = 0;
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      subtotal = precio;
+    } else {
+      subtotal = precio * cantidad;
+    }
+    return sum + subtotal + cobroEnvaseTotal;
   }, 0);
   
   return Math.abs(Math.round(sumaDetalles * 100) / 100 - Math.round(montoTotal * 100) / 100) > 2;
@@ -436,6 +461,7 @@ const montoInicialCajaActiva = ref<number>(0);
 const ventasEfectivo = ref(0);
 const ventasTarjeta = ref(0);
 const ventasTransferencia = ref(0);
+const totalEnvase = ref(0);
 const totalTicketsDia = ref(0);
 const horaInicioCaja = ref<string | null>(null);
 const horaFinCaja = ref<string | null>(null);
@@ -459,6 +485,19 @@ const ventaDetalleMontoEditado = ref(0);
 const ventaDetalleItemEditando = ref<number | null>(null);
 const ventaDetalleCantidadTemp = ref(0);
 const ventaDetallePrecioTemp = ref(0);
+
+const ventaDetalleEnvases = computed(() => {
+  return ventaDetalleItems.value.filter((d) => {
+    const cobroEnvaseTotal = Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+    return cobroEnvaseTotal > 0;
+  });
+});
+
+const ventaDetalleEnvaseTotal = computed(() => {
+  return ventaDetalleEnvases.value.reduce((sum, d) => {
+    return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+  }, 0);
+});
 const modalGramajeAbierto = ref(false);
 const modalProductoGramaje = ref<any>(null);
 const gramajeEditandoIndice = ref<number | null>(null);
@@ -727,6 +766,32 @@ async function generarCorte() {
     // Usar las ganancias del corte (ya filtradas por usuario)
     // El backend ya filtra por usuario, no necesitamos sobrescribir
 
+    // Calcular total de envases del corte actual
+    try {
+      const hoy = fechaCorte.toISOString().slice(0, 10);
+      const ventasCorte = await fetchApi<VentaDTO[]>(`/ventas/obtenerVentaPorDia/${hoy}`);
+      const idsVentasCorte = (Array.isArray(ventasCorte?.ventas) ? ventasCorte.ventas : [])
+        .filter(v => v.estatus === 'C' || v.estatus === 'F')
+        .map(v => v.idVenta);
+      
+      if (idsVentasCorte.length > 0) {
+        const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+        const detallesCorte = (allDetails || []).filter(d => {
+          const idVenta = Number(d?.Venta?.idVenta || 0);
+          return idsVentasCorte.includes(idVenta);
+        });
+        
+        totalEnvase.value = detallesCorte.reduce((sum, d) => {
+          return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+        }, 0);
+      } else {
+        totalEnvase.value = 0;
+      }
+    } catch (e) {
+      console.error('Error al calcular total envases:', e);
+      totalEnvase.value = 0;
+    }
+
     if (idUsuario.value) {
       try {
         const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
@@ -923,6 +988,12 @@ async function generarReporteDiario() {
         });
         console.log('Detalles filtrados:', detallesDia);
         detallesDiario.value = detallesDia;
+        
+        const totalEnvaseDia = detallesDia.reduce((sum, d) => {
+          return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+        }, 0);
+        totalEnvase.value = totalEnvaseDia;
+        
         calcularProductosReporte(detallesDia, 'diario');
         console.log('Productos diario:', productosDiario.value);
         console.log('Productos unitarios diario:', productosUnitariosDiario.value);
@@ -2900,6 +2971,7 @@ onMounted(() => {
         { label: 'Efectivo', value: formatoMoneda(ventasEfectivo), icon: '💰', clase: 'success' },
         { label: 'Transferencia', value: formatoMoneda(ventasTransferencia), icon: '📱', clase: '' },
         { label: 'Tarjeta', value: formatoMoneda(ventasTarjeta), icon: '💳', clase: '' },
+        { label: 'Envases', value: formatoMoneda(totalEnvase), icon: '🧴', clase: 'envase' },
         { label: 'Tickets', value: totalTicketsDia, icon: '🧾', clase: '' }
       ]" :key="index" :class="['stat-card', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
         <div class="stat-glow"></div>
@@ -3020,6 +3092,19 @@ onMounted(() => {
           </div>
           <div class="card-details">
             <span class="click-hint">Toca para ver detalles</span>
+          </div>
+        </div>
+
+        <div class="reporte-card envase-card">
+          <div class="card-header">
+            <span class="card-icon">🧴</span>
+            <h3>Cobro Envases</h3>
+          </div>
+          <div class="card-value envase-value">
+            {{ formatoMoneda(totalEnvase) }}
+          </div>
+          <div class="card-details">
+            <span class="envase-hint">Importes por envase</span>
           </div>
         </div>
 
@@ -3471,14 +3556,34 @@ onMounted(() => {
                 </template>
               </div>
               <div class="detalle-item-right">
-                <span class="detalle-item-price">
-                  {{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}
-                </span>
+                <div class="detalle-price-stack">
+                  <span class="detalle-item-price">
+                    {{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}
+                  </span>
+                  <span v-if="Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0) > 0" class="detalle-envase-inline">
+                    🧴 {{ formatoMonedaRedondeada(Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0)) }}
+                  </span>
+                </div>
                 <template v-if="ventaDetalleEditando">
                   <button class="btn-icon-clean" @click="iniciarEditarItemDetalle(index)" title="Editar">✎</button>
                   <button class="btn-icon-clean btn-icon-danger" @click="eliminarItemDetalle(index)" title="Eliminar">✕</button>
                 </template>
               </div>
+            </div>
+          </div>
+
+          <div v-if="ventaDetalleEnvases.length > 0" class="detalle-envase-section">
+            <div class="detalle-section-title">Envases</div>
+            <div class="detalle-envase-list">
+              <div v-for="d in ventaDetalleEnvases" :key="`env-${d.idVentaDetalle}`" class="detalle-envase-row">
+                <span class="detalle-envase-name">{{ d.productoNombre || 'Producto eliminado' }}</span>
+                <span class="detalle-envase-qty">{{ (d as any).cantidadEnvase || d.cantidad }} env.</span>
+                <span class="detalle-envase-price">{{ formatoMonedaRedondeada(Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0)) }}</span>
+              </div>
+            </div>
+            <div class="detalle-envase-total">
+              <span>Total Envases</span>
+              <strong>{{ formatoMonedaRedondeada(ventaDetalleEnvaseTotal) }}</strong>
             </div>
           </div>
 
@@ -4153,6 +4258,11 @@ onMounted(() => {
   border-color: var(--success-color);
 }
 
+.stat-card.envase {
+  border-color: var(--warning-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--warning-color) 15%, var(--bg-primary)) 100%);
+}
+
 .stat-glow {
   position: absolute;
   top: -50%;
@@ -4205,6 +4315,10 @@ onMounted(() => {
 
 .stat-card.success .stat-value {
   color: var(--success-color);
+}
+
+.stat-card.envase .stat-value {
+  color: var(--warning-color);
 }
 
 .stat-decoration {
@@ -4366,6 +4480,11 @@ onMounted(() => {
   border-color: var(--accent-color);
 }
 
+.reporte-card.envase-card {
+  border-color: var(--warning-color);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--warning-color) 8%, var(--bg-card)) 0%, var(--bg-card) 100%);
+}
+
 .card-header {
   display: flex;
   align-items: center;
@@ -4403,6 +4522,10 @@ onMounted(() => {
   color: var(--error-color);
 }
 
+.card-value.envase-value {
+  color: var(--warning-color);
+}
+
 .card-details {
   font-size: 0.75rem;
 }
@@ -4432,6 +4555,12 @@ onMounted(() => {
 
 .click-hint {
   color: var(--accent-color);
+  font-style: italic;
+  font-size: 0.7rem;
+}
+
+.envase-hint {
+  color: var(--warning-color);
   font-style: italic;
   font-size: 0.7rem;
 }
@@ -11483,6 +11612,66 @@ th {
   margin-bottom: 1rem;
 }
 
+.detalle-envase-section {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-color) 25%, transparent);
+  border-radius: 8px;
+}
+
+.detalle-envase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.detalle-envase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  font-size: 0.8rem;
+}
+
+.detalle-envase-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detalle-envase-qty {
+  color: var(--text-muted);
+  margin: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+.detalle-envase-price {
+  font-weight: 600;
+  color: var(--warning-color);
+  white-space: nowrap;
+}
+
+.detalle-envase-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.5rem;
+  border-top: 1px dashed color-mix(in srgb, var(--warning-color) 40%, transparent);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.detalle-envase-total strong {
+  color: var(--warning-color);
+  font-size: 0.9rem;
+}
+
 .detalle-item-row {
   display: flex;
   align-items: center;
@@ -11548,6 +11737,20 @@ th {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--success-color);
+  white-space: nowrap;
+}
+
+.detalle-price-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.detalle-envase-inline {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--warning-color);
   white-space: nowrap;
 }
 
