@@ -52,6 +52,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "dulcesnc_abarroter
         nombre VARCHAR(255) NOT NULL,
         codigo_barras VARCHAR(255),
         id_categoria INT NOT NULL DEFAULT 1,
+        id_subcategoria INT,
         precio_costo DECIMAL(10, 2) NOT NULL,
         precio_venta DECIMAL(10, 2) NOT NULL,
         cantidad_min INT NOT NULL,
@@ -59,6 +60,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "dulcesnc_abarroter
         stock INT NOT NULL,
         precio_mayoreo DECIMAL(10, 2),
         is_gramaje BOOLEAN DEFAULT FALSE,
+        requiere_envase BOOLEAN DEFAULT FALSE,
+        precio_envase DECIMAL(10, 2) DEFAULT 0,
         estatus VARCHAR(1) DEFAULT 'A',
         CONSTRAINT fk_categoria_producto_abarrotera
             FOREIGN KEY(id_categoria) REFERENCES tiendadb_abarrotera.categorias(id_categoria)
@@ -208,6 +211,56 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "dulcesnc_abarroter
 
     CREATE INDEX idx_apartado_pago_apartado_abarrotera ON tiendadb_abarrotera.apartado_pago(id_apartado);
     CREATE INDEX idx_apartado_pago_usuario_abarrotera ON tiendadb_abarrotera.apartado_pago(id_usuario);
+
+    -- 14. Proveedores
+    CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.proveedores (
+        id_proveedor SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        contacto VARCHAR(255),
+        telefono VARCHAR(50),
+        email VARCHAR(255),
+        direccion VARCHAR(500),
+        notas TEXT,
+        tipo_proveedor VARCHAR(20) DEFAULT 'DIRECTA',
+        dias_entrega VARCHAR(100) DEFAULT '',
+        estatus VARCHAR(1) DEFAULT 'A'
+    );
+
+    -- 15. Pedidos de proveedor
+    CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.pedidos_proveedor (
+        id_pedido SERIAL PRIMARY KEY,
+        id_proveedor INT NOT NULL,
+        fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
+        fecha_entrega_esperada DATE NOT NULL,
+        monto_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        monto_apartado DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        estatus VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        notas TEXT,
+        CONSTRAINT fk_pedido_proveedor_abarrotera FOREIGN KEY (id_proveedor) REFERENCES tiendadb_abarrotera.proveedores(id_proveedor)
+    );
+
+    -- 16. Detalle de pedidos
+    CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.pedido_detalle (
+        id_detalle SERIAL PRIMARY KEY,
+        id_pedido INT NOT NULL,
+        id_producto INT NOT NULL,
+        cantidad INT NOT NULL,
+        precio_unitario DECIMAL(10, 2) NOT NULL,
+        subtotal DECIMAL(10, 2) NOT NULL,
+        CONSTRAINT fk_detalle_pedido_abarrotera FOREIGN KEY (id_pedido) REFERENCES tiendadb_abarrotera.pedidos_proveedor(id_pedido) ON DELETE CASCADE,
+        CONSTRAINT fk_detalle_producto_abarrotera FOREIGN KEY (id_producto) REFERENCES tiendadb_abarrotera.productos(id_producto)
+    );
+
+    -- 17. Producto-Proveedor mapping
+    CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.producto_proveedor (
+        id SERIAL PRIMARY KEY,
+        id_producto INT NOT NULL,
+        id_proveedor INT NOT NULL,
+        precio_acordado DECIMAL(10, 2),
+        CONSTRAINT fk_pp_producto_abarrotera FOREIGN KEY (id_producto) REFERENCES tiendadb_abarrotera.productos(id_producto) ON DELETE CASCADE,
+        CONSTRAINT fk_pp_proveedor_abarrotera FOREIGN KEY (id_proveedor) REFERENCES tiendadb_abarrotera.proveedores(id_proveedor) ON DELETE CASCADE,
+        CONSTRAINT uq_producto_proveedor_abarrotera UNIQUE (id_producto, id_proveedor)
+    );
 
     -- ============================================
     -- Sincronizacion de usuarios desde dulcesnc

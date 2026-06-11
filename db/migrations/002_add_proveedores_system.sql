@@ -37,3 +37,18 @@ CREATE TABLE IF NOT EXISTS tiendadb.pedido_detalle (
     CONSTRAINT fk_detalle_pedido FOREIGN KEY (id_pedido) REFERENCES tiendadb.pedidos_proveedor(id_pedido) ON DELETE CASCADE,
     CONSTRAINT fk_detalle_producto FOREIGN KEY (id_producto) REFERENCES tiendadb.productos(id_producto)
 );
+
+-- Add supplier type and delivery days (migration 004)
+ALTER TABLE tiendadb.proveedores ADD COLUMN IF NOT EXISTS tipo_proveedor VARCHAR(20) DEFAULT 'DIRECTA';
+ALTER TABLE tiendadb.proveedores ADD COLUMN IF NOT EXISTS dias_entrega VARCHAR(100) DEFAULT '';
+
+-- Create producto_proveedor mapping table
+CREATE TABLE IF NOT EXISTS tiendadb.producto_proveedor (
+    id SERIAL PRIMARY KEY,
+    id_producto INT NOT NULL,
+    id_proveedor INT NOT NULL,
+    precio_acordado DECIMAL(10, 2),
+    CONSTRAINT fk_pp_producto FOREIGN KEY (id_producto) REFERENCES tiendadb.productos(id_producto) ON DELETE CASCADE,
+    CONSTRAINT fk_pp_proveedor FOREIGN KEY (id_proveedor) REFERENCES tiendadb.proveedores(id_proveedor) ON DELETE CASCADE,
+    CONSTRAINT uq_producto_proveedor UNIQUE (id_producto, id_proveedor)
+);

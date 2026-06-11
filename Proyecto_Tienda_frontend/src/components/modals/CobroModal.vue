@@ -12,6 +12,7 @@ const emit = defineEmits<{
   (event: 'confirmar-transferencia'): void;
   (event: 'confirmar-tarjeta'): void;
   (event: 'confirmar-pendiente'): void;
+  (event: 'confirmar-credito'): void;
 }>();
 
 const montoRecibido = ref<number | null>(null);
@@ -69,6 +70,9 @@ function manejarTeclado(e: KeyboardEvent) {
   } else if (e.key === 'F5') {
     e.preventDefault();
     emit('confirmar-pendiente');
+  } else if (e.key === 'F6') {
+    e.preventDefault();
+    emit('confirmar-credito');
   }
 }
 
@@ -162,6 +166,13 @@ onUnmounted(() => {
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Pendiente</span>
                 <span class="btn-shortcut">F5</span>
+                <span class="btn-rune">◈</span>
+              </button>
+              
+              <button class="pay-btn credito" @click="emit('confirmar-credito')">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Crédito</span>
+                <span class="btn-shortcut">F6</span>
                 <span class="btn-rune">◈</span>
               </button>
             </div>
@@ -600,6 +611,15 @@ onUnmounted(() => {
 
 .pendiente:hover {
   background: linear-gradient(180deg, #d4b87b 0%, #9a8a5a 100%);
+}
+
+.credito {
+  background: linear-gradient(180deg, #8a6bb4 0%, #6a4a8a 100%);
+  color: #f0e8ff;
+}
+
+.credito:hover {
+  background: linear-gradient(180deg, #9a7bc4 0%, #7a5a9a 100%);
 }
 
 .cancel-btn {

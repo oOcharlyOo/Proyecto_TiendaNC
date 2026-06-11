@@ -117,6 +117,7 @@ CREATE TABLE tiendadb.productos (
     nombre VARCHAR(255) NOT NULL,
     codigo_barras VARCHAR(255),
     id_categoria INT NOT NULL DEFAULT 1,
+    id_subcategoria INT,
     precio_costo DECIMAL(10, 2) NOT NULL,
     precio_venta DECIMAL(10, 2) NOT NULL,
     cantidad_min INT NOT NULL,
@@ -280,3 +281,53 @@ $$;
 INSERT INTO tiendadb.tipos_usuario (nombre, descripcion) VALUES 
 ('Administrador', 'Usuario con todos los privilegios'),
 ('Cajero', 'Usuario encargado de las ventas y manejo de caja');
+
+-- Proveedores table
+CREATE TABLE IF NOT EXISTS tiendadb.proveedores (
+    id_proveedor SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    contacto VARCHAR(255),
+    telefono VARCHAR(50),
+    email VARCHAR(255),
+    direccion VARCHAR(500),
+    notas TEXT,
+    tipo_proveedor VARCHAR(20) DEFAULT 'DIRECTA',
+    dias_entrega VARCHAR(100) DEFAULT '',
+    estatus VARCHAR(1) DEFAULT 'A'
+);
+
+-- Pedidos de proveedor table
+CREATE TABLE IF NOT EXISTS tiendadb.pedidos_proveedor (
+    id_pedido SERIAL PRIMARY KEY,
+    id_proveedor INT NOT NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
+    fecha_entrega_esperada DATE NOT NULL,
+    monto_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    monto_apartado DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    estatus VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+    notas TEXT,
+    CONSTRAINT fk_pedido_proveedor FOREIGN KEY (id_proveedor) REFERENCES tiendadb.proveedores(id_proveedor)
+);
+
+-- Detalle de pedidos table
+CREATE TABLE IF NOT EXISTS tiendadb.pedido_detalle (
+    id_detalle SERIAL PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10, 2) NOT NULL,
+    subtotal DECIMAL(10, 2) NOT NULL,
+    CONSTRAINT fk_detalle_pedido FOREIGN KEY (id_pedido) REFERENCES tiendadb.pedidos_proveedor(id_pedido) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_producto FOREIGN KEY (id_producto) REFERENCES tiendadb.productos(id_producto)
+);
+
+-- Producto-Proveedor mapping table
+CREATE TABLE IF NOT EXISTS tiendadb.producto_proveedor (
+    id SERIAL PRIMARY KEY,
+    id_producto INT NOT NULL,
+    id_proveedor INT NOT NULL,
+    precio_acordado DECIMAL(10, 2),
+    CONSTRAINT fk_pp_producto FOREIGN KEY (id_producto) REFERENCES tiendadb.productos(id_producto) ON DELETE CASCADE,
+    CONSTRAINT fk_pp_proveedor FOREIGN KEY (id_proveedor) REFERENCES tiendadb.proveedores(id_proveedor) ON DELETE CASCADE,
+    CONSTRAINT uq_producto_proveedor UNIQUE (id_producto, id_proveedor)
+);

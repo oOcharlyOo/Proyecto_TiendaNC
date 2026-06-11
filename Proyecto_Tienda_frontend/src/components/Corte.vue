@@ -84,6 +84,7 @@ type VentaDTO = {
   usuario?: UsuarioDTO;
   nombreUsuario?: string;
   tieneDiscrepancia?: boolean;
+  detalles?: VentaDetalleDTO[];
 };
 
 type GananciasDTO = {
@@ -91,6 +92,23 @@ type GananciasDTO = {
   gananciaTotal?: number;
   ventas?: VentaDTO[];
   nombreUsuario?: string;
+};
+
+type ReporteDiarioCompletoDTO = {
+  ventas: VentaDTO[];
+  cobroTotal: number;
+  gananciaTotal: number;
+  ventasEfectivo: number;
+  ventasTarjeta: number;
+  ventasTransferencia: number;
+  totalTickets: number;
+  montoInicial: number;
+  otrosIngresos: number;
+  totalEgresos: number;
+  horaInicio: string | null;
+  horaFin: string | null;
+  nombreUsuario: string | null;
+  todosDetalles: VentaDetalleDTO[];
 };
 
 type CorteDTO = {
@@ -766,46 +784,38 @@ async function generarCorte() {
     // Usar las ganancias del corte (ya filtradas por usuario)
     // El backend ya filtra por usuario, no necesitamos sobrescribir
 
-    // Calcular total de envases del corte actual
-    try {
-      const hoy = fechaCorte.toISOString().slice(0, 10);
-      const ventasCorte = await fetchApi<VentaDTO[]>(`/ventas/obtenerVentaPorDia/${hoy}`);
-      const idsVentasCorte = (Array.isArray(ventasCorte?.ventas) ? ventasCorte.ventas : [])
-        .filter(v => v.estatus === 'C' || v.estatus === 'F')
-        .map(v => v.idVenta);
-      
-      if (idsVentasCorte.length > 0) {
-        const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
-        const detallesCorte = (allDetails || []).filter(d => {
-          const idVenta = Number(d?.Venta?.idVenta || 0);
-          return idsVentasCorte.includes(idVenta);
-        });
-        
-        totalEnvase.value = detallesCorte.reduce((sum, d) => {
-          return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
-        }, 0);
-      } else {
-        totalEnvase.value = 0;
-      }
-    } catch (e) {
-      console.error('Error al calcular total envases:', e);
-      totalEnvase.value = 0;
-    }
-
-    if (idUsuario.value) {
-      try {
-        const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
-        const totalValue = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
-        totalApartarDiario.value = totalValue;
-        
-        const apartadosData = await fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`);
-        apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
-      } catch (e) {
-        console.error('Error al obtener total apartados:', e);
-        totalApartarDiario.value = 0;
-        apartadosActivos.value = [];
-      }
-    }
+    // Paralelizar envases + apartados (independientes)
+    const hoy = fechaCorte.toISOString().slice(0, 10);
+    await Promise.all([
+      (async () => {
+        try {
+          const reporteDiario = await fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${hoy}`);
+          const detallesCorte = reporteDiario.todosDetalles || [];
+          totalEnvase.value = detallesCorte.reduce((sum, d) => {
+            return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+          }, 0);
+        } catch (e) {
+          console.error('Error al calcular total envases:', e);
+          totalEnvase.value = 0;
+        }
+      })(),
+      (async () => {
+        if (idUsuario.value) {
+          try {
+            const [totalApartadoData, apartadosData] = await Promise.all([
+              fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`),
+              fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`)
+            ]);
+            totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+            apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
+          } catch (e) {
+            console.error('Error al obtener apartados:', e);
+            totalApartarDiario.value = 0;
+            apartadosActivos.value = [];
+          }
+        }
+      })()
+    ]);
 
     mostrarMensaje('Corte de caja generado con exito.', 'ok');
   } catch (error) {
@@ -827,51 +837,29 @@ async function generarReporteDiario() {
   mostrarReporte.value = false;
 
   try {
-    const data = await fetchApi<GananciasDTO>(`/ventas/obtenerVentaPorDia/${fechaDiaria.value}`);
-    console.log('Data response:', data);
-    const ventas = Array.isArray(data?.ventas) ? data.ventas : [];
-    console.log('Ventas:', ventas);
-    console.log('Primera venta:', ventas[0]);
+    const reporte = await fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${fechaDiaria.value}`);
+    const ventas = reporte.ventas || [];
 
-    const todosDetalles = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
-    const detallesMap = new Map<number, VentaDetalleDTO[]>();
-    for (const d of todosDetalles || []) {
-      const idVenta = Number(d?.Venta?.idVenta || 0);
-      if (!detallesMap.has(idVenta)) {
-        detallesMap.set(idVenta, []);
-      }
-      detallesMap.get(idVenta)?.push(d);
-    }
-    
+    // Verificar discrepancias usando detalles embebidos en cada venta
     for (const venta of ventas) {
-      const detalles = detallesMap.get(venta.idVenta) || [];
+      const detalles = venta.detalles || [];
       const montoVenta = Number(venta.montoTotal ?? 0);
-      venta.tieneDiscrepancia = verificarDiscrepancia(detalles, montoVenta);
+      venta.tieneDiscrepancia = verificarDiscrepancia(detalles as any, montoVenta);
     }
 
-    ventasEfectivo.value = ventas
-      .filter((v) => ['EFECTIVO', 'Efectivo'].includes(String(v.metodoPago || '')))
-      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
+    ventasEfectivo.value = Number(reporte.ventasEfectivo || 0);
+    ventasTarjeta.value = Number(reporte.ventasTarjeta || 0);
+    ventasTransferencia.value = Number(reporte.ventasTransferencia || 0);
 
-    ventasTarjeta.value = ventas
-      .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TARJETA')
-      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
-
-    ventasTransferencia.value = ventas
-      .filter((v) => String(v.metodoPago || '').toUpperCase() === 'TRANSFERENCIA')
-      .reduce((sum, v) => sum + Number(v.montoTotal || 0), 0);
-
-    // Obtener usuarios únicos que trabajaron ese día
     const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
     usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
 
-    // Calcular días trabajados en la semana actual
     const today = new Date();
     const dayOfWeek = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     monday.setHours(0, 0, 0, 0);
-    
+
     const diasSemanaMap = new Map<number, Set<string>>();
     for (const v of ventas) {
       if (v.idUsuario && v.fechaVenta) {
@@ -882,146 +870,66 @@ async function generarReporteDiario() {
         diasSemanaMap.get(v.idUsuario)?.add(fecha);
       }
     }
-    
+
     usuariosConSueldo.value = usuariosConSueldo.value.map(u => ({
       ...u,
       diasTrabajados: diasSemanaMap.get(u.id)?.size || 1
     }));
 
-    console.log('Usuarios que trabajaron:', idsUsuariosUnicos);
-    console.log('Días trabajados:', Object.fromEntries(diasSemanaMap));
-    console.log('Dinero a apartar diario:', dineroApartarDiario.value);
-
-    // Obtener datos de caja (monto inicial, ingresos, egresos) del día sin importar usuario
-    let montoInicial = 0;
-    let otrosIngresos = 0;
-    let totalEgresos = 0;
-    
-    try {
-      const cajaData = await fetchApi<any>(`/caja/reporteDiario/${fechaDiaria.value}`);
-      console.log('Caja data response:', cajaData);
-      const datos = cajaData?.datos || cajaData;
-      if (datos) {
-        montoInicial = Number(datos.montoInicial) || 0;
-        otrosIngresos = Number(datos.otrosIngresos) || 0;
-        totalEgresos = Number(datos.totalEgresos) || 0;
-        horaInicioCaja.value = datos.horaInicio || null;
-        horaFinCaja.value = datos.horaFin || null;
-        if (datos.nombreUsuario) {
-          nombreUsuario.value = datos.nombreUsuario;
-        }
-      }
-    } catch (e) {
-      console.error('Error al obtener datos de caja:', e);
+    const montoInicial = Number(reporte.montoInicial || 0);
+    const otrosIngresos = Number(reporte.otrosIngresos || 0);
+    const totalEgresos = Number(reporte.totalEgresos || 0);
+    horaInicioCaja.value = reporte.horaInicio || null;
+    horaFinCaja.value = reporte.horaFin || null;
+    if (reporte.nombreUsuario) {
+      nombreUsuario.value = reporte.nombreUsuario;
     }
 
-    const totalVentas = Number(data?.cobroTotal || 0);
+    const totalVentas = Number(reporte.cobroTotal || 0);
     const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
     const saldoFinalEfectivo = montoInicial + Number(ventasEfectivo.value || 0) + otrosIngresos - totalEgresos;
 
-    if (data?.nombreUsuario && !nombreUsuario.value) {
-      nombreUsuario.value = data.nombreUsuario;
-    } else {
-      const ventasCountMap = new Map<number, { nombre: string; count: number }>();
-      for (const v of ventas) {
-        const nombre = v.nombreUsuario || v.usuario?.nombre;
-        const id = v.idUsuario || v.usuario?.idUsuario;
-        if (id && nombre) {
-          const current = ventasCountMap.get(id);
-          if (current) {
-            current.count++;
-          } else {
-            ventasCountMap.set(id, { nombre, count: 1 });
-          }
-        }
-      }
-      let cajeroPrincipal = 'Varios';
-      let maxVentas = 0;
-      for (const [, dataVenta] of ventasCountMap) {
-        if (dataVenta.count > maxVentas) {
-          maxVentas = dataVenta.count;
-          cajeroPrincipal = dataVenta.nombre;
-        }
-      }
-      if (ventasCountMap.size === 1) {
-        cajeroPrincipal = Array.from(ventasCountMap.values())[0]?.nombre || 'Usuario';
-      }
-      nombreUsuario.value = cajeroPrincipal;
-    }
-
-    console.log('Setting corteActual:', {
-      montoInicial,
-      totalVentas,
-      otrosIngresos,
-      totalEgresos,
-      saldoFinal
-    });
-
-    const gananciaBruta = Number(data?.gananciaTotal || 0);
+    const gananciaBruta = Number(reporte.gananciaTotal || 0);
     const gananciaNeta = Math.max(0, gananciaBruta - dineroApartarDiario.value);
 
     corteActual.value = {
       fechaCorte: `${fechaDiaria.value}T00:00:00`,
-      montoInicial: montoInicial,
-      totalVentas: totalVentas,
-      totalEgresos: totalEgresos,
-      otrosIngresos: otrosIngresos,
+      montoInicial,
+      totalVentas,
+      totalEgresos,
+      otrosIngresos,
       saldoFinalCalculado: saldoFinal,
-      saldoFinalEfectivo: saldoFinalEfectivo,
+      saldoFinalEfectivo,
       gananciaTotal: gananciaBruta,
-      gananciaNeta: gananciaNeta,
+      gananciaNeta,
       ventasTarjeta: Number(ventasTarjeta.value || 0),
       ventasEfectivo: Number(ventasEfectivo.value || 0),
       ventasTransferencia: Number(ventasTransferencia.value || 0)
     };
 
-    // Obtener productos más vendidos del día
-    try {
-      const idsVentasDia = ventas.filter(v => v.estatus === 'C' || v.estatus === 'F').map(v => v.idVenta);
-      console.log('IDs ventas dia:', idsVentasDia);
-      if (idsVentasDia.length > 0) {
-        const allDetails = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
-        console.log('All details:', allDetails);
-        const detallesDia = (allDetails || []).filter(d => {
-          const idVenta = Number(d?.Venta?.idVenta || 0);
-          return idsVentasDia.includes(idVenta);
-        });
-        console.log('Detalles filtrados:', detallesDia);
-        detallesDiario.value = detallesDia;
-        
-        const totalEnvaseDia = detallesDia.reduce((sum, d) => {
-          return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
-        }, 0);
-        totalEnvase.value = totalEnvaseDia;
-        
-        calcularProductosReporte(detallesDia, 'diario');
-        console.log('Productos diario:', productosDiario.value);
-        console.log('Productos unitarios diario:', productosUnitariosDiario.value);
-        console.log('Productos granel diario:', productosGranelDiario.value);
-      } else {
-        productosDiario.value = [];
-        productosUnitariosDiario.value = [];
-        productosGranelDiario.value = [];
-      }
-    } catch (e) {
-      console.error('Error al obtener productos más vendidos:', e);
-      productosDiario.value = [];
-      productosUnitariosDiario.value = [];
-      productosGranelDiario.value = [];
-    }
+    const todosDetalles = reporte.todosDetalles || [];
+    detallesDiario.value = todosDetalles;
+    totalEnvase.value = todosDetalles.reduce((sum, d) => {
+      return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+    }, 0);
+    calcularProductosReporte(todosDetalles, 'diario');
 
     if (idUsuario.value) {
       try {
-        const totalApartadoData = await fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`);
-        const totalValue = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
-        totalApartarDiario.value = totalValue;
+        const [totalApartadoData, apartadosData] = await Promise.all([
+          fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`),
+          fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`)
+        ]);
+        totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+        apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
       } catch (e) {
-        console.error('Error al obtener total apartados:', e);
+        console.error('Error al obtener apartados:', e);
         totalApartarDiario.value = 0;
+        apartadosActivos.value = [];
       }
     }
 
-    totalTicketsDia.value = ventas.length;
+    totalTicketsDia.value = reporte.totalTickets ?? ventas.length;
     reporteTitulo.value = `Reporte del Dia: ${fechaDiaria.value}`;
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = false;
@@ -10738,6 +10646,64 @@ th {
   .card-metric.total {
     grid-column: span 2;
   }
+}
+
+/* =========================================
+   MODAL CARD BASE STYLES
+   ========================================= */
+.modal-card.panel {
+  position: relative;
+  width: min(95vw, 500px);
+  max-height: 90vh;
+  background: var(--bg-secondary);
+  border: 3px solid var(--accent-color);
+  border-radius: 16px;
+  box-shadow: 
+    0 0 0 2px var(--border-color),
+    0 8px 0 var(--border-color),
+    0 12px 32px var(--shadow-color),
+    inset 0 0 40px color-mix(in srgb, var(--accent-color) 10%, transparent);
+  overflow: hidden;
+  animation: fadeSlideIn 300ms ease-out;
+}
+
+.modal-card.panel::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.modal-content-scroll {
+  padding: 1.5rem;
+  max-height: calc(90vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.modal-content-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content-scroll::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.modal-content-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
+}
+
+.modal-actions.solo-accion {
+  display: flex;
+  justify-content: center;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 /* =========================================

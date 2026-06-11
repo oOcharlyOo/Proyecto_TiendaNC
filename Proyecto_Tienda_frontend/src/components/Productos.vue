@@ -41,6 +41,8 @@ type ProductoDTO = {
   idSubcategoria?: number | null;
   requiere_envase?: boolean;
   precio_envase?: number;
+  presentacion_caja?: string;
+  cajas?: { piezas: number }[];
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -55,6 +57,7 @@ const categoriaFiltro = ref<number | null>(null);
 const subcategoriaFiltro = ref<number | string | null>(null);
 const ordenStock = ref<'mayor' | 'menor' | null>(null);
 const filtroTipo = ref<'unidad' | 'gramaje' | null>(null);
+const vistaLista = ref(true);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
 const tabActiva = ref<'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte'>('productos');
 
@@ -77,6 +80,7 @@ let toastIdCounter = 0;
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const importando = ref(false);
+const vaciando = ref(false);
 
 async function exportarCSV() {
   const XLSX = await import('xlsx');
@@ -203,6 +207,30 @@ async function handleImport(event: Event) {
   } finally {
     importando.value = false;
     target.value = '';
+  }
+}
+
+async function vaciarInventario() {
+  if (!confirm('⚠️ ¿Estás seguro de que quieres VACIAR el inventario?\n\nEsto pondrá el stock de TODOS los productos en 0.\n\nLos productos NO se eliminarán, solo se reiniciará su stock.')) {
+    return;
+  }
+  if (!confirm('⚠️ CONFIRMACIÓN FINAL\n\nEsta acción no se puede deshacer fácilmente.\n\n¿Realmente deseas continuar?')) {
+    return;
+  }
+  vaciando.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/productos/vaciarInventario`, { method: 'PUT' });
+    const data = await res.json();
+    if (data?.codigo === 200) {
+      mostrarToast(`Inventario vaciado: ${data.datos} productos con stock en 0.`, 'ok');
+      await cargarProductos();
+    } else {
+      mostrarToast(data?.mensaje || 'Error al vaciar inventario.', 'error');
+    }
+  } catch (error) {
+    mostrarToast('Error de conexión al vaciar inventario.', 'error');
+  } finally {
+    vaciando.value = false;
   }
 }
 
@@ -380,12 +408,14 @@ async function handleSubmitProducto(payload: ProductoDTO) {
 
   guardando.value = true;
   try {
+    let idProducto: number;
     if (payload.idProducto) {
       const data = await fetchApi<ApiRespuesta<ProductoDTO>>(
         `${API_BASE}/productos/actualizarProducto/${payload.idProducto}`,
         { method: 'PUT', body: JSON.stringify(payload) }
       );
       if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo actualizar.');
+      idProducto = payload.idProducto;
       mostrarToast('Producto actualizado correctamente.', 'ok');
     } else {
       const data = await fetchApi<ApiRespuesta<ProductoDTO>>(
@@ -393,7 +423,27 @@ async function handleSubmitProducto(payload: ProductoDTO) {
         { method: 'POST', body: JSON.stringify(payload) }
       );
       if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo agregar.');
+      idProducto = data.datos!.idProducto!;
       mostrarToast('Producto agregado correctamente.', 'ok');
+    }
+
+    // Guardar presentaciones de caja si existen
+    if (payload.cajas && payload.cajas.length > 0) {
+      // Eliminar cajas existentes del producto
+      await fetch(`${API_BASE}/producto-presentacion-caja/eliminar-por-producto/${idProducto}`, { method: 'DELETE' });
+      // Crear cada presentación
+      for (const caja of payload.cajas) {
+        const res = await fetch(`${API_BASE}/producto-presentacion-caja/asignar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: null, id_producto: idProducto, piezas: caja.piezas })
+        });
+        const json = await res.json();
+        if (json?.codigo !== 200) throw new Error(json?.mensaje || 'Error al guardar presentación de caja');
+      }
+    } else if (payload.idProducto) {
+      // No hay cajas seleccionadas, limpiar las existentes
+      await fetch(`${API_BASE}/producto-presentacion-caja/eliminar-por-producto/${idProducto}`, { method: 'DELETE' });
     }
 
     await cargarProductos();
@@ -638,6 +688,14 @@ function procesarEscaneoProductos(codigo: string) {
               <span class="btn-icon">{{ importando ? '⏳' : '📥' }}</span>
               <span class="btn-text">{{ importando ? '...' : 'Importar' }}</span>
             </button>
+            <button type="button" class="btn-danger btn-sm" @click="vaciarInventario" :disabled="vaciando" title="Vaciar inventario (stock a 0)">
+              <span class="btn-icon">{{ vaciando ? '⏳' : '🗑️' }}</span>
+              <span class="btn-text">{{ vaciando ? '...' : 'Vaciar' }}</span>
+            </button>
+          </div>
+          <div class="view-toggles">
+            <button :class="['view-btn', { on: vistaLista }]" @click="vistaLista = true" title="Lista">📋</button>
+            <button :class="['view-btn', { on: !vistaLista }]" @click="vistaLista = false" title="Cuadrícula">🔲</button>
           </div>
           <button type="button" class="btn-primary" @click="abrirModalNuevoProducto">
             <span class="btn-icon">＋</span>
@@ -716,7 +774,7 @@ function procesarEscaneoProductos(codigo: string) {
             </button>
           </div>
 
-          <table v-else class="tabla-productos">
+          <table v-else-if="vistaLista" class="tabla-productos">
             <thead>
               <tr>
                 <th class="col-check">
@@ -842,6 +900,40 @@ function procesarEscaneoProductos(codigo: string) {
               </tr>
             </tbody>
           </table>
+
+          <!-- GRID VIEW -->
+          <div v-else class="productos-grid">
+            <article v-for="producto in productosFiltrados" :key="producto.idProducto" class="producto-card" :class="{ 'low-stock': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) > 0 && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0), 'out-of-stock': !esCategoriaGaming(producto.idCategoria) && Number(producto.stock || 0) === 0 }">
+              <div class="pc-top">
+                <span class="pc-id">#{{ String(producto.idProducto).padStart(4, '0') }}</span>
+                <span class="pc-dot" :class="esCategoriaGaming(producto.idCategoria) ? 'dot-gaming' : (Number(producto.stock || 0) === 0 ? 'dot-out' : (Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) ? 'dot-low' : 'dot-ok'))"></span>
+              </div>
+              <div class="pc-ico">{{ obtenerEmojiDulce(producto.idProducto) }}</div>
+              <h3 class="pc-name">{{ producto.nombre }}</h3>
+              <div class="pc-badges">
+                <span class="pc-badge">{{ obtenerNombreCategoria(producto.idCategoria) }}</span>
+                <span class="pc-badge pc-type">{{ producto.is_gramaje ? '⚖️ Gramaje' : '📦 Unidad' }}</span>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat">
+                  <span class="pc-stat-l">Stock</span>
+                  <span class="pc-stat-v" :class="esCategoriaGaming(producto.idCategoria) ? 'stat-rentable' : (Number(producto.stock || 0) === 0 ? 'stat-out' : (Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) ? 'stat-low' : 'stat-ok'))">{{ esCategoriaGaming(producto.idCategoria) ? '🎮 Rentable' : `${producto.stock || 0}${producto.is_gramaje ? 'g' : 'u'}` }}</span>
+                </div>
+                <div class="pc-stat">
+                  <span class="pc-stat-l">Venta</span>
+                  <span class="pc-stat-v stat-price">{{ formatoMoneda(Number(producto.precio_venta || 0)) }}</span>
+                </div>
+                <div class="pc-stat" v-if="producto.precio_mayoreo">
+                  <span class="pc-stat-l">Mayoreo</span>
+                  <span class="pc-stat-v stat-price">{{ formatoMoneda(producto.precio_mayoreo) }}</span>
+                </div>
+              </div>
+              <div class="pc-actions">
+                <button class="pc-btn" @click="abrirModalEditarProducto(producto)" title="Editar">✏️</button>
+                <button class="pc-btn pc-btn-del" @click="handleDeleteProducto(producto)" title="Eliminar">🗑️</button>
+              </div>
+            </article>
+          </div>
         </div>
 
         <div v-if="selectedProductos.size > 0" class="bulk-action-bar">
@@ -1226,6 +1318,41 @@ function procesarEscaneoProductos(codigo: string) {
 }
 
 .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  border: 2px solid #c75a5a;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: inherit;
+  color: #fff;
+  background: linear-gradient(180deg, #c75a5a 0%, #a04040 100%);
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(199, 90, 90, 0.3);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(199, 90, 90, 0.4);
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1903,6 +2030,15 @@ function procesarEscaneoProductos(codigo: string) {
   
   .toolbar-right {
     justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .view-toggles {
+    order: -1;
+    width: 100%;
+    max-width: 120px;
+    margin: 0 auto;
   }
   
   .import-export-group {
@@ -1921,6 +2057,18 @@ function procesarEscaneoProductos(codigo: string) {
   
   .col-precio,
   .col-stock {
+    display: none;
+  }
+  
+  .col-codigo {
+    display: none;
+  }
+  
+  .col-envase {
+    display: none;
+  }
+  
+  .col-subcategoria {
     display: none;
   }
   
@@ -2039,6 +2187,14 @@ function procesarEscaneoProductos(codigo: string) {
     padding: 0.75rem 0.5rem;
   }
   
+  .toolbar-right {
+    gap: 0.4rem;
+  }
+  
+  .view-toggles {
+    max-width: 100px;
+  }
+  
   .toolbar-title {
     font-size: 1.1rem;
   }
@@ -2145,6 +2301,18 @@ function procesarEscaneoProductos(codigo: string) {
     font-size: 0.7rem;
   }
   
+  .col-categoria {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .categoria-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+  }
+  
   .table-footer {
     padding: 0.6rem 1rem;
   }
@@ -2152,5 +2320,684 @@ function procesarEscaneoProductos(codigo: string) {
   .footer-count {
     font-size: 0.7rem;
   }
+  
+  .bulk-action-bar {
+    padding: 0.6rem 0.75rem;
+  }
+  
+  .bulk-count {
+    font-size: 0.8rem;
+  }
+  
+  .btn-bulk-action {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .import-export-group {
+    gap: 0.25rem;
+  }
+
+  .import-export-group .btn-text {
+    display: none;
+  }
+
+  .import-export-group .btn-secondary {
+    padding: 0.45rem 0.55rem;
+    min-width: 36px;
+    justify-content: center;
+  }
+
+  .import-export-group .btn-icon {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .toolbar-right {
+    gap: 0.4rem;
+  }
+
+  .btn-secondary.btn-sm {
+    padding: 0.4rem 0.5rem;
+  }
+
+  /* Table view ultra-compact */
+  .col-categoria {
+    display: none;
+  }
+
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.35rem 0.3rem;
+  }
+
+  .nombre-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+  }
+
+  .nombre-text {
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+
+  .nombre-id {
+    font-size: 0.5rem;
+  }
+
+  .stock-cell {
+    padding: 0.15rem 0.25rem;
+    font-size: 0.65rem;
+  }
+
+  .stock-icon {
+    font-size: 0.7rem;
+  }
+
+  .stock-value {
+    font-size: 0.65rem;
+  }
+
+  .tipo-badge {
+    font-size: 0.55rem;
+    padding: 0.08rem 0.25rem;
+  }
+
+  .btn-action {
+    width: 24px;
+    height: 24px;
+  }
+
+  .btn-action .action-icon {
+    width: 11px;
+    height: 11px;
+  }
+
+  .acciones-cell {
+    gap: 0.15rem;
+  }
+
+  .productos-layout {
+    padding: 0.35rem;
+  }
+  
+  .toolbar {
+    padding: 0.6rem 0.4rem;
+    gap: 0.35rem;
+  }
+  
+  .toolbar-title {
+    font-size: 0.95rem;
+  }
+  
+  .title-icon {
+    font-size: 1rem;
+  }
+  
+  .toolbar-subtitle {
+    font-size: 0.65rem;
+  }
+  
+  .toolbar-right {
+    gap: 0.3rem;
+  }
+  
+  .category-filter,
+  .search-input {
+    font-size: 0.75rem;
+    padding: 0.45rem 1.8rem 0.45rem 0.6rem;
+  }
+  
+  .search-wrapper {
+    width: 100%;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .view-toggles {
+    max-width: 90px;
+  }
+  
+  .tab-btn {
+    padding: 0.6rem 0.4rem;
+  }
+  
+  .tab-icon {
+    font-size: 1rem;
+  }
+  
+  .tabs-bar {
+    padding: 0 0.3rem;
+    gap: 0;
+  }
+  
+  /* Table view ultra-compact */
+  .tabla-productos {
+    font-size: 0.7rem;
+  }
+  
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.4rem 0.35rem;
+  }
+  
+  .col-check {
+    width: 30px;
+  }
+  
+  .row-checkbox {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .col-icon {
+    width: 30px;
+  }
+  
+  .icon-cell {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  
+  .nombre-text {
+    font-size: 0.7rem;
+  }
+  
+  .nombre-id {
+    font-size: 0.55rem;
+  }
+  
+  .categoria-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .btn-action {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .btn-action .action-icon {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .stock-value {
+    font-size: 0.7rem;
+  }
+  
+  .stock-icon {
+    font-size: 0.75rem;
+  }
+  
+  .tipo-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+  
+  .envase-badge {
+    font-size: 0.6rem;
+  }
+  
+  /* Grid view ultra-compact */
+  .productos-grid {
+    gap: 0.35rem;
+    padding: 0.3rem 0;
+  }
+  
+  .producto-card {
+    padding: 0.45rem;
+    gap: 0.25rem;
+    border-radius: 8px;
+  }
+  
+  .pc-top {
+    margin-bottom: 0.1rem;
+  }
+  
+  .pc-id {
+    font-size: 0.5rem;
+  }
+  
+  .pc-dot {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .pc-ico {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+  
+  .pc-name {
+    font-size: 0.6rem;
+    min-height: 1.2em;
+    -webkit-line-clamp: 1;
+  }
+  
+  .pc-badges {
+    gap: 0.2rem;
+  }
+  
+  .pc-badge {
+    font-size: 0.45rem;
+    padding: 0.05rem 0.25rem;
+    border-radius: 4px;
+  }
+  
+  .pc-stats {
+    gap: 0.15rem;
+  }
+  
+  .pc-stat {
+    padding: 0.12rem 0.2rem;
+    border-radius: 4px;
+  }
+  
+  .pc-stat-l {
+    font-size: 0.4rem;
+  }
+  
+  .pc-stat-v {
+    font-size: 0.5rem;
+  }
+  
+  .pc-actions {
+    gap: 0.15rem;
+    margin-top: 0.05rem;
+  }
+  
+  .pc-btn {
+    height: 24px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+  }
+  
+  /* Toast */
+  .toast-container {
+    bottom: 0.3rem;
+    right: 0.3rem;
+    left: 0.3rem;
+  }
+  
+  .toast-notification {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.75rem;
+  }
+  
+  .toast-icon {
+    font-size: 0.9rem;
+  }
+  
+  .toast-message {
+    font-size: 0.7rem;
+  }
+  
+  /* Empty/loading states */
+  .estado-loading,
+  .estado-empty {
+    padding: 2rem 0.3rem;
+  }
+  
+  .empty-icon {
+    font-size: 2rem;
+  }
+  
+  .empty-text {
+    font-size: 0.8rem;
+  }
+  
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 2px;
+  }
+  
+  /* Bulk action bar */
+  .bulk-action-bar {
+    padding: 0.5rem 0.6rem;
+    gap: 0.4rem;
+  }
+  
+  .bulk-count {
+    font-size: 0.7rem;
+  }
+  
+  .btn-clear-selection {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+  }
+  
+  .btn-bulk-action {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+  }
+  
+  .btn-icon {
+    font-size: 0.85rem;
+  }
+  
+  .btn-text {
+    font-size: 0.65rem;
+  }
+}
+
+/* VIEW TOGGLES */
+.view-toggles {
+  display: flex;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.view-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 1rem;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.view-btn.on { 
+  background: var(--accent-color); 
+  color: var(--bg-primary);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+.view-btn:hover:not(.on) { background: var(--bg-secondary); }
+.view-btn:active { transform: scale(0.95); }
+
+@media (max-width: 768px) {
+  .view-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .view-toggles {
+    border-width: 1px;
+    border-radius: 6px;
+  }
+  
+  .view-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .view-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 0.85rem;
+  }
+}
+
+/* PRODUCTOS GRID */
+.productos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .productos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .productos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .producto-card {
+    padding: 0.6rem;
+  }
+  
+  .pc-ico {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+  
+  .pc-name {
+    font-size: 0.7rem;
+  }
+  
+  .pc-stat-l {
+    font-size: 0.5rem;
+  }
+  
+  .pc-stat-v {
+    font-size: 0.6rem;
+  }
+  
+  .pc-btn {
+    height: 28px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .productos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+  }
+  
+  .producto-card {
+    padding: 0.5rem;
+    gap: 0.3rem;
+  }
+  
+  .pc-ico {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  
+  .pc-name {
+    font-size: 0.65rem;
+    -webkit-line-clamp: 1;
+  }
+  
+  .pc-badge {
+    font-size: 0.5rem;
+    padding: 0.05rem 0.3rem;
+  }
+  
+  .pc-stat {
+    padding: 0.15rem 0.25rem;
+  }
+  
+  .pc-stat-l {
+    font-size: 0.45rem;
+  }
+  
+  .pc-stat-v {
+    font-size: 0.55rem;
+  }
+  
+  .pc-actions {
+    gap: 0.2rem;
+  }
+  
+  .pc-btn {
+    height: 26px;
+    font-size: 0.75rem;
+  }
+}
+
+.producto-card {
+  position: relative;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.producto-card:hover {
+  border-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.producto-card.low-stock { border-color: rgba(245, 158, 11, 0.4); }
+.producto-card.out-of-stock { border-color: rgba(239, 68, 68, 0.4); }
+
+.pc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pc-id {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.pc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-ok { background: #22c55e; box-shadow: 0 0 4px #22c55e; }
+.dot-low { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+.dot-out { background: #ef4444; box-shadow: 0 0 4px #ef4444; }
+.dot-gaming { background: #8b5cf6; box-shadow: 0 0 4px #8b5cf6; }
+
+.pc-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  font-size: 1.2rem;
+  border: 1px solid var(--border-color);
+  align-self: center;
+}
+
+.pc-name {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--accent-color);
+  text-align: center;
+  line-height: 1.25;
+  min-height: 1.5em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: 'HyliaSerif', serif;
+}
+
+.pc-badges {
+  display: flex;
+  gap: 0.3rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pc-badge {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  padding: 0.1rem 0.4rem;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+.pc-type { color: var(--accent-color); }
+
+.pc-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pc-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0.35rem;
+  background: var(--bg-secondary);
+  border-radius: 5px;
+}
+
+.pc-stat-l {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+}
+
+.pc-stat-v {
+  font-size: 0.65rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stat-ok { color: #22c55e; }
+.stat-low { color: #f59e0b; }
+.stat-out { color: #ef4444; }
+.stat-rentable { color: #8b5cf6; }
+.stat-price { color: var(--success-color); }
+
+.pc-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+.pc-btn {
+  flex: 1;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.pc-btn:hover {
+  transform: scale(1.05);
+  border-color: var(--accent-color);
+}
+
+.pc-btn-del:hover {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, var(--bg-secondary));
 }
 </style>

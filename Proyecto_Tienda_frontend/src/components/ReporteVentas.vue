@@ -76,6 +76,7 @@ type DiaStats = {
   label: string;
   ventas: number;
   monto: number;
+  ganancia: number;
 };
 
 type MovimientoCaja = {
@@ -85,10 +86,12 @@ type MovimientoCaja = {
   monto: number;
   descripcion: string;
   saldoResultante: number;
+  montoInicial?: number;
 };
 
 const entradasCaja = ref<MovimientoCaja[]>([]);
 const salidasCaja = ref<MovimientoCaja[]>([]);
+const montoInicialPeriodo = ref<number>(0);
 
 function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -99,6 +102,9 @@ const periodo = ref<'dia' | 'semana' | 'mes' | 'anio'>('mes');
 const fechaSeleccionada = ref('');
 const detalles = ref<VentasDetalleListDTO[]>([]);
 const cargando = ref(false);
+const modalCategoriaOpen = ref(false);
+const categoriaSeleccionada = ref('');
+const subCategoriaSeleccionada = ref('');
 
 const ventasMap = computed(() => {
   const map = new Map<number, { 
@@ -142,8 +148,8 @@ const productosTop = computed<ProductoStats[]>(() => {
     let monto: number;
     let costo: number;
     
-    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
-      monto = precioVenta;
+    if (d.productoIsGramaje) {
+      monto = precioVenta * (cantidad / 1000);
       costo = (precioCostoKg / 1000) * cantidad;
     } else {
       monto = precioVenta * cantidad;
@@ -196,8 +202,8 @@ const metodosStats = computed<MetodoStats[]>(() => {
   for (const d of detalles.value) {
     if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
     const metodo = d.Venta.metodoPago || 'N/D';
-    const monto = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' 
-      ? Number(d.precioUnitarioVenta || 0) 
+    const monto = d.tipoPrecioAplicado === 'VENTA_GRAMAJE'
+      ? Number(d.precioUnitarioVenta || 0)
       : Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0);
     const existing = map.get(metodo);
     if (existing) {
@@ -217,7 +223,8 @@ const categoriasJerarquicas = computed<CategoriaJerarquica[]>(() => {
   for (const d of detalles.value) {
     if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
     const cat = d.productoCategoria || 'Sin categoría';
-    const sub = d.productoSubcategoria || 'Sin subcategoría';
+    const subRaw = d.productoSubcategoria || '';
+    const sub = (!subRaw || subRaw === '-' || subRaw.toLowerCase() === 'general') ? 'Sin subcategoría' : subRaw;
     const cantidad = Number(d.cantidad || 0);
     const precioCostoKg = Number(d.productoPrecioCosto || 0);
     const precioVenta = Number(d.precioUnitarioVenta || 0);
@@ -297,9 +304,27 @@ const ventasPorDia = computed<DiaStats[]>(() => {
     const fecha = new Date(fechaStr);
     if (isNaN(fecha.getTime())) continue;
     
-    const monto = d.tipoPrecioAplicado === 'VENTA_GRAMAJE' 
-      ? Number(d.precioUnitarioVenta || 0) 
-      : Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0);
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    const cantidad = Number(d.cantidad || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    // Monto: usa tipoPrecioAplicado (como el backend)
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+    } else {
+      monto = precioVenta * cantidad;
+    }
+    
+    // Costo: usa productoIsGramaje (como el backend)
+    if (d.productoIsGramaje) {
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      costo = precioCostoKg * cantidad;
+    }
+    const ganancia = monto - costo;
     
     const y = fecha.getFullYear();
     const m = String(fecha.getMonth() + 1).padStart(2, '0');
@@ -329,8 +354,9 @@ const ventasPorDia = computed<DiaStats[]>(() => {
     if (existing) {
       existing.ventas += 1;
       existing.monto += monto;
+      existing.ganancia += ganancia;
     } else {
-      map.set(key, { fecha: key, label, ventas: 1, monto });
+      map.set(key, { fecha: key, label, ventas: 1, monto, ganancia });
     }
   }
   
@@ -351,7 +377,8 @@ const ventasPorDia = computed<DiaStats[]>(() => {
         fecha: key,
         label: `${hour.toString().padStart(2, '0')}:00`,
         ventas: 0,
-        monto: 0
+        monto: 0,
+        ganancia: 0
       });
     }
     return result;
@@ -371,7 +398,8 @@ const ventasPorDia = computed<DiaStats[]>(() => {
         fecha: key,
         label: `${dias[day.getDay()]} ${day.getDate()}`,
         ventas: 0,
-        monto: 0
+        monto: 0,
+        ganancia: 0
       });
     }
     return result;
@@ -394,7 +422,7 @@ const totalCosto = computed(() => {
     if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
     const cantidad = Number(d.cantidad || 0);
     const precioCostoKg = Number(d.productoPrecioCosto || 0);
-    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+    if (d.productoIsGramaje) {
       sum += (precioCostoKg / 1000) * cantidad;
     } else {
       sum += precioCostoKg * cantidad;
@@ -436,12 +464,35 @@ const valorPromedio = computed(() => {
 const productosUnicos = computed(() => new Set(detalles.value.map(d => d.idProducto)).size);
 
 const flujoDineroPorDia = computed(() => {
-  const map = new Map<string, { entradas: number; salidas: number; label: string }>();
+  const map = new Map<string, { entradas: number; salidas: number; ventas: number; label: string }>();
   
   for (const dia of ventasPorDia.value) {
     const key = dia.fecha;
     if (!map.has(key)) {
-      map.set(key, { entradas: 0, salidas: 0, label: dia.label });
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label: dia.label });
+    }
+    const existing = map.get(key);
+    if (existing) {
+      existing.ventas += Number(dia.monto || 0);
+    }
+  }
+  
+  function getKeyAndLabel(fecha: Date): { key: string; label: string } {
+    const y = fecha.getFullYear();
+    const m = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const h = fecha.getHours();
+    
+    if (periodo.value === 'dia') {
+      return { key: `${y}-${m}-${day}-${String(h).padStart(2, '0')}`, label: `${h.toString().padStart(2, '0')}:00` };
+    } else if (periodo.value === 'semana') {
+      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      return { key: `${y}-${m}-${day}`, label: `${dias[fecha.getDay()]} ${fecha.getDate()}` };
+    } else if (periodo.value === 'mes') {
+      return { key: `${y}-${m}-${day}`, label: `${fecha.getDate()}` };
+    } else {
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      return { key: `${y}-${m}`, label: meses[fecha.getMonth()] };
     }
   }
   
@@ -450,30 +501,10 @@ const flujoDineroPorDia = computed(() => {
     const fecha = new Date(entrada.fechaMovimiento);
     if (isNaN(fecha.getTime())) continue;
     
-    const y = fecha.getFullYear();
-    const m = String(fecha.getMonth() + 1).padStart(2, '0');
-    const day = String(fecha.getDate()).padStart(2, '0');
-    const h = fecha.getHours();
-    
-    let key: string;
-    let label: string;
-    
-    if (periodo.value === 'dia') {
-      key = `${y}-${m}-${day}-${String(h).padStart(2, '0')}`;
-      label = `${h.toString().padStart(2, '0')}:00`;
-    } else if (periodo.value === 'semana') {
-      key = `${y}-${m}-${day}`;
-      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      label = `${dias[fecha.getDay()]} ${fecha.getDate()}`;
-    } else if (periodo.value === 'mes') {
-      key = `${y}-${m}-${day}`;
-      label = `${fecha.getDate()}`;
-    } else {
-      key = `${y}-${m}`;
-      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      label = meses[fecha.getMonth()];
+    const { key, label } = getKeyAndLabel(fecha);
+    if (!map.has(key)) {
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label });
     }
-    
     const existing = map.get(key);
     if (existing) {
       existing.entradas += Number(entrada.monto || 0);
@@ -485,44 +516,49 @@ const flujoDineroPorDia = computed(() => {
     const fecha = new Date(salida.fechaMovimiento);
     if (isNaN(fecha.getTime())) continue;
     
-    const y = fecha.getFullYear();
-    const m = String(fecha.getMonth() + 1).padStart(2, '0');
-    const day = String(fecha.getDate()).padStart(2, '0');
-    const h = fecha.getHours();
-    
-    let key: string;
-    let label: string;
-    
-    if (periodo.value === 'dia') {
-      key = `${y}-${m}-${day}-${String(h).padStart(2, '0')}`;
-      label = `${h.toString().padStart(2, '0')}:00`;
-    } else if (periodo.value === 'semana') {
-      key = `${y}-${m}-${day}`;
-      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      label = `${dias[fecha.getDay()]} ${fecha.getDate()}`;
-    } else if (periodo.value === 'mes') {
-      key = `${y}-${m}-${day}`;
-      label = `${fecha.getDate()}`;
-    } else {
-      key = `${y}-${m}`;
-      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      label = meses[fecha.getMonth()];
+    const { key, label } = getKeyAndLabel(fecha);
+    if (!map.has(key)) {
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label });
     }
-    
     const existing = map.get(key);
     if (existing) {
       existing.salidas += Number(salida.monto || 0);
     }
   }
   
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, val]) => ({
+  const sorted = Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b));
+  
+  const totalVentasPeriodo = sorted.reduce((sum, [, val]) => sum + val.ventas, 0);
+  const totalEntradasCajaPeriodo = sorted.reduce((sum, [, val]) => sum + val.entradas, 0);
+  const totalSalidasPeriodo = sorted.reduce((sum, [, val]) => sum + val.salidas, 0);
+  const disponibleReal = montoInicialPeriodo.value + totalVentasPeriodo + totalEntradasCajaPeriodo;
+  
+  const resultado = [];
+  let saldoEnCaja = montoInicialPeriodo.value;
+  
+  for (const [key, val] of sorted) {
+    const ventasDia = val.ventas;
+    const entradasManualesDia = val.entradas;
+    const salidasDia = val.salidas;
+    const totalIngresosDia = ventasDia + entradasManualesDia;
+    
+    const saldoAntes = saldoEnCaja;
+    saldoEnCaja += totalIngresosDia - salidasDia;
+    
+    resultado.push({
       fecha: key,
       label: val.label,
-      entradas: Math.round(val.entradas * 100) / 100,
-      salidas: Math.round(val.salidas * 100) / 100
-    }));
+      montoInicial: resultado.length === 0 ? montoInicialPeriodo.value : 0,
+      ventas: Math.round(ventasDia * 100) / 100,
+      entradasManuales: Math.round(entradasManualesDia * 100) / 100,
+      salidas: Math.round(salidasDia * 100) / 100,
+      saldoInicio: Math.round(saldoAntes * 100) / 100,
+      saldoFinal: Math.round(saldoEnCaja * 100) / 100
+    });
+  }
+  
+  return resultado;
 });
 
 const totalEntradas = computed(() => {
@@ -533,7 +569,13 @@ const totalSalidas = computed(() => {
   return salidasCaja.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
 });
 
-const flujoNeto = computed(() => totalEntradas.value - totalSalidas.value);
+const totalVentasPeriodo = computed(() => {
+  return ventasPorDia.value.reduce((sum, d) => sum + d.monto, 0);
+});
+
+const flujoNeto = computed(() => {
+  return montoInicialPeriodo.value + totalVentasPeriodo.value + totalEntradas.value - totalSalidas.value;
+});
 
 const chartColors = ['#c99234', '#28a745', '#17a2b8', '#dc3545', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#007bff', '#ffc107', '#6610f2', '#e83e8c', '#20c997', '#fd7e14', '#17a2b8', '#6c757d'];
 
@@ -718,10 +760,20 @@ const chartTendencia = computed(() => ({
       pointHoverRadius: 6
     },
     {
-      label: 'Ventas',
-      data: ventasPorDia.value.map(d => d.ventas),
+      label: 'Ganancia ($)',
+      data: ventasPorDia.value.map(d => Math.round(d.ganancia * 100) / 100),
       borderColor: '#28a745',
       backgroundColor: '#28a74522',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    },
+    {
+      label: 'Ventas',
+      data: ventasPorDia.value.map(d => d.ventas),
+      borderColor: '#4a90d9',
+      backgroundColor: '#4a90d922',
       fill: true,
       tension: 0.4,
       pointRadius: 4,
@@ -731,31 +783,40 @@ const chartTendencia = computed(() => ({
   ]
 }));
 
-const chartFlujoDinero = computed(() => ({
-  labels: flujoDineroPorDia.value.map(d => d.label),
-  datasets: [
-    {
-      label: 'Entradas ($)',
-      data: flujoDineroPorDia.value.map(d => d.entradas),
-      borderColor: '#28a745',
-      backgroundColor: '#28a74522',
-      fill: true,
-      tension: 0.4,
-      pointRadius: 4,
-      pointHoverRadius: 6
-    },
-    {
-      label: 'Salidas ($)',
-      data: flujoDineroPorDia.value.map(d => d.salidas),
-      borderColor: '#dc3545',
-      backgroundColor: '#dc354522',
-      fill: true,
-      tension: 0.4,
-      pointRadius: 4,
-      pointHoverRadius: 6
-    }
-  ]
-}));
+const chartFlujoDinero = computed(() => {
+  const saldos = flujoDineroPorDia.value.map(d => d.saldoFinal);
+  const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+  
+  return {
+    labels: flujoDineroPorDia.value.map(d => d.label),
+    datasets: [
+      {
+        type: 'line' as const,
+        label: 'Saldo Final en Caja ($)',
+        data: saldos,
+        borderColor: '#c99234',
+        backgroundColor: '#c9923415',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 14,
+        pointHoverRadius: 18,
+        pointBackgroundColor: 'transparent',
+        pointBorderColor: 'transparent',
+        pointBorderWidth: 0,
+        borderWidth: 4,
+        segment: {
+          borderColor: (ctx: any) => {
+            const y1 = ctx.p0.parsed.y;
+            const y2 = ctx.p1.parsed.y;
+            if (y1 > media && y2 > media) return '#28a745';
+            if (y1 < media && y2 < media) return '#dc3545';
+            return '#ffc107';
+          }
+        }
+      }
+    ]
+  };
+});
 
 const chartOptions = {
   responsive: true,
@@ -808,7 +869,13 @@ const chartOptionsTendencia = {
       mode: 'index' as const,
       intersect: false,
       callbacks: {
-        label: (ctx: any) => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('es-MX')}`
+        label: (ctx: any) => {
+          const val = ctx.parsed.y;
+          if (ctx.dataset.label.includes('$')) {
+            return ` ${ctx.dataset.label}: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          }
+          return ` ${ctx.dataset.label}: ${val}`;
+        }
       }
     }
   },
@@ -824,13 +891,13 @@ const chartOptionsTendencia = {
       ticks: { color: '#c99234', font: { size: 11 }, callback: (v: any) => `$${v}` },
       grid: { color: '#33333344' },
       beginAtZero: true,
-      title: { display: true, text: 'Monto ($)', color: '#c99234' }
+      title: { display: true, text: 'Monto / Ganancia ($)', color: '#c99234' }
     },
     y1: {
       type: 'linear' as const,
       display: true,
       position: 'right' as const,
-      ticks: { color: '#28a745', font: { size: 11 } },
+      ticks: { color: '#4a90d9', font: { size: 11 } },
       grid: { drawOnChartArea: false },
       beginAtZero: true,
       title: { display: true, text: 'Cantidad', color: '#28a745' }
@@ -873,10 +940,139 @@ const chartOptionsBar = {
   }
 };
 
+const productosCategoriaSeleccionada = computed<ProductoStats[]>(() => {
+  if (!categoriaSeleccionada.value) return [];
+  const map = new Map<string, ProductoStats>();
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    if (d.productoCategoria !== categoriaSeleccionada.value) continue;
+    
+    const subCat = d.productoSubcategoria || '';
+    const subCatNormalizada = (!subCat || subCat === '-' || subCat.toLowerCase() === 'general') ? 'Sin subcategoría' : subCat;
+    const esSinSub = subCategoriaSeleccionada.value === 'Sin subcategoría';
+    if (esSinSub) {
+      if (subCatNormalizada !== 'Sin subcategoría') continue;
+    } else if (subCategoriaSeleccionada.value && subCatNormalizada !== subCategoriaSeleccionada.value) {
+      continue;
+    }
+    
+    const key = d.productoNombre || 'Sin nombre';
+    const existing = map.get(key);
+    const cantidad = Number(d.cantidad || 0);
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      monto = precioVenta * cantidad;
+      costo = precioCostoKg * cantidad;
+    }
+    
+    const ganancia = monto - costo;
+    
+    if (existing) {
+      existing.cantidadTotal += cantidad;
+      existing.montoTotal += monto;
+      existing.costoTotal += costo;
+      existing.gananciaTotal += ganancia;
+    } else {
+      map.set(key, {
+        nombre: key,
+        cantidadTotal: cantidad,
+        montoTotal: monto,
+        costoTotal: costo,
+        gananciaTotal: ganancia,
+        isGramaje: d.productoIsGramaje || false
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.montoTotal - a.montoTotal);
+});
+
+const chartProductosCategoria = computed(() => ({
+  labels: productosCategoriaSeleccionada.value.map(p => p.nombre.length > 25 ? p.nombre.slice(0, 25) + '...' : p.nombre),
+  datasets: [
+    {
+      label: 'Monto ($)',
+      data: productosCategoriaSeleccionada.value.map(p => Math.round(p.montoTotal * 100) / 100),
+      backgroundColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length),
+      borderRadius: 6,
+      borderSkipped: false
+    },
+    {
+      label: 'Ganancia ($)',
+      data: productosCategoriaSeleccionada.value.map(p => Math.round(p.gananciaTotal * 100) / 100),
+      backgroundColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length).map(c => c + '88'),
+      borderColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length),
+      borderWidth: 1,
+      borderRadius: 6,
+      borderSkipped: false
+    }
+  ]
+}));
+
+const chartOptionsProductosCategoria = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: {
+    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12 } },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: true,
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      stacked: true,
+      ticks: { color: '#f6f2de', font: { size: 11 } },
+      grid: { display: false }
+    }
+  }
+};
+
+function onCategoriaClick(event: any, elements: any[]) {
+  if (elements.length > 0) {
+    const el = elements[0];
+    const catName = chartVentasCategoria.value.labels[el.index];
+    const subName = chartVentasCategoria.value.datasets[el.datasetIndex]?.label;
+    if (catName) {
+      categoriaSeleccionada.value = catName as string;
+      subCategoriaSeleccionada.value = (subName as string) || '';
+      modalCategoriaOpen.value = true;
+    }
+  }
+}
+
+function cerrarModalCategoria() {
+  modalCategoriaOpen.value = false;
+  categoriaSeleccionada.value = '';
+  subCategoriaSeleccionada.value = '';
+}
+
 const chartOptionsCategoria = {
   responsive: true,
   maintainAspectRatio: false,
   indexAxis: 'y' as const,
+  onClick: onCategoriaClick,
   plugins: {
     legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12, boxWidth: 14 } },
     tooltip: {
@@ -946,7 +1142,7 @@ const chartOptionsFlujo = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 12 }, padding: 16 } },
+    legend: { display: false },
     tooltip: {
       backgroundColor: '#1a1a2e',
       titleColor: '#c99234',
@@ -954,11 +1150,65 @@ const chartOptionsFlujo = {
       borderColor: '#c99234',
       borderWidth: 1,
       cornerRadius: 8,
-      mode: 'index' as const,
-      intersect: false,
       callbacks: {
-        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('es-MX')}`
+        title: (items: any) => `📅 ${items[0].label}`,
+        label: (ctx: any) => {
+          const d = flujoDineroPorDia.value[ctx.dataIndex];
+          if (!d) return '';
+          const saldos = flujoDineroPorDia.value.map(x => x.saldoFinal);
+          const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+          const diff = d.saldoFinal - media;
+          const signo = diff >= 0 ? '+' : '';
+          const estado = diff > 0 ? '📈 Sobre la media' : diff < 0 ? '📉 Bajo la media' : '➡️ En la media';
+          return [
+            ` Saldo: $${d.saldoFinal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            ` ${estado} (${signo}$${Math.abs(diff).toLocaleString('es-MX', { minimumFractionDigits: 2 })})`
+          ];
+        },
+        afterBody: (items: any) => {
+          const d = flujoDineroPorDia.value[items[0].dataIndex];
+          if (!d) return '';
+          return [
+            '',
+            `  Inicio: $${d.saldoInicio.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  +Ventas: $${d.ventas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  +Entradas: $${d.entradasManuales.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  -Salidas: -$${d.salidas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          ];
+        }
       }
+    },
+    afterDraw: (chart: any) => {
+      const ctx = chart.ctx;
+      const dataset = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      const saldos = flujoDineroPorDia.value.map(d => d.saldoFinal);
+      const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+      
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '18px serif';
+      
+      meta.data.forEach((point: any, index: number) => {
+        const saldo = saldos[index];
+        const diff = saldo - media;
+        let color;
+        if (diff > media * 0.02) color = '#28a745';
+        else if (diff < -media * 0.02) color = '#dc3545';
+        else color = '#ffc107';
+        
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#1a1a2e';
+        ctx.font = 'bold 10px Courier New';
+        ctx.fillText('$', point.x, point.y + 1);
+      });
+      
+      ctx.restore();
     }
   },
   scales: {
@@ -972,8 +1222,7 @@ const chartOptionsFlujo = {
       position: 'left' as const,
       ticks: { color: '#888', font: { size: 11 }, callback: (v: any) => `$${v}` },
       grid: { color: '#33333344' },
-      beginAtZero: true,
-      title: { display: true, text: 'Monto ($)', color: '#888' }
+      title: { display: true, text: 'Saldo en Caja ($)', color: '#c99234' }
     }
   },
   interaction: {
@@ -1042,20 +1291,26 @@ async function cargarDatos() {
     
     const urlEntradas = `${API_BASE}/caja/entradas/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
     const urlSalidas = `${API_BASE}/caja/egresos/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    const urlReporte = `${API_BASE}/caja/reporteDiario/${fechaInicio}`;
     
-    const [resEntradas, resSalidas] = await Promise.all([
+    const [resEntradas, resSalidas, resReporte] = await Promise.all([
       fetch(urlEntradas),
-      fetch(urlSalidas)
+      fetch(urlSalidas),
+      fetch(urlReporte)
     ]);
     
     const dataEntradas = await resEntradas.json();
     const dataSalidas = await resSalidas.json();
+    const dataReporte = await resReporte.json();
     
     if (dataEntradas.codigo === 200) {
       entradasCaja.value = dataEntradas.datos || [];
     }
     if (dataSalidas.codigo === 200) {
       salidasCaja.value = dataSalidas.datos || [];
+    }
+    if (dataReporte.codigo === 200 && dataReporte.datos) {
+      montoInicialPeriodo.value = Number(dataReporte.datos.montoInicial || 0);
     }
   } catch (e) {
     console.error('Error al cargar reporte:', e);
@@ -1234,7 +1489,7 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
         </div>
 
         <div class="chart-card chart-wide">
-          <h3 class="chart-title">💹 Flujo de Dinero (Entradas vs Salidas)</h3>
+          <h3 class="chart-title">💹 Movimiento de Dinero en Caja</h3>
           <div class="chart-container">
             <Line :data="chartFlujoDinero" :options="chartOptionsFlujo" />
           </div>
@@ -1356,6 +1611,48 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
         </div>
       </div>
     </template>
+
+    <!-- MODAL DETALLE CATEGORIA -->
+    <div v-if="modalCategoriaOpen" class="modal-overlay-cat" @click.self="cerrarModalCategoria">
+      <div class="modal-card-cat">
+        <div class="modal-header-cat">
+          <h3>📦 {{ categoriaSeleccionada }} → {{ subCategoriaSeleccionada }}</h3>
+          <button class="modal-close-cat" @click="cerrarModalCategoria">✕</button>
+        </div>
+        <div class="modal-body-cat">
+          <div v-if="productosCategoriaSeleccionada.length === 0" class="modal-empty">
+            No hay productos para {{ categoriaSeleccionada }} / {{ subCategoriaSeleccionada }} en este periodo.
+          </div>
+          <template v-else>
+            <div class="chart-container-modal">
+              <Bar :data="chartProductosCategoria" :options="chartOptionsProductosCategoria" />
+            </div>
+            <div class="tabla-modal">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th class="text-right">Cantidad</th>
+                    <th class="text-right">Venta</th>
+                    <th class="text-right">Costo</th>
+                    <th class="text-right">Ganancia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in productosCategoriaSeleccionada" :key="p.nombre">
+                    <td>{{ p.nombre }}</td>
+                    <td class="text-right">{{ formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
+                    <td class="text-right monto">{{ formatoMoneda(p.montoTotal) }}</td>
+                    <td class="text-right costo">{{ formatoMoneda(p.costoTotal) }}</td>
+                    <td class="text-right ganancia">{{ formatoMoneda(p.gananciaTotal) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1736,6 +2033,125 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
   .periodo-btn {
     padding: 0.3rem 0.6rem;
     font-size: 0.7rem;
+  }
+}
+
+/* MODAL CATEGORIA */
+.modal-overlay-cat {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.modal-card-cat {
+  background: var(--bg-primary, #1a1a2e);
+  border: 2px solid var(--accent-color, #c99234);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header-cat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.modal-header-cat h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary, #f6f2de);
+}
+
+.modal-close-cat {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--bg-secondary, #2a2a3e);
+  color: var(--text-secondary, #888);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s;
+}
+
+.modal-close-cat:hover {
+  background: #c75a5a;
+  color: white;
+}
+
+.modal-body-cat {
+  padding: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+
+.chart-container-modal {
+  height: 300px;
+  margin-bottom: 1.5rem;
+}
+
+.tabla-modal {
+  overflow-x: auto;
+}
+
+.tabla-modal table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tabla-modal th {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary, #2a2a3e);
+  color: var(--text-secondary, #888);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--border-color, #333);
+}
+
+.tabla-modal td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color, #333);
+  color: var(--text-primary, #f6f2de);
+}
+
+.tabla-modal tr:hover td {
+  background: var(--bg-panel, #252538);
+}
+
+@media (max-width: 768px) {
+  .modal-card-cat {
+    max-width: 100%;
+    max-height: 95vh;
+  }
+  
+  .chart-container-modal {
+    height: 250px;
   }
 }
 </style>

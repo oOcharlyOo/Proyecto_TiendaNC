@@ -8,7 +8,10 @@ import HistorialVentasModal from './modals/HistorialVentasModal.vue';
 import CalculadoraGramajeModal from './modals/CalculadoraGramajeModal.vue';
 import CobroModal from './modals/CobroModal.vue';
 import CarruselPromociones from './modals/CarruselPromociones.vue';
+import PedidoSugerido from './modals/PedidoSugerido.vue';
+import SugeridoHoy from './modals/SugeridoHoy.vue';
 import CrudPromociones from './modals/CrudPromociones.vue';
+import CreditosPersonasModal from './modals/CreditosPersonasModal.vue';
 
 let isResizing = false;
 let startY = 0;
@@ -357,6 +360,9 @@ async function cargarTicketsDesdeBackend() {
 async function crearVentaPendienteEnBackend() {
   const idUsuario = obtenerIdUsuarioSesion();
   if (!idUsuario) return;
+  if (creandoTicket.value) return;
+
+  creandoTicket.value = true;
 
   try {
     const payload = {
@@ -398,6 +404,9 @@ async function crearVentaPendienteEnBackend() {
     }
   } catch (_error) {
     console.error('Error al crear venta pendiente:', _error);
+    mostrarMensaje('Error al crear ticket. Reintenta.', 'error');
+  } finally {
+    creandoTicket.value = false;
   }
 }
 
@@ -473,6 +482,7 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Cajero');
 const sugerenciasVisibles = ref(false);
 const indiceSugerenciaActiva = ref(-1);
 const ticketDelDia = ref('1');
+const creandoTicket = ref(false);
 const isRecording = ref(false);
 const scannerActivo = ref(false);
 const recognition = ref<any>(null);
@@ -490,7 +500,32 @@ const modalCobroAbierto = ref(false);
 const modalPromocionesAbierto = ref(false);
 const modalDescripcionPendiente = ref(false);
 const descripcionPendienteTexto = ref('');
+const modalCreditosAbierto = ref(false);
+const modalCreditosSeleccionar = ref(false);
+const creditoPersonaSeleccionada = ref<any>(null);
+const totalPersonasCredito = ref(0);
+const creditosResumen = ref<any[]>([]);
+
+async function cargarCreditosResumen() {
+  try {
+    const res = await getJson<{ codigo: number; datos: any[] }>('/credito/venta/activos');
+    if (res.codigo === 200) {
+      creditosResumen.value = res.datos;
+      const personasUnicas = new Set(res.datos.map((v: any) => v.idPersona));
+      totalPersonasCredito.value = personasUnicas.size;
+    }
+  } catch (e) {
+    console.error('Error al cargar resumen créditos', e);
+  }
+}
+
+function abrirCreditos() {
+  modalCreditosAbierto.value = true;
+  modalCreditosSeleccionar.value = false;
+  cargarCreditosResumen();
+}
 const modalVentasPendientesAbierto = ref(false);
+const vpVistaLista = ref(true);
 const ventasPendientes = ref<any[]>([]);
 const ventaPendienteSeleccionada = ref<any>(null);
 const modalCobroPendienteAbierto = ref(false);
@@ -512,6 +547,28 @@ const agregarPendienteBusqueda = ref('');
 const agregarPendienteInput = ref<HTMLInputElement | null>(null);
 const agregarPendienteScannerActivo = ref(false);
 const agregarPendienteProductos = ref<any[]>([]);
+const modalProveedoresPedidos = ref(false);
+const ppVistaListaProv = ref(true);
+const ppVistaListaPed = ref(true);
+const proveedores = ref<any[]>([]);
+const pedidosProveedor = ref<any[]>([]);
+const proveedorForm = ref<any>({ nombre: '', contacto: '', telefono: '', email: '', direccion: '', notas: '' });
+const pedidoForm = ref<any>({ idProveedor: 0, fechaEntregaEsperada: '', montoTotal: 0, montoApartado: 0, estatus: 'PENDIENTE', notas: '', detalles: [] });
+const editingProveedor = ref<any>(null);
+const editingPedido = ref<any>(null);
+const pedidoProveedorTab = ref<'proveedores' | 'pedidos' | 'sugerido' | 'sugeridoHoy'>('proveedores');
+const sugerenciasPedido = ref<any[]>([]);
+const sugerenciasSeleccionadas = ref<Set<number>>(new Set());
+const sugerenciasPeriodo = ref<'semanal' | 'mensual'>('mensual');
+const sugerenciasCargando = ref(false);
+const showProveedorForm = ref(false);
+const showPedidoForm = ref(false);
+const montoManual = ref(false);
+const searchProductoPedido = ref('');
+const showProductoDropdownPedido = ref(false);
+const newDetallePedido = ref<{ idProducto: number; nombre: string; cantidad: number; precioUnitario: number }>({ idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 });
+const productosDisponibles = ref<{ idProducto: number; nombre: string; precio_costo: number; codigoBarras?: string }[]>([]);
+const searchWrapperRef = ref<HTMLElement | null>(null);
 
 const historialEnvases = computed(() => {
   return historialVentaDetalle.value.filter((d) => {
@@ -651,6 +708,7 @@ onMounted(() => {
   window.addEventListener('keydown', manejarAtajosTeclado);
   
   cargarVentasPendientes();
+  cargarCreditosResumen();
 });
 
 onUnmounted(() => {
@@ -913,7 +971,18 @@ onMounted(async () => {
   await cargarSiguienteTicket();
   await cargarPromocionesActivas();
   await cargarProvisionSemanal();
+  document.addEventListener('click', handleClickOutsideDropdown);
 });
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutsideDropdown);
+});
+
+function handleClickOutsideDropdown(e: MouseEvent) {
+  if (searchWrapperRef.value && !searchWrapperRef.value.contains(e.target as Node)) {
+    showProductoDropdownPedido.value = false;
+  }
+}
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const respuesta = await fetch(`${API_BASE}${url}`, {
@@ -1475,6 +1544,96 @@ function confirmarCobroPendiente() {
   modalDescripcionPendiente.value = true;
 }
 
+function confirmarCobroCredito() {
+  if (ticket.value.length === 0) {
+    mostrarMensaje('No hay productos en el ticket.', 'error');
+    return;
+  }
+  modalCobroAbierto.value = false;
+  modalCreditosSeleccionar.value = true;
+  modalCreditosAbierto.value = true;
+}
+
+function onPersonaCreditoSeleccionada(persona: any) {
+  creditoPersonaSeleccionada.value = persona;
+  modalCreditosSeleccionar.value = false;
+  if (ventaPendienteSeleccionada.value) {
+    procesarCobroPendienteCredito(persona);
+  } else {
+    procesarCobroCredito(persona);
+  }
+}
+
+async function procesarCobroCredito(persona: any) {
+  const idUsuario = obtenerIdUsuarioSesion();
+  if (!idUsuario) {
+    mostrarMensaje('No se encontro sesion de usuario.', 'error');
+    return;
+  }
+  if (!ticketActual.value || ticketActual.value.items.length === 0) {
+    mostrarMensaje('No hay productos en el ticket.', 'error');
+    return;
+  }
+  try {
+    const montoTotal = totalVenta.value;
+    const ventaId = ticketActual.value.id;
+    const numTicket = ticketActual.value.numero;
+
+    const detallesParaGuardar: any[] = [];
+    for (const item of ticketActual.value.items as (TicketItem | TicketItemPromocion)[]) {
+      if ((item as any).is_promocion && (item as any).promocion) {
+        const promo = (item as any).promocion;
+        for (const detalle of promo.detalles) {
+          const cantidad = Number(detalle.cantidad) || 0;
+          const subtotalDetalle = Number(detalle.subtotal) || 0;
+          const precioPromocionTotal = montoTotal;
+          const subtotalOriginal = ticketActual.value.items.reduce((sum, i) => {
+            if ((i as any).is_promocion) return sum + (i as any).promocion.detalles.reduce((s: number, d: any) => s + (Number(d.subtotal) || 0), 0);
+            return sum + (i.precio * i.cantidad);
+          }, 0);
+          const proporcion = subtotalOriginal > 0 ? subtotalDetalle / subtotalOriginal : 0;
+          const precioAjustado = Math.round(precioPromocionTotal * proporcion / cantidad * 100) / 100;
+          detallesParaGuardar.push({
+            id: detalle.id_producto, nombre: detalle.nombre_producto || '',
+            dto: { idProducto: detalle.id_producto, nombre: '', precio_venta: Number(detalle.precio_unitario) || 0, codigoBarras: '' },
+            cantidad, precio: precioAjustado, is_gramaje: cantidad < 1000
+          });
+        }
+      } else {
+        detallesParaGuardar.push(item);
+      }
+    }
+
+    await Promise.all(detallesParaGuardar.map((item) => crearDetalleVenta(ventaId, item)));
+
+    await getJson<ApiRespuesta<any>>(`/ventas/completarVenta/${ventaId}?montoTotal=${encodeURIComponent(montoTotal.toString())}&metodoPago=CREDITO`, { method: 'PUT' });
+
+    await getJson<ApiRespuesta<any>>('/credito/venta?idUsuario=' + idUsuario, {
+      method: 'POST',
+      body: JSON.stringify({ idPersona: persona.idPersona, idVenta: ventaId, montoTotal, notas: '' })
+    });
+
+    window.dispatchEvent(new CustomEvent('venta-completada', { detail: { ventaId, montoTotal } }));
+
+    tickets.value = tickets.value.filter(t => t.id !== ticketActual.value!.id);
+    if (tickets.value.length === 0) {
+      await crearNuevoTicket();
+    } else {
+      const pendiente = tickets.value.find(t => t.estado === 'pendiente');
+      ticketActualId.value = pendiente ? pendiente.id : tickets.value[0].id;
+    }
+
+    mostrarMensaje(`Venta a crédito con ${persona.nombre}. Ticket #${numTicket}`, 'ok');
+    playSound('cash');
+    modalCreditosAbierto.value = false;
+    await cargarTicketsDesdeBackend();
+    await cargarSiguienteTicket();
+  } catch (error) {
+    const detalle = error instanceof Error ? error.message : 'Error inesperado.';
+    mostrarMensaje(`No se pudo procesar: ${detalle}`, 'error');
+  }
+}
+
 async function guardarVentaPendiente() {
   if (!descripcionPendienteTexto.value.trim()) {
     mostrarMensaje('Debes escribir una descripción del motivo.', 'error');
@@ -1601,6 +1760,23 @@ function agregarAVentaPendiente(venta: any) {
   });
 }
 
+async function eliminarVentaPendiente(venta: any) {
+  if (!confirm(`¿Eliminar el ticket #${venta.numeroTicket}?`)) return;
+  try {
+    const response = await getJson<ApiRespuesta<unknown>>(`/ventas/cancelarVenta/${venta.idVenta}`, {
+      method: 'PUT'
+    });
+    if (response?.codigo === 200) {
+      await cargarVentasPendientes();
+      mostrarMensaje('Venta pendiente eliminada', 'ok');
+    } else {
+      mostrarMensaje(response?.mensaje || 'Error al eliminar', 'error');
+    }
+  } catch (e: any) {
+    mostrarMensaje('Error de red: ' + e.message, 'error');
+  }
+}
+
 function agregarProductoAPendiente(prod: any) {
   agregarPendienteProductos.value.push({
     idProducto: prod.idProducto || prod.id,
@@ -1691,6 +1867,45 @@ async function confirmarCobroPendienteTransferencia() {
 
 async function confirmarCobroPendienteTarjeta() {
   await procesarCobroPendiente('TARJETA');
+}
+
+function confirmarCobroPendienteCredito() {
+  if (!ventaPendienteSeleccionada.value) return;
+  modalCobroPendienteAbierto.value = false;
+  modalCreditosSeleccionar.value = true;
+  modalCreditosAbierto.value = true;
+}
+
+async function procesarCobroPendienteCredito(persona: any) {
+  const venta = ventaPendienteSeleccionada.value;
+  if (!venta) return;
+  const idUsuario = obtenerIdUsuarioSesion();
+  if (!idUsuario) return;
+  try {
+    const res1 = await getJson<ApiRespuesta<any>>(
+      `/ventas/cobrarVentaPendiente/${venta.idVenta}?idUsuario=${idUsuario}&metodoPago=CREDITO&montoTotal=${Number(venta.montoTotal)}`,
+      { method: 'PUT' }
+    );
+    if (res1.codigo !== 200) { throw new Error(res1.mensaje || 'Error al cobrar venta pendiente'); }
+
+    const res2 = await getJson<ApiRespuesta<any>>('/credito/venta?idUsuario=' + idUsuario, {
+      method: 'POST',
+      body: JSON.stringify({ idPersona: persona.idPersona, idVenta: venta.idVenta, montoTotal: Number(venta.montoTotal), notas: '' })
+    });
+    if (res2.codigo !== 200) { throw new Error(res2.mensaje || 'Error al registrar crédito'); }
+
+    const nuevoTicket = res1?.datos?.numeroTicket || venta.numeroTicket;
+    mostrarMensaje(`Venta a crédito con ${persona.nombre}. Ticket #${nuevoTicket}`, 'ok');
+    playSound('cash');
+    modalCobroPendienteAbierto.value = false;
+    ventaPendienteSeleccionada.value = null;
+    modalCreditosAbierto.value = false;
+    await cargarVentasPendientes();
+    await cargarCreditosResumen();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Error al procesar crédito.';
+    mostrarMensaje(msg, 'error');
+  }
 }
 
 async function procesarCobroPendiente(metodoPago: string) {
@@ -2023,6 +2238,240 @@ function formatoMonedaRedondeada(valor: number) {
     style: 'currency',
     currency: 'MXN'
   }).format(redondeado);
+}
+
+function formatoGramaje(gramos: number) {
+  const g = Math.max(0, Math.round(gramos || 0));
+  if (g >= 1000) {
+    return (g / 1000).toFixed(2) + ' kg';
+  }
+  return g + ' g';
+}
+
+async function cargarProveedoresPedidos() {
+  try {
+    const resProv = await fetch(`${API_BASE}/proveedores/listar`);
+    const dataProv = await resProv.json();
+    proveedores.value = dataProv.datos ?? dataProv;
+  } catch (e) { console.error('Error proveedores:', e); }
+  try {
+    const resPed = await fetch(`${API_BASE}/pedidos-proveedor/listar`);
+    const dataPed = await resPed.json();
+    pedidosProveedor.value = (dataPed.datos ?? dataPed).filter((p: any) => p.estatus === 'PENDIENTE');
+  } catch (e) { console.error('Error pedidos:', e); }
+  try {
+    const resProd = await fetch(`${API_BASE}/productos/listarProductos`);
+    const dataProd = await resProd.json();
+    productosDisponibles.value = (dataProd.datos ?? dataProd).map((p: any) => ({
+      idProducto: p.idProducto,
+      nombre: p.nombre,
+      precio_costo: p.precio_costo || 0,
+      codigoBarras: p.codigoBarras
+    }));
+  } catch (e) { console.error('Error productos:', e); }
+}
+
+function abrirModalProveedoresPedidos() {
+  modalProveedoresPedidos.value = true;
+  cargarProveedoresPedidos();
+}
+
+async function cargarSugerenciasPedido() {
+  sugerenciasCargando.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/pedidos-proveedor/sugerido?periodo=${sugerenciasPeriodo.value}`);
+    const data = await res.json();
+    if (data.codigo === 200 && data.datos) {
+      sugerenciasPedido.value = data.datos;
+      sugerenciasSeleccionadas.value = new Set(data.datos.map((s: any) => s.idProducto));
+    } else {
+      sugerenciasPedido.value = [];
+    }
+  } catch (e) {
+    console.error('Error cargando sugerencias:', e);
+    sugerenciasPedido.value = [];
+  } finally {
+    sugerenciasCargando.value = false;
+  }
+}
+
+function toggleSugerencia(id: number) {
+  if (sugerenciasSeleccionadas.value.has(id)) {
+    sugerenciasSeleccionadas.value.delete(id);
+  } else {
+    sugerenciasSeleccionadas.value.add(id);
+  }
+  sugerenciasSeleccionadas.value = new Set(sugerenciasSeleccionadas.value);
+}
+
+function seleccionarTodasSugerencias() {
+  sugerenciasSeleccionadas.value = new Set(sugerenciasPedido.value.map((s: any) => s.idProducto));
+}
+
+function deseleccionarTodasSugerencias() {
+  sugerenciasSeleccionadas.value = new Set();
+}
+
+async function crearPedidoDesdeSugerencias() {
+  const seleccionados = sugerenciasPedido.value.filter((s: any) => sugerenciasSeleccionadas.value.has(s.idProducto));
+  if (seleccionados.length === 0) return;
+
+  const idProveedor = prompt('ID del proveedor para este pedido:');
+  if (!idProveedor) return;
+
+  const fechaEntrega = prompt('Fecha de entrega esperada (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+  if (!fechaEntrega) return;
+
+  const detalles = seleccionados.map((s: any) => ({
+    idProducto: s.idProducto,
+    cantidad: s.cantidadSugerida,
+    precioUnitario: s.precioCosto,
+    subtotal: s.precioCosto * s.cantidadSugerida
+  }));
+
+  const montoTotal = detalles.reduce((sum: number, d: any) => sum + d.subtotal, 0);
+
+  try {
+    await fetch(`${API_BASE}/pedidos-proveedor/crear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idProveedor: parseInt(idProveedor),
+        fechaEntregaEsperada: fechaEntrega,
+        montoTotal,
+        montoApartado: 0,
+        estatus: 'PENDIENTE',
+        notas: 'Pedido generado desde sugerencias',
+        detalles
+      })
+    });
+    alert('Pedido creado exitosamente');
+    await cargarProveedoresPedidos();
+    pedidoProveedorTab.value = 'pedidos';
+  } catch (e) {
+    console.error('Error creando pedido:', e);
+    alert('Error al crear el pedido');
+  }
+}
+
+function openProveedorModal(p?: any) {
+  if (p) {
+    editingProveedor.value = p;
+    proveedorForm.value = { ...p };
+  } else {
+    editingProveedor.value = null;
+    proveedorForm.value = { nombre: '', contacto: '', telefono: '', email: '', direccion: '', notas: '' };
+  }
+  showProveedorForm.value = true;
+}
+
+async function saveProveedor() {
+  if (!proveedorForm.value.nombre.trim()) return;
+  try {
+    if (editingProveedor.value?.idProveedor) {
+      await fetch(`${API_BASE}/proveedores/actualizar/${editingProveedor.value.idProveedor}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proveedorForm.value) });
+    } else {
+      await fetch(`${API_BASE}/proveedores/agregar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proveedorForm.value) });
+    }
+    showProveedorForm.value = false;
+    await cargarProveedoresPedidos();
+  } catch (e) { console.error('Error saving proveedor:', e); }
+}
+
+async function deleteProveedor(id: number) {
+  if (!confirm('¿Eliminar este proveedor?')) return;
+  try {
+    await fetch(`${API_BASE}/proveedores/eliminar/${id}`, { method: 'DELETE' });
+    await cargarProveedoresPedidos();
+  } catch (e) { console.error('Error deleting proveedor:', e); }
+}
+
+function openPedidoModal(p?: any) {
+  if (p) {
+    editingPedido.value = p;
+    pedidoForm.value = { ...p, detalles: p.detalles || [] };
+    montoManual.value = p.detalles?.length === 0 && p.montoTotal > 0;
+  } else {
+    editingPedido.value = null;
+    pedidoForm.value = { idProveedor: 0, fechaEntregaEsperada: '', montoTotal: 0, montoApartado: 0, estatus: 'PENDIENTE', notas: '', detalles: [] };
+    montoManual.value = false;
+  }
+  searchProductoPedido.value = '';
+  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 };
+  showPedidoForm.value = true;
+}
+
+function addDetallePedido() {
+  if (!newDetallePedido.value.idProducto || !newDetallePedido.value.cantidad || !newDetallePedido.value.precioUnitario) return;
+  pedidoForm.value.detalles.push({
+    idProducto: newDetallePedido.value.idProducto,
+    nombreProducto: newDetallePedido.value.nombre,
+    cantidad: newDetallePedido.value.cantidad,
+    precioUnitario: newDetallePedido.value.precioUnitario,
+    subtotal: newDetallePedido.value.cantidad * newDetallePedido.value.precioUnitario
+  });
+  recalcTotalPedido();
+  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 };
+  searchProductoPedido.value = '';
+  showProductoDropdownPedido.value = false;
+}
+
+function removeDetallePedido(idx: number) {
+  pedidoForm.value.detalles.splice(idx, 1);
+  recalcTotalPedido();
+}
+
+function recalcTotalPedido() {
+  if (!montoManual.value) {
+    pedidoForm.value.montoTotal = pedidoForm.value.detalles.reduce((sum: number, d: any) => sum + d.subtotal, 0);
+  }
+}
+
+function selectProductoForPedido(prod: { idProducto: number; nombre: string; precio_costo: number }) {
+  newDetallePedido.value.idProducto = prod.idProducto;
+  newDetallePedido.value.nombre = prod.nombre;
+  newDetallePedido.value.precioUnitario = prod.precio_costo;
+  searchProductoPedido.value = prod.nombre;
+  showProductoDropdownPedido.value = false;
+}
+
+const filteredProductosPedido = computed(() => {
+  if (!searchProductoPedido.value) return productosDisponibles.value;
+  const q = searchProductoPedido.value.toLowerCase();
+  return productosDisponibles.value.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    p.codigoBarras?.toLowerCase().includes(q)
+  ).slice(0, 10);
+});
+
+async function savePedido() {
+  if (!pedidoForm.value.idProveedor || !pedidoForm.value.fechaEntregaEsperada) return;
+  if (montoManual.value && (!pedidoForm.value.montoTotal || pedidoForm.value.montoTotal <= 0)) return;
+  try {
+    if (editingPedido.value?.idPedido) {
+      await fetch(`${API_BASE}/pedidos-proveedor/actualizar/${editingPedido.value.idPedido}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedidoForm.value) });
+    } else {
+      await fetch(`${API_BASE}/pedidos-proveedor/crear`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedidoForm.value) });
+    }
+    showPedidoForm.value = false;
+    await cargarProveedoresPedidos();
+  } catch (e) { console.error('Error saving pedido:', e); }
+}
+
+async function recibirPedido(id: number) {
+  if (!confirm('¿Confirmar recepción?')) return;
+  try {
+    await fetch(`${API_BASE}/pedidos-proveedor/recibir/${id}`, { method: 'PUT' });
+    await cargarProveedoresPedidos();
+  } catch (e) { console.error('Error receiving pedido:', e); }
+}
+
+async function deletePedido(id: number) {
+  if (!confirm('¿Cancelar este pedido?')) return;
+  try {
+    await fetch(`${API_BASE}/pedidos-proveedor/eliminar/${id}`, { method: 'DELETE' });
+    await cargarProveedoresPedidos();
+  } catch (e) { console.error('Error deleting pedido:', e); }
 }
 
 function getMetodoClase(metodo: string | undefined): string {
@@ -2599,7 +3048,7 @@ async function eliminarTodosLosDetalles() {
       <div class="sidebar-header">
         <span class="icon">🎫</span>
         <h3>Tickets</h3>
-        <button type="button" class="btn-add-ticket" @click="crearNuevoTicket" title="Nuevo Ticket">
+        <button type="button" class="btn-add-ticket" :disabled="creandoTicket" @click="crearNuevoTicket" title="Nuevo Ticket">
           <span class="plus">+</span>
         </button>
       </div>
@@ -2634,10 +3083,16 @@ async function eliminarTodosLosDetalles() {
         </div>
       </nav>
 
-      <button class="btn-pendientes-ticket" @click="abrirModalPendientes" title="Ventas Pendientes">
-        <span class="pending-badge" v-if="ventasPendientes.length > 0">{{ ventasPendientes.length }}</span>
-        P
-      </button>
+      <div class="sidebar-actions">
+        <button class="btn-creditos-sidebar" @click="abrirCreditos" title="Créditos">
+          <span class="creditos-badge" v-if="totalPersonasCredito > 0">{{ totalPersonasCredito }}</span>
+          💳
+        </button>
+        <button class="btn-pendientes-ticket" @click="abrirModalPendientes" title="Ventas Pendientes">
+          <span class="pending-badge" v-if="ventasPendientes.length > 0">{{ ventasPendientes.length }}</span>
+          P
+        </button>
+      </div>
     </aside>
 
     <!-- PANEL CENTRAL: BUSCADOR Y CATÁLOGO -->
@@ -2649,6 +3104,7 @@ async function eliminarTodosLosDetalles() {
           <button 
             type="button" 
             class="btn-add-ticket-mini" 
+            :disabled="creandoTicket"
             @click="crearNuevoTicket" 
             title="Nuevo Ticket"
           >
@@ -2901,6 +3357,7 @@ async function eliminarTodosLosDetalles() {
               </button>
               
               <div class="extra-actions">
+                <button class="btn-checkout secondary" @click="abrirModalProveedoresPedidos" title="Proveedores y Pedidos">🚚</button>
                 <button class="btn-checkout secondary" @click="historialVentasAbrir" title="Historial">📜</button>
                 <button class="btn-checkout secondary" @click="entradaEfectivo" title="Entrada Cash">📥</button>
                 <button class="btn-checkout secondary" @click="salidaEfectivo" title="Salida Cash">📤</button>
@@ -3109,8 +3566,9 @@ async function eliminarTodosLosDetalles() {
       @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null" 
       @add="agregarProductoGramaje" 
     />
-    <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" @confirmar-pendiente="confirmarCobroPendiente" />
-    <CobroModal :open="modalCobroPendienteAbierto" :total="Number(ventaPendienteSeleccionada?.montoTotal) || 0" @close="modalCobroPendienteAbierto = false; ventaPendienteSeleccionada = null" @confirmar-efectivo="confirmarCobroPendienteEfectivo" @confirmar-transferencia="confirmarCobroPendienteTransferencia" @confirmar-tarjeta="confirmarCobroPendienteTarjeta" />
+    <CobroModal :open="modalCobroAbierto" :total="totalVenta" @close="modalCobroAbierto = false" @confirmar-efectivo="confirmarCobroEfectivo" @confirmar-transferencia="confirmarCobroTransferencia" @confirmar-tarjeta="confirmarCobroTarjeta" @confirmar-pendiente="confirmarCobroPendiente" @confirmar-credito="confirmarCobroCredito" />
+    <CreditosPersonasModal :open="modalCreditosAbierto" :seleccionar="modalCreditosSeleccionar" @close="modalCreditosAbierto = false; modalCreditosSeleccionar = false" @persona-seleccionada="onPersonaCreditoSeleccionada" @credito-actualizado="cargarCreditosResumen" />
+    <CobroModal :open="modalCobroPendienteAbierto" :total="Number(ventaPendienteSeleccionada?.montoTotal) || 0" @close="modalCobroPendienteAbierto = false; ventaPendienteSeleccionada = null" @confirmar-efectivo="confirmarCobroPendienteEfectivo" @confirmar-transferencia="confirmarCobroPendienteTransferencia" @confirmar-tarjeta="confirmarCobroPendienteTarjeta" @confirmar-credito="confirmarCobroPendienteCredito" />
     <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />
 
     <!-- Modal descripción pendiente -->
@@ -3144,42 +3602,86 @@ async function eliminarTodosLosDetalles() {
     <!-- Modal ventas pendientes -->
     <div v-if="modalVentasPendientesAbierto" class="pos-modal-overlay" @click.self="modalVentasPendientesAbierto = false">
       <div class="pos-modal-card modal-pendientes animate-pop-in">
-        <header class="modal-header-clean">
-          <h3>Ventas Pendientes</h3>
-          <button class="close-x" @click="modalVentasPendientesAbierto = false">×</button>
-        </header>
-        <div class="modal-body-clean custom-scrollbar">
-          <div v-if="ventasPendientes.length === 0" class="empty-state">
-            <span class="empty-icon">✓</span>
-            <p>No hay ventas pendientes</p>
+        <header class="vp-modal-head">
+          <div class="vp-head-left">
+            <h3 class="vp-title">📋 Ventas Pendientes</h3>
+            <span class="vp-count" v-if="ventasPendientes.length > 0">{{ ventasPendientes.length }} ticket{{ ventasPendientes.length > 1 ? 's' : '' }}</span>
           </div>
-          <div v-else class="pendientes-list">
-            <div v-for="v in ventasPendientesAgrupadas" :key="v.idVenta" class="pendiente-row">
-              <div class="pendiente-main">
-                <span class="pendiente-ticket">#{{ v.numeroTicket }}</span>
-                <span class="pendiente-amount">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
+          <div class="vp-head-right">
+            <div class="vp-views">
+              <button :class="['vp-vbtn', { on: vpVistaLista }]" @click="vpVistaLista = true" title="Lista">📋</button>
+              <button :class="['vp-vbtn', { on: !vpVistaLista }]" @click="vpVistaLista = false" title="Cuadrícula">🔲</button>
+            </div>
+            <button class="vp-close" @click="modalVentasPendientesAbierto = false">✕</button>
+          </div>
+        </header>
+        <div class="vp-modal-body custom-scrollbar">
+          <div v-if="ventasPendientes.length === 0" class="vp-empty">
+            <span class="vp-empty-ico">✅</span>
+            <p class="vp-empty-text">No hay ventas pendientes</p>
+          </div>
+          <!-- VISTA LISTA -->
+          <div v-else-if="vpVistaLista" class="vp-list">
+            <div v-for="v in ventasPendientesAgrupadas" :key="v.idVenta" class="vp-list-row">
+              <div class="vp-list-main" @click="cobrarVentaPendiente(v)">
+                <div class="vp-list-left">
+                  <span class="vp-list-badge">#{{ v.numeroTicket }}</span>
+                  <span class="vp-list-time">{{ v.fechaVenta?.slice(11, 16) }}</span>
+                  <span class="vp-list-user">👤 {{ v.nombreUsuario }}</span>
+                </div>
+                <span class="vp-list-amount">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
               </div>
-              <div class="pendiente-sub">
-                <span>{{ v.fechaVenta?.slice(11, 16) }}</span>
-                <span class="separator">·</span>
-                <span>{{ v.nombreUsuario }}</span>
+              <div v-if="v.descripcionPendiente" class="vp-list-desc">
+                <span class="vp-list-desc-ico">📝</span>
+                <span class="vp-list-desc-text">{{ v.descripcionPendiente }}</span>
+                <button class="vp-list-edit-desc" @click.stop="editarDescripcionPendiente(v)" title="Editar">✏️</button>
               </div>
-              <div v-if="v.descripcionPendiente" class="pendiente-desc-box">
-                <span class="desc-text">{{ v.descripcionPendiente }}</span>
-                <button class="btn-edit-desc" @click="editarDescripcionPendiente(v)" title="Editar descripción">✎</button>
-              </div>
-              <div v-if="v.detallesAgrupados && v.detallesAgrupados.length > 0" class="pendiente-detalles">
-                <div v-for="(d, i) in v.detallesAgrupados" :key="i" class="detalle-item">
-                  <span class="detalle-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
-                  <span class="detalle-name">{{ d.productoNombre }}</span>
-                  <span class="detalle-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
+              <div v-if="v.detallesAgrupados && v.detallesAgrupados.length > 0" class="vp-list-details">
+                <div v-for="(d, i) in v.detallesAgrupados" :key="i" class="vp-list-detail-row">
+                  <span class="vp-list-detail-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
+                  <span class="vp-list-detail-name">{{ d.productoNombre }}</span>
+                  <span class="vp-list-detail-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
                 </div>
               </div>
-              <div class="pendiente-actions">
-                <button class="btn-add-pendiente" @click="agregarAVentaPendiente(v)" title="Agregar productos">+</button>
-                <button class="btn-cobrar-pendiente" @click="cobrarVentaPendiente(v)">Cobrar</button>
+              <div class="vp-list-actions">
+                <button class="vp-list-btn-del" @click.stop="eliminarVentaPendiente(v)" title="Eliminar">🗑️</button>
+                <button class="vp-list-btn-add" @click.stop="agregarAVentaPendiente(v)" title="Agregar productos">➕</button>
+                <button class="vp-list-btn-cobrar" @click.stop="cobrarVentaPendiente(v)">💰 Cobrar</button>
               </div>
             </div>
+          </div>
+          <!-- VISTA GRID -->
+          <div v-else class="vp-grid">
+            <article v-for="v in ventasPendientesAgrupadas" :key="v.idVenta" class="vp-card">
+              <div class="vp-card-head">
+                <div class="vp-ticket-box">
+                  <span class="vp-ticket-badge">#{{ v.numeroTicket }}</span>
+                  <span class="vp-time">{{ v.fechaVenta?.slice(11, 16) }}</span>
+                </div>
+                <span class="vp-amount">{{ formatoMoneda(Number(v.montoTotal)) }}</span>
+              </div>
+              <div class="vp-card-user">
+                <span class="vp-user-ico">👤</span>
+                <span class="vp-user-name">{{ v.nombreUsuario }}</span>
+              </div>
+              <div v-if="v.descripcionPendiente" class="vp-desc">
+                <span class="vp-desc-ico">📝</span>
+                <span class="vp-desc-text">{{ v.descripcionPendiente }}</span>
+                <button class="vp-edit-desc" @click.stop="editarDescripcionPendiente(v)" title="Editar">✏️</button>
+              </div>
+              <div v-if="v.detallesAgrupados && v.detallesAgrupados.length > 0" class="vp-details">
+                <div v-for="(d, i) in v.detallesAgrupados" :key="i" class="vp-detail-row">
+                  <span class="vp-detail-qty">{{ d.cantidad }}{{ d.isGramaje ? 'g' : 'pz' }}</span>
+                  <span class="vp-detail-name">{{ d.productoNombre }}</span>
+                  <span class="vp-detail-price">{{ formatoMoneda(Number(d.precioUnitarioVenta)) }}</span>
+                </div>
+              </div>
+              <div class="vp-actions">
+                <button class="vp-btn-del" @click.stop="eliminarVentaPendiente(v)" title="Eliminar">🗑️</button>
+                <button class="vp-btn-add" @click.stop="agregarAVentaPendiente(v)" title="Agregar productos">➕</button>
+                <button class="vp-btn-cobrar" @click.stop="cobrarVentaPendiente(v)">💰 Cobrar</button>
+              </div>
+            </article>
           </div>
         </div>
       </div>
@@ -3239,6 +3741,238 @@ async function eliminarTodosLosDetalles() {
         <button class="btn-stop-scan" @click="stopScanner">Detener</button>
       </div>
     </div>
+
+    <!-- MODAL PROVEEDORES Y PEDIDOS -->
+    <div v-if="modalProveedoresPedidos" class="pos-modal-overlay" @click.self="modalProveedoresPedidos = false">
+      <div class="pos-modal-card proveedores-pedidos-modal">
+        <div class="pp-header">
+          <h3>📦 Proveedores y Pedidos</h3>
+          <button class="btn-close" @click="modalProveedoresPedidos = false">✕</button>
+        </div>
+        <div class="pp-tabs">
+          <button :class="['pp-tab', { active: pedidoProveedorTab === 'proveedores' }]" @click="pedidoProveedorTab = 'proveedores'">Proveedores</button>
+          <button :class="['pp-tab', { active: pedidoProveedorTab === 'pedidos' }]" @click="pedidoProveedorTab = 'pedidos'">Pedidos ({{ pedidosProveedor.length }})</button>
+          <button :class="['pp-tab', { active: pedidoProveedorTab === 'sugerido' }]" @click="pedidoProveedorTab = 'sugerido'">🧙 Sugerido</button>
+          <button :class="['pp-tab', { active: pedidoProveedorTab === 'sugeridoHoy' }]" @click="pedidoProveedorTab = 'sugeridoHoy'">📅 Sugerido Hoy</button>
+        </div>
+        <div class="pp-body">
+          <!-- PROVEEDORES -->
+          <div v-if="pedidoProveedorTab === 'proveedores'" class="pp-section">
+            <div class="pp-toolbar">
+              <button class="pp-btn-add" @click="openProveedorModal()">+ Proveedor</button>
+              <div class="pp-views">
+                <button :class="['pp-vbtn', { on: ppVistaListaProv }]" @click="ppVistaListaProv = true" title="Lista">📋</button>
+                <button :class="['pp-vbtn', { on: !ppVistaListaProv }]" @click="ppVistaListaProv = false" title="Cuadrícula">🔲</button>
+              </div>
+            </div>
+            <div v-if="proveedores.length === 0" class="pp-empty">No hay proveedores</div>
+            <!-- Lista -->
+            <div v-else-if="ppVistaListaProv" class="pp-list">
+              <div v-for="p in proveedores" :key="p.idProveedor" class="pp-item">
+                <div class="pp-item-avatar">{{ p.nombre.charAt(0) }}</div>
+                <div class="pp-item-info">
+                  <span class="pp-item-name">{{ p.nombre }}</span>
+                  <span class="pp-item-detail" v-if="p.telefono">📞 {{ p.telefono }}</span>
+                  <span class="pp-item-detail" v-if="p.email">✉️ {{ p.email }}</span>
+                </div>
+                <div class="pp-item-actions">
+                  <button class="pp-btn-sm" @click="openProveedorModal(p)">✏️</button>
+                  <button class="pp-btn-sm pp-btn-del" @click="deleteProveedor(p.idProveedor)">🗑️</button>
+                </div>
+              </div>
+            </div>
+            <!-- Grid -->
+            <div v-else class="pp-grid">
+              <div v-for="p in proveedores" :key="p.idProveedor" class="pp-card">
+                <div class="pp-card-avatar">{{ p.nombre.charAt(0) }}</div>
+                <h4 class="pp-card-name">{{ p.nombre }}</h4>
+                <div class="pp-card-details">
+                  <span v-if="p.telefono" class="pp-card-detail">📞 {{ p.telefono }}</span>
+                  <span v-if="p.email" class="pp-card-detail">✉️ {{ p.email }}</span>
+                  <span v-if="p.direccion" class="pp-card-detail">📍 {{ p.direccion }}</span>
+                  <span v-if="p.contacto" class="pp-card-detail">👤 {{ p.contacto }}</span>
+                </div>
+                <div class="pp-card-actions">
+                  <button class="pp-card-btn" @click="openProveedorModal(p)" title="Editar">✏️</button>
+                  <button class="pp-card-btn pp-card-btn-del" @click="deleteProveedor(p.idProveedor)" title="Eliminar">🗑️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- PEDIDOS -->
+          <div v-if="pedidoProveedorTab === 'pedidos'" class="pp-section">
+            <div class="pp-toolbar">
+              <button class="pp-btn-add" @click="openPedidoModal()">+ Pedido</button>
+              <div class="pp-views">
+                <button :class="['pp-vbtn', { on: ppVistaListaPed }]" @click="ppVistaListaPed = true" title="Lista">📋</button>
+                <button :class="['pp-vbtn', { on: !ppVistaListaPed }]" @click="ppVistaListaPed = false" title="Cuadrícula">🔲</button>
+              </div>
+            </div>
+            <div v-if="pedidosProveedor.length === 0" class="pp-empty">No hay pedidos pendientes</div>
+            <!-- Lista -->
+            <div v-else-if="ppVistaListaPed" class="pp-list">
+              <div v-for="ped in pedidosProveedor" :key="ped.idPedido" class="pp-item pp-pedido">
+                <div class="pp-pedido-info">
+                  <span class="pp-pedido-prov">{{ ped.nombreProveedor }}</span>
+                  <span class="pp-pedido-date">📅 {{ ped.fechaEntregaEsperada }}</span>
+                  <span class="pp-pedido-total">{{ formatoMoneda(ped.montoTotal) }}</span>
+                </div>
+                <div class="pp-item-actions">
+                  <button class="pp-btn-sm pp-btn-ok" @click="recibirPedido(ped.idPedido)">✅</button>
+                  <button class="pp-btn-sm pp-btn-del" @click="deletePedido(ped.idPedido)">🗑️</button>
+                </div>
+              </div>
+            </div>
+            <!-- Grid -->
+            <div v-else class="pp-grid">
+              <div v-for="ped in pedidosProveedor" :key="ped.idPedido" class="pp-card pp-pedido-card">
+                <div class="pp-pedido-card-head">
+                  <span class="pp-pedido-card-prov">{{ ped.nombreProveedor }}</span>
+                  <span class="pp-pedido-card-total">{{ formatoMoneda(ped.montoTotal) }}</span>
+                </div>
+                <div class="pp-pedido-card-details">
+                  <span class="pp-pedido-card-date">📅 {{ ped.fechaEntregaEsperada }}</span>
+                  <span v-if="ped.montoApartado" class="pp-pedido-card-apartado">💰 Apartado: {{ formatoMoneda(ped.montoApartado) }}</span>
+                </div>
+                <div class="pp-pedido-card-actions">
+                  <button class="pp-card-btn pp-card-btn-ok" @click="recibirPedido(ped.idPedido)" title="Recibir">✅</button>
+                  <button class="pp-card-btn pp-card-btn-del" @click="deletePedido(ped.idPedido)" title="Eliminar">🗑️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- SUGERIDO -->
+          <div v-if="pedidoProveedorTab === 'sugerido'" class="pp-section pp-section-sugerido">
+            <PedidoSugerido @pedido-creado="cargarProveedoresPedidos" />
+          </div>
+          <!-- SUGERIDO HOY -->
+          <div v-if="pedidoProveedorTab === 'sugeridoHoy'" class="pp-section pp-section-sugerido">
+            <SugeridoHoy @pedido-creado="cargarProveedoresPedidos" />
+          </div>
+        </div>
+
+        <!-- FORMULARIO PROVEEDOR -->
+        <div v-if="showProveedorForm" class="pp-form-overlay">
+          <div class="pp-form-card">
+            <h4>{{ editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor' }}</h4>
+            <div class="pp-form-grid">
+              <div class="pp-field">
+                <label class="pp-field-label">Nombre del proveedor *</label>
+                <input v-model="proveedorForm.nombre" placeholder="Ej: Distribuidora ABC" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Persona de contacto</label>
+                <input v-model="proveedorForm.contacto" placeholder="Nombre del contacto" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Teléfono</label>
+                <input v-model="proveedorForm.telefono" placeholder="(000) 000-0000" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Email</label>
+                <input v-model="proveedorForm.email" type="email" placeholder="correo@ejemplo.com" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Dirección</label>
+                <input v-model="proveedorForm.direccion" placeholder="Calle, número, colonia..." class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Notas</label>
+                <textarea v-model="proveedorForm.notas" rows="2" placeholder="Notas adicionales..." class="pp-input pp-textarea"></textarea>
+              </div>
+            </div>
+            <div class="pp-form-actions">
+              <button class="pp-btn-cancel" @click="showProveedorForm = false">Cancelar</button>
+              <button class="pp-btn-save" @click="saveProveedor">{{ editingProveedor ? 'Actualizar' : 'Guardar' }}</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- FORMULARIO PEDIDO -->
+        <div v-if="showPedidoForm" class="pp-form-overlay">
+          <div class="pp-form-card pp-form-card-pedido">
+            <h4>{{ editingPedido ? 'Editar Pedido' : 'Nuevo Pedido' }}</h4>
+            <div class="pp-form-grid">
+              <div class="pp-field">
+                <label class="pp-field-label">Proveedor *</label>
+                <select v-model="pedidoForm.idProveedor" class="pp-input">
+                  <option :value="0">Seleccionar proveedor...</option>
+                  <option v-for="p in proveedores" :key="p.idProveedor" :value="p.idProveedor">{{ p.nombre }}</option>
+                </select>
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Fecha de entrega esperada *</label>
+                <input v-model="pedidoForm.fechaEntregaEsperada" type="date" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-field-label">Monto apartado</label>
+                <input v-model.number="pedidoForm.montoApartado" type="number" step="0.01" min="0" placeholder="0.00" class="pp-input" />
+              </div>
+              <div class="pp-field">
+                <label class="pp-checkbox-label">
+                  <input type="checkbox" v-model="montoManual" />
+                  Monto total sin productos
+                </label>
+              </div>
+              <div v-if="montoManual" class="pp-field">
+                <label class="pp-field-label">Monto total *</label>
+                <input v-model.number="pedidoForm.montoTotal" type="number" step="0.01" min="0" placeholder="0.00" class="pp-input" />
+              </div>
+            </div>
+
+            <!-- PRODUCTOS DEL PEDIDO -->
+            <div v-if="!montoManual" class="pp-product-section">
+              <h5>📦 Productos del Pedido</h5>
+              <div class="pp-product-search-wrap">
+                <div ref="searchWrapperRef" class="pp-search-wrapper">
+                  <input
+                    v-model="searchProductoPedido"
+                    type="text"
+                    placeholder="Buscar producto..."
+                    class="pp-input"
+                    @focus="showProductoDropdownPedido = true"
+                    @input="showProductoDropdownPedido = true"
+                  />
+                  <div v-if="showProductoDropdownPedido && filteredProductosPedido.length" class="pp-dropdown">
+                    <div
+                      v-for="prod in filteredProductosPedido"
+                      :key="prod.idProducto"
+                      class="pp-dropdown-item"
+                      @click="selectProductoForPedido(prod)"
+                    >
+                      <span class="pp-dropdown-name">{{ prod.nombre }}</span>
+                      <span class="pp-dropdown-price">{{ formatoMoneda(prod.precio_costo) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <input v-model.number="newDetallePedido.cantidad" type="number" min="1" placeholder="Cant" class="pp-input pp-qty" />
+                <input v-model.number="newDetallePedido.precioUnitario" type="number" step="0.01" min="0" placeholder="$" class="pp-input pp-price" />
+                <button class="pp-btn-add-prod" @click="addDetallePedido">+</button>
+              </div>
+
+              <!-- LISTA DE DETALLES -->
+              <div v-if="pedidoForm.detalles.length > 0" class="pp-detalle-list">
+                <div v-for="(d, idx) in pedidoForm.detalles" :key="idx" class="pp-detalle-row">
+                  <span class="pp-detalle-name">{{ d.nombreProducto }}</span>
+                  <span class="pp-detalle-qty">{{ d.cantidad }} × {{ formatoMoneda(d.precioUnitario) }}</span>
+                  <span class="pp-detalle-sub">{{ formatoMoneda(d.subtotal) }}</span>
+                  <button class="pp-btn-remove" @click="removeDetallePedido(idx)">✕</button>
+                </div>
+                <div class="pp-detalle-total">
+                  <span>Total:</span>
+                  <strong>{{ formatoMoneda(pedidoForm.montoTotal) }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="pp-form-actions">
+              <button class="pp-btn-cancel" @click="showPedidoForm = false">Cancelar</button>
+              <button class="pp-btn-save" @click="savePedido">{{ editingPedido ? 'Actualizar' : 'Crear' }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -3252,7 +3986,7 @@ async function eliminarTodosLosDetalles() {
   grid-template-rows: 1fr;
   height: calc(98vh - 64px);
   background-color: var(--bg-primary);
-  color: var(--text-primary);
+  color: var(--zelda-gold);
   overflow: hidden;
   position: relative;
   width: 100%;
@@ -5850,10 +6584,54 @@ async function eliminarTodosLosDetalles() {
 
 .ticket-nav-item:hover .btn-delete-ticket { display: flex; }
 
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.5rem auto 0.75rem;
+}
+
+.btn-creditos-sidebar {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: #8a6bb4;
+  font-size: 1.2rem;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-creditos-sidebar:hover {
+  border-color: #8a6bb4;
+  background: color-mix(in srgb, #8a6bb4 10%, var(--bg-primary));
+}
+
+.btn-creditos-sidebar .creditos-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #8a6bb4;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .btn-pendientes-ticket {
   width: 44px;
   height: 44px;
-  margin: 0.5rem auto 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
@@ -8402,225 +9180,83 @@ async function eliminarTodosLosDetalles() {
   margin-top: 1rem;
 }
 
-/* Lista de ventas pendientes */
-/* Modal pendientes minimalista */
+/* Lista de ventas pendientes - Diseño tarjetas */
 .modal-pendientes {
-  max-width: 480px;
+  max-width: 560px;
 }
 
-.modal-header-clean {
+.vp-modal-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
   border-bottom: 1px solid var(--border-color);
+  background: var(--bg-panel);
 }
 
-.modal-header-clean h3 {
+.vp-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.vp-head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vp-title {
   font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--accent-color);
   margin: 0;
+  font-family: 'HyliaSerif', serif;
 }
 
-.modal-body-clean {
-  padding: 1rem 1.25rem;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem 1rem;
+.vp-count {
+  font-size: 0.7rem;
   color: var(--text-muted);
-}
-
-.empty-state .empty-icon {
-  font-size: 2rem;
-  display: block;
-  margin-bottom: 0.5rem;
-  color: var(--success-color);
-}
-
-.pendientes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.pendiente-row {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.75rem;
-  transition: border-color 0.15s;
-}
-
-.pendiente-row:hover {
-  border-color: var(--accent-color);
-}
-
-.pendiente-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.25rem;
-}
-
-.pendiente-ticket {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--accent-color);
-}
-
-.pendiente-amount {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.pendiente-sub {
-  display: flex;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.pendiente-sub .separator {
-  opacity: 0.5;
-}
-
-.pendiente-desc-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
   background: var(--bg-secondary);
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
+  border: 1px solid var(--border-color);
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
 }
 
-.pendiente-desc-box .desc-text {
-  flex: 1;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-style: italic;
+.vp-views {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.btn-edit-desc {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--accent-color);
-  font-size: 0.85rem;
-  cursor: pointer;
+.vp-vbtn {
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s;
-}
-
-.btn-edit-desc:hover {
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
-}
-
-.pendiente-detalles {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  margin-bottom: 0.5rem;
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-.detalle-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.4rem;
-  font-size: 0.8rem;
-  border-radius: 3px;
-}
-
-.detalle-item:nth-child(odd) {
-  background: var(--bg-secondary);
-}
-
-.detalle-qty {
-  background: var(--accent-color);
-  color: var(--bg-primary);
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  min-width: 35px;
-  text-align: center;
-}
-
-.detalle-name {
-  flex: 1;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detalle-price {
-  color: var(--success-color);
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.pendiente-desc-inline {
-  font-style: italic;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pendiente-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-cobrar-pendiente {
-  flex: 1;
-  padding: 0.5rem;
-  background: var(--success-color);
   border: none;
-  border-radius: 6px;
-  color: white;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.btn-cobrar-pendiente:hover {
-  opacity: 0.9;
-}
-
-.btn-cobrar-pendiente:active {
-  transform: scale(0.98);
-}
-
-.btn-add-pendiente {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--accent-color);
-  border-radius: 8px;
   background: transparent;
-  color: var(--accent-color);
-  font-size: 1.25rem;
-  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.vp-vbtn.on { background: var(--accent-color); color: var(--bg-primary); }
+.vp-vbtn:hover:not(.on) { background: var(--bg-panel); }
+
+.vp-close {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.9rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -8628,13 +9264,508 @@ async function eliminarTodosLosDetalles() {
   transition: all 0.15s;
 }
 
-.btn-add-pendiente:hover {
-  background: var(--accent-color);
+.vp-close:hover {
+  background: var(--error-color);
+  border-color: var(--error-color);
   color: white;
 }
 
-.btn-add-pendiente:active {
-  transform: scale(0.95);
+.vp-modal-body {
+  padding: 0.85rem 1.25rem;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.vp-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+
+.vp-empty-ico {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.vp-empty-text {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.vp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+/* VISTA LISTA */
+.vp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vp-list-row {
+  position: relative;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: all 0.15s;
+}
+
+.vp-list-row:hover {
+  border-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.vp-list-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.vp-list-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vp-list-badge {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-list-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+}
+
+.vp-list-user {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.vp-list-amount {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.vp-list-desc {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--bg-secondary);
+  border-radius: 5px;
+}
+
+.vp-list-desc-ico {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.vp-list-desc-text {
+  flex: 1;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp-list-edit-desc {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: all 0.15s;
+}
+
+.vp-list-edit-desc:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.vp-list-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  max-height: 70px;
+  overflow-y: auto;
+  padding: 0.1rem;
+}
+
+.vp-list-details::-webkit-scrollbar { width: 3px; }
+.vp-list-details::-webkit-scrollbar-track { background: transparent; }
+.vp-list-details::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+
+.vp-list-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.3rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+}
+
+.vp-list-detail-qty {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  padding: 0.06rem 0.22rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-list-detail-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp-list-detail-price {
+  color: var(--success-color);
+  font-weight: 600;
+  font-size: 0.65rem;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-list-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.1rem;
+}
+
+.vp-list-btn-del {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-list-btn-del:hover {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+}
+
+.vp-list-btn-add {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-list-btn-add:hover {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.vp-list-btn-cobrar {
+  flex: 1;
+  padding: 0.45rem;
+  background: var(--success-color);
+  border: none;
+  border-radius: 5px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.vp-list-btn-cobrar:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25);
+}
+
+.vp-list-btn-cobrar:active {
+  transform: scale(0.98);
+}
+
+.vp-card {
+  position: relative;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.vp-card:hover {
+  border-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.vp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vp-ticket-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vp-ticket-badge {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+}
+
+.vp-amount {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.vp-card-user {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.vp-user-ico {
+  font-size: 0.8rem;
+}
+
+.vp-user-name {
+  color: var(--text-secondary);
+}
+
+.vp-desc {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+.vp-desc-ico {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.vp-desc-text {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp-edit-desc {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: all 0.15s;
+}
+
+.vp-edit-desc:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.vp-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 80px;
+  overflow-y: auto;
+  padding: 0.15rem;
+}
+
+.vp-details::-webkit-scrollbar { width: 3px; }
+.vp-details::-webkit-scrollbar-track { background: transparent; }
+.vp-details::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+
+.vp-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+}
+
+.vp-detail-qty {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  padding: 0.08rem 0.25rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  min-width: 32px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-detail-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp-detail-price {
+  color: var(--success-color);
+  font-weight: 600;
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+}
+
+.vp-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.vp-btn-del {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-btn-del:hover {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, transparent);
+}
+
+.vp-btn-add {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-btn-add:hover {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+}
+
+.vp-btn-cobrar {
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--success-color);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.vp-btn-cobrar:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(34, 197, 94, 0.25);
+}
+
+.vp-btn-cobrar:active {
+  transform: scale(0.98);
 }
 
 /* Modal agregar pendiente minimalista */
@@ -9082,6 +10213,36 @@ async function eliminarTodosLosDetalles() {
   
   .d-sub {
     font-size: 0.95rem;
+  }
+  
+  /* PP modal responsive */
+  .pp-tabs {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.6rem 1rem;
+  }
+  
+  .pp-tab {
+    font-size: 0.75rem;
+    padding: 0.4rem;
+  }
+  
+  .pp-product-search-wrap {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  
+  .pp-search-wrapper {
+    flex: 1 1 100%;
+  }
+  
+  .pp-qty, .pp-price {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .pp-form-grid {
+    gap: 0.6rem;
   }
 }
 
@@ -9574,6 +10735,175 @@ async function eliminarTodosLosDetalles() {
     font-size: 0.9rem;
     padding: 0.6rem 0;
   }
+  
+  /* PP modal responsive 480 */
+  .pp-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .pp-tab {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.25rem;
+  }
+  
+  .pp-body {
+    padding: 0.75rem;
+  }
+  
+  .pp-toolbar {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  
+  .pp-btn-add {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .pp-header {
+    padding: 0.75rem;
+  }
+  
+  .pp-header h3 {
+    font-size: 0.95rem;
+  }
+  
+  .pp-form-overlay {
+    padding: 0.5rem;
+  }
+  
+  .pp-form-card,
+  .pp-form-card-pedido {
+    max-width: 100%;
+    padding: 1rem;
+  }
+  
+  .pp-form-actions {
+    flex-direction: column;
+  }
+  
+  .pp-form-actions button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .pp-product-search-wrap {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  
+  .pp-product-search-wrap .pp-input {
+    width: 100%;
+  }
+  
+  .pp-qty, .pp-price {
+    width: 100%;
+    flex: 1;
+    box-sizing: border-box;
+  }
+  
+  .pp-btn-add-prod {
+    width: 100%;
+    height: 36px;
+  }
+  
+  .pp-detalle-row {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.35rem 0.5rem;
+  }
+  
+  .pp-detalle-name {
+    width: 100%;
+  }
+  
+  .pp-btn-remove {
+    margin-left: auto;
+  }
+  
+  /* Ventas Pendientes responsive 480 */
+  .vp-modal-head {
+    padding: 0.65rem 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  
+  .vp-title {
+    font-size: 0.85rem;
+  }
+  
+  .vp-modal-body {
+    padding: 0.65rem 0.75rem;
+  }
+  
+  .vp-list-left {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  
+  .vp-list-actions {
+    flex-wrap: wrap;
+  }
+  
+  .vp-list-btn-del, .vp-list-btn-add {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+  
+  .vp-list-btn-cobrar {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .vp-card {
+    padding: 0.6rem;
+  }
+  
+  .vp-card-head {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  
+  .ticket-item {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.35rem 0;
+  }
+  
+  .ticket-item-name {
+    width: 100%;
+  }
+  
+  .modal-header-clean h3 {
+    font-size: 0.9rem;
+  }
+  
+  .vp-detail-row {
+    flex-wrap: wrap;
+    gap: 0.2rem;
+  }
+  
+  .vp-detail-name {
+    width: 100%;
+  }
+  
+  /* Descripción pendiente */
+  .pendiente-textarea {
+    font-size: 0.85rem;
+  }
+  
+  .pendiente-actions {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  
+  .pendiente-actions button {
+    width: 100%;
+  }
 }
 
 /* Móviles pequeños (400px y menos) */
@@ -9829,6 +11159,55 @@ async function eliminarTodosLosDetalles() {
   .method-badge {
     font-size: 0.7rem !important;
     padding: 0.18rem 0.5rem;
+  }
+  
+  /* PP modal 400 */
+  .pp-tabs {
+    gap: 0.2rem;
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .pp-tab {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.2rem;
+  }
+  
+  .pp-header h3 {
+    font-size: 0.85rem;
+  }
+  
+  .pp-body {
+    padding: 0.5rem;
+  }
+  
+  .pp-form-card,
+  .pp-form-card-pedido {
+    padding: 0.75rem;
+  }
+  
+  .pp-form-grid {
+    gap: 0.5rem;
+  }
+  
+  .pp-field-label {
+    font-size: 0.65rem;
+  }
+  
+  .pp-input {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
+  }
+  
+  .vp-list-row {
+    padding: 0.5rem;
+  }
+  
+  .vp-list-left {
+    gap: 0.2rem;
+  }
+  
+  .vp-list-amount {
+    font-size: 0.78rem;
   }
 }
 
@@ -10815,6 +12194,958 @@ async function eliminarTodosLosDetalles() {
 @media (max-width: 768px) {
   .link-sprite {
     animation-delay: 5s;
+  }
+}
+
+/* PROVEEDORES Y PEDIDOS MODAL */
+.proveedores-pedidos-modal {
+  max-width: 600px;
+  width: 95%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pp-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.pp-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pp-tab {
+  flex: 1;
+  padding: 0.5rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pp-tab.active {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
+}
+
+.pp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  position: relative;
+}
+
+.pp-section {
+  min-height: 200px;
+}
+
+.pp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.pp-views {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pp-vbtn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.pp-vbtn.on { background: var(--accent-color); color: var(--bg-primary); }
+.pp-vbtn:hover:not(.on) { background: var(--bg-panel); }
+
+.pp-btn-add {
+  padding: 0.5rem 1rem;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.pp-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.pp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pp-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.pp-item-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 70%, black));
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.pp-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pp-item-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.pp-item-detail {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.pp-item-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.pp-btn-sm {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.pp-btn-sm:hover {
+  transform: scale(1.1);
+}
+
+.pp-btn-del:hover {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, var(--bg-panel));
+}
+
+.pp-btn-ok:hover {
+  border-color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 15%, var(--bg-panel));
+}
+
+.pp-pedido {
+  flex-wrap: wrap;
+}
+
+.pp-pedido-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pp-pedido-prov {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.pp-pedido-date {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.pp-pedido-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: monospace;
+}
+
+/* GRID */
+.pp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+
+.pp-card {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.pp-card:hover {
+  border-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.pp-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 70%, black));
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  align-self: center;
+}
+
+.pp-card-name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 1.2em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pp-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  background: var(--bg-panel);
+  border-radius: 6px;
+}
+
+.pp-card-detail {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-card-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+.pp-card-btn {
+  flex: 1;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.pp-card-btn:hover {
+  transform: scale(1.05);
+}
+
+.pp-card-btn-del:hover {
+  border-color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, var(--bg-panel));
+}
+
+.pp-card-btn-ok:hover {
+  border-color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 15%, var(--bg-panel));
+}
+
+/* Pedido cards */
+.pp-pedido-card .pp-pedido-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-pedido-card-prov {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.pp-pedido-card-total {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: monospace;
+}
+
+.pp-pedido-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pp-pedido-card-date,
+.pp-pedido-card-apartado {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.pp-pedido-card-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+/* SUGERIDO */
+.pp-section-sugerido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sugerido-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.pp-select-periodo {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.sugerido-loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--accent-color);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.sugerido-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sugerido-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.pp-btn-crear-pedido {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  padding: 0.4rem 0.75rem;
+  width: auto;
+  height: auto;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+.pp-btn-crear-pedido:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sugerido-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 450px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.sugerido-card {
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.sugerido-card:hover {
+  border-color: var(--accent-color);
+  box-shadow: 0 2px 12px rgba(201, 146, 52, 0.15);
+}
+
+.sugerido-card.selected {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-secondary));
+}
+
+.sugerido-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sugerido-card-check {
+  flex-shrink: 0;
+}
+
+.check-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: transparent;
+  transition: all 0.15s;
+}
+
+.sugerido-card.selected .check-box {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--bg-primary);
+}
+
+.sugerido-card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.sugerido-card-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sugerido-card-badges {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-cat {
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  color: var(--accent-color);
+}
+
+.badge-sub {
+  background: color-mix(in srgb, #6366f1 15%, transparent);
+  color: #818cf8;
+}
+
+.badge-gramaje {
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  color: #34d399;
+}
+
+.sugerido-card-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  background: color-mix(in srgb, #e74c3c 12%, transparent);
+  border-radius: 6px;
+}
+
+.alert-icon {
+  font-size: 0.85rem;
+}
+
+.alert-text {
+  font-size: 0.7rem;
+  color: #e74c3c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sugerido-card-body {
+  padding: 0.75rem 1rem;
+}
+
+.info-group {
+  margin-bottom: 0.5rem;
+}
+
+.info-group:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.info-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 80px;
+}
+
+.info-item-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.info-item-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.info-item-value.highlight {
+  color: var(--accent-color);
+}
+
+.info-item-value.critical {
+  color: #e74c3c;
+}
+
+.info-item-value.low {
+  color: #e6a817;
+}
+
+.info-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.5rem 0;
+}
+
+.suggestion-row {
+  gap: 1.25rem;
+}
+
+.suggestion-item {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  flex: none;
+}
+
+.suggest-qty {
+  color: #34d399 !important;
+  font-size: 1rem !important;
+}
+
+.suggest-cost {
+  color: var(--accent-color) !important;
+  font-size: 0.95rem !important;
+}
+
+.sugerido-total-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.sugerido-total-bar strong {
+  color: var(--accent-color);
+  font-size: 1rem;
+  font-family: monospace;
+}
+
+/* FORM OVERLAY */
+.pp-form-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 10;
+  border-radius: 16px;
+}
+
+.pp-form-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.pp-form-card h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.pp-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pp-field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pp-input {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.pp-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.pp-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.pp-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pp-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+}
+
+.pp-btn-cancel {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.pp-btn-save {
+  padding: 0.5rem 1.2rem;
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pp-form-card-pedido {
+  max-width: 500px;
+}
+
+.pp-product-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.pp-product-section h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.pp-product-search-wrap {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.pp-search-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.pp-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  margin-top: 4px;
+}
+
+.pp-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s;
+}
+
+.pp-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.pp-dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.pp-dropdown-name {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-dropdown-price {
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.pp-qty {
+  width: 55px;
+  text-align: center;
+}
+
+.pp-price {
+  width: 70px;
+  text-align: center;
+}
+
+.pp-btn-add-prod {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pp-detalle-list {
+  margin-top: 0.75rem;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.pp-detalle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+}
+
+.pp-detalle-row:last-child {
+  border-bottom: none;
+}
+
+.pp-detalle-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.pp-detalle-qty {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.pp-detalle-sub {
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.pp-btn-remove {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--error-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--error-color);
+  cursor: pointer;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.pp-btn-remove:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.pp-detalle-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-panel);
+  border-radius: 0 0 8px 8px;
+  font-size: 0.85rem;
+}
+
+.pp-detalle-total strong {
+  color: var(--accent-color);
+  font-family: monospace;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .proveedores-pedidos-modal {
+    max-width: 100%;
+    max-height: 95vh;
   }
 }
 </style>

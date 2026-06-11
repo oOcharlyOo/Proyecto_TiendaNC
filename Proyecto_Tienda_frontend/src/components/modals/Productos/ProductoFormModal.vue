@@ -29,6 +29,8 @@ type ProductoPayload = {
   idSubcategoria?: number | null;
   requiere_envase?: boolean;
   precio_envase?: number;
+  presentacion_caja?: string;
+  cajas?: { piezas: number }[];
 };
 
 const props = defineProps<{
@@ -60,7 +62,8 @@ const form = ref<ProductoPayload>({
   idCategoria: 1,
   idSubcategoria: null,
   requiere_envase: false,
-  precio_envase: 0
+  precio_envase: 0,
+  presentacion_caja: ''
 });
 
 watch(
@@ -87,6 +90,15 @@ watch(
   }
 );
 
+watch(
+  () => form.value.precio_costo,
+  () => {
+    cajasSeleccionadas.value.forEach(size => {
+      cajasPrecios.value[size] = Number(form.value.precio_costo || 0) * size;
+    });
+  }
+);
+
 function setFormFromData() {
   const source = props.data;
   if (!source) {
@@ -103,17 +115,21 @@ function setFormFromData() {
     idCategoria: 1,
     idSubcategoria: null,
     requiere_envase: false,
-    precio_envase: 0
+    precio_envase: 0,
+    presentacion_caja: ''
   };
+    cajasSeleccionadas.value = [];
+    cajasPrecios.value = {};
     return;
   }
 
+  const precioCosto = Number(source.precio_costo || 0);
   form.value = {
     idProducto: source.idProducto,
     nombre: source.nombre,
     stock: Number(source.stock || 0),
     codigoBarras: (source.codigoBarras ?? props.prefillCode?.trim()) || '',
-    precio_costo: Number(source.precio_costo || 0),
+    precio_costo: precioCosto,
     precio_venta: Number(source.precio_venta || 0),
     cantidad_min: Number(source.cantidad_min || 0),
     cantidad_max: Number(source.cantidad_max || 0),
@@ -122,15 +138,34 @@ function setFormFromData() {
     idCategoria: source.idCategoria || 1,
     idSubcategoria: source.idSubcategoria ?? null,
     requiere_envase: Boolean(source.requiere_envase),
-    precio_envase: Number(source.precio_envase || 0)
+    precio_envase: Number(source.precio_envase || 0),
+    presentacion_caja: source.presentacion_caja || ''
   };
+  
+  // Cargar cajas existentes y recalcular con precio_costo actual
+  cajasSeleccionadas.value = [];
+  cajasPrecios.value = {};
+  if (source.presentacion_caja) {
+    const sizes = source.presentacion_caja.split(',').map(s => parseInt(s.trim())).filter(s => s > 0);
+    sizes.forEach(s => {
+      cajasSeleccionadas.value.push(s);
+      cajasPrecios.value[s] = precioCosto * s;
+    });
+  }
 }
 
 function handleSubmit() {
+  const presentacionCaja = cajasSeleccionadas.value.join(',');
+  const cajas = cajasSeleccionadas.value.map(s => ({
+    piezas: s
+  }));
+  
   emit('submit', {
     ...form.value,
     codigoBarras: form.value.codigoBarras?.trim() || null,
-    nombre: form.value.nombre.trim()
+    nombre: form.value.nombre.trim(),
+    presentacion_caja: presentacionCaja,
+    cajas
   });
 }
 
@@ -142,6 +177,42 @@ const subcategoriasFiltradas = computed(() => {
   if (!form.value.idCategoria) return [];
   return (props.subcategorias || []).filter(s => s.idCategoria === form.value.idCategoria);
 });
+
+const CAJA_SIZES = [4, 6, 8, 12, 24] as const;
+const cajasSeleccionadas = ref<number[]>([]);
+const cajasPrecios = ref<Record<number, number>>({});
+const customCajaSize = ref<number | null>(null);
+
+function toggleCaja(size: number) {
+  const idx = cajasSeleccionadas.value.indexOf(size);
+  if (idx >= 0) {
+    cajasSeleccionadas.value.splice(idx, 1);
+    delete cajasPrecios.value[size];
+  } else {
+    cajasSeleccionadas.value.push(size);
+    cajasPrecios.value[size] = Number(form.value.precio_costo || 0) * size;
+  }
+}
+
+function addCustomCaja() {
+  const size = customCajaSize.value;
+  if (!size || size <= 0) return;
+  if (cajasSeleccionadas.value.includes(size)) {
+    customCajaSize.value = null;
+    return;
+  }
+  cajasSeleccionadas.value.push(size);
+  cajasPrecios.value[size] = Number(form.value.precio_costo || 0) * size;
+  customCajaSize.value = null;
+}
+
+function removeCaja(size: number) {
+  const idx = cajasSeleccionadas.value.indexOf(size);
+  if (idx >= 0) {
+    cajasSeleccionadas.value.splice(idx, 1);
+    delete cajasPrecios.value[size];
+  }
+}
 
 const esCategoriaGaming = computed(() => {
   if (!form.value.idCategoria || !props.categorias) return false;
@@ -251,6 +322,52 @@ const esCategoriaGaming = computed(() => {
             <div v-if="form.requiere_envase" class="stock-field">
               <label>Precio del envase ($) <span class="required">*</span></label>
               <input v-model.number="form.precio_envase" type="number" step="0.01" min="0" required class="input-field">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4 class="section-title">📦 Presentación en Cajas</h4>
+          <div class="caja-section">
+            <p class="caja-description">Selecciona los tamaños de caja. El precio se calcula automáticamente: <strong>precio_costo × piezas</strong>.</p>
+            <div class="caja-buttons-grid">
+              <div v-for="size in CAJA_SIZES" :key="size" class="caja-item">
+                <button 
+                  type="button" 
+                  class="caja-toggle-btn" 
+                  :class="{ active: cajasSeleccionadas.includes(size) }"
+                  @click="toggleCaja(size)"
+                >
+                  📦 {{ size }} pzs
+                </button>
+                <span v-if="cajasSeleccionadas.includes(size) && cajasPrecios[size] > 0" class="caja-auto-price">
+                  {{ formatCurrency(cajasPrecios[size]) }}
+                </span>
+              </div>
+            </div>
+            <div class="caja-custom-row">
+              <input
+                v-model.number="customCajaSize"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Piezas ej: 20"
+                class="caja-custom-input"
+                @keyup.enter="addCustomCaja"
+              />
+              <button type="button" class="caja-custom-btn" @click="addCustomCaja">+ Agregar</button>
+            </div>
+            <div v-if="cajasSeleccionadas.some(s => !CAJA_SIZES.includes(s))" class="caja-custom-list">
+              <span class="caja-custom-list-label">Personalizadas:</span>
+              <div
+                v-for="size in cajasSeleccionadas.filter(s => !CAJA_SIZES.includes(s))"
+                :key="size"
+                class="caja-custom-chip"
+              >
+                📦 {{ size }} pzs
+                <span class="caja-chip-price">{{ formatCurrency(cajasPrecios[size] || 0) }}</span>
+                <button type="button" class="caja-chip-remove" @click="removeCaja(size)">✕</button>
+              </div>
             </div>
           </div>
         </div>
@@ -518,6 +635,162 @@ const esCategoriaGaming = computed(() => {
   font-size: 0.6rem;
   opacity: 0.7;
   text-transform: none;
+}
+
+.field-hint {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+  margin-top: 0.2rem;
+}
+
+.full-width {
+  grid-column: span 2;
+}
+
+/* Cajas section */
+.caja-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.caja-description {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.caja-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.caja-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.caja-toggle-btn {
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.caja-toggle-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.caja-toggle-btn.active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: #818cf8;
+  color: #818cf8;
+}
+
+.caja-custom-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.caja-custom-input {
+  flex: 1;
+  max-width: 180px;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.caja-custom-input:focus {
+  border-color: var(--accent-color);
+}
+
+.caja-custom-input::placeholder {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 0.7rem;
+}
+
+.caja-custom-btn {
+  padding: 0.45rem 0.8rem;
+  background: var(--accent-color);
+  border: none;
+  border-radius: 8px;
+  color: var(--bg-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.caja-custom-btn:hover {
+  opacity: 0.85;
+}
+
+.caja-custom-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+}
+
+.caja-custom-list-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.caja-custom-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #818cf8;
+}
+
+.caja-chip-price {
+  font-size: 0.6rem;
+  opacity: 0.8;
+  color: var(--text-secondary);
+}
+
+.caja-chip-remove {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 0.6rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.caja-chip-remove:hover {
+  opacity: 1;
 }
 
 .modal-actions {
