@@ -2012,15 +2012,16 @@ async function cargarHistorialVentasDia() {
       `/ventas/historialDia/${fechaHoy}`
     );
 
-    historialCobroTotal.value = Number(data?.datos?.cobroTotal ?? 0);
-    historialGananciaTotal.value = Number(data?.datos?.gananciaTotal ?? 0);
-    historialVentas.value = Array.isArray(data?.datos?.ventas) 
-      ? data.datos.ventas.sort((a, b) => {
+    const ventas = Array.isArray(data?.datos?.ventas) ? data.datos.ventas : [];
+    historialVentas.value = ventas
+      .filter(v => !v.metodoPago?.startsWith('ABONO/'))
+      .sort((a, b) => {
           const dateA = a.fechaVenta ? new Date(a.fechaVenta).getTime() : 0;
           const dateB = b.fechaVenta ? new Date(b.fechaVenta).getTime() : 0;
           return dateB - dateA;
-        })
-      : [];
+      });
+    historialCobroTotal.value = historialVentas.value.reduce((s, v) => s + Number(v.montoTotal || 0), 0);
+    historialGananciaTotal.value = historialVentas.value.reduce((s, v) => s + Number((v as any).ganancia || 0), 0);
     
     const usuariosMap = new Map<number, string>();
     for (const v of historialVentas.value) {
