@@ -479,6 +479,7 @@ const montoInicialCajaActiva = ref<number>(0);
 const ventasEfectivo = ref(0);
 const ventasTarjeta = ref(0);
 const ventasTransferencia = ref(0);
+const abonoTotalDia = ref(0);
 const totalEnvase = ref(0);
 const totalTicketsDia = ref(0);
 const horaInicioCaja = ref<string | null>(null);
@@ -847,9 +848,11 @@ async function generarReporteDiario() {
       venta.tieneDiscrepancia = verificarDiscrepancia(detalles as any, montoVenta);
     }
 
+    const abonoTotalReporte = Number((reporte as any).abonoTotal || 0);
     ventasEfectivo.value = Number(reporte.ventasEfectivo || 0);
     ventasTarjeta.value = Number(reporte.ventasTarjeta || 0);
     ventasTransferencia.value = Number(reporte.ventasTransferencia || 0);
+    abonoTotalDia.value = abonoTotalReporte;
 
     const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
     usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
@@ -2880,6 +2883,7 @@ onMounted(() => {
         { label: 'Transferencia', value: formatoMoneda(ventasTransferencia), icon: '📱', clase: '' },
         { label: 'Tarjeta', value: formatoMoneda(ventasTarjeta), icon: '💳', clase: '' },
         { label: 'Envases', value: formatoMoneda(totalEnvase), icon: '🧴', clase: 'envase' },
+        { label: 'Abonos', value: formatoMoneda(abonoTotalDia), icon: '💰', clase: 'abono' },
         { label: 'Tickets', value: totalTicketsDia, icon: '🧾', clase: '' }
       ]" :key="index" :class="['stat-card', stat.clase]" :style="{ animationDelay: `${index * 0.1}s` }">
         <div class="stat-glow"></div>
@@ -4171,6 +4175,11 @@ onMounted(() => {
   background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--warning-color) 15%, var(--bg-primary)) 100%);
 }
 
+.stat-card.abono {
+  border-color: var(--info-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--info-color) 15%, var(--bg-primary)) 100%);
+}
+
 .stat-glow {
   position: absolute;
   top: -50%;
@@ -4227,6 +4236,10 @@ onMounted(() => {
 
 .stat-card.envase .stat-value {
   color: var(--warning-color);
+}
+
+.stat-card.abono .stat-value {
+  color: var(--info-color, #7c3aed);
 }
 
 .stat-decoration {

@@ -71,9 +71,24 @@ function toggleSeleccion(id: number) { ventasSeleccionadas.value.has(id) ? venta
 function seleccionarTodas() { todasSeleccionadas.value ? ventasSeleccionadas.value.clear() : ventasConDiscrepancia.value.forEach(v => ventasSeleccionadas.value.add(v.idVenta)); }
 function formatoMoneda(v: number) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v); }
 function formatoHora(f?: string) { if (!f) return 'N/D'; const d = new Date(f); return Number.isNaN(d.getTime()) ? 'N/D' : d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); }
-function getMetodoClase(m?: string) { if (!m) return 'efectivo'; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? 'transferencia' : u === 'TARJETA' ? 'tarjeta' : 'efectivo'; }
-function getMetodoIcono(m?: string) { if (!m) return ''; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? '📱' : u === 'TARJETA' ? '💳' : '💵'; }
-function getMetodoLabel(m?: string) { if (!m) return 'N/D'; const u = m.toUpperCase(); return u === 'TRANSFERENCIA' ? 'Transferencia' : u === 'TARJETA' ? 'Tarjeta' : u === 'EFECTIVO' ? 'Efectivo' : m; }
+function getMetodoClase(m?: string) {
+  if (!m) return 'efectivo';
+  const u = m.toUpperCase();
+  if (u.startsWith('ABONO/')) return 'abono-credito';
+  return u === 'TRANSFERENCIA' ? 'transferencia' : u === 'TARJETA' ? 'tarjeta' : 'efectivo';
+}
+function getMetodoIcono(m?: string) {
+  if (!m) return '';
+  const u = m.toUpperCase();
+  if (u.startsWith('ABONO/')) return '💰';
+  return u === 'TRANSFERENCIA' ? '📱' : u === 'TARJETA' ? '💳' : '💵';
+}
+function getMetodoLabel(m?: string) {
+  if (!m) return 'N/D';
+  const u = m.toUpperCase();
+  if (u.startsWith('ABONO/')) return m;
+  return u === 'TRANSFERENCIA' ? 'Transferencia' : u === 'TARJETA' ? 'Tarjeta' : u === 'EFECTIVO' ? 'Efectivo' : m;
+}
 
 async function corregir(ids: number[]) {
   if (!ids.length) return;
@@ -230,6 +245,7 @@ async function corregir(ids: number[]) {
 .hist-badge-pago.efectivo { background: rgba(34,197,94,0.1); color: #166534; }
 .hist-badge-pago.transferencia { background: rgba(59,130,246,0.1); color: #1d4ed8; }
 .hist-badge-pago.tarjeta { background: rgba(236,72,153,0.1); color: #be185d; }
+.hist-badge-pago.abono-credito { background: rgba(139,92,246,0.15); color: #7c3aed; font-weight: 700; }
 .hist-td-cajero { color: var(--text-secondary); font-size: 0.78rem; }
 .hist-td-act { text-align: center; }
 .hist-btn-icon { width: 26px; height: 26px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }

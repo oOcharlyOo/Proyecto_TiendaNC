@@ -4,6 +4,9 @@ import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 const props = defineProps<{
   open: boolean;
   total: number;
+  modo?: 'venta' | 'abono';
+  saldoPendiente?: number;
+  nombrePersona?: string;
 }>();
 
 const emit = defineEmits<{
@@ -13,16 +16,20 @@ const emit = defineEmits<{
   (event: 'confirmar-tarjeta'): void;
   (event: 'confirmar-pendiente'): void;
   (event: 'confirmar-credito'): void;
+  (event: 'confirmar-abono', payload: { monto: number; metodoPago: string }): void;
 }>();
 
 const montoRecibido = ref<number | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
 
+const modoActual = computed(() => props.modo || 'venta');
+const esAbono = computed(() => modoActual.value === 'abono');
+
 watch(
   () => props.open,
   (abierto) => {
     if (abierto) {
-      montoRecibido.value = null;
+      montoRecibido.value = esAbono.value ? (props.saldoPendiente || props.total) : null;
       nextTick(() => {
         inputRef.value?.focus();
       });
@@ -31,9 +38,19 @@ watch(
 );
 
 const cambio = computed(() => {
+  if (esAbono.value) return 0;
   const recibido = Number(montoRecibido.value ?? 0);
   const restante = recibido - Number(props.total ?? 0);
   return restante > 0 ? restante : 0;
+});
+
+const montoValido = computed(() => {
+  if (esAbono.value) {
+    const monto = Number(montoRecibido.value ?? 0);
+    const maximo = props.saldoPendiente || props.total;
+    return monto > 0 && monto <= maximo;
+  }
+  return true;
 });
 
 function formatoMoneda(valor: number) {
@@ -44,8 +61,31 @@ function formatoMoneda(valor: number) {
 }
 
 function confirmarEfectivo() {
+  if (esAbono.value) {
+    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
+    emit('confirmar-abono', { monto, metodoPago: 'EFECTIVO' });
+    return;
+  }
   const recibido = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : props.total;
   emit('confirmar-efectivo', { montoRecibido: recibido });
+}
+
+function confirmarTransferencia() {
+  if (esAbono.value) {
+    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
+    emit('confirmar-abono', { monto, metodoPago: 'TRANSFERENCIA' });
+    return;
+  }
+  emit('confirmar-transferencia');
+}
+
+function confirmarTarjeta() {
+  if (esAbono.value) {
+    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
+    emit('confirmar-abono', { monto, metodoPago: 'TARJETA' });
+    return;
+  }
+  emit('confirmar-tarjeta');
 }
 
 function manejarEnter(e: KeyboardEvent) {
@@ -63,14 +103,14 @@ function manejarTeclado(e: KeyboardEvent) {
     confirmarEfectivo();
   } else if (e.key === 'F3') {
     e.preventDefault();
-    emit('confirmar-transferencia');
+    confirmarTransferencia();
   } else if (e.key === 'F4') {
     e.preventDefault();
-    emit('confirmar-tarjeta');
-  } else if (e.key === 'F5') {
+    confirmarTarjeta();
+  } else if (e.key === 'F5' && !esAbono.value) {
     e.preventDefault();
     emit('confirmar-pendiente');
-  } else if (e.key === 'F6') {
+  } else if (e.key === 'F6' && !esAbono.value) {
     e.preventDefault();
     emit('confirmar-credito');
   }
@@ -111,65 +151,76 @@ onUnmounted(() => {
             <div class="header-line"></div>
           </header>
 
-          <div class="modal-body">
-            <div class="total-parchment">
-              <span class="parchment-label">Total a pagar</span>
-              <span class="parchment-amount">{{ formatoMoneda(total) }}</span>
-            </div>
-
-            <div class="input-parchment">
-              <label>Monto recibido</label>
-              <div class="input-container">
-                <span class="coin-icon">🪙</span>
-                <input 
-                  ref="inputRef"
-                  v-model.number="montoRecibido" 
-                  type="number" 
-                  step="0.01" 
-                  min="0" 
-                  placeholder="0.00"
-                  @keydown.enter="manejarEnter"
-                >
-              </div>
-            </div>
-
-            <div class="cambio-parchment" :class="{ active: cambio > 0 }">
-              <span class="cambio-label">Cambio</span>
-              <span class="cambio-amount">{{ formatoMoneda(cambio) }}</span>
-            </div>
+        <div class="modal-body">
+          <div v-if="esAbono" class="saldo-pendiente-banner">
+            <span class="banner-label">Saldo pendiente</span>
+            <span class="banner-amount">{{ formatoMoneda(saldoPendiente || total) }}</span>
+            <span v-if="nombrePersona" class="banner-persona">{{ nombrePersona }}</span>
           </div>
 
+          <div class="total-parchment" :class="{ 'abono-mode': esAbono }">
+            <span class="parchment-label">{{ esAbono ? 'Monto a abonar' : 'Total a pagar' }}</span>
+            <span class="parchment-amount">{{ formatoMoneda(total) }}</span>
+          </div>
+
+          <div class="input-parchment">
+            <label>{{ esAbono ? 'Monto a abonar' : 'Monto recibido' }}</label>
+            <div class="input-container">
+              <span class="coin-icon">🪙</span>
+              <input 
+                ref="inputRef"
+                v-model.number="montoRecibido" 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                :max="esAbono ? (saldoPendiente || total) : undefined"
+                :placeholder="esAbono ? '0.00' : '0.00'"
+                @keydown.enter="manejarEnter"
+                :class="{ 'input-invalid': !montoValido && montoRecibido !== null && montoRecibido > 0 }"
+              >
+            </div>
+            <span v-if="!montoValido && montoRecibido !== null && montoRecibido > 0" class="input-error">
+              El monto no puede ser mayor al saldo pendiente
+            </span>
+          </div>
+
+          <div v-if="!esAbono" class="cambio-parchment" :class="{ active: cambio > 0 }">
+            <span class="cambio-label">Cambio</span>
+            <span class="cambio-amount">{{ formatoMoneda(cambio) }}</span>
+          </div>
+        </div>
+
           <footer class="modal-footer">
-            <div class="payment-buttons">
-              <button class="pay-btn efectivo" @click="confirmarEfectivo">
+            <div class="payment-buttons" :class="{ 'abono-buttons': esAbono }">
+              <button class="pay-btn efectivo" @click="confirmarEfectivo" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Efectivo</span>
                 <span class="btn-shortcut">F2</span>
                 <span class="btn-rune">◈</span>
               </button>
               
-              <button class="pay-btn transferencia" @click="emit('confirmar-transferencia')">
+              <button class="pay-btn transferencia" @click="confirmarTransferencia" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Transferencia</span>
                 <span class="btn-shortcut">F3</span>
                 <span class="btn-rune">◈</span>
               </button>
               
-              <button class="pay-btn tarjeta" @click="emit('confirmar-tarjeta')">
+              <button class="pay-btn tarjeta" @click="confirmarTarjeta" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Tarjeta</span>
                 <span class="btn-shortcut">F4</span>
                 <span class="btn-rune">◈</span>
               </button>
               
-              <button class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
+              <button v-if="!esAbono" class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Pendiente</span>
                 <span class="btn-shortcut">F5</span>
                 <span class="btn-rune">◈</span>
               </button>
               
-              <button class="pay-btn credito" @click="emit('confirmar-credito')">
+              <button v-if="!esAbono" class="pay-btn credito" @click="emit('confirmar-credito')">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Crédito</span>
                 <span class="btn-shortcut">F6</span>
@@ -355,6 +406,11 @@ onUnmounted(() => {
     0 2px 0 #1a120a;
 }
 
+.total-parchment.abono-mode {
+  background: linear-gradient(180deg, #4a2f4f 0%, #2a1f35 100%);
+  border-color: #6a4a7a;
+}
+
 .parchment-label {
   display: block;
   font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
@@ -469,6 +525,60 @@ onUnmounted(() => {
 
 .cambio-parchment.active .cambio-amount {
   color: #f4e8c1;
+}
+
+.saldo-pendiente-banner {
+  background: linear-gradient(180deg, #6a4a7a 0%, #4a2f5f 100%);
+  border: 2px solid #8a5a9a;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.banner-label {
+  display: block;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.7rem;
+  color: #d4b8e8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+}
+
+.banner-amount {
+  display: block;
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #f4e8ff;
+  text-shadow: 0 0 10px rgba(244, 232, 255, 0.3);
+}
+
+.banner-persona {
+  display: block;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  font-size: 0.8rem;
+  color: #c8a8d8;
+  margin-top: 0.25rem;
+}
+
+.input-error {
+  display: block;
+  font-size: 0.7rem;
+  color: #ff6b6b;
+  margin-top: 0.25rem;
+  font-weight: bold;
+}
+
+.input-container input.input-invalid {
+  border-color: #ff6b6b;
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd4d4 100%);
+}
+
+.payment-buttons.abono-buttons {
+  grid-template-columns: repeat(3, 1fr) !important;
 }
 
 .modal-footer {
@@ -677,6 +787,10 @@ onUnmounted(() => {
     gap: 0.4rem;
   }
   
+  .payment-buttons.abono-buttons {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  
   .pay-btn {
     padding: 0.7rem 0.5rem;
     gap: 0.4rem;
@@ -732,6 +846,22 @@ onUnmounted(() => {
     padding: 0.7rem;
     font-size: 0.75rem;
   }
+  
+  .saldo-pendiente-banner {
+    padding: 0.6rem 0.8rem;
+  }
+  
+  .banner-label {
+    font-size: 0.65rem;
+  }
+  
+  .banner-amount {
+    font-size: 1.2rem;
+  }
+  
+  .banner-persona {
+    font-size: 0.7rem;
+  }
 }
 
 @media (max-width: 360px) {
@@ -746,6 +876,23 @@ onUnmounted(() => {
   
   .pay-btn {
     padding: 0.6rem 0.4rem;
+  }
+  
+  .payment-buttons {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.3rem;
+  }
+  
+  .payment-buttons.abono-buttons {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .banner-amount {
+    font-size: 1rem;
+  }
+  
+  .parchment-amount {
+    font-size: 1.4rem;
   }
 }
 </style>

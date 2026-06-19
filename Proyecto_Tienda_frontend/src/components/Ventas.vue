@@ -540,6 +540,8 @@ const historialVentaSeleccionada = ref<any>(null);
 const historialVentaTieneDiscrepancia = ref(false);
 const historialDiscrepanciaMonto = ref(0);
 const modalDetalleVentaAbierto = ref(false);
+const detalleCreditoInfo = ref<any>(null);
+const detalleAbonos = ref<any[]>([]);
 const ticketVisibleMobile = ref(false);
 const isKeyboardVisible = ref(false);
 const modalAgregarPendienteAbierto = ref(false);
@@ -2063,6 +2065,8 @@ async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket
   historialDetalleCargando.value = true;
   historialVentaTieneDiscrepancia.value = false;
   modalDetalleVentaAbierto.value = true;
+  detalleCreditoInfo.value = null;
+  detalleAbonos.value = [];
   
   try {
     const data = await getJson<ApiRespuesta<VentaDetalleDTO[]>>(
@@ -2076,6 +2080,33 @@ async function verDetalleVenta(venta: VentaDTO | { idVenta: number; numeroTicket
     
     if (!tieneDiscrepancia) {
       historialDiscrepanciaMonto.value = 0;
+    }
+    
+    const metodoPago = (venta as any).metodoPago || '';
+    if (metodoPago.startsWith('ABONO/')) {
+      const desc = (venta as any).descripcionPendiente || '';
+      const match = desc.match(/Crédito #(\d+)/);
+      if (match) {
+        const idCreditoVenta = parseInt(match[1]);
+        try {
+          const resCredito = await fetch(`${API_BASE}/credito/venta`, {
+            headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('jwt') ? { 'Authorization': `Bearer ${localStorage.getItem('jwt')}` } : {}) }
+          });
+          const creditosData = await resCredito.json();
+          if (creditosData.codigo === 200) {
+            const creditoEncontrado = creditosData.datos.find((cv: any) => cv.idCreditoVenta === idCreditoVenta);
+            if (creditoEncontrado) {
+              detalleCreditoInfo.value = creditoEncontrado;
+            }
+          }
+          const resAbonos = await getJson<{ codigo: number; datos: any[] }>(`/credito/abono/${idCreditoVenta}`);
+          if (resAbonos.codigo === 200) {
+            detalleAbonos.value = resAbonos.datos || [];
+          }
+        } catch (e) {
+          console.error('Error al cargar info del crédito:', e);
+        }
+      }
     }
     
     const idx = historialVentas.value.findIndex(v => v.idVenta === venta.idVenta);
@@ -2118,6 +2149,8 @@ function cerrarDetalleVenta() {
   historialVentaDetalle.value = [];
   historialVentaTieneDiscrepancia.value = false;
   historialDiscrepanciaMonto.value = 0;
+  detalleCreditoInfo.value = null;
+  detalleAbonos.value = [];
 }
 
 async function agregarProductoGramaje(payload: { gramos: number; precioTotal: number }) {
@@ -2238,6 +2271,17 @@ function formatoMonedaRedondeada(valor: number) {
     style: 'currency',
     currency: 'MXN'
   }).format(redondeado);
+}
+
+function formatearFecha(fecha?: string) {
+  if (!fecha) return 'N/A';
+  return fecha.slice(0, 10);
+}
+
+function formatearFechaHora(fecha?: string) {
+  if (!fecha) return 'N/A';
+  const d = new Date(fecha);
+  return d.toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatoGramaje(gramos: number) {
@@ -3458,6 +3502,57 @@ async function eliminarTodosLosDetalles() {
               </div>
               <div class="alert-diff">
                 {{ historialDiscrepanciaMonto > 0 ? 'Faltan' : 'Sobran' }} {{ formatoMonedaRedondeada(Math.abs(historialDiscrepanciaMonto)) }}
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="detalleCreditoInfo" class="credito-info-panel">
+            <div class="credito-info-header">
+              <span class="credito-icon">💰</span>
+              <h4>Abono a Crédito</h4>
+            </div>
+            <div class="credito-info-grid">
+              <div class="credito-field">
+                <span class="field-label">Persona</span>
+                <span class="field-value">{{ detalleCreditoInfo.nombrePersona }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Teléfono</span>
+                <span class="field-value">{{ detalleCreditoInfo.telefonoPersona || 'N/A' }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Crédito creado</span>
+                <span class="field-value">{{ formatearFecha(detalleCreditoInfo.fechaCreacion) }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Monto total</span>
+                <span class="field-value">{{ formatoMoneda(detalleCreditoInfo.montoTotal) }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Monto pagado</span>
+                <span class="field-value pagado">{{ formatoMoneda(detalleCreditoInfo.montoPagado) }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Saldo pendiente</span>
+                <span class="field-value saldo">{{ formatoMoneda(detalleCreditoInfo.saldoPendiente) }}</span>
+              </div>
+              <div class="credito-field">
+                <span class="field-label">Estatus</span>
+                <span class="field-value estatus" :class="detalleCreditoInfo.estatus.toLowerCase()">{{ detalleCreditoInfo.estatus }}</span>
+              </div>
+              <div v-if="detalleCreditoInfo.notas" class="credito-field full">
+                <span class="field-label">Notas</span>
+                <span class="field-value">{{ detalleCreditoInfo.notas }}</span>
+              </div>
+            </div>
+            
+            <div v-if="detalleAbonos.length > 0" class="abonos-historial">
+              <h5>Historial de Abonos</h5>
+              <div class="abono-item" v-for="abono in detalleAbonos" :key="abono.idAbono">
+                <span class="abono-monto">{{ formatoMoneda(abono.monto) }}</span>
+                <span class="abono-fecha">{{ formatearFechaHora(abono.fechaAbono) }}</span>
+                <span class="abono-metodo" :class="abono.metodoPago?.toLowerCase()">{{ abono.metodoPago }}</span>
+                <span class="abono-user">👤 {{ abono.nombreUsuario }}</span>
               </div>
             </div>
           </div>
@@ -8586,6 +8681,157 @@ async function eliminarTodosLosDetalles() {
   color: #f59e0b;
 }
 
+.credito-info-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 10px;
+}
+
+.credito-info-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.credito-info-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.credito-icon {
+  font-size: 1.2rem;
+}
+
+.credito-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.credito-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.credito-field.full {
+  grid-column: 1 / -1;
+}
+
+.field-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field-value {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.field-value.pagado {
+  color: var(--success-color);
+}
+
+.field-value.saldo {
+  color: var(--error-color);
+  font-weight: 700;
+}
+
+.field-value.estatus {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field-value.estatus.pendiente {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.field-value.estatus.pagado {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.abonos-historial {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.abonos-historial h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.abono-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+}
+
+.abono-monto {
+  font-weight: 700;
+  color: var(--success-color);
+  font-family: 'Courier New', monospace;
+  min-width: 70px;
+}
+
+.abono-fecha {
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.abono-metodo {
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.abono-metodo.efectivo {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.abono-metodo.tarjeta {
+  background: rgba(236, 72, 153, 0.15);
+  color: #be185d;
+}
+
+.abono-metodo.transferencia {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.abono-user {
+  color: var(--text-secondary);
+}
+
 .productos-section {
   margin-top: 1rem;
 }
@@ -10077,6 +10323,23 @@ async function eliminarTodosLosDetalles() {
   
   .alert-diff {
     font-size: 0.75rem;
+  }
+  
+  .credito-info-panel {
+    padding: 0.75rem;
+  }
+  
+  .credito-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .abono-item {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  
+  .abono-monto {
+    min-width: auto;
   }
   
   .productos-header {
