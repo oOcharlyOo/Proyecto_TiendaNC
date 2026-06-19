@@ -31,6 +31,9 @@ type VentasDetalleListDTO = {
   cantidad: number;
   precioUnitarioVenta: number;
   tipoPrecioAplicado: string;
+  cobroEnvase?: boolean;
+  cantidadEnvase?: number;
+  cobroEnvaseTotal?: number;
   Venta: {
     idVenta?: number;
     fechaVenta: string;
@@ -92,6 +95,7 @@ type MovimientoCaja = {
 const entradasCaja = ref<MovimientoCaja[]>([]);
 const salidasCaja = ref<MovimientoCaja[]>([]);
 const montoInicialPeriodo = ref<number>(0);
+const aperturasPorDia = ref<Map<string, number>>(new Map());
 
 function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -463,6 +467,105 @@ const valorPromedio = computed(() => {
 });
 const productosUnicos = computed(() => new Set(detalles.value.map(d => d.idProducto)).size);
 
+const gananciaPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((totalGanancia.value / diasEnPeriodo.value) * 100) / 100;
+});
+
+const ventasPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((totalMonto.value / diasEnPeriodo.value) * 100) / 100;
+});
+
+const totalAbonos = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago?.startsWith('ABONO/')) sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+const totalTransferencias = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago === 'TRANSFERENCIA') sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+const totalTarjetas = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago === 'TARJETA') sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+const totalEnvases = computed(() => {
+  let sum = 0;
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    sum += Number(d.cobroEnvaseTotal || 0);
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+const modalMovimientosOpen = ref(false);
+const movimientosTitulo = ref('');
+const movimientosLista = ref<MovimientoCaja[]>([]);
+const editandoMovimientoId = ref<number | null>(null);
+const editandoDescripcion = ref('');
+const guardandoDescripcion = ref(false);
+
+function abrirMovimientos(tipo: 'entradas' | 'salidas') {
+  editandoMovimientoId.value = null;
+  movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
+  const datos = tipo === 'entradas' ? entradasCaja.value : salidasCaja.value;
+  movimientosLista.value = [...datos].sort((a, b) =>
+    new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime()
+  );
+  modalMovimientosOpen.value = true;
+}
+
+function formatearFechaHora(fecha?: string) {
+  if (!fecha) return 'N/A';
+  const d = new Date(fecha);
+  return d.toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function iniciarEdicionDescripcion(m: MovimientoCaja) {
+  editandoMovimientoId.value = m.idCaja;
+  editandoDescripcion.value = m.descripcion || '';
+}
+
+function cancelarEdicionDescripcion() {
+  editandoMovimientoId.value = null;
+  editandoDescripcion.value = '';
+}
+
+async function guardarDescripcion(id: number) {
+  guardandoDescripcion.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/caja/${id}/descripcion`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descripcion: editandoDescripcion.value })
+    });
+    const json = await res.json();
+    if (json.codigo === 200) {
+      const idx = movimientosLista.value.findIndex(m => m.idCaja === id);
+      if (idx !== -1) movimientosLista.value[idx].descripcion = editandoDescripcion.value;
+      editandoMovimientoId.value = null;
+    } else {
+      alert('Error al guardar: ' + json.mensaje);
+    }
+  } catch (e) {
+    alert('Error de red al actualizar descripción');
+  } finally {
+    guardandoDescripcion.value = false;
+  }
+}
+
 const flujoDineroPorDia = computed(() => {
   const map = new Map<string, { entradas: number; salidas: number; ventas: number; label: string }>();
   
@@ -538,13 +641,20 @@ const flujoDineroPorDia = computed(() => {
   let saldoEnCaja = montoInicialPeriodo.value;
   
   for (const [key, val] of sorted) {
+    const aperturaDia = aperturasPorDia.value.get(key) ?? saldoEnCaja;
+    const montoInicialDia = periodo.value === 'dia' ? saldoEnCaja : aperturaDia;
+    
     const ventasDia = val.ventas;
     const entradasManualesDia = val.entradas;
     const salidasDia = val.salidas;
     const totalIngresosDia = ventasDia + entradasManualesDia;
     
-    const saldoAntes = saldoEnCaja;
-    saldoEnCaja += totalIngresosDia - salidasDia;
+    const saldoInicio = montoInicialDia;
+    const saldoFinal = saldoInicio + totalIngresosDia - salidasDia;
+    
+    if (periodo.value === 'dia') {
+      saldoEnCaja = saldoFinal;
+    }
     
     resultado.push({
       fecha: key,
@@ -553,8 +663,9 @@ const flujoDineroPorDia = computed(() => {
       ventas: Math.round(ventasDia * 100) / 100,
       entradasManuales: Math.round(entradasManualesDia * 100) / 100,
       salidas: Math.round(salidasDia * 100) / 100,
-      saldoInicio: Math.round(saldoAntes * 100) / 100,
-      saldoFinal: Math.round(saldoEnCaja * 100) / 100
+      saldoInicio: Math.round(saldoInicio * 100) / 100,
+      saldoFinal: Math.round(saldoFinal * 100) / 100,
+      apertura: Math.round(montoInicialDia * 100) / 100
     });
   }
   
@@ -784,37 +895,36 @@ const chartTendencia = computed(() => ({
 }));
 
 const chartFlujoDinero = computed(() => {
-  const saldos = flujoDineroPorDia.value.map(d => d.saldoFinal);
+  const datos = flujoDineroPorDia.value;
+  const saldos = datos.map(d => d.saldoFinal);
   const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
-  
+
   return {
-    labels: flujoDineroPorDia.value.map(d => d.label),
-    datasets: [
-      {
-        type: 'line' as const,
-        label: 'Saldo Final en Caja ($)',
-        data: saldos,
-        borderColor: '#c99234',
-        backgroundColor: '#c9923415',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 14,
-        pointHoverRadius: 18,
-        pointBackgroundColor: 'transparent',
-        pointBorderColor: 'transparent',
-        pointBorderWidth: 0,
-        borderWidth: 4,
-        segment: {
-          borderColor: (ctx: any) => {
-            const y1 = ctx.p0.parsed.y;
-            const y2 = ctx.p1.parsed.y;
-            if (y1 > media && y2 > media) return '#28a745';
-            if (y1 < media && y2 < media) return '#dc3545';
-            return '#ffc107';
-          }
+    labels: datos.map(d => d.label),
+    datasets: [{
+      type: 'line' as const,
+      label: 'Saldo Final en Caja ($)',
+      data: saldos,
+      borderColor: '#c99234',
+      backgroundColor: '#c9923415',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 14,
+      pointHoverRadius: 18,
+      pointBackgroundColor: 'transparent',
+      pointBorderColor: 'transparent',
+      pointBorderWidth: 0,
+      borderWidth: 4,
+      segment: {
+        borderColor: (ctx: any) => {
+          const y1 = ctx.p0.parsed.y;
+          const y2 = ctx.p1.parsed.y;
+          if (y1 > media && y2 > media) return '#28a745';
+          if (y1 < media && y2 < media) return '#dc3545';
+          return '#ffc107';
         }
       }
-    ]
+    }]
   };
 });
 
@@ -1138,7 +1248,7 @@ const chartPieOptions = {
   }
 };
 
-const chartOptionsFlujo = {
+const chartOptionsFlujo = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -1180,16 +1290,15 @@ const chartOptionsFlujo = {
     },
     afterDraw: (chart: any) => {
       const ctx = chart.ctx;
-      const dataset = chart.data.datasets[0];
-      const meta = chart.getDatasetMeta(0);
       const saldos = flujoDineroPorDia.value.map(d => d.saldoFinal);
       const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
-      
+
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = '18px serif';
-      
+
+      const meta = chart.getDatasetMeta(0);
       meta.data.forEach((point: any, index: number) => {
         const saldo = saldos[index];
         const diff = saldo - media;
@@ -1197,17 +1306,17 @@ const chartOptionsFlujo = {
         if (diff > media * 0.02) color = '#28a745';
         else if (diff < -media * 0.02) color = '#dc3545';
         else color = '#ffc107';
-        
+
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(point.x, point.y, 12, 0, Math.PI * 2);
         ctx.fill();
-        
+
         ctx.fillStyle = '#1a1a2e';
         ctx.font = 'bold 10px Courier New';
         ctx.fillText('$', point.x, point.y + 1);
       });
-      
+
       ctx.restore();
     }
   },
@@ -1217,9 +1326,7 @@ const chartOptionsFlujo = {
       grid: { color: '#33333344' }
     },
     y: {
-      type: 'linear' as const,
-      display: true,
-      position: 'left' as const,
+      beginAtZero: false,
       ticks: { color: '#888', font: { size: 11 }, callback: (v: any) => `$${v}` },
       grid: { color: '#33333344' },
       title: { display: true, text: 'Saldo en Caja ($)', color: '#c99234' }
@@ -1229,7 +1336,7 @@ const chartOptionsFlujo = {
     mode: 'index' as const,
     intersect: false
   }
-};
+}));
 
 function inicializarFecha() {
   const now = new Date();
@@ -1291,17 +1398,22 @@ async function cargarDatos() {
     
     const urlEntradas = `${API_BASE}/caja/entradas/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
     const urlSalidas = `${API_BASE}/caja/egresos/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
-    const urlReporte = `${API_BASE}/caja/reporteDiario/${fechaInicio}`;
+    const urlReporte = periodo.value === 'dia'
+      ? `${API_BASE}/caja/reporteDiario/${fechaInicio}`
+      : `${API_BASE}/caja/reporteDiario/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    const urlAperturas = `${API_BASE}/caja/aperturas/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
     
-    const [resEntradas, resSalidas, resReporte] = await Promise.all([
+    const [resEntradas, resSalidas, resReporte, resAperturas] = await Promise.all([
       fetch(urlEntradas),
       fetch(urlSalidas),
-      fetch(urlReporte)
+      fetch(urlReporte),
+      fetch(urlAperturas)
     ]);
     
     const dataEntradas = await resEntradas.json();
     const dataSalidas = await resSalidas.json();
     const dataReporte = await resReporte.json();
+    const dataAperturas = await resAperturas.json();
     
     if (dataEntradas.codigo === 200) {
       entradasCaja.value = dataEntradas.datos || [];
@@ -1311,6 +1423,13 @@ async function cargarDatos() {
     }
     if (dataReporte.codigo === 200 && dataReporte.datos) {
       montoInicialPeriodo.value = Number(dataReporte.datos.montoInicial || 0);
+    }
+    if (dataAperturas.codigo === 200 && dataAperturas.datos) {
+      const map = new Map<string, number>();
+      for (const a of dataAperturas.datos) {
+        map.set(a.fecha, Number(a.montoInicial || 0));
+      }
+      aperturasPorDia.value = map;
     }
   } catch (e) {
     console.error('Error al cargar reporte:', e);
@@ -1436,6 +1555,48 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
             <span class="summary-value">{{ formatoMoneda(totalGanancia) }}</span>
           </div>
         </div>
+        <div class="summary-card highlight ganancia">
+          <span class="summary-icon">📊</span>
+          <div class="summary-info">
+            <span class="summary-label">Ganancia Prom. por Día</span>
+            <span class="summary-value">{{ formatoMoneda(gananciaPromedioDia) }}</span>
+          </div>
+        </div>
+        <div class="summary-card highlight">
+          <span class="summary-icon">📅</span>
+          <div class="summary-info">
+            <span class="summary-label">Ventas Prom. por Día</span>
+            <span class="summary-value">{{ formatoMoneda(ventasPromedioDia) }}</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <span class="summary-icon">📋</span>
+          <div class="summary-info">
+            <span class="summary-label">Abonos</span>
+            <span class="summary-value">{{ formatoMoneda(totalAbonos) }}</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <span class="summary-icon">💳</span>
+          <div class="summary-info">
+            <span class="summary-label">Transferencias</span>
+            <span class="summary-value">{{ formatoMoneda(totalTransferencias) }}</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <span class="summary-icon">💳</span>
+          <div class="summary-info">
+            <span class="summary-label">Tarjetas</span>
+            <span class="summary-value">{{ formatoMoneda(totalTarjetas) }}</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <span class="summary-icon">🧴</span>
+          <div class="summary-info">
+            <span class="summary-label">Envases</span>
+            <span class="summary-value">{{ formatoMoneda(totalEnvases) }}</span>
+          </div>
+        </div>
         <div class="summary-card">
           <span class="summary-icon">📦</span>
           <div class="summary-info">
@@ -1457,14 +1618,14 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
             <span class="summary-value">{{ valorPromedio }}</span>
           </div>
         </div>
-        <div class="summary-card highlight">
+        <div class="summary-card highlight" style="cursor:pointer" @click="abrirMovimientos('entradas')">
           <span class="summary-icon">📥</span>
           <div class="summary-info">
             <span class="summary-label">Total Entradas</span>
             <span class="summary-value">{{ formatoMoneda(totalEntradas) }}</span>
           </div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card" style="cursor:pointer" @click="abrirMovimientos('salidas')">
           <span class="summary-icon">📤</span>
           <div class="summary-info">
             <span class="summary-label">Total Salidas</span>
@@ -1650,6 +1811,60 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
               </table>
             </div>
           </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL MOVIMIENTOS CAJA -->
+    <div v-if="modalMovimientosOpen" class="modal-overlay-cat" @click.self="modalMovimientosOpen = false">
+      <div class="modal-card-cat modal-movimientos">
+        <div class="modal-header-cat">
+          <h3>{{ movimientosTitulo }}</h3>
+          <button class="modal-close-cat" @click="modalMovimientosOpen = false">✕</button>
+        </div>
+        <div class="modal-body-cat">
+          <div v-if="movimientosLista.length === 0" class="modal-empty">
+            No hay {{ movimientosTitulo.toLowerCase() }} en este período.
+          </div>
+          <table v-else class="tabla-movimientos">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th class="text-right">Monto</th>
+                <th class="text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in movimientosLista" :key="m.idCaja">
+                <td class="fecha-col">{{ formatearFechaHora(m.fechaMovimiento) }}</td>
+                <td>
+                  <template v-if="editandoMovimientoId === m.idCaja">
+                    <input v-model="editandoDescripcion" class="edit-desc-input" type="text" @keyup.enter="guardarDescripcion(m.idCaja)" @keyup.escape="cancelarEdicionDescripcion" />
+                    <span class="edit-actions">
+                      <button class="btn-edit-save" @click="guardarDescripcion(m.idCaja)" :disabled="guardandoDescripcion" title="Guardar">✓</button>
+                      <button class="btn-edit-cancel" @click="cancelarEdicionDescripcion" title="Cancelar">✕</button>
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="desc-text">{{ m.descripcion }}</span>
+                    <button class="btn-edit-icon" @click="iniciarEdicionDescripcion(m)" title="Editar descripción">✎</button>
+                  </template>
+                </td>
+                <td class="text-right" :class="movimientosTitulo.startsWith('Entradas') ? 'monto' : 'costo'">
+                  {{ formatoMoneda(m.monto) }}
+                </td>
+                <td class="text-center"></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2"><strong>Total</strong></td>
+                <td class="text-right"><strong>{{ formatoMoneda(movimientosLista.reduce((s, m) => s + Number(m.monto || 0), 0)) }}</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
@@ -2142,6 +2357,143 @@ function formatoCantidad(cantidad: number, isGramaje: boolean) {
 
 .tabla-modal tr:hover td {
   background: var(--bg-panel, #252538);
+}
+
+.modal-movimientos {
+  max-width: 700px;
+}
+
+.tabla-movimientos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tabla-movimientos th {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary, #2a2a3e);
+  color: var(--text-secondary, #888);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--border-color, #333);
+  text-align: left;
+}
+
+.tabla-movimientos th.text-right {
+  text-align: right;
+}
+
+.tabla-movimientos td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color, #333);
+  color: var(--text-primary, #f6f2de);
+}
+
+.tabla-movimientos tr:hover td {
+  background: var(--bg-panel, #252538);
+}
+
+.tabla-movimientos tfoot td {
+  border-top: 2px solid var(--accent-color, #c99234);
+  border-bottom: none;
+  font-size: 0.85rem;
+}
+
+.fecha-col {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+}
+
+.tabla-movimientos .monto {
+  color: var(--success-color, #4caf50);
+  font-weight: 600;
+}
+
+.tabla-movimientos .costo {
+  color: var(--danger-color, #e57373);
+  font-weight: 600;
+}
+
+.desc-text {
+  margin-right: 0.4rem;
+}
+
+.btn-edit-icon {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.btn-edit-icon:hover {
+  color: var(--accent-color, #c99234);
+  background: var(--bg-panel, #252538);
+}
+
+.edit-desc-input {
+  background: var(--bg-secondary, #2a2a3e);
+  border: 1px solid var(--accent-color, #c99234);
+  border-radius: 6px;
+  color: var(--text-primary, #f6f2de);
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  width: 180px;
+  outline: none;
+}
+
+.edit-desc-input:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.3);
+}
+
+.edit-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.btn-edit-save,
+.btn-edit-cancel {
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  transition: all 0.15s;
+}
+
+.btn-edit-save {
+  background: var(--success-color, #4caf50);
+  color: white;
+}
+
+.btn-edit-save:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.btn-edit-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-edit-cancel {
+  background: var(--danger-color, #e57373);
+  color: white;
+}
+
+.btn-edit-cancel:hover {
+  background: #d32f2f;
+}
+
+.text-center {
+  text-align: center;
 }
 
 @media (max-width: 768px) {
