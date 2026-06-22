@@ -111,11 +111,14 @@ CREATE TABLE IF NOT EXISTS tiendadb.productos (
     is_gramaje BOOLEAN DEFAULT FALSE,
     requiere_envase BOOLEAN DEFAULT FALSE,
     precio_envase DECIMAL(10, 2) DEFAULT 0,
+    presentacion_caja VARCHAR(50) DEFAULT '',
     estatus VARCHAR(1) DEFAULT 'A',
     CONSTRAINT fk_categoria_producto FOREIGN KEY (id_categoria)
         REFERENCES tiendadb.categorias(id_categoria)
         ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_productos_estatus ON tiendadb.productos(estatus);
 
 CREATE TABLE IF NOT EXISTS tiendadb.ventas (
     id_venta SERIAL PRIMARY KEY,
@@ -479,11 +482,14 @@ CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.productos (
     is_gramaje BOOLEAN DEFAULT FALSE,
     requiere_envase BOOLEAN DEFAULT FALSE,
     precio_envase DECIMAL(10, 2) DEFAULT 0,
+    presentacion_caja VARCHAR(50) DEFAULT '',
     estatus VARCHAR(1) DEFAULT 'A',
     CONSTRAINT fk_categoria_producto FOREIGN KEY (id_categoria)
         REFERENCES tiendadb_abarrotera.categorias(id_categoria)
         ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_productos_estatus ON tiendadb_abarrotera.productos(estatus);
 
 CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.ventas (
     id_venta SERIAL PRIMARY KEY,
