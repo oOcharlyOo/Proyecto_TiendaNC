@@ -2720,25 +2720,57 @@ function cerrarModalPago() {
   errorMontoPago.value = '';
 }
 
+function descargarArchivo(file: string) {
+  const link = document.createElement('a');
+  link.href = `${API_BASE}/backup/descargar?file=${encodeURIComponent(file)}`;
+  link.download = file;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 async function descargarBackups() {
   try {
-    const resp = await fetch(`${API_BASE}/backup/listar`);
+    let resp = await fetch(`${API_BASE}/backup/listar`);
     if (!resp.ok) throw new Error('Error al listar backups');
-    const data = await resp.json();
+    let data = await resp.json();
     if (data?.datos?.length) {
-      const file = data.datos[0];
-      const link = document.createElement('a');
-      link.href = `${API_BASE}/backup/descargar?file=${encodeURIComponent(file)}`;
-      link.download = file;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      mostrarMensaje(`Backup descargado: ${file}`, 'ok');
+      descargarArchivo(data.datos[0]);
+      mostrarMensaje(`Backup descargado: ${data.datos[0]}`, 'ok');
+      return;
+    }
+
+    cargandoBackup.value = true;
+    mostrarMensaje('No hay backups. Generando uno...', 'info');
+
+    resp = await fetch(`${API_BASE}/backup/generar`, { method: 'POST' });
+    if (!resp.ok) throw new Error('Error al generar backup');
+
+    let backupFile: string | null = null;
+    const inicio = Date.now();
+    const TIMEOUT = 60000;
+
+    while (!backupFile && Date.now() - inicio < TIMEOUT) {
+      await new Promise(r => setTimeout(r, 3000));
+      resp = await fetch(`${API_BASE}/backup/listar`);
+      if (resp.ok) {
+        data = await resp.json();
+        if (data?.datos?.length) {
+          backupFile = data.datos[0];
+        }
+      }
+    }
+
+    if (backupFile) {
+      descargarArchivo(backupFile);
+      mostrarMensaje(`Backup generado y descargado: ${backupFile}`, 'ok');
     } else {
-      mostrarMensaje('No hay backups disponibles', 'info');
+      mostrarMensaje('El backup está en proceso. Intenta descargar en unos minutos.', 'info');
     }
   } catch (e) {
-    mostrarMensaje(`Error al descargar: ${e instanceof Error ? e.message : 'Error'}`, 'error');
+    mostrarMensaje(`Error: ${e instanceof Error ? e.message : 'Error'}`, 'error');
+  } finally {
+    cargandoBackup.value = false;
   }
 }
 
@@ -3957,9 +3989,9 @@ onMounted(() => {
       <div class="backup-bar">
         <span class="backup-title">🗄️ Gestión de Backups</span>
         <div class="backup-actions">
-          <button type="button" class="btn-backup" @click="descargarBackups">
-            <span class="btn-icon">📥</span>
-            <span class="btn-text">Descargar Backups</span>
+          <button type="button" class="btn-backup" :disabled="cargandoBackup" @click="descargarBackups">
+            <span class="btn-icon">{{ cargandoBackup ? '⏳' : '📥' }}</span>
+            <span class="btn-text">{{ cargandoBackup ? 'Generando...' : 'Descargar Backups' }}</span>
           </button>
           <button type="button" class="btn-backup btn-import" @click="mostrarImportModal = true">
             <span class="btn-icon">📤</span>
