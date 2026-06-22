@@ -7501,6 +7501,7 @@ async function eliminarTodosLosDetalles() {
   gap: 0.6rem;
   min-width: 0;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .ticket-item-row:hover {
