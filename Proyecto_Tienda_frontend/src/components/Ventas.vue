@@ -203,6 +203,7 @@ type Ticket = {
   estado: 'pendiente' | 'completado';
   creadoEn: number;
   desdeBackend?: boolean;
+  nombreUsuario?: string;
 };
 
 type PromocionDetalleDTO = {
@@ -267,7 +268,13 @@ async function cargarTicketsDesdeBackend() {
   }
 
   try {
-    const response = await getJson<ApiRespuesta<VentaPendienteDTO[]>>(`/ventas/buscarVentasPendientes`);
+    const esAdmin = Number(localStorage.getItem('tipoUsuario') || 2) === 1;
+    const modoReportes = localStorage.getItem('modoReportes') === 'true';
+    const verTodos = esAdmin && modoReportes;
+    const url = verTodos
+      ? '/ventas/buscarVentasPendientes'
+      : `/ventas/buscarVentasPendientes?idUsuario=${idUsuario}`;
+    const response = await getJson<ApiRespuesta<VentaPendienteDTO[]>>(url);
 
     if (response?.codigo === 200 && response?.datos) {
       const ventasPendientes = response.datos;
@@ -282,7 +289,8 @@ async function cargarTicketsDesdeBackend() {
             items: [],
             estado: 'pendiente',
             creadoEn: Date.now(),
-            desdeBackend: true
+            desdeBackend: true,
+            nombreUsuario: venta.nombreUsuario || venta.usuario?.nombre
           };
           tickets.value.push(nuevoTicket);
           
@@ -395,7 +403,8 @@ async function crearVentaPendienteEnBackend() {
         items: [],
         estado: 'pendiente',
         creadoEn: Date.now(),
-        desdeBackend: true
+        desdeBackend: true,
+        nombreUsuario: venta.nombreUsuario || venta.usuario?.nombre || nombreUsuario.value
       };
       
       tickets.value.push(nuevoTicket);
@@ -1359,6 +1368,13 @@ async function limpiarTicket() {
 function obtenerIdUsuarioSesion() {
   const id = Number(localStorage.getItem(AUTH_USER_ID_KEY) || '0');
   return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function obtenerIniciales(nombre?: string): string {
+  if (!nombre || nombre === 'Cajero') return 'C';
+  const partes = nombre.trim().split(/\s+/);
+  if (partes.length >= 2) return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+  return partes[0][0].toUpperCase();
 }
 
 async function crearVenta(idUsuario: number): Promise<VentaDTO> {
@@ -3116,6 +3132,7 @@ async function eliminarTodosLosDetalles() {
               {{ formatoMoneda(t.items.reduce((sum, i) => sum + ((i as any).is_gramaje ? i.precio : i.precio * i.cantidad), 0)) }}
             </span>
             <span class="ticket-status" v-else>vacío</span>
+            <span class="ticket-initials">{{ obtenerIniciales(t.nombreUsuario) }}</span>
           </div>
           <button 
             v-if="t.items.length === 0 && tickets.length > 1" 
@@ -3170,6 +3187,7 @@ async function eliminarTodosLosDetalles() {
               {{ formatoMoneda(t.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0)) }}
             </span>
             <span class="chip-status" v-else>vacío</span>
+            <span class="chip-user">{{ obtenerIniciales(t.nombreUsuario) }}</span>
             <button 
               v-if="t.items.length === 0 && tickets.length > 1" 
               type="button" 
@@ -6603,7 +6621,7 @@ async function eliminarTodosLosDetalles() {
 .ticket-nav-item {
   width: 100%;
   max-width: 56px;
-  height: 60px;
+  height: 72px;
   margin: 0 auto;
   border: var(--border-width) solid var(--border-color);
   border-radius: 8px;
@@ -6659,6 +6677,20 @@ async function eliminarTodosLosDetalles() {
   font-size: 0.45rem; 
   color: var(--text-secondary); 
   text-transform: uppercase; 
+}
+.ticket-initials {
+  font-size: 0.45rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1;
+}
+.chip-user {
+  font-size: 0.45rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .btn-delete-ticket {
