@@ -38,20 +38,14 @@ RUN echo 'server { \
     open_file_cache_min_uses 2; \
     open_file_cache_errors on; \
     \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-        expires 7d; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-    \
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|otf)$ { \
         expires 30d; \
         add_header Cache-Control "public, immutable"; \
         access_log off; \
     } \
     \
-    location /api/ { \
-        proxy_pass http://backend:8080/; \
+    location ~ ^/(backup|caja|ventas|ventasDetalle|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito)/ { \
+        proxy_pass http://backend:8080; \
         proxy_http_version 1.1; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
@@ -61,6 +55,12 @@ RUN echo 'server { \
         proxy_send_timeout 60s; \
         proxy_read_timeout 60s; \
         proxy_buffering off; \
+    } \
+    \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+        expires 7d; \
+        add_header Cache-Control "public, immutable"; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
