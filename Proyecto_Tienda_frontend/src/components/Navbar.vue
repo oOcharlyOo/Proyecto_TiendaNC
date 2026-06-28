@@ -665,6 +665,9 @@ function cerrarSesion() {
   top: calc(100% + 0.6rem);
   right: 0;
   width: 280px;
+  max-width: calc(100vw - 1.5rem);
+  max-height: 85vh;
+  overflow-y: auto;
   background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
   border: var(--border-width-thick) solid var(--accent-color);
   border-radius: 12px;
@@ -676,7 +679,6 @@ function cerrarSesion() {
     0 0 30px color-mix(in srgb, var(--zelda-gold) 15%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--accent-color) 30%, white);
   z-index: 100;
-  overflow: hidden;
 }
 
 .menu-corner {
@@ -1207,8 +1209,6 @@ function cerrarSesion() {
     right: auto;
     left: 0;
     border-radius: 0 0 12px 12px;
-    max-height: 85vh;
-    overflow-y: auto;
   }
 
   .menu-user-section {

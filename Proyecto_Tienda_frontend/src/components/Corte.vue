@@ -2802,10 +2802,14 @@ async function importarBackup() {
       body: formData
     });
     const data = await resp.json();
+    if (data?.datos) {
+      const lines = data.datos.split('\n').filter((l: string) => l.trim());
+      backupLog.value.push(...lines);
+    }
     if (data?.codigo === 200) {
-      backupLog.value.push('✅ Archivo subido exitosamente');
+      backupLog.value.push('✅ Restauración completada exitosamente');
       mostrarMensaje('Backup importado. Recargando...', 'ok');
-      setTimeout(() => location.reload(), 2000);
+      setTimeout(() => location.reload(), 3000);
     } else {
       backupLog.value.push(`❌ ${data?.mensaje || 'Error al importar'}`);
     }
