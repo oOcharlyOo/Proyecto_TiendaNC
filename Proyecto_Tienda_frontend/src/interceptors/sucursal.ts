@@ -3,7 +3,7 @@ const originalFetch = window.fetch;
 window.fetch = async function(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const sucursal = localStorage.getItem('sucursalActiva');
 
-  // Rewrite external API URL to relative for internal routing through nginx
+  // Rewrite external API URL to relative (nginx in prod, Vite proxy in dev)
   let urlStr = typeof url === 'string' ? url : url.toString();
   urlStr = urlStr.replace('https://api.laleyendadeldulce.com', '');
 

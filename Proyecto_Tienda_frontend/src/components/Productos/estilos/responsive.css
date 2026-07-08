@@ -1,0 +1,804 @@
+@media (max-width: 1024px) {
+  .col-categoria,
+  .col-subcategoria,
+  .col-codigo,
+  .col-tipo {
+    display: none;
+  }
+
+  .tabs-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .productos-layout {
+    padding: 0.5rem;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.875rem 1rem;
+  }
+
+  .toolbar-left {
+    text-align: center;
+  }
+
+  .toolbar-title {
+    justify-content: center;
+  }
+
+  .toolbar-right {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .view-toggles {
+    order: -1;
+    width: 100%;
+    max-width: 120px;
+    margin: 0 auto;
+  }
+
+  .import-export-group {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .category-filter {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .col-precio,
+  .col-stock {
+    display: none;
+  }
+
+  .col-codigo {
+    display: none;
+  }
+
+  .col-envase {
+    display: none;
+  }
+
+  .col-subcategoria {
+    display: none;
+  }
+
+  .bulk-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-info {
+    justify-content: center;
+  }
+
+  .btn-bulk-action {
+    justify-content: center;
+  }
+
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .tabs-bar {
+    padding: 0 1rem;
+  }
+
+  .tab-btn {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .tab-icon {
+    font-size: 1rem;
+  }
+
+  .icon-cell {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+
+  .nombre-text {
+    font-size: 0.85rem;
+  }
+
+  .nombre-id {
+    font-size: 0.65rem;
+  }
+
+  .btn-action {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-action .action-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .acciones-cell {
+    gap: 0.35rem;
+  }
+
+  .toast-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+  }
+
+  .toast-notification {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+
+  .toolbar-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-right .category-filter,
+  .toolbar-right .search-wrapper,
+  .toolbar-right .import-export-group {
+    width: 100%;
+  }
+
+  .productos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.6rem;
+  }
+
+  .view-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-primary .btn-text {
+    display: none;
+  }
+
+  .btn-primary {
+    padding: 0.6rem 0.875rem;
+  }
+
+  .tab-text {
+    display: none;
+  }
+
+  .tab-btn {
+    padding: 0.75rem;
+    justify-content: center;
+  }
+
+  .tab-icon {
+    font-size: 1.2rem;
+    margin: 0;
+  }
+
+  .tabs-bar {
+    justify-content: space-around;
+    padding: 0 0.5rem;
+  }
+
+  .toolbar {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .toolbar-right {
+    gap: 0.4rem;
+  }
+
+  .view-toggles {
+    max-width: 100px;
+  }
+
+  .toolbar-title {
+    font-size: 1.1rem;
+  }
+
+  .title-icon {
+    font-size: 1.2rem;
+  }
+
+  .toolbar-subtitle {
+    font-size: 0.7rem;
+  }
+
+  .tabla-productos {
+    font-size: 0.8rem;
+  }
+
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.5rem 0.5rem;
+  }
+
+  .icon-cell {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+
+  .nombre-text {
+    font-size: 0.8rem;
+  }
+
+  .nombre-id {
+    font-size: 0.6rem;
+  }
+
+  .btn-action {
+    width: 30px;
+    height: 30px;
+  }
+
+  .btn-action .action-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .acciones-cell {
+    gap: 0.25rem;
+  }
+
+  .stock-cell {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .stock-icon {
+    font-size: 0.85rem;
+  }
+
+  .toast-container {
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+  }
+
+  .toast-notification {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .toast-icon {
+    font-size: 1rem;
+  }
+
+  .toast-message {
+    font-size: 0.8rem;
+  }
+
+  .estado-loading,
+  .estado-empty {
+    padding: 2.5rem 0.5rem;
+  }
+
+  .empty-icon {
+    font-size: 2.5rem;
+  }
+
+  .empty-text {
+    font-size: 0.9rem;
+  }
+
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+  }
+
+  .category-filter,
+  .search-input {
+    font-size: 0.8rem;
+    padding: 0.5rem 2rem 0.5rem 0.7rem;
+  }
+
+  .btn-secondary {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.7rem;
+  }
+
+  .col-categoria {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .categoria-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .table-footer {
+    padding: 0.6rem 1rem;
+  }
+
+  .footer-count {
+    font-size: 0.7rem;
+  }
+
+  .bulk-action-bar {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .bulk-count {
+    font-size: 0.8rem;
+  }
+
+  .btn-bulk-action {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .productos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .producto-card {
+    padding: 0.6rem;
+  }
+
+  .pc-ico {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+
+  .pc-name {
+    font-size: 0.7rem;
+  }
+
+  .pc-stat-l {
+    font-size: 0.5rem;
+  }
+
+  .pc-stat-v {
+    font-size: 0.6rem;
+  }
+
+  .pc-btn {
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .view-toggles {
+    border-width: 1px;
+    border-radius: 6px;
+  }
+
+  .view-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .import-export-group {
+    gap: 0.25rem;
+  }
+
+  .import-export-group .btn-text {
+    display: none;
+  }
+
+  .import-export-group .btn-secondary {
+    padding: 0.45rem 0.55rem;
+    min-width: 36px;
+    justify-content: center;
+  }
+
+  .import-export-group .btn-icon {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .toolbar-right {
+    gap: 0.4rem;
+  }
+
+  .btn-secondary.btn-sm {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .col-categoria {
+    display: none;
+  }
+
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.35rem 0.3rem;
+  }
+
+  .nombre-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+  }
+
+  .nombre-text {
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+
+  .nombre-id {
+    font-size: 0.5rem;
+  }
+
+  .stock-cell {
+    padding: 0.15rem 0.25rem;
+    font-size: 0.65rem;
+  }
+
+  .stock-icon {
+    font-size: 0.7rem;
+  }
+
+  .stock-value {
+    font-size: 0.65rem;
+  }
+
+  .tipo-badge {
+    font-size: 0.55rem;
+    padding: 0.08rem 0.25rem;
+  }
+
+  .btn-action {
+    width: 24px;
+    height: 24px;
+  }
+
+  .btn-action .action-icon {
+    width: 11px;
+    height: 11px;
+  }
+
+  .acciones-cell {
+    gap: 0.15rem;
+  }
+
+  .productos-layout {
+    padding: 0.35rem;
+  }
+
+  .toolbar {
+    padding: 0.6rem 0.4rem;
+    gap: 0.35rem;
+  }
+
+  .toolbar-title {
+    font-size: 0.95rem;
+  }
+
+  .title-icon {
+    font-size: 1rem;
+  }
+
+  .toolbar-subtitle {
+    font-size: 0.65rem;
+  }
+
+  .toolbar-right {
+    gap: 0.3rem;
+  }
+
+  .category-filter,
+  .search-input {
+    font-size: 0.75rem;
+    padding: 0.45rem 1.8rem 0.45rem 0.6rem;
+  }
+
+  .search-wrapper {
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .view-toggles {
+    max-width: 90px;
+  }
+
+  .tab-btn {
+    padding: 0.6rem 0.4rem;
+  }
+
+  .tab-icon {
+    font-size: 1rem;
+  }
+
+  .tabs-bar {
+    padding: 0 0.3rem;
+    gap: 0;
+  }
+
+  .tabla-productos {
+    font-size: 0.7rem;
+  }
+
+  .tabla-productos th,
+  .tabla-productos td {
+    padding: 0.4rem 0.35rem;
+  }
+
+  .col-check {
+    width: 30px;
+  }
+
+  .row-checkbox {
+    width: 14px;
+    height: 14px;
+  }
+
+  .col-icon {
+    width: 30px;
+  }
+
+  .icon-cell {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+
+  .nombre-text {
+    font-size: 0.7rem;
+  }
+
+  .nombre-id {
+    font-size: 0.55rem;
+  }
+
+  .categoria-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .btn-action {
+    width: 26px;
+    height: 26px;
+  }
+
+  .btn-action .action-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .stock-value {
+    font-size: 0.7rem;
+  }
+
+  .stock-icon {
+    font-size: 0.75rem;
+  }
+
+  .tipo-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .envase-badge {
+    font-size: 0.6rem;
+  }
+
+  .productos-grid {
+    gap: 0.35rem;
+    padding: 0.3rem 0;
+  }
+
+  .producto-card {
+    padding: 0.45rem;
+    gap: 0.25rem;
+    border-radius: 8px;
+  }
+
+  .pc-top {
+    margin-bottom: 0.1rem;
+  }
+
+  .pc-id {
+    font-size: 0.5rem;
+  }
+
+  .pc-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .pc-ico {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .pc-name {
+    font-size: 0.6rem;
+    min-height: 1.2em;
+    -webkit-line-clamp: 1;
+  }
+
+  .pc-badges {
+    gap: 0.2rem;
+  }
+
+  .pc-badge {
+    font-size: 0.45rem;
+    padding: 0.05rem 0.25rem;
+    border-radius: 4px;
+  }
+
+  .pc-stats {
+    gap: 0.15rem;
+  }
+
+  .pc-stat {
+    padding: 0.12rem 0.2rem;
+    border-radius: 4px;
+  }
+
+  .pc-stat-l {
+    font-size: 0.4rem;
+  }
+
+  .pc-stat-v {
+    font-size: 0.5rem;
+  }
+
+  .pc-actions {
+    gap: 0.15rem;
+    margin-top: 0.05rem;
+  }
+
+  .pc-btn {
+    height: 24px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+  }
+
+  .toast-container {
+    bottom: 0.3rem;
+    right: 0.3rem;
+    left: 0.3rem;
+  }
+
+  .toast-notification {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .toast-icon {
+    font-size: 0.9rem;
+  }
+
+  .toast-message {
+    font-size: 0.7rem;
+  }
+
+  .estado-loading,
+  .estado-empty {
+    padding: 2rem 0.3rem;
+  }
+
+  .empty-icon {
+    font-size: 2rem;
+  }
+
+  .empty-text {
+    font-size: 0.8rem;
+  }
+
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 2px;
+  }
+
+  .bulk-action-bar {
+    padding: 0.5rem 0.6rem;
+    gap: 0.4rem;
+  }
+
+  .bulk-count {
+    font-size: 0.7rem;
+  }
+
+  .btn-clear-selection {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+  }
+
+  .btn-bulk-action {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+  }
+
+  .btn-icon {
+    font-size: 0.85rem;
+  }
+
+  .btn-text {
+    font-size: 0.65rem;
+  }
+
+  .productos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+  }
+
+  .producto-card {
+    padding: 0.5rem;
+    gap: 0.3rem;
+  }
+
+  .pc-ico {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+
+  .pc-name {
+    font-size: 0.65rem;
+    -webkit-line-clamp: 1;
+  }
+
+  .pc-badge {
+    font-size: 0.5rem;
+    padding: 0.05rem 0.3rem;
+  }
+
+  .pc-stat {
+    padding: 0.15rem 0.25rem;
+  }
+
+  .pc-stat-l {
+    font-size: 0.45rem;
+  }
+
+  .pc-stat-v {
+    font-size: 0.55rem;
+  }
+
+  .pc-actions {
+    gap: 0.2rem;
+  }
+
+  .pc-btn {
+    height: 26px;
+    font-size: 0.75rem;
+  }
+
+  .view-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 0.85rem;
+  }
+}

@@ -1,0 +1,580 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+
+import {
+  tickets, ticketActualId, ticketActual, ticket, creandoTicket, ticketDelDia,
+  totalVenta, ticketInfoText, nombreUsuario, mensaje, mensajeTipo,
+  obtenerIniciales, getJson, mostrarMensaje,
+  cargarSiguienteTicket, crearNuevoTicket, cargarTicketsDesdeBackend,
+  seleccionarTicket, eliminarTicket, aumentarCantidad, disminuirCantidad,
+  quitarItem, limpiarTicket, getFechaHoy
+} from './logica/usePosTicket';
+
+import {
+  terminoBusqueda, categoriaFiltro, productos, categorias,
+  sugerenciasVisibles, indiceSugerenciaActiva,
+  provisionSemanalTotal, provisionStatusClass,
+  esCategoriaGaming, cargarProductos, cargarCategorias,
+  productosParaMostrar, sugerenciasPorNombre, productosAccesoRapido,
+  buscarProductoPorCodigoBarras, manejarFocusBusqueda,
+  manejarInputBusqueda, ocultarSugerencias, manejarTeclasSugerencias,
+  agregarDesdeBuscador, seleccionarSugerencia, agregarProductoATicket,
+  toggleMayoreo, toggleEnvase, cargarProvisionSemanal
+} from './logica/usePosProductos';
+
+import {
+  modalGramajeAbierto, modalProductoGramaje,
+  gramajeEditandoDesdeHistorial, gramajeEditandoIndice,
+  gramajeEditandoCantidad, gramajeEditandoPrecio,
+  editarGramajeItem, agregarProductoGramaje
+} from './logica/usePosGramaje';
+
+import {
+  modalCobroAbierto, modalCreditosAbierto, modalCreditosSeleccionar,
+  totalPersonasCredito, modalEntradaAbierto, modalSalidaAbierto,
+  modalHistorialAbierto, modalDetalleVentaAbierto,
+  modalDescripcionPendiente, descripcionPendienteTexto,
+  modalVentasPendientesAbierto, ventasPendientes, ventaPendienteSeleccionada,
+  modalCobroPendienteAbierto, modalAgregarPendienteAbierto,
+  agregarPendienteBusqueda, agregarPendienteInput, agregarPendienteScannerActivo,
+  agregarPendienteProductos, historialCargando, historialCobroTotal,
+  historialGananciaTotal, historialVentas, historialUsuariosUnicos,
+  historialVentaDetalle, historialVentaSeleccionada, detalleCreditoInfo,
+  detalleAbonos, historialVentaTieneDiscrepancia, historialDiscrepanciaMonto,
+  cobrar, confirmarCobroEfectivo, confirmarCobroTransferencia,
+  confirmarCobroTarjeta, confirmarCobroPendiente, confirmarCobroCredito,
+  onPersonaCreditoSeleccionada,
+  confirmarCobroPendienteEfectivo, confirmarCobroPendienteTransferencia,
+  confirmarCobroPendienteTarjeta, confirmarCobroPendienteCredito,
+  cargarCreditosResumen, cargarVentasPendientes as cargarVentasPendientesFn,
+  abrirModalPendientes, cobrarVentaPendiente, guardarVentaPendiente,
+  editarDescripcionPendiente, guardarEdicionDescripcion,
+  eliminarVentaPendiente, agregarAVentaPendiente, agregarProductoAPendiente,
+  quitarProductoPendiente, confirmarAgregarPendiente,
+  cargarHistorialVentasDia, verDetalleVenta, cancelarVentaDesdeHistorial,
+  historialVentasAbrir, onVentasCorregidas,
+  registrarEntradaEfectivo, registrarSalidaEfectivo,
+  entradaEfectivo, salidaEfectivo
+} from './logica/usePosCobro';
+
+import {
+  promocionesActivas, agregarPromocionAlTicket, cargarPromocionesActivas
+} from './logica/usePosPromociones';
+
+import {
+  scannerActivo, startScanner, stopScanner
+} from './logica/usePosScanner';
+
+import {
+  modalProveedoresPedidos, ppVistaListaProv, ppVistaListaPed,
+  proveedores, pedidosProveedor, proveedorForm, pedidoForm,
+  editingProveedor, editingPedido, pedidoProveedorTab,
+  showProveedorForm, showPedidoForm, montoManual,
+  searchProductoPedido, showProductoDropdownPedido,
+  newDetallePedido, productosDisponibles, filteredProductosPedido,
+  searchWrapperRef,
+  abrirModalProveedoresPedidos, cargarProveedoresPedidos, openProveedorModal, saveProveedor,
+  deleteProveedor, openPedidoModal, addDetallePedido,
+  removeDetallePedido, selectProductoForPedido, savePedido,
+  recibirPedido, deletePedido, handleClickOutsideDropdown
+} from './logica/usePosProveedores';
+
+import {
+  modoEdicionDetalle, montoTotalEditado, detalleEditandoIndex,
+  cantidadTemporal, precioTemporal, totalManualEditado, montoTotalInput,
+  busquedaEditar, resultadosEditar, cargandoBusquedaEditar,
+  iniciarEdicionDetalle, iniciarEditarItem, confirmarEdicionItem,
+  cancelarEdicionItem, onTotalManualChange, guardarCambiosDetalle,
+  cancelarEdicionDetalle, buscarProductoEditar, agregarProductoADetalle,
+  eliminarDetalleVenta, eliminarTodosLosDetalles, cerrarDetalleVenta
+} from './logica/usePosEdicionDetalle';
+
+import PosSidebar from './secciones/PosSidebar.vue';
+import PosCatalogo from './secciones/PosCatalogo.vue';
+import PosPanelTicket from './secciones/PosPanelTicket.vue';
+
+import EntradaEfectivoModal from '../modals/EntradaEfectivoModal.vue';
+import SalidaEfectivoModal from '../modals/SalidaEfectivoModal.vue';
+import CalculadoraGramajeModal from '../modals/CalculadoraGramajeModal.vue';
+import CobroModal from './modales/CobroModal.vue';
+import CreditosPersonasModal from './modales/CreditosPersonasModal.vue';
+import HistorialVentasModal from './modales/HistorialVentasModal.vue';
+import CrudPromociones from './modales/CrudPromociones.vue';
+import PosDetalleVentaModal from './modales/PosDetalleVentaModal.vue';
+import PosDescripcionPendienteModal from './modales/PosDescripcionPendienteModal.vue';
+import PosVentasPendientesModal from './modales/PosVentasPendientesModal.vue';
+import PosAgregarPendienteModal from './modales/PosAgregarPendienteModal.vue';
+import PosProveedoresPedidosModal from './modales/PosProveedoresPedidosModal.vue';
+import PosToastNotification from './modales/PosToastNotification.vue';
+import PosScannerOverlay from './modales/PosScannerOverlay.vue';
+
+import './estilos/pos-catalogo.css';
+import './estilos/pos-layout.css';
+import './estilos/pos-ticket.css';
+import './estilos/pos-modales.css';
+import './estilos/pos-scanner.css';
+
+// --- Orchestration state ---
+const isRecording = ref(false);
+const ticketVisibleMobile = ref(false);
+const isKeyboardVisible = ref(false);
+const modalPromocionesAbierto = ref(false);
+const vpVistaLista = ref(true);
+
+const recognition = ref<any>(null);
+
+let isResizing = false;
+let startY = 0;
+let startHeight = 0;
+
+let scannerBuffer = '';
+let scannerTimer: ReturnType<typeof setTimeout> | null = null;
+let lastScannerKeyTime = 0;
+
+// --- Composites ---
+const productosFiltradosBusqueda = computed(() => {
+  if (!agregarPendienteBusqueda.value) return [];
+  const q = agregarPendienteBusqueda.value.toLowerCase();
+  return productos.value.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    (p.codigo_barras || '').toLowerCase().includes(q)
+  ).slice(0, 10);
+});
+
+const ventasPendientesAgrupadas = computed(() => {
+  return ventasPendientes.value.map((v: any) => {
+    if (!v.detalles || v.detalles.length === 0) return v;
+    const grouped: Record<string, any> = {};
+    for (const d of v.detalles) {
+      const key = `${d.productoNombre}_${d.precioUnitarioVenta}_${d.isGramaje}`;
+      if (grouped[key]) {
+        grouped[key].cantidad += d.cantidad || 1;
+        grouped[key].subtotal = Number(grouped[key].cantidad) * Number(d.precioUnitarioVenta || 0);
+      } else {
+        grouped[key] = { ...d, cantidad: d.cantidad || 1, subtotal: Number(d.cantidad || 1) * Number(d.precioUnitarioVenta || 0) };
+      }
+    }
+    return { ...v, detallesAgrupados: Object.values(grouped) };
+  });
+});
+
+const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
+
+const historialEnvases = computed(() => {
+  return historialVentaDetalle.value.filter((d: any) => {
+    const cobroEnvaseTotal = Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+    return cobroEnvaseTotal > 0;
+  });
+});
+
+const historialEnvaseTotal = computed(() => {
+  return historialEnvases.value.reduce((sum: number, d: any) => {
+    return sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0);
+  }, 0);
+});
+
+// --- Resize handlers ---
+function startResize(e: MouseEvent | TouchEvent) {
+  isResizing = true;
+  startY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+  const container = document.querySelector('.pos-right');
+  if (container) startHeight = parseFloat(getComputedStyle(container).height);
+  document.documentElement.style.cursor = 'row-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+}
+
+function doResize(e: MouseEvent | TouchEvent) {
+  if (!isResizing) return;
+  const currentY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+  let newHeight = startHeight - (currentY - startY);
+  const maxHeight = window.innerHeight * 0.9;
+  const minHeight = 200;
+  if (newHeight > maxHeight) newHeight = maxHeight;
+  if (newHeight < minHeight) newHeight = minHeight;
+  const container = document.querySelector('.pos-right');
+  if (container) (container as HTMLElement).style.height = newHeight + 'px';
+  e.preventDefault();
+}
+
+function stopResize() {
+  isResizing = false;
+  document.documentElement.style.cursor = '';
+  document.body.style.userSelect = '';
+}
+
+// --- Keyboard / Scanner ---
+function manejarAtajosTeclado(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (modalDetalleVentaAbierto.value) { cerrarDetalleVenta(); return; }
+    if (modalCobroPendienteAbierto.value) { modalCobroPendienteAbierto.value = false; ventaPendienteSeleccionada.value = null; return; }
+    if (modalVentasPendientesAbierto.value) { modalVentasPendientesAbierto.value = false; return; }
+    if (modalDescripcionPendiente.value) { modalDescripcionPendiente.value = false; return; }
+    if (modalCobroAbierto.value) { modalCobroAbierto.value = false; return; }
+    if (modalGramajeAbierto.value) { modalGramajeAbierto.value = false; modalProductoGramaje.value = null; gramajeEditandoDesdeHistorial.value = false; gramajeEditandoIndice.value = null; return; }
+    if (modalHistorialAbierto.value) { modalHistorialAbierto.value = false; return; }
+    if (modalSalidaAbierto.value) { modalSalidaAbierto.value = false; return; }
+    if (modalEntradaAbierto.value) { modalEntradaAbierto.value = false; return; }
+    if (modalPromocionesAbierto.value) { modalPromocionesAbierto.value = false; return; }
+    if (scannerActivo.value) { stopScanner(); return; }
+  }
+  if (e.key === 'F12') { e.preventDefault(); if (ticket.value.length > 0 && !modalCobroAbierto.value) cobrar(); }
+  const target = e.target as HTMLElement;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  if (e.key === 'Enter' && !isInput && scannerBuffer.length > 0) {
+    e.preventDefault(); procesarEscaneo(scannerBuffer); scannerBuffer = ''; return;
+  }
+  if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const now = Date.now();
+    const timeDiff = now - lastScannerKeyTime;
+    if (lastScannerKeyTime > 0 && timeDiff > 100) scannerBuffer = '';
+    scannerBuffer += e.key;
+    lastScannerKeyTime = now;
+    if (scannerTimer) clearTimeout(scannerTimer);
+    scannerTimer = setTimeout(() => {
+      if (scannerBuffer.length > 0) { procesarEscaneo(scannerBuffer); scannerBuffer = ''; }
+    }, 300);
+  }
+}
+
+async function procesarEscaneo(codigo: string) {
+  const codigoLimpio = codigo.trim();
+  if (!codigoLimpio) return;
+  const producto = await buscarProductoPorCodigoBarras(codigoLimpio);
+  if (producto) {
+    const stockDisponible = producto.dto?.stock ?? Infinity;
+    if (stockDisponible <= 0) { mostrarMensaje(`Producto ${producto.nombre} sin stock`, 'error'); return; }
+    await agregarProductoATicket(producto);
+    mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
+  } else {
+    mostrarMensaje(`Producto no encontrado: ${codigoLimpio}`, 'error');
+  }
+}
+
+// --- Voice ---
+function startVoiceCommand() {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) { mostrarMensaje('Reconocimiento de voz no soportado', 'error'); return; }
+  if (isRecording.value) { isRecording.value = false; recognition.value?.stop(); return; }
+  isRecording.value = true;
+  recognition.value = new SpeechRecognition();
+  recognition.value.lang = 'es-MX';
+  recognition.value.interimResults = false;
+  recognition.value.onresult = async (event: any) => {
+    const transcript = event.results[0][0].transcript.toLowerCase();
+    if (transcript.includes('buscar')) {
+      const termino = transcript.replace('buscar', '').trim();
+      if (termino) { terminoBusqueda.value = termino; }
+    } else {
+      buscarProducto(transcript);
+    }
+    isRecording.value = false;
+  };
+  recognition.value.onerror = () => { isRecording.value = false; mostrarMensaje('Error en reconocimiento de voz', 'error'); };
+  recognition.value.start();
+}
+
+async function buscarProducto(termino: string) {
+  terminoBusqueda.value = termino;
+  const producto = await (await import('./logica/usePosProductos')).buscarProducto(termino);
+  if (producto) { await agregarProductoATicket(producto); terminoBusqueda.value = ''; }
+  else { mostrarMensaje(`"${termino}" no encontrado`, 'error'); }
+}
+
+function buscarYAgregarPendiente() {
+  if (!agregarPendienteBusqueda.value) return;
+  const prod = productosFiltradosBusqueda.value[0];
+  if (prod) agregarProductoAPendiente(prod);
+}
+
+function handleResize() {
+  isKeyboardVisible.value = window.innerWidth < 768 && window.innerHeight < 500;
+}
+
+function buscarYAgregarProducto(codigo: string) {
+  procesarEscaneo(codigo);
+}
+
+// --- Lifecycle ---
+onMounted(async () => {
+  window.addEventListener('resize', handleResize);
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+  document.addEventListener('touchmove', doResize, { passive: false });
+  document.addEventListener('touchend', stopResize);
+  window.addEventListener('focusin', (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      isKeyboardVisible.value = true;
+      ticketVisibleMobile.value = false;
+    }
+  });
+  window.addEventListener('focusout', () => { isKeyboardVisible.value = false; });
+  window.addEventListener('keydown', manejarAtajosTeclado);
+  document.addEventListener('click', handleClickOutsideDropdown);
+
+  await cargarProductos();
+  await cargarCategorias();
+  await cargarTicketsDesdeBackend();
+  await cargarSiguienteTicket();
+  await cargarPromocionesActivas();
+  await cargarProvisionSemanal();
+  await cargarVentasPendientesFn();
+  await cargarCreditosResumen();
+});
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', doResize);
+  document.removeEventListener('mouseup', stopResize);
+  document.removeEventListener('touchmove', doResize);
+  document.removeEventListener('touchend', stopResize);
+  window.removeEventListener('keydown', manejarAtajosTeclado);
+});
+</script>
+
+<template>
+  <main class="pos-container">
+    <PosSidebar
+      :tickets="tickets"
+      :ticket-actual-id="ticketActualId"
+      :creando-ticket="creandoTicket"
+      :total-personas-credito="totalPersonasCredito"
+      :ventas-pendientes-count="ventasPendientes.length"
+      @crear-nuevo-ticket="crearNuevoTicket"
+      @seleccionar-ticket="seleccionarTicket"
+      @eliminar-ticket="eliminarTicket"
+      @abrir-creditos="cargarCreditosResumen(); modalCreditosAbierto = true; modalCreditosSeleccionar = false"
+      @abrir-pendientes="abrirModalPendientes"
+    />
+
+    <PosCatalogo
+      :productos-acceso-rapido="productosAccesoRapido"
+      :productos-para-mostrar="productosParaMostrar"
+      :promociones-activas="promocionesActivas"
+      :termino-busqueda="terminoBusqueda"
+      :categoria-filtro="categoriaFiltro"
+      :categorias="categorias"
+      :provision-semanal-total="provisionSemanalTotal"
+      :provision-status-class="provisionStatusClass"
+      :sugerencias-por-nombre="sugerenciasPorNombre"
+      :sugerencias-visibles="sugerenciasVisibles"
+      :indice-sugerencia-activa="indiceSugerenciaActiva"
+      :is-recording="isRecording"
+      @update:termino-busqueda="terminoBusqueda = $event"
+      @update:categoria-filtro="categoriaFiltro = $event"
+      @focus-busqueda="manejarFocusBusqueda"
+      @input-busqueda="manejarInputBusqueda"
+      @ocultar-sugerencias="ocultarSugerencias"
+      @keydown-sugerencias="manejarTeclasSugerencias($event)"
+      @agregar-desde-buscador="agregarDesdeBuscador"
+      @seleccionar-sugerencia="seleccionarSugerencia"
+      @agregar-producto="agregarProductoATicket"
+      @agregar-promocion="agregarPromocionAlTicket"
+      @abrir-promociones="modalPromocionesAbierto = true"
+      @start-scanner="startScanner"
+      @start-voice-command="startVoiceCommand"
+    />
+
+    <PosPanelTicket
+      :ticket="ticket"
+      :ticket-actual="ticketActual"
+      :total-venta="totalVenta"
+      :nombre-usuario="nombreUsuario"
+      :ticket-visible-mobile="ticketVisibleMobile"
+      @update:ticket-visible-mobile="ticketVisibleMobile = $event"
+      @start-resize="startResize($event)"
+      @limpiar-ticket="limpiarTicket"
+      @toggle-mayoreo="toggleMayoreo($event)"
+      @toggle-envase="toggleEnvase($event)"
+      @editar-gramaje="editarGramajeItem($event)"
+      @disminuir-cantidad="disminuirCantidad($event)"
+      @aumentar-cantidad="aumentarCantidad($event)"
+      @quitar-item="quitarItem($event)"
+      @cobrar="cobrar"
+      @abrir-proveedores-pedidos="abrirModalProveedoresPedidos"
+      @historial-ventas-abrir="historialVentasAbrir"
+      @entrada-efectivo="entradaEfectivo"
+      @salida-efectivo="salidaEfectivo"
+    />
+
+    <EntradaEfectivoModal :open="modalEntradaAbierto" @close="modalEntradaAbierto = false" @submit="registrarEntradaEfectivo" />
+    <SalidaEfectivoModal :open="modalSalidaAbierto" @close="modalSalidaAbierto = false" @submit="registrarSalidaEfectivo" />
+    <HistorialVentasModal
+      :open="modalHistorialAbierto"
+      :loading="historialCargando"
+      :cobro-total="historialCobroTotal"
+      :ganancia-total="historialGananciaTotal"
+      :ventas="historialVentas"
+      :usuarios-unicos="historialUsuariosUnicos"
+      :es-admin="esAdmin"
+      @close="modalHistorialAbierto = false"
+      @ver-detalle="verDetalleVenta"
+      @cancelar="cancelarVentaDesdeHistorial"
+      @ventas-corregidas="onVentasCorregidas"
+    />
+
+    <PosDetalleVentaModal
+      :open="modalDetalleVentaAbierto"
+      :historial-venta-seleccionada="historialVentaSeleccionada"
+      :modo-edicion-detalle="modoEdicionDetalle"
+      :historial-venta-detalle="historialVentaDetalle"
+      :historial-venta-tiene-discrepancia="historialVentaTieneDiscrepancia"
+      :historial-discrepancia-monto="historialDiscrepanciaMonto"
+      :busqueda-editar="busquedaEditar"
+      :resultados-editar="resultadosEditar"
+      :cargando-busqueda-editar="cargandoBusquedaEditar"
+      :detalle-editando-index="detalleEditandoIndex"
+      :cantidad-temporal="cantidadTemporal"
+      :precio-temporal="precioTemporal"
+      :detalle-credito-info="detalleCreditoInfo"
+      :detalle-abonos="detalleAbonos"
+      :historial-envases="historialEnvases"
+      :historial-envase-total="historialEnvaseTotal"
+      :es-admin="esAdmin"
+      :monto-total-input="montoTotalInput"
+      :total-manual-editado="totalManualEditado"
+      @cerrar-detalle-venta="cerrarDetalleVenta"
+      @iniciar-edicion-detalle="iniciarEdicionDetalle"
+      @cancelar-edicion-detalle="cancelarEdicionDetalle"
+      @guardar-cambios-detalle="guardarCambiosDetalle"
+      @eliminar-todos-detalles="eliminarTodosLosDetalles"
+      @update:busqueda-editar="busquedaEditar = $event"
+      @buscar-producto-editar="buscarProductoEditar"
+      @agregar-producto-detalle="agregarProductoADetalle"
+      @iniciar-editar-item="iniciarEditarItem"
+      @confirmar-edicion-item="confirmarEdicionItem"
+      @cancelar-edicion-item="cancelarEdicionItem"
+      @eliminar-detalle-venta="eliminarDetalleVenta"
+      @update:monto-total-input="montoTotalInput = $event"
+      @total-manual-change="onTotalManualChange"
+      @clear-busqueda-editar="busquedaEditar = ''; resultadosEditar = []"
+    />
+
+    <CalculadoraGramajeModal
+      :open="modalGramajeAbierto"
+      :producto="modalProductoGramaje ? { ...modalProductoGramaje, codigo_barras: modalProductoGramaje.codigo_barras ?? '' } : null"
+      :is-editing="gramajeEditandoDesdeHistorial"
+      :cantidad-inicial="gramajeEditandoCantidad"
+      :precio-inicial="gramajeEditandoPrecio"
+      @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null"
+      @add="agregarProductoGramaje"
+    />
+
+    <CobroModal
+      :open="modalCobroAbierto"
+      :total="totalVenta"
+      @close="modalCobroAbierto = false"
+      @confirmar-efectivo="confirmarCobroEfectivo"
+      @confirmar-transferencia="confirmarCobroTransferencia"
+      @confirmar-tarjeta="confirmarCobroTarjeta"
+      @confirmar-pendiente="confirmarCobroPendiente"
+      @confirmar-credito="confirmarCobroCredito"
+    />
+
+    <CreditosPersonasModal
+      :open="modalCreditosAbierto"
+      :seleccionar="modalCreditosSeleccionar"
+      @close="modalCreditosAbierto = false; modalCreditosSeleccionar = false"
+      @persona-seleccionada="onPersonaCreditoSeleccionada"
+      @credito-actualizado="cargarCreditosResumen"
+    />
+
+    <CobroModal
+      :open="modalCobroPendienteAbierto"
+      :total="Number(ventaPendienteSeleccionada?.montoTotal) || 0"
+      @close="modalCobroPendienteAbierto = false; ventaPendienteSeleccionada = null"
+      @confirmar-efectivo="confirmarCobroPendienteEfectivo"
+      @confirmar-transferencia="confirmarCobroPendienteTransferencia"
+      @confirmar-tarjeta="confirmarCobroPendienteTarjeta"
+      @confirmar-credito="confirmarCobroPendienteCredito"
+    />
+
+    <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />
+
+    <PosDescripcionPendienteModal
+      :open="modalDescripcionPendiente"
+      :venta-pendiente-seleccionada="ventaPendienteSeleccionada"
+      :descripcion-pendiente-texto="descripcionPendienteTexto"
+      @close="modalDescripcionPendiente = false"
+      @update:descripcion-pendiente-texto="descripcionPendienteTexto = $event"
+      @guardar="ventaPendienteSeleccionada ? guardarEdicionDescripcion() : guardarVentaPendiente()"
+    />
+
+    <PosVentasPendientesModal
+      :open="modalVentasPendientesAbierto"
+      :ventas-pendientes="ventasPendientes"
+      :ventas-pendientes-agrupadas="ventasPendientesAgrupadas"
+      :vp-vista-lista="vpVistaLista"
+      @close="modalVentasPendientesAbierto = false"
+      @update:vp-vista-lista="vpVistaLista = $event"
+      @cobrar="cobrarVentaPendiente"
+      @editar-descripcion="editarDescripcionPendiente"
+      @eliminar="eliminarVentaPendiente"
+      @agregar-productos="agregarAVentaPendiente"
+    />
+
+    <PosAgregarPendienteModal
+      :open="modalAgregarPendienteAbierto"
+      :venta-pendiente-seleccionada="ventaPendienteSeleccionada"
+      :agregar-pendiente-busqueda="agregarPendienteBusqueda"
+      :agregar-pendiente-scanner-activo="agregarPendienteScannerActivo"
+      :productos-filtrados-busqueda="productosFiltradosBusqueda"
+      :agregar-pendiente-productos="agregarPendienteProductos"
+      @close="modalAgregarPendienteAbierto = false"
+      @update:agregar-pendiente-busqueda="agregarPendienteBusqueda = $event"
+      @buscar-y-agregar="buscarYAgregarPendiente"
+      @start-scanner-pendiente="agregarPendienteScannerActivo = !agregarPendienteScannerActivo"
+      @agregar-producto="agregarProductoAPendiente"
+      @quitar-producto="quitarProductoPendiente"
+      @confirmar-agregar="confirmarAgregarPendiente"
+    />
+
+    <PosProveedoresPedidosModal
+      :open="modalProveedoresPedidos"
+      :pedido-proveedor-tab="pedidoProveedorTab"
+      :pp-vista-lista-prov="ppVistaListaProv"
+      :pp-vista-lista-ped="ppVistaListaPed"
+      :proveedores="proveedores"
+      :pedidos-proveedor="pedidosProveedor"
+      :show-proveedor-form="showProveedorForm"
+      :show-pedido-form="showPedidoForm"
+      :editing-proveedor="editingProveedor"
+      :editing-pedido="editingPedido"
+      :proveedor-form="proveedorForm"
+      :pedido-form="pedidoForm"
+      :monto-manual="montoManual"
+      :search-producto-pedido="searchProductoPedido"
+      :show-producto-dropdown-pedido="showProductoDropdownPedido"
+      :filtered-productos-pedido="filteredProductosPedido"
+      :new-detalle-pedido="newDetallePedido"
+      :search-wrapper-ref="searchWrapperRef"
+      @close="modalProveedoresPedidos = false"
+      @update:pedido-proveedor-tab="pedidoProveedorTab = $event as 'proveedores' | 'pedidos' | 'sugerido' | 'sugeridoHoy'"
+      @update:pp-vista-lista-prov="ppVistaListaProv = $event"
+      @update:pp-vista-lista-ped="ppVistaListaPed = $event"
+      @update:show-proveedor-form="showProveedorForm = $event"
+      @update:show-pedido-form="showPedidoForm = $event"
+      @update:proveedor-form="proveedorForm = $event"
+      @update:pedido-form="pedidoForm = $event"
+      @update:monto-manual="montoManual = $event"
+      @update:search-producto-pedido="searchProductoPedido = $event"
+      @update:show-producto-dropdown-pedido="showProductoDropdownPedido = $event"
+      @update:new-detalle-pedido="newDetallePedido = $event"
+      @open-proveedor-modal="openProveedorModal"
+      @delete-proveedor="deleteProveedor"
+      @save-proveedor="saveProveedor"
+      @open-pedido-modal="openPedidoModal"
+      @recibir-pedido="recibirPedido"
+      @delete-pedido="deletePedido"
+      @save-pedido="savePedido"
+      @add-detalle-pedido="addDetallePedido"
+      @remove-detalle-pedido="removeDetallePedido"
+      @select-producto-pedido="selectProductoForPedido"
+      @pedido-creado="cargarProveedoresPedidos"
+    />
+
+    <PosToastNotification :mensaje="mensaje" :mensaje-tipo="mensajeTipo" />
+    <PosScannerOverlay :scanner-activo="scannerActivo" @stop-scanner="stopScanner" />
+  </main>
+</template>
+
+

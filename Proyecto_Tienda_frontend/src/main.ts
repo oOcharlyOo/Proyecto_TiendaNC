@@ -2,6 +2,7 @@
 import './interceptors/sucursal';
 import { createApp } from 'vue';
 import './components/styles/themes.css';
+import './components/styles/base.css';
 import './components/styles/inventario.css';
 import App from './App.vue';
 import router from './router';

@@ -47,6 +47,10 @@ const productosSeleccionados = ref<Set<number>>(new Set());
 const asignandoLote = ref(false);
 const buscarLote = ref('');
 
+const cargandoAuto = ref(false);
+const productosSinProveedor = ref<any[]>([]);
+const seleccionSinProv = ref<Map<number, number>>(new Map());
+
 let scannerBuffer = '';
 let lastScannerKeyTime = 0;
 
@@ -241,6 +245,56 @@ async function eliminarAsignacion(id: number) {
   }
 }
 
+async function autoAsignar() {
+  cargandoAuto.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/producto-proveedor/auto-asignar`, { method: 'POST' });
+    const json = await res.json();
+    const data = json.datos ?? json;
+    productosSinProveedor.value = data.sinProveedor ?? [];
+    const msg = `✅ ${data.asignados} producto(s) asignados automáticamente` +
+      (data.sinProveedor?.length > 0 ? `\n📋 ${data.sinProveedor.length} producto(s) sin proveedor (revisa la barra lateral)` : '');
+    alert(msg);
+    if (proveedorSeleccionado.value) {
+      await cargarAsignaciones(proveedorSeleccionado.value.idProveedor);
+    }
+  } catch (e) {
+    alert('Error al auto-asignar: ' + (e as Error).message);
+  } finally {
+    cargandoAuto.value = false;
+  }
+}
+
+function seleccionarProvSinProv(idProducto: number, idProveedor: number) {
+  const next = new Map(seleccionSinProv.value);
+  next.set(idProducto, idProveedor);
+  seleccionSinProv.value = next;
+}
+
+async function asignarSinProveedor(idProducto: number) {
+  const idProveedor = seleccionSinProv.value.get(idProducto);
+  if (!idProveedor) return;
+  try {
+    const res = await fetch(`${API_BASE}/producto-proveedor/asignar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idProducto, idProveedor })
+    });
+    const data = await res.json();
+    if (data.codigo === 200 || data.codigo === 201) {
+      productosSinProveedor.value = productosSinProveedor.value.filter(p => p.idProducto !== idProducto);
+      const next = new Map(seleccionSinProv.value);
+      next.delete(idProducto);
+      seleccionSinProv.value = next;
+      if (proveedorSeleccionado.value?.idProveedor === idProveedor) {
+        await cargarAsignaciones(idProveedor);
+      }
+    }
+  } catch (e) {
+    console.error('Error asignando:', e);
+  }
+}
+
 watch(buscarProducto, (val) => {
   dropdownIndex.value = 0;
   showDropdown.value = val.length > 0;
@@ -326,6 +380,12 @@ onUnmounted(() => {
         <h3 class="ap-title">Asignar Productos a Proveedor</h3>
         <p class="ap-subtitle">Vincula productos con sus proveedores habituales</p>
       </div>
+      <div class="ap-header-right">
+        <button class="btn-auto-asignar" @click="autoAsignar" :disabled="cargandoAuto">
+          <span v-if="cargandoAuto">⏳ Auto-asignando...</span>
+          <span v-else>🔄 Auto-asignar</span>
+        </button>
+      </div>
     </div>
 
     <div class="ap-layout">
@@ -356,6 +416,29 @@ onUnmounted(() => {
           </div>
           <div v-if="proveedoresFiltrados.length === 0" class="ap-empty-small">
             No hay proveedores
+          </div>
+        </div>
+
+        <!-- Productos sin proveedor -->
+        <div v-if="productosSinProveedor.length > 0" class="ap-sinprov-section">
+          <div class="ap-sinprov-header">
+            <span>📋 Sin proveedor</span>
+            <span class="ap-sinprov-count">{{ productosSinProveedor.length }}</span>
+          </div>
+          <div class="ap-sinprov-list">
+            <div v-for="item in productosSinProveedor" :key="item.idProducto" class="ap-sinprov-item">
+              <div class="ap-sinprov-info">
+                <span class="ap-sinprov-name">{{ item.nombre }}</span>
+                <span v-if="item.subcategoria" class="ap-sinprov-sub">{{ item.subcategoria }}</span>
+              </div>
+              <div class="ap-sinprov-actions">
+                <select class="ap-sinprov-select" :value="seleccionSinProv.get(item.idProducto) ?? ''" @change="seleccionarProvSinProv(item.idProducto, Number(($event.target as HTMLSelectElement).value))">
+                  <option value="" disabled>Proveedor...</option>
+                  <option v-for="prov in proveedores" :key="prov.idProveedor" :value="prov.idProveedor">{{ prov.nombre }}</option>
+                </select>
+                <button class="ap-sinprov-btn" :disabled="!seleccionSinProv.get(item.idProducto)" @click="asignarSinProveedor(item.idProducto)">Asignar</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -461,7 +544,7 @@ onUnmounted(() => {
                   class="ap-input"
                   @focus="inputFocused = true"
                   @blur="inputFocused = false"
-                  @keydown="handleBarcodeInput($event.key)"
+                  @keydown="handleBarcodeInput($event)"
                   autofocus
                 >
               </div>
@@ -1162,6 +1245,146 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
+.ap-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.btn-auto-asignar {
+  padding: 0.4rem 0.75rem;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 6px;
+  color: #34d399;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-auto-asignar:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.35);
+  filter: brightness(1.1);
+}
+
+.btn-auto-asignar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ap-sinprov-section {
+  border-top: 1px solid var(--border-color, #333);
+  display: flex;
+  flex-direction: column;
+  max-height: 40%;
+  overflow: hidden;
+}
+
+.ap-sinprov-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-primary, #f6f2de);
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  flex-shrink: 0;
+}
+
+.ap-sinprov-count {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.ap-sinprov-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.ap-sinprov-item {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ap-sinprov-item:last-child {
+  border-bottom: none;
+}
+
+.ap-sinprov-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.ap-sinprov-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary, #f6f2de);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ap-sinprov-sub {
+  font-size: 0.6rem;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+
+.ap-sinprov-actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.ap-sinprov-select {
+  flex: 1;
+  padding: 0.25rem 0.3rem;
+  background: var(--bg-panel, #252538);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  color: var(--text-primary, #f6f2de);
+  font-size: 0.65rem;
+  min-width: 0;
+  max-width: 130px;
+}
+
+.ap-sinprov-btn {
+  padding: 0.25rem 0.5rem;
+  background: var(--accent-color, #c99234);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg-primary, #1a1a2e);
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ap-sinprov-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.ap-sinprov-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .ap-layout {
     flex-direction: column;
@@ -1169,6 +1392,24 @@ onUnmounted(() => {
 
   .ap-sidebar {
     width: 100%;
+    max-height: 200px;
+  }
+
+  .ap-header {
+    flex-wrap: wrap;
+  }
+
+  .ap-header-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .btn-auto-asignar {
+    width: 100%;
+    text-align: center;
+  }
+
+  .ap-sinprov-section {
     max-height: 150px;
   }
   

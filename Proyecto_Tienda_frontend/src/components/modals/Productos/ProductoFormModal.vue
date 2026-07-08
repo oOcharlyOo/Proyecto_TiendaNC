@@ -178,7 +178,7 @@ const subcategoriasFiltradas = computed(() => {
   return (props.subcategorias || []).filter(s => s.idCategoria === form.value.idCategoria);
 });
 
-const CAJA_SIZES = [4, 6, 8, 12, 24] as const;
+const CAJA_SIZES: readonly number[] = [4, 6, 8, 12, 24];
 const cajasSeleccionadas = ref<number[]>([]);
 const cajasPrecios = ref<Record<number, number>>({});
 const customCajaSize = ref<number | null>(null);

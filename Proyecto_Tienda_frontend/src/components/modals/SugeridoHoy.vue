@@ -62,6 +62,7 @@ const grupos = ref<SugeridoHoy[]>([]);
 const seleccionados = ref<Set<number>>(new Set());
 const cargando = ref(false);
 const buscarProducto = ref('');
+const expandedGroups = ref<Set<number>>(new Set());
 const emit = defineEmits(['pedido-creado']);
 
 async function cargar() {
@@ -72,6 +73,7 @@ async function cargar() {
     const data = await res.json();
     if (data.codigo === 200 && data.datos) {
       grupos.value = data.datos;
+      expandedGroups.value = new Set(data.datos.map((g: SugeridoHoy) => g.idProveedor));
       const allIds = data.datos.flatMap((g: SugeridoHoy) => g.productos.map((p: Sugerencia) => p.idProducto));
       seleccionados.value = new Set(allIds);
     } else {
@@ -89,6 +91,13 @@ function toggle(id: number) {
   const next = new Set(seleccionados.value);
   if (next.has(id)) next.delete(id); else next.add(id);
   seleccionados.value = next;
+}
+
+function toggleGroupExpand(idProveedor: number) {
+  const next = new Set(expandedGroups.value);
+  if (next.has(idProveedor)) next.delete(idProveedor);
+  else next.add(idProveedor);
+  expandedGroups.value = next;
 }
 
 function toggleGrupo(grupo: SugeridoHoy) {
@@ -323,9 +332,10 @@ defineExpose({ cargar });
 
       <div class="sh-grupos">
         <div v-for="grupo in grupos" :key="grupo.idProveedor" class="sh-grupo">
-          <div class="sh-grupo-header">
+          <div class="sh-grupo-header" @click="toggleGroupExpand(grupo.idProveedor)">
             <div class="sh-grupo-info">
-              <button class="sh-check-all" @click="toggleGrupo(grupo)">
+              <span class="sh-chevron">{{ expandedGroups.has(grupo.idProveedor) ? '▼' : '▶' }}</span>
+              <button class="sh-check-all" @click.stop="toggleGrupo(grupo)">
                 <span v-if="filteredProductos(grupo).length > 0 && filteredProductos(grupo).every(p => seleccionados.has(p.idProducto))" class="check-all-mark">☑</span>
                 <span v-else class="check-all-mark">☐</span>
               </button>
@@ -345,13 +355,13 @@ defineExpose({ cargar });
             </div>
             <div class="sh-grupo-totals">
               <span class="grupo-costo">{{ formatoMoneda(grupo.costoTotal) }}</span>
-              <button class="btn-crear-pedido" @click="crearPedidoPorGrupo(grupo)" :disabled="!grupo.productos.some(p => seleccionados.has(p.idProducto))">
+              <button class="btn-crear-pedido" @click.stop="crearPedidoPorGrupo(grupo)" :disabled="!grupo.productos.some(p => seleccionados.has(p.idProducto))">
                 🛒 Crear Pedido
               </button>
             </div>
           </div>
 
-          <div class="sh-productos">
+          <div v-if="expandedGroups.has(grupo.idProveedor)" class="sh-productos">
             <div
               v-for="p in filteredProductos(grupo)"
               :key="p.idProducto"
@@ -570,6 +580,7 @@ defineExpose({ cargar });
   position: sticky;
   top: 0;
   z-index: 10;
+  backdrop-filter: blur(8px);
 }
 
 .total-label {
@@ -701,6 +712,17 @@ defineExpose({ cargar });
   padding: 0.75rem 1rem;
   background: linear-gradient(135deg, rgba(201, 146, 52, 0.08), rgba(201, 146, 52, 0.02));
   border-bottom: 1px solid var(--border-color, #333);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sh-chevron {
+  font-size: 0.65rem;
+  color: var(--text-secondary, #888);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  width: 12px;
+  text-align: center;
 }
 
 .sh-grupo-info {
@@ -843,9 +865,10 @@ defineExpose({ cargar });
 .sh-productos {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.35rem;
   max-height: 350px;
   overflow-y: auto;
+  padding: 0.25rem 0;
 }
 
 .sh-productos::-webkit-scrollbar {
@@ -867,24 +890,29 @@ defineExpose({ cargar });
 
 .sh-producto {
   display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
-  min-height: 48px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sh-producto:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .sh-producto:hover {
+  border-color: rgba(201, 146, 52, 0.3);
   background: rgba(201, 146, 52, 0.05);
 }
 
 .sh-producto.selected {
+  border-color: var(--accent-color, #c99234);
   background: rgba(201, 146, 52, 0.08);
 }
 
@@ -909,6 +937,7 @@ defineExpose({ cargar });
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  align-self: flex-start;
   transition: all 0.15s;
 }
 
@@ -926,11 +955,13 @@ defineExpose({ cargar });
 .sh-prod-info {
   flex: 1;
   min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .sh-prod-name {
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-primary, #f6f2de);
   white-space: nowrap;
   overflow: hidden;
@@ -940,8 +971,8 @@ defineExpose({ cargar });
 
 .sh-prod-stats {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 0.2rem;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
   flex-wrap: wrap;
 }
 
@@ -953,6 +984,7 @@ defineExpose({ cargar });
 .stat strong {
   color: var(--text-primary, #f6f2de);
   font-family: monospace;
+  font-weight: 700;
 }
 
 /* Badge de sugerencia de caja */
@@ -960,8 +992,8 @@ defineExpose({ cargar });
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.3rem;
-  padding: 0.3rem 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.5rem;
   background: rgba(99, 102, 241, 0.15);
   border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: 6px;
@@ -1036,8 +1068,11 @@ defineExpose({ cargar });
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.1rem;
+  justify-content: center;
+  gap: 0.15rem;
   flex-shrink: 0;
+  min-width: 90px;
+  padding: 0.15rem 0;
 }
 
 .sug-cantidad {
@@ -1142,7 +1177,7 @@ defineExpose({ cargar });
   }
 
   .sh-producto {
-    padding: 0.5rem 0.75rem;
+    padding: 0.6rem 0.75rem;
     gap: 0.5rem;
   }
 
@@ -1151,9 +1186,8 @@ defineExpose({ cargar });
   }
 
   .sh-prod-stats {
-    gap: 0.4rem;
-    flex-direction: column;
-    flex-wrap: nowrap;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
   }
 
   .stat {
@@ -1161,7 +1195,7 @@ defineExpose({ cargar });
   }
 
   .sh-prod-suggestion {
-    gap: 0.05rem;
+    gap: 0.1rem;
   }
 
   .sug-cantidad {
@@ -1185,6 +1219,16 @@ defineExpose({ cargar });
 
   .grupo-costo {
     font-size: 0.85rem;
+  }
+
+  .sh-productos {
+    max-height: 280px;
+  }
+
+  .sh-caja-badge {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
   }
 }
 
@@ -1234,8 +1278,8 @@ defineExpose({ cargar });
   }
 
   .sh-producto {
-    padding: 0.4rem 0.5rem;
-    min-height: 48px;
+    padding: 0.5rem 0.6rem;
+    gap: 0.5rem;
   }
 
   .sh-prod-name {
@@ -1243,8 +1287,8 @@ defineExpose({ cargar });
   }
 
   .sh-prod-stats {
-    gap: 0.35rem;
-    flex-wrap: nowrap;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
   }
 
   .stat {
@@ -1252,10 +1296,9 @@ defineExpose({ cargar });
   }
 
   .sh-prod-suggestion {
-    flex-direction: row;
-    justify-content: flex-end;
-    gap: 0.4rem;
-    flex-shrink: 0;
+    justify-content: center;
+    gap: 0.1rem;
+    min-width: 60px;
   }
 
   .sug-cantidad, .sug-costo, .sug-ganancia {
@@ -1264,6 +1307,7 @@ defineExpose({ cargar });
 
   .sh-productos {
     max-height: 250px;
+    gap: 0.25rem;
   }
 
   .sh-check-all {
@@ -1284,6 +1328,96 @@ defineExpose({ cargar });
 
   .sh-caja-badge .caja-dias {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .sugerido-hoy-panel {
+    gap: 0.4rem;
+  }
+
+  .sh-header {
+    padding: 0.4rem;
+  }
+
+  .sh-title {
+    font-size: 0.82rem;
+  }
+
+  .sh-subtitle {
+    font-size: 0.6rem;
+  }
+
+  .sh-search-box {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .sh-search-input {
+    font-size: 0.7rem;
+  }
+
+  .sh-total-bar {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .total-value {
+    font-size: 0.85rem;
+  }
+
+  .total-ganancia {
+    font-size: 0.65rem;
+  }
+
+  .total-label {
+    font-size: 0.65rem;
+  }
+
+  .sh-caja-bar {
+    padding: 0.25rem 0.4rem;
+  }
+
+  .caja-bar-row {
+    font-size: 0.6rem;
+  }
+
+  .sh-grupo-header {
+    padding: 0.4rem;
+  }
+
+  .sh-grupo-name {
+    font-size: 0.75rem;
+  }
+
+  .sh-producto {
+    padding: 0.4rem 0.5rem;
+    gap: 0.35rem;
+  }
+
+  .sh-prod-name {
+    font-size: 0.65rem;
+  }
+
+  .sh-prod-stats {
+    margin-top: 0.2rem;
+    gap: 0.25rem;
+  }
+
+  .stat {
+    font-size: 0.5rem;
+  }
+
+  .sug-cantidad, .sug-costo, .sug-ganancia {
+    font-size: 0.6rem;
+  }
+
+  .sh-productos {
+    max-height: 200px;
+    gap: 0.2rem;
+  }
+
+  .btn-crear-pedido {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.4rem;
   }
 }
 </style>

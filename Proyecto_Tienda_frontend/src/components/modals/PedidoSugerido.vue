@@ -16,6 +16,8 @@ type Sugerencia = {
   codigoBarras: string | null;
   categoria: string | null;
   subcategoria: string | null;
+  idProveedor?: number;
+  nombreProveedor?: string;
   stockActual: number;
   stockMinimo: number;
   stockMaximo: number;
@@ -53,7 +55,65 @@ const modoPresupuesto = ref<'tier' | 'custom'>('tier');
 const montoCustom = ref<string>('');
 const cargando = ref(false);
 const buscarProducto = ref('');
+const vistaAgrupada = ref(true);
+const provExpandidos = ref<Set<number>>(new Set());
 const emit = defineEmits(['pedido-creado']);
+
+type GrupoDepartamento = {
+  nombre: string;
+  productos: Sugerencia[];
+  costoTotal: number;
+  gananciaTotal: number;
+};
+
+type GrupoProveedor = {
+  idProveedor: number;
+  nombre: string;
+  departamentos: GrupoDepartamento[];
+  costoTotal: number;
+  gananciaTotal: number;
+  totalProductos: number;
+};
+
+const gruposPorProveedor = computed(() => {
+  const mapa = new Map<number, GrupoProveedor>();
+  for (const s of sugerenciasFiltradas.value) {
+    const idProv = s.idProveedor || 0;
+    const nomProv = s.nombreProveedor || 'Sin proveedor';
+    if (!mapa.has(idProv)) {
+      mapa.set(idProv, { idProveedor: idProv, nombre: nomProv, departamentos: [], costoTotal: 0, gananciaTotal: 0, totalProductos: 0 });
+    }
+    const grupo = mapa.get(idProv)!;
+    const nomDepto = s.categoria || 'Sin departamento';
+    let depto = grupo.departamentos.find(d => d.nombre === nomDepto);
+    if (!depto) {
+      depto = { nombre: nomDepto, productos: [], costoTotal: 0, gananciaTotal: 0 };
+      grupo.departamentos.push(depto);
+    }
+    depto.productos.push(s);
+    depto.costoTotal += s.costoEstimado || 0;
+    depto.gananciaTotal += s.gananciaEstimada || 0;
+    grupo.costoTotal += s.costoEstimado || 0;
+    grupo.gananciaTotal += s.gananciaEstimada || 0;
+    grupo.totalProductos++;
+  }
+  const sorted = Array.from(mapa.values());
+  sorted.sort((a, b) => {
+    if (a.idProveedor === 0) return 1;
+    if (b.idProveedor === 0) return -1;
+    return b.costoTotal - a.costoTotal;
+  });
+  for (const g of sorted) {
+    g.departamentos.sort((a, b) => b.costoTotal - a.costoTotal);
+  }
+  return sorted;
+});
+
+function toggleProvExpand(id: number) {
+  const next = new Set(provExpandidos.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  provExpandidos.value = next;
+}
 
 async function cargar() {
   cargando.value = true;
@@ -180,12 +240,14 @@ function getUrgencyClass(s: Sugerencia) {
   return 'urgency-low';
 }
 
-async function crearPedido() {
-  const seleccionados = sugerencias.value.filter(s => seleccionadas.value.has(s.idProducto));
-  if (seleccionados.length === 0) return;
-
-  const idProveedor = prompt('ID del proveedor para este pedido:');
-  if (!idProveedor) return;
+async function crearPedidoPorProveedor(idProveedor: number, nombreProveedor: string) {
+  const seleccionados = sugerencias.value.filter(
+    s => s.idProveedor === idProveedor && seleccionadas.value.has(s.idProducto)
+  );
+  if (seleccionados.length === 0) {
+    alert(`No hay productos seleccionados de ${nombreProveedor}`);
+    return;
+  }
 
   const fechaEntrega = prompt('Fecha de entrega esperada (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
   if (!fechaEntrega) return;
@@ -200,25 +262,39 @@ async function crearPedido() {
   const montoTotal = detalles.reduce((sum, d) => sum + d.subtotal, 0);
 
   try {
-    await fetch(`${API_BASE}/pedidos-proveedor/crear`, {
+    const res = await fetch(`${API_BASE}/pedidos-proveedor/crear`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        idProveedor: parseInt(idProveedor),
+        idProveedor,
         fechaEntregaEsperada: fechaEntrega,
         montoTotal,
         montoApartado: 0,
         estatus: 'PENDIENTE',
-        notas: 'Pedido generado desde sugerencias',
+        notas: `Pedido generado desde sugerencias - ${nombreProveedor}`,
         detalles
       })
     });
-    alert('Pedido creado exitosamente');
-    emit('pedido-creado');
+    const data = await res.json();
+    if (data.codigo === 200) {
+      alert(`✅ Pedido a ${nombreProveedor} creado exitosamente`);
+      emit('pedido-creado');
+    } else {
+      alert(`Error: ${data.mensaje || 'No se pudo crear el pedido'}`);
+    }
   } catch (e) {
     console.error('Error creando pedido:', e);
     alert('Error al crear el pedido');
   }
+}
+
+async function crearPedido() {
+  const seleccionados = sugerencias.value.filter(s => seleccionadas.value.has(s.idProducto));
+  if (seleccionados.length === 0) return;
+
+  const idProveedor = prompt('ID del proveedor para este pedido:');
+  if (!idProveedor) return;
+  await crearPedidoPorProveedor(parseInt(idProveedor), 'Proveedor #' + idProveedor);
 }
 
 onMounted(() => cargar());
@@ -325,6 +401,12 @@ defineExpose({ cargar });
         </div>
       </div>
 
+      <!-- VIEW TOGGLE -->
+      <div class="s-view-toggle">
+        <button :class="['view-btn', { active: !vistaAgrupada }]" @click="vistaAgrupada = false">📋 Lista</button>
+        <button :class="['view-btn', { active: vistaAgrupada }]" @click="vistaAgrupada = true">🗂️ Por Proveedor</button>
+      </div>
+
       <!-- TOOLBAR -->
       <div class="sugerido-toolbar">
         <div class="toolbar-info">
@@ -333,14 +415,138 @@ defineExpose({ cargar });
         <div class="toolbar-actions">
           <button class="btn-tool" @click="seleccionarTodas">☑ Todos</button>
           <button class="btn-tool" @click="deseleccionarTodas">☐ Ninguno</button>
-          <button class="btn-create" @click="crearPedido" :disabled="seleccionadas.size === 0">
-            🛒 Crear Pedido
-          </button>
+          <template v-if="!vistaAgrupada">
+            <button class="btn-create" @click="crearPedido" :disabled="seleccionadas.size === 0">
+              🛒 Crear Pedido
+            </button>
+          </template>
         </div>
       </div>
 
-      <!-- CARDS -->
-      <div class="sugerido-cards">
+      <!-- GROUPED VIEW: Proveedor > Departamento -->
+      <div v-if="vistaAgrupada" class="ps-grupos">
+        <div v-for="gp in gruposPorProveedor" :key="gp.idProveedor" class="ps-grupo-prov">
+          <div class="ps-prov-header" :class="{ expandido: provExpandidos.has(gp.idProveedor) }" @click="toggleProvExpand(gp.idProveedor)">
+            <div class="ps-prov-info">
+              <span class="ps-prov-icon">{{ gp.idProveedor === 0 ? '🏢' : '🧙' }}</span>
+              <span class="ps-prov-name">{{ gp.nombre }}</span>
+              <span class="ps-prov-count">{{ gp.totalProductos }} prod.</span>
+            </div>
+            <div class="ps-prov-totals">
+              <span class="ps-prov-total">{{ formatoMoneda(gp.costoTotal) }}</span>
+              <span class="ps-prov-toggle">{{ provExpandidos.has(gp.idProveedor) ? '▼' : '▶' }}</span>
+            </div>
+          </div>
+          <div v-if="provExpandidos.has(gp.idProveedor)" class="ps-prov-body">
+            <div v-for="depto in gp.departamentos" :key="depto.nombre" class="ps-grupo-depto">
+              <div class="ps-depto-header">
+                <span class="ps-depto-icon">{{ depto.nombre === 'Sin departamento' ? '📂' : '🍬' }}</span>
+                <span class="ps-depto-name">{{ depto.nombre }}</span>
+                <span class="ps-depto-total">{{ formatoMoneda(depto.costoTotal) }}</span>
+              </div>
+              <div class="ps-depto-productos">
+                <div
+                  v-for="s in depto.productos"
+                  :key="s.idProducto"
+                  class="s-card"
+                  :class="[getUrgencyClass(s), { selected: seleccionadas.has(s.idProducto) }]"
+                  @click="toggle(s.idProducto)"
+                >
+                  <div class="s-card-bar">
+                    <div class="s-check">
+                      <span v-if="seleccionadas.has(s.idProducto)" class="check-mark">✓</span>
+                    </div>
+                    <div class="s-title-area">
+                      <span class="s-name">{{ s.nombreProducto }}</span>
+                      <div class="s-badges">
+                        <span v-if="s.categoria" class="badge badge-cat">{{ s.categoria }}</span>
+                        <span v-if="s.subcategoria && s.subcategoria !== 'Sin subcategoría'" class="badge badge-sub">{{ s.subcategoria }}</span>
+                        <span v-if="s.isGramaje" class="badge badge-gram">⚖️</span>
+                      </div>
+                    </div>
+                    <div class="s-alert">
+                      <span class="alert-icon">{{ getMotivoIcon(s.motivo) }}</span>
+                      <span class="alert-text">{{ s.motivo }}</span>
+                    </div>
+                  </div>
+                  <div class="s-card-body">
+                    <div class="s-section">
+                      <div class="s-section-label">Situación actual</div>
+                      <div class="s-stats">
+                        <div class="s-stat">
+                          <span class="s-stat-label">Stock</span>
+                          <span class="s-stat-value" :class="{ critical: s.stockActual <= 0, low: s.stockActual > 0 && s.stockActual <= s.stockMinimo }">{{ formatoStock(s) }}</span>
+                        </div>
+                        <div class="s-stat">
+                          <span class="s-stat-label">Venta/día</span>
+                          <span class="s-stat-value accent">{{ formatoVentaDia(s) }}</span>
+                        </div>
+                        <div class="s-stat">
+                          <span class="s-stat-label">Duración</span>
+                          <span class="s-stat-value" :class="{ critical: s.diasInventarioRestante <= 3, low: s.diasInventarioRestante > 3 && s.diasInventarioRestante <= 7 }">
+                            {{ s.diasInventarioRestante === -1 ? 'Sin ventas' : '~' + s.diasInventarioRestante + (s.diasInventarioRestante === 1 ? ' día' : ' días') }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="s-divider"></div>
+                    <div class="s-section">
+                      <div class="s-section-label">Sugerencia</div>
+                      <div class="s-suggestion">
+                        <div class="s-sug-item">
+                          <span class="s-sug-label">Pedir</span>
+                          <span class="s-sug-value qty">{{ formatoCantidad(s) }}</span>
+                        </div>
+                        <div class="s-sug-item">
+                          <span class="s-sug-label">Costo</span>
+                          <span class="s-sug-value cost">{{ formatoMoneda(s.costoEstimado) }}</span>
+                        </div>
+                        <div class="s-sug-item">
+                          <span class="s-sug-label">Ganancia</span>
+                          <span class="s-sug-value profit">{{ formatoMoneda(s.gananciaEstimada || 0) }}</span>
+                        </div>
+                      </div>
+                      <div class="s-suggestion s-prices">
+                        <div class="s-sug-item">
+                          <span class="s-sug-label">P. costo</span>
+                          <span class="s-sug-value">{{ formatoMoneda(s.precioCosto) }}{{ s.isGramaje ? '/kg' : '/ud' }}</span>
+                        </div>
+                        <div class="s-sug-item">
+                          <span class="s-sug-label">P. venta</span>
+                          <span class="s-sug-value">{{ formatoMoneda(s.precioVenta || 0) }}{{ s.isGramaje ? '/kg' : '/ud' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-if="s.sugerirCaja && s.cajaSugerida" class="ps-caja-badge">
+                      <span class="caja-icon">📦</span>
+                      <span class="caja-text">Sugerido: Caja de {{ s.cajaSugerida }} pzs × {{ s.cajasSugeridas }} = {{ s.cantidadSugerida }} pzs</span>
+                      <span v-if="s.diasStockConCaja" class="caja-dias">Duración: ~{{ s.diasStockConCaja }}d</span>
+                    </div>
+                    <div v-if="s.cajasDisponibles && s.cajasDisponibles.length > 0" class="ps-caja-options">
+                      <span class="caja-options-label">Opciones:</span>
+                      <button v-for="caja in s.cajasDisponibles" :key="caja.piezas" class="caja-option-btn" :class="{ recommended: caja.piezas === s.cajaSugerida }" @click.stop>
+                        📦 {{ caja.piezas }}pzs - {{ formatoMoneda(caja.precioCaja) }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Crear pedido para este proveedor -->
+            <div class="ps-prov-footer">
+              <button class="btn-create" :disabled="seleccionadas.size === 0 || !sugerencias.some(s => s.idProveedor === gp.idProveedor && seleccionadas.has(s.idProducto))" @click="crearPedidoPorProveedor(gp.idProveedor, gp.nombre)">
+                🛒 Crear Pedido a {{ gp.nombre }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-if="gruposPorProveedor.length === 0" class="s-no-results">
+          No se encontraron productos
+        </div>
+      </div>
+
+      <!-- FLAT VIEW: cards list -->
+      <div v-else class="sugerido-cards">
         <div
           v-for="s in sugerenciasFiltradas"
           :key="s.idProducto"
@@ -348,7 +554,6 @@ defineExpose({ cargar });
           :class="[getUrgencyClass(s), { selected: seleccionadas.has(s.idProducto) }]"
           @click="toggle(s.idProducto)"
         >
-          <!-- Card top bar -->
           <div class="s-card-bar">
             <div class="s-check">
               <span v-if="seleccionadas.has(s.idProducto)" class="check-mark">✓</span>
@@ -359,6 +564,7 @@ defineExpose({ cargar });
                 <span v-if="s.categoria" class="badge badge-cat">{{ s.categoria }}</span>
                 <span v-if="s.subcategoria && s.subcategoria !== 'Sin subcategoría'" class="badge badge-sub">{{ s.subcategoria }}</span>
                 <span v-if="s.isGramaje" class="badge badge-gram">⚖️</span>
+                <span v-if="s.nombreProveedor" class="badge badge-prov">{{ s.nombreProveedor }}</span>
               </div>
             </div>
             <div class="s-alert">
@@ -366,17 +572,13 @@ defineExpose({ cargar });
               <span class="alert-text">{{ s.motivo }}</span>
             </div>
           </div>
-
-          <!-- Card body -->
           <div class="s-card-body">
             <div class="s-section">
               <div class="s-section-label">Situación actual</div>
               <div class="s-stats">
                 <div class="s-stat">
                   <span class="s-stat-label">Stock</span>
-                  <span class="s-stat-value" :class="{ critical: s.stockActual <= 0, low: s.stockActual > 0 && s.stockActual <= s.stockMinimo }">
-                    {{ formatoStock(s) }}
-                  </span>
+                  <span class="s-stat-value" :class="{ critical: s.stockActual <= 0, low: s.stockActual > 0 && s.stockActual <= s.stockMinimo }">{{ formatoStock(s) }}</span>
                 </div>
                 <div class="s-stat">
                   <span class="s-stat-label">Venta/día</span>
@@ -390,9 +592,7 @@ defineExpose({ cargar });
                 </div>
               </div>
             </div>
-
             <div class="s-divider"></div>
-
             <div class="s-section">
               <div class="s-section-label">Sugerencia</div>
               <div class="s-suggestion">
@@ -420,8 +620,6 @@ defineExpose({ cargar });
                 </div>
               </div>
             </div>
-
-            <!-- Caja badge -->
             <div v-if="s.sugerirCaja && s.cajaSugerida" class="ps-caja-badge">
               <span class="caja-icon">📦</span>
               <span class="caja-text">Sugerido: Caja de {{ s.cajaSugerida }} pzs × {{ s.cajasSugeridas }} = {{ s.cantidadSugerida }} pzs</span>
@@ -429,13 +627,7 @@ defineExpose({ cargar });
             </div>
             <div v-if="s.cajasDisponibles && s.cajasDisponibles.length > 0" class="ps-caja-options">
               <span class="caja-options-label">Opciones:</span>
-              <button
-                v-for="caja in s.cajasDisponibles"
-                :key="caja.piezas"
-                class="caja-option-btn"
-                :class="{ recommended: caja.piezas === s.cajaSugerida }"
-                @click.stop
-              >
+              <button v-for="caja in s.cajasDisponibles" :key="caja.piezas" class="caja-option-btn" :class="{ recommended: caja.piezas === s.cajaSugerida }" @click.stop>
                 📦 {{ caja.piezas }}pzs - {{ formatoMoneda(caja.precioCaja) }}
               </button>
             </div>
@@ -1153,6 +1345,193 @@ defineExpose({ cargar });
   color: #a0d911;
 }
 
+.badge-prov {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+/* VIEW TOGGLE */
+.s-view-toggle {
+  display: flex;
+  gap: 0.2rem;
+  background: var(--bg-secondary, #2a2a3e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 0.2rem;
+  align-self: flex-start;
+}
+
+.view-btn {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.view-btn:hover {
+  color: var(--text-primary, #f6f2de);
+}
+
+.view-btn.active {
+  background: var(--accent-color, #c99234);
+  color: var(--bg-primary, #1a1a2e);
+}
+
+/* GROUPED VIEW */
+.ps-grupos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 0.25rem;
+}
+
+.ps-grupo-prov {
+  background: var(--bg-secondary, #2a2a3e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ps-prov-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.ps-prov-header:hover {
+  background: rgba(201, 146, 52, 0.08);
+}
+
+.ps-prov-header.expandido {
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.ps-prov-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ps-prov-icon {
+  font-size: 1.2rem;
+}
+
+.ps-prov-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary, #f6f2de);
+}
+
+.ps-prov-count {
+  font-size: 0.65rem;
+  color: var(--text-secondary, #888);
+  background: var(--bg-panel, #252538);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.ps-prov-totals {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ps-prov-total {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--accent-color, #c99234);
+  font-family: monospace;
+}
+
+.ps-prov-toggle {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  width: 16px;
+  text-align: center;
+}
+
+.ps-prov-body {
+  padding: 0;
+}
+
+.ps-grupo-depto {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ps-grupo-depto:last-child {
+  border-bottom: none;
+}
+
+.ps-depto-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.ps-depto-icon {
+  font-size: 0.85rem;
+}
+
+.ps-depto-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex: 1;
+}
+
+.ps-depto-total {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-color, #c99234);
+  font-family: monospace;
+}
+
+.ps-depto-productos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.ps-depto-productos .s-card {
+  border-width: 1px;
+  margin: 0;
+}
+
+.ps-depto-productos .s-card-bar {
+  padding: 0.4rem 0.5rem;
+}
+
+.ps-depto-productos .s-card-body {
+  padding: 0.4rem 0.5rem;
+}
+
+.ps-prov-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-color, #333);
+  display: flex;
+  justify-content: flex-end;
+}
+
 .s-no-results {
   padding: 1.5rem;
   text-align: center;
@@ -1367,6 +1746,10 @@ defineExpose({ cargar });
     gap: 0.3rem;
   }
 
+  .s-stat {
+    min-width: auto;
+  }
+
   .s-suggestion {
     flex-direction: column;
     gap: 0.3rem;
@@ -1393,6 +1776,209 @@ defineExpose({ cargar });
 
   .s-prices {
     margin-top: 0.2rem;
+  }
+
+  /* PS-1: caja-bar responsive */
+  .ps-caja-bar {
+    padding: 0.35rem 0.5rem;
+    gap: 0.15rem;
+    font-size: 0.65rem;
+  }
+
+  .ps-caja-bar .caja-bar-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+  }
+
+  .caja-bar-alerta,
+  .caja-bar-info {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.4rem;
+  }
+
+  /* PS-2: caja badge */
+  .ps-caja-badge {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+
+  .ps-caja-badge .caja-dias {
+    margin-left: 0;
+  }
+
+  /* Grouped view responsive */
+  .ps-prov-header {
+    padding: 0.5rem;
+  }
+
+  .ps-prov-name {
+    font-size: 0.78rem;
+  }
+
+  .ps-prov-total {
+    font-size: 0.8rem;
+  }
+
+  .ps-depto-header {
+    padding: 0.3rem 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+  }
+
+  .ps-depto-name {
+    font-size: 0.65rem;
+  }
+
+  .ps-depto-total {
+    font-size: 0.7rem;
+  }
+
+  .ps-depto-productos {
+    padding: 0.25rem 0.35rem;
+    gap: 0.25rem;
+  }
+
+  .ps-depto-productos .s-card-bar {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .ps-depto-productos .s-card-body {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .ps-prov-footer {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .s-view-toggle {
+    width: 100%;
+  }
+
+  .view-btn {
+    flex: 1;
+    text-align: center;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.4rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .sugerido-header {
+    padding: 0.4rem;
+  }
+
+  .header-title {
+    font-size: 0.82rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.6rem;
+  }
+
+  .periodo-select {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.4rem;
+  }
+
+  .budget-btn {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.35rem;
+  }
+
+  .mode-btn {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.35rem;
+  }
+
+  .monto-input {
+    font-size: 0.7rem;
+  }
+
+  .s-card-bar {
+    padding: 0.3rem 0.4rem;
+    gap: 0.3rem;
+  }
+
+  .s-name {
+    font-size: 0.75rem;
+  }
+
+  .badge {
+    font-size: 0.55rem;
+    padding: 0.05rem 0.3rem;
+  }
+
+  .s-card-body {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .s-stat-value {
+    font-size: 0.75rem;
+  }
+
+  .s-sug-value {
+    font-size: 0.7rem;
+  }
+
+  .s-sug-value.qty {
+    font-size: 0.75rem;
+  }
+
+  .s-total-bar {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .total-value {
+    font-size: 0.85rem;
+  }
+
+  .total-label {
+    font-size: 0.65rem;
+  }
+
+  .total-items {
+    font-size: 0.6rem;
+  }
+
+  .btn-tool {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .btn-create {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .ps-prov-header {
+    padding: 0.4rem;
+  }
+
+  .ps-prov-name {
+    font-size: 0.72rem;
+  }
+
+  .ps-prov-total {
+    font-size: 0.75rem;
+  }
+
+  .ps-depto-name {
+    font-size: 0.6rem;
+  }
+
+  .ps-caja-bar {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.6rem;
+  }
+
+  .sugerido-toolbar {
+    padding: 0.25rem 0.4rem;
+  }
+
+  .sel-count {
+    font-size: 0.65rem;
   }
 }
 
