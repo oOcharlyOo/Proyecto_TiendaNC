@@ -293,9 +293,8 @@ const cargandoEgresos = ref(false);
 // --- Backup ---
 const mostrarBackupManager = ref(false);
 const mostrarImportModal = ref(false);
-const backupFileRef = ref<HTMLInputElement | null>(null);
 const backupLog = ref<string[]>([]);
-const selectedFile = ref<File | null>(null);
+const selectedFiles = ref<File[]>([]);
 const dragOver = ref(false);
 
 // --- Annual ---
@@ -1391,7 +1390,14 @@ async function descargarBackups() {
     let resp = await fetch(`${API_BASE}/backup/listar`);
     if (!resp.ok) throw new Error('Error al listar backups');
     let data = await resp.json();
-    if (data?.datos?.length) { descargarArchivo(data.datos[0]); mostrarMensaje(`Backup descargado: ${data.datos[0]}`, 'ok'); return; }
+    if (data?.datos?.length) {
+      const dumpFiles = data.datos.filter((f: string) => f.startsWith('dump-'));
+      const minioFiles = data.datos.filter((f: string) => f.startsWith('minio-'));
+      if (dumpFiles.length) { descargarArchivo(dumpFiles[0]); await new Promise(r => setTimeout(r, 300)); }
+      if (minioFiles.length) descargarArchivo(minioFiles[0]);
+      mostrarMensaje(dumpFiles.length ? `Backup descargado: ${dumpFiles[0]}${minioFiles.length ? ' + MinIO' : ''}` : 'Backup MinIO descargado', 'ok');
+      return;
+    }
     cargandoBackup.value = true;
     mostrarMensaje('No hay backups. Generando uno...', 'info');
     resp = await fetch(`${API_BASE}/backup/generar`, { method: 'POST' });
@@ -1409,31 +1415,74 @@ async function descargarBackups() {
   finally { cargandoBackup.value = false; }
 }
 
+const MAX_BACKUP_SIZE = 500 * 1024 * 1024; // 500 MB
+
+function validarExtensionBackup(file: File): boolean {
+  return file.name.endsWith('.sql') || file.name.endsWith('.dump') || file.name.endsWith('.bak') || file.name.endsWith('.tar.gz') || file.name.endsWith('.tgz');
+}
+
 function handleFileSelect(event: Event) {
-  selectedFile.value = (event.target as HTMLInputElement).files?.[0] || null;
+  const files = Array.from((event.target as HTMLInputElement).files || []);
+  if (files.length === 0) return;
+  const invalid = files.filter(f => !validarExtensionBackup(f));
+  if (invalid.length) { mostrarMensaje(`Archivo no válido: ${invalid.map(f => f.name).join(', ')}`, 'error'); return; }
+  const big = files.filter(f => f.size > MAX_BACKUP_SIZE);
+  if (big.length) { mostrarMensaje(`Archivo excede ${(MAX_BACKUP_SIZE / 1024 / 1024).toFixed(0)} MB: ${big.map(f => f.name).join(', ')}`, 'error'); return; }
+  selectedFiles.value = files;
 }
 
 function handleFileDrop(event: DragEvent) {
   dragOver.value = false;
-  const file = event.dataTransfer?.files[0];
-  if (file && (file.name.endsWith('.sql') || file.name.endsWith('.dump') || file.name.endsWith('.bak'))) selectedFile.value = file;
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (files.length === 0) return;
+  const invalid = files.filter(f => !validarExtensionBackup(f));
+  if (invalid.length) { mostrarMensaje(`Archivo no válido: ${invalid.map(f => f.name).join(', ')}`, 'error'); return; }
+  const big = files.filter(f => f.size > MAX_BACKUP_SIZE);
+  if (big.length) { mostrarMensaje(`Archivo excede ${(MAX_BACKUP_SIZE / 1024 / 1024).toFixed(0)} MB: ${big.map(f => f.name).join(', ')}`, 'error'); return; }
+  selectedFiles.value = files;
 }
 
 async function importarBackup() {
-  if (!selectedFile.value) return;
+  if (selectedFiles.value.length === 0) return;
   cargandoBackup.value = true;
-  backupLog.value = [`Cargando ${selectedFile.value.name}...`];
-  try {
-    const formData = new FormData();
-    formData.append('file', selectedFile.value);
-    formData.append('filename', selectedFile.value.name);
-    const resp = await fetch(`${API_BASE}/backup/restaurar`, { method: 'POST', body: formData });
-    const data = await resp.json();
-    if (data?.datos) { backupLog.value.push(...data.datos.split('\n').filter((l: string) => l.trim())); }
-    if (data?.codigo === 200) { backupLog.value.push('✅ Restauración completada exitosamente'); mostrarMensaje('Backup importado. Recargando...', 'ok'); setTimeout(() => location.reload(), 3000); }
-    else backupLog.value.push(`❌ ${data?.mensaje || 'Error al importar'}`);
-  } catch (e) { backupLog.value.push(`❌ Error: ${e instanceof Error ? e.message : 'Error inesperado'}`); }
-  finally { cargandoBackup.value = false; if (backupFileRef.value) backupFileRef.value.value = ''; selectedFile.value = null; }
+  backupLog.value = [];
+  let errors = 0;
+  for (const file of selectedFiles.value) {
+    const fileName = file.name;
+    backupLog.value.push(`Subiendo ${fileName} (${(file.size / 1024 / 1024).toFixed(1)} MB)...`);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('filename', fileName);
+      const resp = await fetch(`${API_BASE}/backup/restaurar`, { method: 'POST', body: formData });
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '');
+        backupLog.value.push(`❌ Servidor respondió ${resp.status}${text ? ': ' + text.slice(0, 300) : ''}`);
+        errors++;
+        continue;
+      }
+      const data = await resp.json();
+      if (data?.datos) { backupLog.value.push(...data.datos.split('\n').filter((l: string) => l.trim())); }
+      if (data?.codigo === 200) {
+        backupLog.value.push(`✅ ${fileName} restaurado`);
+      } else {
+        backupLog.value.push(`❌ ${fileName}: ${data?.mensaje || 'Error'}`);
+        errors++;
+      }
+    } catch (e) {
+      backupLog.value.push(`❌ ${fileName}: ${e instanceof Error ? e.message : 'Error'}`);
+      errors++;
+    }
+  }
+  if (errors === 0) {
+    backupLog.value.push('✅ Todos los archivos restaurados. Recargando...');
+    mostrarMensaje('Backups importados correctamente. Recargando...', 'ok');
+    setTimeout(() => location.reload(), 3000);
+  } else {
+    mostrarMensaje(`${errors} de ${selectedFiles.value.length} archivos fallaron. Revisa el log.`, 'error');
+  }
+  cargandoBackup.value = false;
+  selectedFiles.value = [];
 }
 
 export {
@@ -1469,7 +1518,7 @@ export {
   ventaDetalleEnvases, ventaDetalleEnvaseTotal,
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
-  backupFileRef, selectedFile, dragOver,
+  selectedFile, dragOver,
   historialVentasAgrupadas, historialMeses, historialDias, historialFiltrado, historialTotalFiltrado,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
@@ -1505,5 +1554,5 @@ export {
   abrirModalPago, cerrarModalPago, validarMontoPago, confirmarPagoCustom,
   toggleHistorialPagos, cancelarApartado, toggleHistorialCompletados,
   getRankIcon, getRankClass,
-  descargarBackups, handleFileSelect, handleFileDrop, importarBackup
+  descargarBackups, handleFileSelect, handleFileDrop, importarBackup, selectedFiles
 };

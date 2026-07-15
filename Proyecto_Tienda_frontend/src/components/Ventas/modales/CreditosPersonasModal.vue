@@ -587,22 +587,22 @@ watch(() => props.open, (val) => {
 <style scoped>
 .pos-modal-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: color-mix(in srgb, var(--bg-primary) 85%, black);
-  backdrop-filter: blur(5px);
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(6px);
   display: grid; place-items: center;
   padding: 1rem;
 }
 
 .pos-modal-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  background: var(--color-bg-panel);
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03);
   width: min(100%, 900px);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  overflow: visible;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
   position: relative;
 }
 
@@ -617,24 +617,24 @@ watch(() => props.open, (val) => {
 
 .modal-h {
   padding: 1rem 1.25rem;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .modal-h h3 {
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-size: 1.1rem;
   font-weight: 700;
   margin: 0;
 }
 
 .close-x {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  background: var(--color-bg-panel);
+  border: none;
+  color: var(--color-text-primary);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -647,8 +647,8 @@ watch(() => props.open, (val) => {
 }
 
 .close-x:hover {
-  background: var(--error-color);
-  border-color: var(--error-color);
+  background: var(--color-error);
+  border-color: var(--color-error);
   color: white;
 }
 
@@ -664,30 +664,30 @@ watch(() => props.open, (val) => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: var(--color-bg-primary);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--accent-color);
+  background: var(--color-accent);
   border-radius: 3px;
 }
 
 .resumen-bar {
   display: flex; gap: 1rem; justify-content: center;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 6px;
   padding: 0.5rem 1rem; margin-bottom: 0.75rem;
 }
 
 .resumen-item {
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .total-deuda {
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-weight: bold;
 }
 
@@ -701,10 +701,10 @@ watch(() => props.open, (val) => {
 
 .btn-add {
   padding: 0.4rem 0.8rem;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 5px;
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
@@ -712,29 +712,29 @@ watch(() => props.open, (val) => {
 }
 
 .btn-add:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .vbtn {
   padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: 4px;
-  background: var(--bg-secondary);
+  background: var(--color-bg-panel);
   cursor: pointer;
   font-size: 0.85rem;
   transition: all 0.2s;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .vbtn.on {
-  background: var(--bg-panel);
-  border-color: var(--accent-color);
+  background: var(--color-bg-panel);
+  border-color: var(--color-accent);
 }
 
 .empty-state {
   text-align: center;
   padding: 2rem 1rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .empty-state .empty-ico {
@@ -759,15 +759,15 @@ watch(() => props.open, (val) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   transition: all 0.15s;
 }
 
 .persona-row:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .persona-row.clickable {
@@ -776,8 +776,8 @@ watch(() => props.open, (val) => {
 
 .persona-avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
   display: flex; align-items: center; justify-content: center;
   font-weight: bold; font-size: 1rem; flex-shrink: 0;
 }
@@ -792,12 +792,12 @@ watch(() => props.open, (val) => {
 .persona-name {
   font-weight: bold;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .persona-detail {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .persona-deuda {
@@ -809,16 +809,16 @@ watch(() => props.open, (val) => {
   display: block;
   font-weight: bold;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .deuda-count {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .deuda-count.paga {
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .persona-actions {
@@ -829,21 +829,21 @@ watch(() => props.open, (val) => {
 
 .action-btn {
   padding: 0.3rem 0.4rem;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: 4px;
-  background: var(--bg-secondary);
+  background: var(--color-bg-panel);
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.15s;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .action-btn:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .action-del:hover {
-  border-color: var(--error-color);
+  border-color: var(--color-error);
 }
 
 .personas-grid {
@@ -853,8 +853,8 @@ watch(() => props.open, (val) => {
 }
 
 .persona-card {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 8px;
   padding: 0.75rem;
   display: flex;
@@ -865,7 +865,7 @@ watch(() => props.open, (val) => {
 }
 
 .persona-card:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .persona-card.clickable {
@@ -874,8 +874,8 @@ watch(() => props.open, (val) => {
 
 .card-avatar {
   width: 44px; height: 44px; border-radius: 50%;
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
   display: flex; align-items: center; justify-content: center;
   font-weight: bold; font-size: 1.2rem;
 }
@@ -883,7 +883,7 @@ watch(() => props.open, (val) => {
 .card-name {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   text-align: center;
 }
 
@@ -896,7 +896,7 @@ watch(() => props.open, (val) => {
 
 .card-detail {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .card-deuda {
@@ -907,16 +907,16 @@ watch(() => props.open, (val) => {
   display: block;
   font-weight: bold;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .card-deuda-count {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .card-deuda-count.paga {
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .card-actions {
@@ -927,45 +927,49 @@ watch(() => props.open, (val) => {
 
 .card-btn {
   padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: 4px;
-  background: var(--bg-secondary);
+  background: var(--color-bg-panel);
   cursor: pointer;
   font-size: 0.8rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   transition: all 0.15s;
 }
 
 .card-btn:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .card-btn-del:hover {
-  border-color: var(--error-color);
+  border-color: var(--color-error);
 }
 
 /* Inner overlays (creditos panel, forms, abono) */
 .inner-overlay {
-  position: absolute; inset: 0;
-  background: color-mix(in srgb, var(--bg-primary) 85%, black);
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  z-index: 200;
 }
 
 .inner-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  width: min(95%, 500px);
-  max-height: 80vh;
+  background: var(--color-bg-panel);
+  border: none;
+  border-radius: var(--radius-lg);
+  width: min(95%, 620px);
+  max-height: 82vh;
+  min-height: 40vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03);
 }
 
 .inner-overlay .inner-panel {
-  width: min(95%, 550px);
+  width: min(95%, 620px);
 }
 
 .inner-panel--sm {
@@ -975,7 +979,7 @@ watch(() => props.open, (val) => {
 
 .inner-panel h4 {
   margin: 0 0 0.75rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
 }
 
 .inner-header {
@@ -983,13 +987,13 @@ watch(() => props.open, (val) => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .inner-header h3 {
   margin: 0;
   font-size: 1rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .inner-list {
@@ -999,8 +1003,8 @@ watch(() => props.open, (val) => {
 }
 
 .credito-item {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 6px;
   padding: 0.6rem;
   margin-bottom: 0.4rem;
@@ -1020,7 +1024,7 @@ watch(() => props.open, (val) => {
 .credito-ticket {
   font-weight: bold;
   font-size: 0.8rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
 }
 
 .credito-status {
@@ -1032,12 +1036,12 @@ watch(() => props.open, (val) => {
 }
 
 .badge-pendiente {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
 }
 
 .badge-pagado {
-  background: var(--success-color);
+  background: var(--color-success);
   color: white;
 }
 
@@ -1049,26 +1053,26 @@ watch(() => props.open, (val) => {
 }
 
 .credito-label {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .credito-valor {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .credito-valor.pagado {
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
 }
 
 .credito-valor.saldo {
-  color: var(--error-color);
+  color: var(--color-error);
   font-weight: bold;
 }
 
 .credito-fecha {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   margin-top: 0.2rem;
 }
 
@@ -1080,8 +1084,8 @@ watch(() => props.open, (val) => {
 
 .btn-abonar {
   padding: 0.35rem 0.6rem;
-  background: var(--success-color);
-  border: 1px solid var(--border-color);
+  background: var(--color-success);
+  border: none;
   border-radius: 4px;
   color: white;
   font-size: 0.75rem;
@@ -1110,7 +1114,7 @@ watch(() => props.open, (val) => {
 
 .abonos-list {
   margin-top: 0.4rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border);
   padding-top: 0.3rem;
 }
 
@@ -1120,20 +1124,20 @@ watch(() => props.open, (val) => {
   align-items: center;
   font-size: 0.7rem;
   padding: 0.1rem 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .abono-monto {
   font-weight: bold;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .abono-fecha {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .abono-user {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* Form */
@@ -1151,25 +1155,25 @@ watch(() => props.open, (val) => {
 
 .field-label {
   font-size: 0.75rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .input-field {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 5px;
   padding: 0.5rem 0.7rem;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   outline: none;
 }
 
 .input-field:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .form-actions {
@@ -1181,25 +1185,25 @@ watch(() => props.open, (val) => {
 
 .btn-cancel {
   padding: 0.4rem 0.8rem;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 5px;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
 }
 
 .btn-cancel:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .btn-save {
   padding: 0.4rem 0.8rem;
-  background: var(--accent-color);
-  border: 1px solid var(--border-color);
+  background: var(--color-accent);
+  border: none;
   border-radius: 5px;
-  color: var(--bg-primary);
+  color: var(--color-bg-primary);
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
@@ -1213,24 +1217,24 @@ watch(() => props.open, (val) => {
 .abono-info p {
   margin: 0.2rem 0;
   font-size: 0.85rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .modal-f {
   padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-panel);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
 }
 
 .cancel-btn {
   width: 100%;
   padding: 0.5rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 6px;
   font-size: 0.8rem;
   font-weight: bold;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
@@ -1238,11 +1242,11 @@ watch(() => props.open, (val) => {
 }
 
 .cancel-btn:hover {
-  border-color: var(--accent-color);
-  color: var(--accent-color);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
-.toast {
+.toast { z-index: 9999;
   position: fixed;
   bottom: 1.5rem;
   left: 50%;
@@ -1251,50 +1255,50 @@ watch(() => props.open, (val) => {
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: bold;
-  z-index: 999;
+  
 }
 
 .toast-ok {
-  background: var(--success-color);
+  background: var(--color-success);
   color: white;
 }
 
 .toast-error {
-  background: var(--error-color);
+  background: var(--color-error);
   color: white;
 }
 
 .toast-info {
-  background: var(--bg-panel);
-  border: 1px solid var(--accent-color);
-  color: var(--accent-color);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-ver-detalle {
   padding: 0.35rem 0.5rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-panel);
+  border: none;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .btn-ver-detalle:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 /* --- Detalle inline expandible --- */
 
 .credito-item.is-expanded {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
 }
 
 .detalle-inline {
   margin-top: 0.4rem;
   padding-top: 0.4rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border);
   animation: fadeSlideIn 200ms ease-out;
 }
 
@@ -1307,7 +1311,7 @@ watch(() => props.open, (val) => {
   text-align: center;
   padding: 0.5rem;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .detalle-productos {
@@ -1322,7 +1326,7 @@ watch(() => props.open, (val) => {
   gap: 0.5rem;
   padding: 0.3rem 0;
   font-size: 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
 }
 
 .detalle-producto:last-child {
@@ -1331,7 +1335,7 @@ watch(() => props.open, (val) => {
 
 .dp-nombre {
   flex: 1;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1340,13 +1344,13 @@ watch(() => props.open, (val) => {
 }
 
 .dp-cant {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   text-align: right;
 }
 
 .dp-subtotal {
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-weight: 700;
   white-space: nowrap;
   text-align: right;
@@ -1392,8 +1396,8 @@ watch(() => props.open, (val) => {
 /* --- Discrepancia --- */
 
 .detalle-discrepancia {
-  background: color-mix(in srgb, var(--error-color) 12%, transparent);
-  color: var(--error-color);
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  color: var(--color-error);
   padding: 0.35rem 0.5rem;
   border-radius: 5px;
   font-size: 0.75rem;

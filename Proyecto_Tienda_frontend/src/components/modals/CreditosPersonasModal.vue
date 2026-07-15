@@ -399,7 +399,7 @@ watch(() => props.open, (val) => {
           <!-- Toolbar -->
           <div class="toolbar">
             <div class="toolbar-left">
-              <button class="btn-add" @click="abrirFormNueva">+ Nueva Persona</button>
+              <button class="btn-add" @click="abrirFormNueva">➕ Nueva Persona</button>
             </div>
             <div class="toolbar-right">
               <button :class="['vbtn', { on: vistaPersonas === 'lista' }]" @click="vistaPersonas = 'lista'" title="Lista">📋</button>
@@ -547,7 +547,7 @@ watch(() => props.open, (val) => {
                 </div>
               </div>
               <div class="form-actions">
-                <button class="btn-cancel" @click="cerrarFormPersona">Cancelar</button>
+                <button class="btn-cancel" @click="cerrarFormPersona">❌ Cancelar</button>
                 <button class="btn-save" @click="guardarPersona" :disabled="cargando">💾 {{ editandoPersona ? 'Actualizar' : 'Guardar' }}</button>
               </div>
             </div>
@@ -570,7 +570,7 @@ watch(() => props.open, (val) => {
 
         <footer class="modal-f">
           <button class="cancel-btn" @click="emit('close')">
-            {{ seleccionar ? 'Cancelar' : 'Cerrar' }}
+            ❌ {{ seleccionar ? 'Cancelar' : 'Cerrar' }}
           </button>
         </footer>
 
@@ -1242,7 +1242,7 @@ watch(() => props.open, (val) => {
   color: var(--accent-color);
 }
 
-.toast {
+.toast { z-index: 9999;
   position: fixed;
   bottom: 1.5rem;
   left: 50%;
@@ -1251,7 +1251,7 @@ watch(() => props.open, (val) => {
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: bold;
-  z-index: 999;
+  
 }
 
 .toast-ok {

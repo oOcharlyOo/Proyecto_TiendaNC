@@ -69,16 +69,24 @@ defineEmits<{
       </table>
       <div v-else class="productos-grid">
         <div v-for="producto in productosFiltrados" :key="producto.idProducto" class="producto-card" :class="{ 'low-stock': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out-of-stock': Number(producto.stock || 0) === 0 }">
-          <div class="pc-top"><input type="checkbox" class="row-checkbox" :checked="selectedProductos.has(producto.idProducto!)" @change="$emit('toggle-seleccion', producto.idProducto!)" /></div>
-          <div class="pc-ico">{{ obtenerEmojiDulce(producto.idProducto) }}</div>
-          <div class="pc-badges"><span v-if="producto.is_gramaje" class="badge-gramaje">Gramaje</span><span v-if="producto.requiere_envase" class="badge-envase">Envase</span></div>
-          <strong>{{ producto.nombre }}</strong>
-          <div class="pc-stats">
-            <div class="pc-stat"><span class="stat-label">Precio</span><span class="stat-value">{{ formatMoneda(producto.precio_venta) }}</span></div>
-            <div class="pc-stat"><span class="stat-label">Stock</span><span class="stat-value" :class="{ 'low': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out': Number(producto.stock || 0) === 0 }">{{ producto.stock }}</span></div>
-            <div class="pc-stat" v-if="producto.precio_mayoreo"><span class="stat-label">Mayoreo</span><span class="stat-value">{{ formatMoneda(producto.precio_mayoreo) }}</span></div>
+          <div class="pc-top">
+            <input type="checkbox" class="row-checkbox" :checked="selectedProductos.has(producto.idProducto!)" @change="$emit('toggle-seleccion', producto.idProducto!)" />
+            <div v-if="producto.is_gramaje || producto.requiere_envase" class="pc-badges">
+              <span v-if="producto.is_gramaje" class="badge-gramaje">Gramaje</span>
+              <span v-if="producto.requiere_envase" class="badge-envase">Envase</span>
+            </div>
           </div>
-          <div class="pc-actions"><button class="btn-action btn-edit" @click="$emit('editar', producto)">✏️</button><button class="btn-action btn-delete" @click="$emit('eliminar', producto)">🗑️</button></div>
+          <div class="pc-ico">{{ obtenerEmojiDulce(producto.idProducto) }}</div>
+          <span class="pc-name">{{ producto.nombre }}</span>
+          <div class="pc-stats">
+            <div class="pc-stat"><span class="stat-label">Precio</span><span class="stat-value stat-price">{{ formatMoneda(producto.precio_venta) }}</span></div>
+            <div class="pc-stat"><span class="stat-label">Stock</span><span class="stat-value" :class="{ 'stat-low': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'stat-out': Number(producto.stock || 0) === 0 }">{{ producto.stock }}</span></div>
+            <div class="pc-stat" v-if="producto.precio_mayoreo"><span class="stat-label">Mayoreo</span><span class="stat-value stat-price">{{ formatMoneda(producto.precio_mayoreo) }}</span></div>
+          </div>
+          <div class="pc-actions">
+            <button class="pc-btn pc-btn-edit" @click="$emit('editar', producto)" title="Editar">✏️</button>
+            <button class="pc-btn pc-btn-del" @click="$emit('eliminar', producto)" title="Eliminar">🗑️</button>
+          </div>
         </div>
       </div>
       <div class="bulk-info" v-if="selectedProductos.size > 0">

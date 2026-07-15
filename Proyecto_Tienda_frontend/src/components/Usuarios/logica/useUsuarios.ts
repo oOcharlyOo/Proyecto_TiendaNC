@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, shallowRef, nextTick } from 'vue';
 import confetti from 'canvas-confetti';
 import Swal from 'sweetalert2';
 
@@ -72,6 +72,7 @@ export type UsuarioDiasData = {
   aperturas?: { [dia: number]: string };
   cierres?: { [dia: number]: string | null };
   horasXTrabajadas?: { [dia: number]: string };
+  overflow?: OverflowDay[];
 };
 
 export type DiasTrabajadosData = {
@@ -85,6 +86,8 @@ export type SemanaInfo = {
   numero: number;
   dias: number[];
   label: string;
+  fechaInicio: string;
+  fechaFin: string;
 };
 
 export type TrabajadorInfo = {
@@ -92,6 +95,14 @@ export type TrabajadorInfo = {
   horas: number;
   apertura: string;
   cierre: string | null;
+};
+
+export type OverflowDay = {
+  fecha: string;
+  horas: number;
+  apertura: string;
+  cierre: string | null;
+  horasX: string;
 };
 
 type DiaCalendarioItem = {
@@ -373,6 +384,9 @@ export function useUsuarios() {
   }
 
   async function cargarAsistencias(mes?: number, anio?: number) {
+    if (usuarios.value.length === 0) {
+      await cargarUsuarios();
+    }
     cargandoAsistencias.value = true;
     const now = new Date();
     const m = mes ?? now.getMonth() + 1;
@@ -381,6 +395,7 @@ export function useUsuarios() {
       const data = await fetchApi<{ codigo: number; datos: DiasTrabajadosData }>(`${API_BASE}/asistencias/dias-trabajados?mes=${m}&anio=${a}`);
       if (data?.codigo === 200 && data.datos) {
         diasTrabajados.value = data.datos;
+        await nextTick();
       }
     } catch (error) {
       console.error('Error al cargar asistencias:', error);
@@ -390,22 +405,28 @@ export function useUsuarios() {
   }
 
   function getHorasTotales(usuario: UsuarioDiasData): number {
+    let total = 0;
     if (usuario.horasPorDia) {
-      return Object.values(usuario.horasPorDia).reduce((a, b) => a + b, 0);
+      total += Object.values(usuario.horasPorDia).reduce((a, b) => a + b, 0);
+    } else if (usuario.diasLaborados) {
+      total += usuario.diasLaborados.length * 8;
     }
-    return usuario.diasLaborados ? usuario.diasLaborados.length * 8 : 0;
+    if (usuario.overflow) {
+      total += usuario.overflow.reduce((sum, ov) => sum + (ov.horas || 0), 0);
+    }
+    return total;
   }
 
-  function getHorasFormateadas(usuario: UsuarioDiasData): string {
-    const total = getHorasTotales(usuario);
-    const h = Math.floor(total);
-    const m = Math.round((total - h) * 60);
+  function getHorasFormateadas(horas: number): string {
+    const h = Math.floor(horas);
+    const m = Math.round((horas - h) * 60);
     return `${h}h ${m}m`;
   }
 
   function formatoHora(hora: string): string {
     if (!hora) return '—';
-    return hora.slice(0, 5);
+    const timePart = hora.includes('T') ? hora.split('T')[1] : hora;
+    return timePart.slice(0, 5);
   }
 
   function getHorasDelDia(usuario: UsuarioDiasData, dia: number): number {
@@ -450,20 +471,31 @@ export function useUsuarios() {
 
   function semanasDelMes(mes: number, anio: number): SemanaInfo[] {
     const semanas: SemanaInfo[] = [];
-    const firstDay = new Date(anio, mes - 1, 1).getDay();
+    const rawDay = new Date(anio, mes - 1, 1).getDay();
+    const offset = (rawDay + 6) % 7;
     const daysInMonth = new Date(anio, mes, 0).getDate();
     let semanaNum = 0;
     let currentWeek: number[] = [];
+    let weekStartDay = 1 - offset;
 
-    for (let i = 0; i < firstDay; i++) {
+    for (let i = 0; i < offset; i++) {
       currentWeek.push(0);
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
       currentWeek.push(d);
       if (currentWeek.length === 7) {
-        semanas.push({ numero: ++semanaNum, dias: currentWeek, label: `Semana ${semanaNum}` });
+        const startDate = new Date(anio, mes - 1, weekStartDay);
+        const endDate = new Date(anio, mes - 1, weekStartDay + 6);
+        semanas.push({
+          numero: ++semanaNum,
+          dias: currentWeek,
+          label: `Semana ${semanaNum}`,
+          fechaInicio: startDate.toISOString().slice(0, 10),
+          fechaFin: endDate.toISOString().slice(0, 10)
+        });
         currentWeek = [];
+        weekStartDay += 7;
       }
     }
 
@@ -471,19 +503,38 @@ export function useUsuarios() {
       while (currentWeek.length < 7) {
         currentWeek.push(0);
       }
-      semanas.push({ numero: ++semanaNum, dias: currentWeek, label: `Semana ${semanaNum}` });
+      const startDate = new Date(anio, mes - 1, weekStartDay);
+      const endDate = new Date(anio, mes - 1, weekStartDay + 6);
+      semanas.push({
+        numero: ++semanaNum,
+        dias: currentWeek,
+        label: `Semana ${semanaNum}`,
+        fechaInicio: startDate.toISOString().slice(0, 10),
+        fechaFin: endDate.toISOString().slice(0, 10)
+      });
     }
 
     return semanas;
   }
 
+  function getHorasOverflowEnSemana(usuario: UsuarioDiasData, semana: SemanaInfo): number {
+    if (!usuario.overflow || usuario.overflow.length === 0) return 0;
+    return usuario.overflow.reduce((sum, ov) => {
+      if (ov.fecha >= semana.fechaInicio && ov.fecha <= semana.fechaFin) {
+        return sum + (ov.horas || 0);
+      }
+      return sum;
+    }, 0);
+  }
+
   function getPagoSemanal(usuario: UsuarioDiasData, semana: SemanaInfo): number {
-    const horas = semana.dias.reduce((sum, dia) => {
+    const horasMes = semana.dias.reduce((sum, dia) => {
       if (dia === 0) return sum;
       return sum + getHorasDelDia(usuario, dia);
     }, 0);
+    const horasOv = getHorasOverflowEnSemana(usuario, semana);
     const sueldo = usuario.idUsuario ? usuarios.value.find(u => u.idUsuario === usuario.idUsuario)?.sueldo_hora || 0 : 0;
-    return horas * sueldo;
+    return (horasMes + horasOv) * sueldo;
   }
 
   function getPagoTotal(usuario: UsuarioDiasData): number {
@@ -497,10 +548,11 @@ export function useUsuarios() {
   }
 
   function getHorasSemana(usuario: UsuarioDiasData, semana: SemanaInfo): number {
-    return semana.dias.reduce((sum, dia) => {
+    const horasMes = semana.dias.reduce((sum, dia) => {
       if (dia === 0) return sum;
       return sum + getHorasDelDia(usuario, dia);
     }, 0);
+    return horasMes + getHorasOverflowEnSemana(usuario, semana);
   }
 
   return {

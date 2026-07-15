@@ -657,44 +657,47 @@ function formatImagenUrl(url: string | null): string | undefined {
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
 .crud-panel {
+  --perg-bg: var(--color-bg-primary);
+  --perg-bg-panel: var(--color-bg-panel);
+  --perg-text: var(--color-text-primary);
+  --perg-text-secondary: var(--color-text-secondary);
+  --perg-title: var(--color-accent);
+  --perg-border: var(--color-border);
+  --perg-accent: var(--color-accent);
+  --perg-shadow: var(--color-shadow);
+  --perg-success: var(--color-success);
+  --perg-error: var(--color-error);
+  --perg-warning: var(--color-warning);
   width: 100%;
   max-width: 800px;
   max-height: 90vh;
-  background: var(--bg-secondary);
-  border: 3px solid var(--accent-color);
-  border-radius: 12px;
+  background: var(--color-bg-panel);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  position: relative;
+  box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03);
+  animation: slideUp 0.3s ease-out;
 }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  border-bottom: 2px solid var(--accent-color);
+  background: var(--color-bg-secondary);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .header-ornaments {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-size: 1.2rem;
 }
 
@@ -702,15 +705,16 @@ function formatImagenUrl(url: string | null): string | undefined {
   margin: 0;
   font-family: 'Palatino Linotype', serif;
   font-size: 1.3rem;
-  text-shadow: 2px 2px 0 var(--shadow-color);
+  color: var(--perg-title) !important;
+  text-shadow: 2px 2px 0 rgba(40, 20, 10, 0.45) !important;
 }
 
 .btn-close {
   width: 36px;
   height: 36px;
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--perg-border);
   border-radius: 50%;
   font-size: 1.2rem;
   cursor: pointer;
@@ -721,8 +725,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .tabs {
   display: flex;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--perg-bg);
+  border-bottom: 1px solid var(--perg-border);
 }
 
 .tab {
@@ -730,7 +734,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   padding: 0.75rem 1rem;
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
@@ -738,13 +742,13 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .tab:hover {
-  background: var(--bg-secondary);
+  background: var(--perg-bg-panel);
 }
 
 .tab.active {
-  color: var(--accent-color);
-  border-bottom-color: var(--accent-color);
-  background: var(--bg-secondary);
+  color: var(--perg-accent);
+  border-bottom-color: var(--perg-accent);
+  background: var(--perg-bg-panel);
 }
 
 .panel-body {
@@ -754,7 +758,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .error-msg {
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
   padding: 0.75rem;
   border-radius: 6px;
@@ -766,22 +770,22 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 2px solid var(--perg-border);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
   margin-bottom: 1rem;
 }
 
 .search-icon {
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
 }
 
 .search-input {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 0.9rem;
   outline: none;
 }
@@ -789,7 +793,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 .loading, .empty-state {
   text-align: center;
   padding: 2rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
 }
 
 .empty-icon {
@@ -805,8 +809,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .promo-card {
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 2px solid var(--perg-border);
   border-radius: 8px;
   padding: 0.75rem;
   display: flex;
@@ -815,7 +819,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .promo-card:hover {
-  border-color: var(--accent-color);
+  border-color: var(--perg-accent);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
@@ -844,7 +848,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary);
+  background: var(--perg-bg-panel);
   font-size: 1.8rem;
 }
 
@@ -865,7 +869,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .card-header h4 {
   margin: 0;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-size: 0.85rem;
   flex: 1;
   line-height: 1.2;
@@ -880,18 +884,18 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .status-badge.active {
-  background: var(--success-color);
+  background: var(--perg-success);
   color: white;
 }
 
 .status-badge.inactive {
-  background: var(--text-secondary);
+  background: var(--perg-text-secondary);
   color: white;
 }
 
 .card-desc {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   margin: 0;
   line-height: 1.3;
 }
@@ -904,15 +908,15 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .product-tag {
   font-size: 0.65rem;
-  background: var(--bg-secondary);
+  background: var(--perg-bg-panel);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--perg-text);
 }
 
 .more-tag {
   font-size: 0.6rem;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-weight: bold;
 }
 
@@ -925,14 +929,14 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .price-original {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   text-decoration: line-through;
 }
 
 .price-promo {
   font-size: 1rem;
   font-weight: bold;
-  color: var(--success-color);
+  color: var(--perg-success);
 }
 
 .card-actions {
@@ -945,23 +949,23 @@ function formatImagenUrl(url: string | null): string | undefined {
   flex: 1;
   padding: 0.4rem;
   font-size: 0.65rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--perg-bg-panel);
+  color: var(--perg-text);
+  border: 1px solid var(--perg-border);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-toggle:hover, .btn-edit:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--perg-accent);
+  color: var(--perg-bg);
 }
 
 .btn-delete {
   width: 28px;
   height: 28px;
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
   border: none;
   border-radius: 4px;
@@ -983,32 +987,32 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .form-group label {
   font-size: 0.8rem;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   text-transform: uppercase;
   font-weight: bold;
 }
 
 .input-field {
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 2px solid var(--perg-border);
   border-radius: 6px;
   padding: 0.75rem;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 0.9rem;
 }
 
 .input-field:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: var(--perg-accent);
 }
 
 .price-info {
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   font-size: 0.8rem;
 }
 
 .price-info strong {
-  color: var(--accent-color);
+  color: var(--perg-accent);
 }
 
 .textarea {
@@ -1021,18 +1025,18 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 0.9rem;
 }
 
 .form-section {
-  border-top: 1px dashed var(--border-color);
+  border-top: 1px dashed var(--perg-border);
   padding-top: 1rem;
 }
 
 .form-section h5 {
   margin: 0 0 0.75rem 0;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-size: 0.9rem;
 }
 
@@ -1047,7 +1051,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   aspect-ratio: 16/9;
   border-radius: 8px;
   overflow: hidden;
-  border: 2px solid var(--accent-color);
+  border: 2px solid var(--perg-accent);
 }
 
 .imagen-preview img {
@@ -1062,7 +1066,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   right: 4px;
   width: 24px;
   height: 24px;
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
   border: none;
   border-radius: 50%;
@@ -1076,8 +1080,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .imagen-placeholder {
   width: 100%;
   aspect-ratio: 16/9;
-  background: var(--bg-primary);
-  border: 2px dashed var(--border-color);
+  background: var(--perg-bg);
+  border: 2px dashed var(--perg-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -1089,8 +1093,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .imagen-placeholder:hover {
-  border-color: var(--accent-color);
-  background: var(--bg-secondary);
+  border-color: var(--perg-accent);
+  background: var(--perg-bg-panel);
 }
 
 .imagen-placeholder .placeholder-icon {
@@ -1099,7 +1103,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .imagen-placeholder .placeholder-text {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
 }
 
 .imagen-input-hidden {
@@ -1117,16 +1121,16 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg-primary);
+  background: var(--perg-bg);
   padding: 0.5rem;
   border-radius: 6px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--perg-border);
 }
 
 .prod-name {
   flex: 1;
   font-size: 0.85rem;
-  color: var(--text-primary);
+  color: var(--perg-text);
 }
 
 .prod-qty {
@@ -1138,23 +1142,23 @@ function formatImagenUrl(url: string | null): string | undefined {
 .qty-input {
   width: 50px;
   padding: 0.25rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--perg-bg-panel);
+  border: 1px solid var(--perg-border);
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--perg-text);
   text-align: center;
   font-size: 0.8rem;
 }
 
 .qty-unit {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
 }
 
 .btn-remove-prod {
   width: 24px;
   height: 24px;
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
   border: none;
   border-radius: 4px;
@@ -1173,17 +1177,17 @@ function formatImagenUrl(url: string | null): string | undefined {
 .product-select {
   flex: 1;
   padding: 0.75rem;
-  background: var(--bg-primary);
-  border: 2px dashed var(--border-color);
+  background: var(--perg-bg);
+  border: 2px dashed var(--perg-border);
   border-radius: 6px;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .product-select:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: var(--perg-accent);
 }
 
 .form-actions {
@@ -1191,15 +1195,15 @@ function formatImagenUrl(url: string | null): string | undefined {
   gap: 0.75rem;
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px dashed var(--border-color);
+  border-top: 1px dashed var(--perg-border);
 }
 
 .btn-cancel {
   flex: 1;
   padding: 0.75rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  color: var(--perg-text);
+  border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -1209,9 +1213,9 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-save {
   flex: 2;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  background: linear-gradient(135deg, var(--perg-success) 0%, color-mix(in srgb, var(--perg-success) 60%, black) 100%);
   color: white;
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -1239,6 +1243,8 @@ function formatImagenUrl(url: string | null): string | undefined {
   opacity: 0;
 }
 
+.modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 1rem; }
+
 @media (max-width: 600px) {
   .crud-panel {
     max-height: 100vh;
@@ -1257,8 +1263,9 @@ function formatImagenUrl(url: string | null): string | undefined {
 .gramaje-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  background: rgba(0, 0, 0, 0.8);
+  z-index: 300;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1266,13 +1273,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .gramaje-modal {
-  background: var(--bg-secondary);
-  border: 3px solid var(--accent-color);
-  border-radius: 12px;
+  background: var(--perg-bg-panel);
+  border-radius: 18px;
   width: 100%;
   max-width: 360px;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: popIn 200ms ease-out;
 }
 
 .gramaje-header {
@@ -1280,21 +1286,24 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  border-bottom: 2px solid var(--accent-color);
+  background: transparent;
+  border-bottom: 2px solid color-mix(in srgb, var(--perg-accent) 25%, transparent);
 }
 
 .gramaje-header h4 {
   margin: 0;
-  color: var(--accent-color);
   font-family: 'Palatino Linotype', serif;
   font-size: 1rem;
+  color: var(--perg-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 900;
 }
 
 .btn-close-gramaje {
   width: 28px;
   height: 28px;
-  background: var(--error-color);
+  background: var(--perg-error);
   color: white;
   border: none;
   border-radius: 50%;
@@ -1313,8 +1322,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .gramaje-info {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 1px solid var(--perg-border);
   border-radius: 8px;
   padding: 0.75rem;
   text-align: center;
@@ -1322,14 +1331,14 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .producto-nombre {
   margin: 0 0 0.25rem 0;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-weight: bold;
   font-size: 0.95rem;
 }
 
 .producto-precio {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   font-size: 0.8rem;
 }
 
@@ -1341,7 +1350,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .gramaje-input-section label {
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   text-transform: uppercase;
   font-weight: bold;
 }
@@ -1354,11 +1363,11 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .gramaje-input {
   flex: 1;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 2px solid var(--perg-border);
   border-radius: 8px;
   padding: 0.75rem;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 1.2rem;
   font-weight: bold;
   text-align: center;
@@ -1366,12 +1375,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .gramaje-input:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: var(--perg-accent);
 }
 
 .gramaje-unit {
   font-size: 1.2rem;
-  color: var(--accent-color);
+  color: var(--perg-accent);
   font-weight: bold;
 }
 
@@ -1383,10 +1392,10 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .gramaje-quick-btns button {
   padding: 0.5rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--perg-bg);
+  border: 1px solid var(--perg-border);
   border-radius: 6px;
-  color: var(--text-primary);
+  color: var(--perg-text);
   font-size: 0.75rem;
   font-weight: bold;
   cursor: pointer;
@@ -1394,13 +1403,13 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .gramaje-quick-btns button:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--perg-accent);
+  color: var(--perg-bg);
 }
 
 .gramaje-subtotal {
   text-align: center;
-  color: var(--success-color);
+  color: var(--perg-success);
   font-weight: bold;
   font-size: 0.9rem;
   margin: 0;
@@ -1408,7 +1417,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .gramaje-display {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--perg-text-secondary);
   margin-left: 0.25rem;
 }
 
@@ -1416,15 +1425,15 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   gap: 0.75rem;
   padding: 1rem;
-  border-top: 1px dashed var(--border-color);
+  border-top: 2px solid color-mix(in srgb, var(--perg-accent) 25%, transparent);
 }
 
 .btn-cancelar {
   flex: 1;
   padding: 0.75rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 2px solid var(--border-color);
+  background: var(--perg-bg);
+  color: var(--perg-text);
+  border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -1434,9 +1443,9 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-confirmar {
   flex: 1;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  background: linear-gradient(135deg, var(--perg-success) 0%, color-mix(in srgb, var(--perg-success) 60%, black) 100%);
   color: white;
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -1452,4 +1461,51 @@ function formatImagenUrl(url: string | null): string | undefined {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Pergamino styles consolidated */
+
+/* Todos los h2 y h3 dentro de modales pergamino usan café oscuro */
+
+/* Overlay */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Pergamino container */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Rollo edges (top / bottom) */
+/* Reveal content (vertical unroll) */
+/* Pergamino inner content */
+
+.pos-container .close-btn {
+  background: none;
+  border: 2px solid var(--perg-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--perg-text-secondary);
+  transition: all 0.2s ease;
+  padding: 0;
+  text-shadow: 0 1px 2px rgba(40, 20, 10, 0.2);
+}
+
+.pos-container .close-btn:hover {
+  color: var(--perg-text);
+  border-color: var(--perg-accent);
+  background: color-mix(in srgb, var(--perg-accent) 10%, transparent);
+}
+
+/* Responsive */
+
 </style>
+

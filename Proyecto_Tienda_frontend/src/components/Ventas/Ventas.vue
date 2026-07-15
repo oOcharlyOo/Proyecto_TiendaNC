@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   tickets, ticketActualId, ticketActual, ticket, creandoTicket, ticketDelDia,
@@ -108,16 +108,12 @@ import PosProveedoresPedidosModal from './modales/PosProveedoresPedidosModal.vue
 import PosToastNotification from './modales/PosToastNotification.vue';
 import PosScannerOverlay from './modales/PosScannerOverlay.vue';
 
-import './estilos/pos-catalogo.css';
-import './estilos/pos-layout.css';
-import './estilos/pos-ticket.css';
-import './estilos/pos-modales.css';
-import './estilos/pos-scanner.css';
 
 // --- Orchestration state ---
 const isRecording = ref(false);
 const ticketVisibleMobile = ref(false);
 const isKeyboardVisible = ref(false);
+watch(isKeyboardVisible, (v) => { if (v) ticketVisibleMobile.value = false; });
 const modalPromocionesAbierto = ref(false);
 const vpVistaLista = ref(true);
 
@@ -140,6 +136,8 @@ const productosFiltradosBusqueda = computed(() => {
     (p.codigo_barras || '').toLowerCase().includes(q)
   ).slice(0, 10);
 });
+
+const agregarPendienteGramajeActivo = ref(false);
 
 const ventasPendientesAgrupadas = computed(() => {
   return ventasPendientes.value.map((v: any) => {
@@ -211,7 +209,7 @@ function manejarAtajosTeclado(e: KeyboardEvent) {
     if (modalVentasPendientesAbierto.value) { modalVentasPendientesAbierto.value = false; return; }
     if (modalDescripcionPendiente.value) { modalDescripcionPendiente.value = false; return; }
     if (modalCobroAbierto.value) { modalCobroAbierto.value = false; return; }
-    if (modalGramajeAbierto.value) { modalGramajeAbierto.value = false; modalProductoGramaje.value = null; gramajeEditandoDesdeHistorial.value = false; gramajeEditandoIndice.value = null; return; }
+    if (modalGramajeAbierto.value) { modalGramajeAbierto.value = false; modalProductoGramaje.value = null; gramajeEditandoDesdeHistorial.value = false; gramajeEditandoIndice.value = null; agregarPendienteGramajeActivo.value = false; return; }
     if (modalHistorialAbierto.value) { modalHistorialAbierto.value = false; return; }
     if (modalSalidaAbierto.value) { modalSalidaAbierto.value = false; return; }
     if (modalEntradaAbierto.value) { modalEntradaAbierto.value = false; return; }
@@ -284,7 +282,41 @@ async function buscarProducto(termino: string) {
 function buscarYAgregarPendiente() {
   if (!agregarPendienteBusqueda.value) return;
   const prod = productosFiltradosBusqueda.value[0];
-  if (prod) agregarProductoAPendiente(prod);
+  if (prod) onAgregarPendiente(prod);
+}
+
+function onAgregarPendiente(prod: any) {
+  if (prod.is_gramaje) {
+    modalProductoGramaje.value = prod;
+    agregarPendienteGramajeActivo.value = true;
+    modalGramajeAbierto.value = true;
+    return;
+  }
+  agregarProductoAPendiente(prod);
+}
+
+function onGramajeModalAdd(payload: { gramos: number; precioTotal: number }) {
+  if (agregarPendienteGramajeActivo.value) {
+    const prod = modalProductoGramaje.value;
+    if (!prod) return;
+    const gramos = Math.max(1, Math.round(payload.gramos));
+    const precioTotal = Math.round(payload.precioTotal * 100) / 100;
+    agregarPendienteProductos.value.push({
+      idProducto: prod.idProducto || prod.id,
+      productoNombre: prod.nombre,
+      cantidad: gramos,
+      precioUnitarioVenta: precioTotal,
+      isGramaje: true,
+      codigoBarras: prod.codigo_barras || '',
+      tipoPrecioAplicado: 'VENTA_GRAMAJE'
+    });
+    modalGramajeAbierto.value = false;
+    modalProductoGramaje.value = null;
+    agregarPendienteGramajeActivo.value = false;
+    mostrarMensaje(`Agregado ${gramos}g de ${prod.nombre}.`, 'ok');
+    return;
+  }
+  agregarProductoGramaje(payload);
 }
 
 function handleResize() {
@@ -359,6 +391,8 @@ onUnmounted(() => {
       :sugerencias-visibles="sugerenciasVisibles"
       :indice-sugerencia-activa="indiceSugerenciaActiva"
       :is-recording="isRecording"
+      :ticket-info-text="ticketInfoText"
+      :total-venta="totalVenta"
       @update:termino-busqueda="terminoBusqueda = $event"
       @update:categoria-filtro="categoriaFiltro = $event"
       @focus-busqueda="manejarFocusBusqueda"
@@ -372,6 +406,10 @@ onUnmounted(() => {
       @abrir-promociones="modalPromocionesAbierto = true"
       @start-scanner="startScanner"
       @start-voice-command="startVoiceCommand"
+      @nuevo-ticket="crearNuevoTicket"
+      @abrir-pendientes="modalVentasPendientesAbierto = true"
+      @abrir-creditos="modalCreditosAbierto = true"
+      @toggle-ticket-mobile="ticketVisibleMobile = !ticketVisibleMobile"
     />
 
     <PosPanelTicket
@@ -455,8 +493,8 @@ onUnmounted(() => {
       :is-editing="gramajeEditandoDesdeHistorial"
       :cantidad-inicial="gramajeEditandoCantidad"
       :precio-inicial="gramajeEditandoPrecio"
-      @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null"
-      @add="agregarProductoGramaje"
+      @close="modalGramajeAbierto = false; modalProductoGramaje = null; gramajeEditandoDesdeHistorial = false; gramajeEditandoIndice = null; agregarPendienteGramajeActivo = false"
+      @add="onGramajeModalAdd"
     />
 
     <CobroModal
@@ -523,7 +561,7 @@ onUnmounted(() => {
       @update:agregar-pendiente-busqueda="agregarPendienteBusqueda = $event"
       @buscar-y-agregar="buscarYAgregarPendiente"
       @start-scanner-pendiente="agregarPendienteScannerActivo = !agregarPendienteScannerActivo"
-      @agregar-producto="agregarProductoAPendiente"
+      @agregar-producto="onAgregarPendiente"
       @quitar-producto="quitarProductoPendiente"
       @confirmar-agregar="confirmarAgregarPendiente"
     />
@@ -576,5 +614,73 @@ onUnmounted(() => {
     <PosScannerOverlay :scanner-activo="scannerActivo" @stop-scanner="stopScanner" />
   </main>
 </template>
+
+<style scoped>
+.pos-container {
+  display: grid;
+  grid-template-columns: 70px 1fr 360px;
+  grid-template-rows: 1fr;
+  height: calc(98vh - 64px);
+  background-color: var(--bg-primary);
+  color: var(--zelda-gold);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1400px) {
+  .pos-container {
+    grid-template-columns: 70px 1fr 400px;
+  }
+}
+
+@media (max-width: 1199px) {
+  .pos-container {
+    grid-template-columns: 60px 1fr 320px;
+  }
+}
+
+@media (max-width: 991px) {
+  .pos-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .pos-container {
+    gap: 0.4rem;
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .pos-container {
+    grid-template-columns: 1fr;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  .pos-container {
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+.pos-modal-overlay { z-index: 200;
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--perg-bg) 85%, var(--bg-primary));
+  backdrop-filter: blur(5px);
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+</style>
 
 

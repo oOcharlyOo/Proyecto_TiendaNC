@@ -9,7 +9,6 @@ RUN npm ci
 COPY . .
 
 # Usar archivo de producción
-RUN echo "VITE_API_URL=https://api.laleyendadeldulce.com" > .env.production
 
 RUN npm run build-only
 
@@ -44,7 +43,7 @@ RUN echo 'server { \
         access_log off; \
     } \
     \
-    location ~ ^/(backup|caja|ventas|ventasDetalle|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito)/ { \
+    location ~ ^/(backup|caja|ventas|ventasDetalle|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito|asistencias)/ { \
         proxy_pass http://backend:8080; \
         proxy_http_version 1.1; \
         proxy_set_header Host $host; \

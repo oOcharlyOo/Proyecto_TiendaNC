@@ -176,13 +176,13 @@ async function corregir(ids: number[]) {
         </table>
       </div>
 
-      <footer class="hist-footer"><button class="hist-btn-close" @click="emit('close')">Cerrar</button></footer>
+      <footer class="hist-footer"><button class="hist-btn-close" @click="emit('close')">❌ Cerrar</button></footer>
     </section>
   </div>
 </template>
 
 <style scoped>
-.hist-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn 0.15s; }
+.hist-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn 0.15s; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .hist-modal { width: min(100%, 1100px); max-height: 92vh; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; position: relative; animation: slideUp 0.2s; min-height: 0; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }

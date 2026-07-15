@@ -29,3 +29,25 @@ defineEmits<{
     </div>
   </section>
 </template>
+
+<style scoped>
+.actions-section {
+  padding: 0.5rem 0 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.8rem;
+}
+
+.actions-grid.solo-corte {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+@media (max-width: 768px) {
+  .actions-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+}
+</style>

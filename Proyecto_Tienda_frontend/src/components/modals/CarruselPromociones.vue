@@ -272,6 +272,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 <style scoped>
 .promo-carousel {
+  --perg-bg:var(--color-bg-primary);--perg-bg-panel:var(--color-bg-panel);--perg-text:var(--color-text-primary);--perg-text-secondary:var(--color-text-secondary);--perg-title:var(--color-accent);--perg-border:var(--color-border);--perg-accent:var(--color-accent);--perg-shadow:var(--color-shadow);--perg-success:var(--color-success);--perg-error:var(--color-error);--perg-warning:var(--color-warning);
   background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--bg-primary) 90%, var(--accent-color)) 100%);
   border: 3px solid var(--accent-color);
   border-radius: 16px;
@@ -411,7 +412,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 3px solid #fbbf24;
+  border: 3px solid var(--perg-accent);
   box-shadow: 
     0 4px 15px rgba(0, 0, 0, 0.4),
     inset 0 2px 4px rgba(255, 255, 255, 0.2);

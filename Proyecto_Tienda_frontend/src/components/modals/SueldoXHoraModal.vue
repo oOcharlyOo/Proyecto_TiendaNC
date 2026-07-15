@@ -153,7 +153,7 @@ onMounted(() => {
           </div>
           
           <div class="modal-actions">
-            <button class="btn-cancelar" @click="close">Cancelar</button>
+            <button class="btn-cancelar" @click="close">❌ Cancelar</button>
             <button 
               class="btn-guardar" 
               @click="guardarCambios" 

@@ -15,9 +15,6 @@ import CorteEgresosModal from './secciones/CorteEgresosModal.vue';
 import CorteEntradasModal from './secciones/CorteEntradasModal.vue';
 import CorteApartadosModal from './secciones/CorteApartadosModal.vue';
 import CorteBackupSection from './secciones/CorteBackupSection.vue';
-import './estilos/corte-layout.css';
-import './estilos/corte-modals.css';
-import './estilos/corte-responsive.css';
 import { useCorte } from './logica/useCorte';
 import {
   idUsuario, nombreUsuario, tipoUsuario, esAdministrador,
@@ -52,7 +49,7 @@ import {
   ventaDetalleEnvases, ventaDetalleEnvaseTotal,
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
-  backupFileRef, selectedFile, dragOver,
+  selectedFiles, dragOver,
   historialVentasAgrupadas, historialMeses, historialDias, historialFiltrado, historialTotalFiltrado,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
@@ -287,6 +284,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :ventaDetalleEnvases="ventaDetalleEnvases"
       :ventaDetalleEnvaseTotal="ventaDetalleEnvaseTotal"
       :esAdministrador="esAdministrador"
+      :usuarios-con-sueldo="usuariosConSueldo"
       :formatoMoneda="formatoMoneda"
       :formatearCantidad="formatearCantidad"
       :formatoFecha="formatoFecha"
@@ -373,8 +371,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :cargandoBackup="cargandoBackup"
       :backupLog="backupLog"
       :dragOver="dragOver"
-      :selectedFile="selectedFile"
-      :backupFileRef="backupFileRef"
+      :selectedFiles="selectedFiles"
       @toggle-backup="mostrarBackupManager = !mostrarBackupManager"
       @toggle-import="mostrarImportModal = !mostrarImportModal"
       @descargar-backups="descargarBackups"

@@ -194,42 +194,42 @@ onUnmounted(() => {
             <div class="payment-buttons" :class="{ 'abono-buttons': esAbono }">
               <button class="pay-btn efectivo" @click="confirmarEfectivo" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
-                <span class="btn-label">Efectivo</span>
+                💵<span class="btn-label">Efectivo</span>
                 <span class="btn-shortcut">F2</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button class="pay-btn transferencia" @click="confirmarTransferencia" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
-                <span class="btn-label">Transferencia</span>
+                📲<span class="btn-label">Transferencia</span>
                 <span class="btn-shortcut">F3</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button class="pay-btn tarjeta" @click="confirmarTarjeta" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
                 <span class="btn-rune">◈</span>
-                <span class="btn-label">Tarjeta</span>
+                💳<span class="btn-label">Tarjeta</span>
                 <span class="btn-shortcut">F4</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button v-if="!esAbono" class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
                 <span class="btn-rune">◈</span>
-                <span class="btn-label">Pendiente</span>
+                ⏳<span class="btn-label">Pendiente</span>
                 <span class="btn-shortcut">F5</span>
                 <span class="btn-rune">◈</span>
               </button>
               
               <button v-if="!esAbono" class="pay-btn credito" @click="emit('confirmar-credito')">
                 <span class="btn-rune">◈</span>
-                <span class="btn-label">Crédito</span>
+                💰<span class="btn-label">Crédito</span>
                 <span class="btn-shortcut">F6</span>
                 <span class="btn-rune">◈</span>
               </button>
             </div>
             
             <button class="cancel-btn" @click="emit('close')">
-              Cancelar
+              ❌ Cancelar
             </button>
           </footer>
         </div>
@@ -242,7 +242,7 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 200;
   background: rgba(20, 15, 10, 0.85);
   backdrop-filter: blur(4px);
   display: flex;
@@ -638,38 +638,6 @@ onUnmounted(() => {
   font-family: monospace;
   letter-spacing: 0.05em;
   flex-shrink: 0;
-}
-
-.pay-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.pay-btn:active {
-  transform: translateY(0);
-}
-
-.btn-rune {
-  font-size: 0.6rem;
-  color: rgba(0, 0, 0, 0.4);
-}
-
-.btn-label {
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.btn-shortcut {
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
-  font-size: 0.6rem;
-  font-weight: 900;
-  font-family: monospace;
-  letter-spacing: 0.05em;
 }
 
 .efectivo .btn-shortcut {

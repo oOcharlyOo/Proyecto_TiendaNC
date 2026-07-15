@@ -436,7 +436,7 @@ onUnmounted(() => {
                   <option value="" disabled>Proveedor...</option>
                   <option v-for="prov in proveedores" :key="prov.idProveedor" :value="prov.idProveedor">{{ prov.nombre }}</option>
                 </select>
-                <button class="ap-sinprov-btn" :disabled="!seleccionSinProv.get(item.idProducto)" @click="asignarSinProveedor(item.idProducto)">Asignar</button>
+                <button class="ap-sinprov-btn" :disabled="!seleccionSinProv.get(item.idProducto)" @click="asignarSinProveedor(item.idProducto)">📌 Asignar</button>
               </div>
             </div>
           </div>
@@ -463,8 +463,8 @@ onUnmounted(() => {
                 <span v-else>📦 Lote</span>
               </button>
               <button class="btn-add" @click="showAgregar = !showAgregar; modoLote = false">
-                <span v-if="showAgregar">✕ Cerrar</span>
-                <span v-else>+ Agregar</span>
+                <span v-if="showAgregar">❌ Cerrar</span>
+                <span v-else>➕ Agregar</span>
               </button>
             </div>
           </div>
@@ -636,13 +636,13 @@ onUnmounted(() => {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
 }
 
 .ap-subtitle {
   margin: 0;
   font-size: 0.7rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-layout {
@@ -657,8 +657,8 @@ onUnmounted(() => {
   width: 250px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary, #2a2a3e);
-  border: 1px solid var(--border-color, #333);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -668,7 +668,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .search-icon {
@@ -680,7 +680,7 @@ onUnmounted(() => {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   font-size: 0.75rem;
   outline: none;
 }
@@ -731,7 +731,7 @@ onUnmounted(() => {
 .ap-prov-name {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -758,8 +758,8 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary, #2a2a3e);
-  border: 1px solid var(--border-color, #333);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: visible;
 }
@@ -769,7 +769,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .ap-header-actions {
@@ -798,7 +798,7 @@ onUnmounted(() => {
 .ap-lote-panel {
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--color-border);
   background: rgba(99, 102, 241, 0.05);
 }
 
@@ -814,7 +814,7 @@ onUnmounted(() => {
 .ap-lote-header h5 {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
 }
 
 .ap-lote-actions {
@@ -826,18 +826,18 @@ onUnmounted(() => {
 
 .btn-select-all {
   padding: 0.35rem 0.6rem;
-  background: var(--bg-panel, #252538);
+  background: var(--color-bg-panel);
   border: 1px solid var(--border-color, #444);
   border-radius: 4px;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
   font-size: 0.7rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .btn-select-all:hover:not(:disabled) {
-  border-color: var(--accent-color, #c99234);
-  color: var(--text-primary, #f6f2de);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 .btn-select-all:disabled {
@@ -847,10 +847,10 @@ onUnmounted(() => {
 
 .btn-asignar-lote {
   padding: 0.35rem 0.75rem;
-  background: linear-gradient(180deg, var(--accent-color, #c99234) 0%, color-mix(in srgb, var(--accent-color, #c99234) 70%, black) 100%);
+  background: linear-gradient(180deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 70%, black) 100%);
   border: none;
   border-radius: 4px;
-  color: var(--bg-primary, #1a1a2e);
+  color: var(--color-bg-primary);
   font-size: 0.7rem;
   font-weight: 700;
   cursor: pointer;
@@ -872,7 +872,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .ap-lote-list {
@@ -916,12 +916,12 @@ onUnmounted(() => {
 }
 
 .ap-lote-item.selected .ap-lote-check {
-  background: var(--accent-color, #c99234);
-  border-color: var(--accent-color, #c99234);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .check-mark {
-  color: var(--bg-primary, #1a1a2e);
+  color: var(--color-bg-primary);
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -934,7 +934,7 @@ onUnmounted(() => {
 .ap-lote-name {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   display: block;
   white-space: nowrap;
   overflow: hidden;
@@ -950,7 +950,7 @@ onUnmounted(() => {
 
 .ap-lote-price {
   font-size: 0.65rem;
-  color: var(--accent-color, #c99234);
+  color: var(--color-accent);
   font-family: monospace;
   font-weight: 600;
 }
@@ -959,27 +959,27 @@ onUnmounted(() => {
   padding: 2rem;
   text-align: center;
   font-size: 0.75rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-main-title {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
 }
 
 .ap-count {
   font-size: 0.7rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .btn-add {
   padding: 0.4rem 0.75rem;
-  background: var(--accent-color, #c99234);
+  background: var(--color-accent);
   border: none;
   border-radius: 6px;
-  color: var(--bg-primary, #1a1a2e);
+  color: var(--color-bg-primary);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -992,7 +992,7 @@ onUnmounted(() => {
 
 .ap-add-panel {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.02);
   overflow: visible;
   position: relative;
@@ -1009,7 +1009,7 @@ onUnmounted(() => {
 .ap-add-header h5 {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
 }
 
 .ap-precio-group {
@@ -1020,16 +1020,16 @@ onUnmounted(() => {
 
 .ap-precio-group label {
   font-size: 0.7rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-precio-input {
   width: 80px;
   padding: 0.25rem 0.4rem;
-  background: var(--bg-panel, #252538);
+  background: var(--color-bg-panel);
   border: 1px solid var(--border-color, #444);
   border-radius: 4px;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   font-size: 0.75rem;
   font-family: monospace;
 }
@@ -1046,7 +1046,7 @@ onUnmounted(() => {
   right: 0;
   max-height: 250px;
   overflow-y: auto;
-  background: var(--bg-panel, #252538);
+  background: var(--color-bg-panel);
   border: 1px solid var(--border-color, #444);
   border-radius: 8px;
   z-index: 10000;
@@ -1085,7 +1085,7 @@ onUnmounted(() => {
 .ap-drop-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   display: block;
   white-space: nowrap;
   overflow: hidden;
@@ -1100,7 +1100,7 @@ onUnmounted(() => {
 
 .ap-drop-price {
   font-size: 0.75rem;
-  color: var(--accent-color, #c99234);
+  color: var(--color-accent);
   font-family: monospace;
   font-weight: 600;
   flex-shrink: 0;
@@ -1116,13 +1116,13 @@ onUnmounted(() => {
 .ap-hint {
   margin-top: 0.5rem;
   font-size: 0.65rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
   text-align: center;
 }
 
 .ap-barcode {
   font-size: 0.6rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-gramaje {
@@ -1156,7 +1156,7 @@ onUnmounted(() => {
 .ap-asig-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   display: block;
 }
 
@@ -1169,7 +1169,7 @@ onUnmounted(() => {
 
 .ap-agreed-price {
   font-size: 0.65rem;
-  color: var(--accent-color, #c99234);
+  color: var(--color-accent);
   font-weight: 600;
   font-family: monospace;
 }
@@ -1206,20 +1206,20 @@ onUnmounted(() => {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
 }
 
 .empty-sub {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-empty-small {
   padding: 1rem;
   text-align: center;
   font-size: 0.75rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
 }
 
 .ap-loading {
@@ -1229,14 +1229,14 @@ onUnmounted(() => {
   justify-content: center;
   padding: 2rem;
   gap: 0.75rem;
-  color: var(--accent-color, #c99234);
+  color: var(--color-accent);
 }
 
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--border-color, #333);
-  border-top-color: var(--accent-color, #c99234);
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1275,7 +1275,7 @@ onUnmounted(() => {
 }
 
 .ap-sinprov-section {
-  border-top: 1px solid var(--border-color, #333);
+  border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   max-height: 40%;
@@ -1289,7 +1289,7 @@ onUnmounted(() => {
   padding: 0.5rem;
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   background: rgba(239, 68, 68, 0.1);
   border-bottom: 1px solid rgba(239, 68, 68, 0.2);
   flex-shrink: 0;
@@ -1332,7 +1332,7 @@ onUnmounted(() => {
 .ap-sinprov-name {
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1340,7 +1340,7 @@ onUnmounted(() => {
 
 .ap-sinprov-sub {
   font-size: 0.6rem;
-  color: var(--text-secondary, #888);
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -1353,10 +1353,10 @@ onUnmounted(() => {
 .ap-sinprov-select {
   flex: 1;
   padding: 0.25rem 0.3rem;
-  background: var(--bg-panel, #252538);
+  background: var(--color-bg-panel);
   border: 1px solid var(--border-color, #444);
   border-radius: 4px;
-  color: var(--text-primary, #f6f2de);
+  color: var(--color-text-primary);
   font-size: 0.65rem;
   min-width: 0;
   max-width: 130px;
@@ -1364,10 +1364,10 @@ onUnmounted(() => {
 
 .ap-sinprov-btn {
   padding: 0.25rem 0.5rem;
-  background: var(--accent-color, #c99234);
+  background: var(--color-accent);
   border: none;
   border-radius: 4px;
-  color: var(--bg-primary, #1a1a2e);
+  color: var(--color-bg-primary);
   font-size: 0.6rem;
   font-weight: 700;
   cursor: pointer;

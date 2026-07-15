@@ -24,8 +24,9 @@ defineEmits<{
       <button v-if="filtroBusqueda" @click="$emit('update:filtro-busqueda', '')" class="inv__x">×</button>
     </div>
     <div class="inv__ctrls">
-      <select :value="filtroCategoria" @change="$emit('update:filtro-categoria', ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)">
-        <option v-for="c in catsConTodas" :key="c.idCategoria ?? 'a'" :value="c.idCategoria">{{ c.nombre }}</option>
+      <select :value="filtroCategoria ?? ''" @change="$emit('update:filtro-categoria', ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)">
+        <option value="">Todas</option>
+        <option v-for="c in catsConTodas.filter(x => x.idCategoria !== null)" :key="c.idCategoria!" :value="c.idCategoria">{{ c.nombre }}</option>
       </select>
       <select :value="ordenarPor" @change="$emit('update:ordenar-por', ($event.target as HTMLSelectElement).value)">
         <option value="nombre">Nombre</option>

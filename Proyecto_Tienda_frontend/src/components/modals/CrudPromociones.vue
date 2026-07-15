@@ -601,7 +601,7 @@ function formatImagenUrl(url: string | null): string | undefined {
             </div>
 
             <div class="form-actions">
-              <button class="btn-cancel" @click="activeTab = 'lista'">Cancelar</button>
+              <button class="btn-cancel" @click="activeTab = 'lista'">❌ Cancelar</button>
               <button class="btn-save" @click="guardarPromocion" :disabled="loading">
                 {{ loading ? 'Guardando...' : '💾 Guardar' }}
               </button>
@@ -635,10 +635,10 @@ function formatImagenUrl(url: string | null): string | undefined {
                 <span class="gramaje-unit">{{ gramosTemp >= 1000 ? 'kg' : 'g' }}</span>
               </div>
               <div class="gramaje-quick-btns">
-                <button type="button" @click="gramosTemp = 100">100g</button>
-                <button type="button" @click="gramosTemp = 250">250g</button>
-                <button type="button" @click="gramosTemp = 500">500g</button>
-                <button type="button" @click="gramosTemp = 1000">1kg</button>
+                <button type="button" @click="gramosTemp = 100">⚖️ 100g</button>
+                <button type="button" @click="gramosTemp = 250">⚖️ 250g</button>
+                <button type="button" @click="gramosTemp = 500">⚖️ 500g</button>
+                <button type="button" @click="gramosTemp = 1000">⚖️ 1kg</button>
               </div>
             </div>
             <p class="gramaje-subtotal" v-if="gramosTemp > 0">
@@ -647,8 +647,8 @@ function formatImagenUrl(url: string | null): string | undefined {
             </p>
           </div>
           <footer class="gramaje-footer">
-            <button class="btn-cancelar" @click="cerrarModalGramaje">Cancelar</button>
-            <button class="btn-confirmar" @click="() => { confirmarGramaje(gramosTemp); gramosTemp = 0; }" :disabled="!gramosTemp || gramosTemp <= 0">Agregar</button>
+            <button class="btn-cancelar" @click="cerrarModalGramaje">❌ Cancelar</button>
+            <button class="btn-confirmar" @click="() => { confirmarGramaje(gramosTemp); gramosTemp = 0; }" :disabled="!gramosTemp || gramosTemp <= 0">➕ Agregar</button>
           </footer>
         </div>
       </div>
@@ -657,10 +657,10 @@ function formatImagenUrl(url: string | null): string | undefined {
 </template>
 
 <style scoped>
-.modal-overlay {
+.modal-overlay { z-index: 200;
   position: fixed;
   inset: 0;
-  z-index: 100;
+  
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
@@ -1254,10 +1254,10 @@ function formatImagenUrl(url: string | null): string | undefined {
   }
 }
 
-.gramaje-modal-overlay {
+.gramaje-modal-overlay { z-index: 300;
   position: fixed;
   inset: 0;
-  z-index: 200;
+  
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;

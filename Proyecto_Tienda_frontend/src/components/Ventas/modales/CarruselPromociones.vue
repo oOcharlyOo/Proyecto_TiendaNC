@@ -218,7 +218,7 @@ function formatImagenUrl(url: string | null): string | undefined {
                 <ul class="products-list">
                   <li v-for="detalle in currentPromocion?.detalles" :key="detalle.id_detalle" class="product-item">
                     <span class="product-qty">{{ formatearCantidad(detalle.cantidad) }}</span>
-                    <span class="product-name">{{ detalle.nombre_producto }}</span>
+                    <span class="pos-product-name">{{ detalle.nombre_producto }}</span>
                   </li>
                 </ul>
               </div>
@@ -272,16 +272,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 <style scoped>
 .promo-carousel {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--bg-primary) 90%, var(--accent-color)) 100%);
-  border: 3px solid var(--accent-color);
+  background: linear-gradient(135deg, var(--color-bg-panel) 0%, color-mix(in srgb, var(--color-bg-primary) 90%, var(--color-accent)) 100%);
   border-radius: 16px;
   padding: 1rem;
   margin: 0.5rem;
   position: relative;
   overflow: hidden;
-  box-shadow: 
-    0 4px 20px var(--shadow-color),
-    inset 0 1px 0 color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .promo-carousel::before {
@@ -290,10 +286,10 @@ function formatImagenUrl(url: string | null): string | undefined {
   top: 12px;
   left: 12px;
   font-size: 1.5rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   opacity: 0.4;
   animation: float 3s ease-in-out infinite;
-  filter: drop-shadow(0 2px 4px var(--shadow-color));
+  filter: drop-shadow(0 2px 4px var(--color-shadow));
 }
 
 .promo-carousel::after {
@@ -302,11 +298,11 @@ function formatImagenUrl(url: string | null): string | undefined {
   bottom: 12px;
   right: 12px;
   font-size: 1.5rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   opacity: 0.4;
   transform: rotate(180deg);
   animation: float 3s ease-in-out infinite reverse;
-  filter: drop-shadow(0 2px 4px var(--shadow-color));
+  filter: drop-shadow(0 2px 4px var(--color-shadow));
 }
 
 @keyframes float {
@@ -321,14 +317,14 @@ function formatImagenUrl(url: string | null): string | undefined {
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 2px dashed var(--border-color);
+  border-bottom: 2px dashed var(--color-border);
 }
 
 .hero-decor {
   font-size: 1.5rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   opacity: 0.6;
-  filter: drop-shadow(0 2px 4px var(--shadow-color));
+  filter: drop-shadow(0 2px 4px var(--color-shadow));
 }
 
 .hero-decor.left { animation: sparkle-left 2s ease-in-out infinite; }
@@ -355,28 +351,28 @@ function formatImagenUrl(url: string | null): string | undefined {
 .hero-icon {
   font-size: 1.8rem;
   animation: pulse-glow 2s ease-in-out infinite;
-  filter: drop-shadow(0 2px 8px var(--accent-color));
+  filter: drop-shadow(0 2px 8px var(--color-accent));
 }
 
 @keyframes pulse-glow {
-  0%, 100% { filter: drop-shadow(0 0 5px var(--accent-color)); }
-  50% { filter: drop-shadow(0 0 15px var(--accent-color)); }
+  0%, 100% { filter: drop-shadow(0 0 5px var(--color-accent)); }
+  50% { filter: drop-shadow(0 0 15px var(--color-accent)); }
 }
 
 .hero-title {
-  font-family: 'HyliaSerifBeta', serif;
-  color: var(--accent-color);
+  
+  color: var(--color-accent);
   font-size: 1.2rem;
   text-transform: uppercase;
   letter-spacing: 0.15em;
   margin: 0;
-  text-shadow: 2px 2px 0 var(--shadow-color);
-  filter: drop-shadow(0 1px 2px var(--shadow-color));
+  text-shadow: 2px 2px 0 var(--color-shadow);
+  filter: drop-shadow(0 1px 2px var(--color-shadow));
 }
 
 .hero-subtitle {
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -402,8 +398,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .card-badge {
-  background: linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #991b1b 100%);
-  color: #fef3c7;
+  background: linear-gradient(135deg, #ff4444 0%, #e53935 40%, #c62828 100%);
+  color: #fff;
   padding: 0.4rem 0.8rem;
   border-radius: 25px;
   font-size: 0.85rem;
@@ -411,12 +407,11 @@ function formatImagenUrl(url: string | null): string | undefined {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 3px solid #fbbf24;
+  border: 3px solid #ffd54f;
   box-shadow: 
-    0 4px 15px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    0 4px 15px rgba(255, 68, 68, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
   animation: badge-bounce 2s ease-in-out infinite;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
 }
 
 @keyframes badge-bounce {
@@ -438,12 +433,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 .card-inner {
   display: flex;
   gap: 1.25rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 1rem;
   box-shadow: 
-    0 8px 30px var(--shadow-color),
+    0 8px 30px var(--color-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
@@ -457,16 +452,16 @@ function formatImagenUrl(url: string | null): string | undefined {
   height: 160px;
   border-radius: 12px;
   overflow: hidden;
-  border: 3px solid var(--accent-color);
-  background: var(--bg-secondary);
+  border: 3px solid var(--color-accent);
+  background: var(--color-bg-panel);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   box-shadow: 
     inset 0 0 20px rgba(0, 0, 0, 0.3),
-    0 4px 15px var(--shadow-color);
-  filter: drop-shadow(0 4px 8px var(--shadow-color));
+    0 4px 15px var(--color-shadow);
+  filter: drop-shadow(0 4px 8px var(--color-shadow));
 }
 
 .promo-img {
@@ -489,13 +484,13 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  background: linear-gradient(135deg, var(--color-bg-panel) 0%, var(--color-bg-primary) 100%);
 }
 
 .placeholder-icon {
   font-size: 3rem;
   animation: bounce-gentle 2s ease-in-out infinite;
-  filter: drop-shadow(0 2px 4px var(--shadow-color));
+  filter: drop-shadow(0 2px 4px var(--color-shadow));
 }
 
 @keyframes bounce-gentle {
@@ -504,9 +499,9 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .placeholder-text {
-  font-family: 'HyliaSerifBeta', serif;
+  
   font-size: 0.8rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -518,7 +513,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   right: -5px;
   bottom: -5px;
   border-radius: 16px;
-  background: linear-gradient(45deg, var(--accent-color), transparent, var(--accent-color));
+  background: linear-gradient(45deg, var(--color-accent), transparent, var(--color-accent));
   opacity: 0;
   z-index: -1;
   transition: opacity 0.3s;
@@ -547,33 +542,33 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .promo-name {
-  font-family: 'HyliaSerifBeta', serif;
-  color: var(--accent-color);
+  
+  color: var(--color-accent);
   font-size: 1.3rem;
   margin: 0 0 0.4rem 0;
-  text-shadow: 1px 1px 0 var(--shadow-color);
+  text-shadow: 1px 1px 0 var(--color-shadow);
   line-height: 1.2;
-  filter: drop-shadow(0 1px 2px var(--shadow-color));
+  filter: drop-shadow(0 1px 2px var(--color-shadow));
 }
 
 .promo-description {
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.4;
   font-style: italic;
 }
 
 .promo-products {
-  background: var(--bg-secondary);
+  background: var(--color-bg-panel);
   border-radius: 8px;
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
 }
 
 .products-title {
   font-size: 0.8rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-weight: bold;
   margin: 0 0 0.5rem 0;
   display: flex;
@@ -584,7 +579,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 .title-icon {
   font-size: 1rem;
   animation: pulse-glow 2s ease-in-out infinite;
-  filter: drop-shadow(0 1px 3px var(--accent-color));
+  filter: drop-shadow(0 1px 3px var(--color-accent));
 }
 
 .products-list {
@@ -598,30 +593,30 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .product-item {
   font-size: 0.8rem;
-  background: var(--bg-primary);
+  background: var(--color-bg-primary);
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
   transition: all 0.2s;
 }
 
 .product-item:hover {
-  border-color: var(--accent-color);
+  border-color: var(--color-accent);
   transform: translateX(3px);
 }
 
 .product-qty {
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
   min-width: 50px;
   font-family: "Courier New", monospace;
 }
 
-.product-name {
-  color: var(--text-primary);
+.pos-product-name {
+  color: var(--color-text-primary);
   flex: 1;
 }
 
@@ -641,18 +636,18 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .price-original {
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   text-decoration: line-through;
   opacity: 0.7;
 }
 
 .price-promo-container {
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  background: linear-gradient(135deg, var(--color-success) 0%, color-mix(in srgb, var(--color-success) 60%, black) 100%);
   padding: 0.4rem 1rem;
   border-radius: 8px;
-  border: 2px solid #4ade80;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
-  filter: drop-shadow(0 2px 4px rgba(34, 197, 94, 0.3));
+  border: 2px solid var(--color-success);
+  box-shadow: 0 4px 15px color-mix(in srgb,var(--color-success) 30%,transparent);
+  filter: drop-shadow(0 2px 4px color-mix(in srgb,var(--color-success) 30%,transparent));
 }
 
 .price-promo {
@@ -668,9 +663,9 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(180deg, var(--accent-color) 0%, #92400e 100%);
-  color: var(--bg-primary);
-  border: 3px solid var(--border-color);
+  background: linear-gradient(180deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 50%, black) 100%);
+  color: var(--color-bg-primary);
+  border: 3px solid var(--color-border);
   border-radius: 10px;
   padding: 0.7rem 1.25rem;
   font-size: 0.9rem;
@@ -679,10 +674,10 @@ function formatImagenUrl(url: string | null): string | undefined {
   transition: all 0.2s;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  box-shadow: 0 4px 0 var(--border-color);
+  box-shadow: 0 4px 0 var(--color-border);
   position: relative;
   overflow: hidden;
-  filter: drop-shadow(0 4px 0 var(--border-color));
+  filter: drop-shadow(0 4px 0 var(--color-border));
 }
 
 .btn-agregar::before {
@@ -702,14 +697,14 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .btn-agregar:hover {
   transform: translateY(-3px);
-  box-shadow: 0 7px 0 var(--border-color);
-  filter: brightness(1.1) drop-shadow(0 7px 0 var(--border-color));
+  box-shadow: 0 7px 0 var(--color-border);
+  filter: brightness(1.1) drop-shadow(0 7px 0 var(--color-border));
 }
 
 .btn-agregar:active {
   transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--border-color);
-  filter: drop-shadow(0 2px 0 var(--border-color));
+  box-shadow: 0 2px 0 var(--color-border);
+  filter: drop-shadow(0 2px 0 var(--color-border));
 }
 
 .btn-icon {
@@ -727,9 +722,9 @@ function formatImagenUrl(url: string | null): string | undefined {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: var(--bg-primary);
-  border: 3px solid var(--border-color);
-  color: var(--accent-color);
+  background: var(--color-bg-primary);
+  border: 3px solid var(--color-border);
+  color: var(--color-accent);
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -739,15 +734,15 @@ function formatImagenUrl(url: string | null): string | undefined {
   cursor: pointer;
   transition: all 0.2s;
   z-index: 5;
-  box-shadow: 0 3px 10px var(--shadow-color);
-  filter: drop-shadow(0 3px 6px var(--shadow-color));
+  box-shadow: 0 3px 10px var(--color-shadow);
+  filter: drop-shadow(0 3px 6px var(--color-shadow));
 }
 
 .carousel-btn:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
   transform: translateY(-50%) scale(1.1);
-  box-shadow: 0 5px 15px color-mix(in srgb, var(--accent-color) 40%, transparent);
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .carousel-btn:active {
@@ -775,7 +770,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   gap: 1rem;
   margin-top: 1rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed var(--border-color);
+  border-top: 1px dashed var(--color-border);
 }
 
 .carousel-dots {
@@ -788,28 +783,28 @@ function formatImagenUrl(url: string | null): string | undefined {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--border-color);
-  border: 2px solid var(--text-secondary);
+  background: var(--color-border);
+  border: 2px solid var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .dot:hover {
-  background: var(--accent-color);
+  background: var(--color-accent);
   transform: scale(1.2);
 }
 
 .dot.active {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   transform: scale(1.3);
-  box-shadow: 0 0 10px var(--accent-color);
-  filter: drop-shadow(0 0 6px var(--accent-color));
+  box-shadow: 0 0 10px var(--color-accent);
+  filter: drop-shadow(0 0 6px var(--color-accent));
 }
 
 .carousel-counter {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -817,7 +812,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .counter-current {
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -1191,7 +1186,7 @@ function formatImagenUrl(url: string | null): string | undefined {
     font-size: 0.65rem;
   }
 
-  .product-name {
+  .pos-product-name {
     font-size: 0.7rem;
   }
 
@@ -1220,7 +1215,7 @@ function formatImagenUrl(url: string | null): string | undefined {
     font-size: 0.7rem;
     gap: 0.3rem;
     border-width: 2px;
-    box-shadow: 0 3px 0 var(--border-color);
+    box-shadow: 0 3px 0 var(--color-border);
   }
 
   .btn-icon {
@@ -1401,7 +1396,7 @@ function formatImagenUrl(url: string | null): string | undefined {
     font-size: 0.55rem;
   }
 
-  .product-name {
+  .pos-product-name {
     font-size: 0.6rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1434,7 +1429,7 @@ function formatImagenUrl(url: string | null): string | undefined {
     font-size: 0.65rem;
     gap: 0.25rem;
     border-width: 2px;
-    box-shadow: 0 2px 0 var(--border-color);
+    box-shadow: 0 2px 0 var(--color-border);
     border-radius: 8px;
   }
 
@@ -1459,7 +1454,7 @@ function formatImagenUrl(url: string | null): string | undefined {
     width: 28px;
     height: 28px;
     border-width: 2px;
-    box-shadow: 0 2px 6px var(--shadow-color);
+    box-shadow: 0 2px 6px var(--color-shadow);
   }
 
   .carousel-btn.prev {

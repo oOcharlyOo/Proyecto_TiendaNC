@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { DiasTrabajadosData, SemanaInfo, UsuarioDiasData } from '../logica/useUsuarios';
 
-defineProps<{
+const props = defineProps<{
   diasTrabajados: DiasTrabajadosData | null;
   cargandoAsistencias: boolean;
   filtroMesVentas: string;
   esAdmin: boolean;
   semanasDelMes: SemanaInfo[];
-  getDiasCalendario: () => Array<{ numero: number | null; esHoy: boolean; trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }>; esVacio: boolean; horasTotales: number }>;
   formatAvatarUrl: (url: string | null) => string | undefined;
   getNombreMes: (mes: number) => string;
   getIniciales: (nombre: string) => string;
@@ -17,10 +17,102 @@ defineProps<{
   getHorasDelDia: (usuario: UsuarioDiasData, dia: number) => number;
   getPagoSemanal: (usuario: UsuarioDiasData, semana: SemanaInfo) => number;
   getPagoTotal: (usuario: UsuarioDiasData) => number;
-  getSueldoHora: (usuario: UsuarioDiasData) => number;
+  getSueldoHora: (usuarioId: number) => number;
   getHorasSemana: (usuario: UsuarioDiasData, semana: SemanaInfo) => number;
   formatoMoneda: (valor: number) => string;
 }>();
+
+const usuariosConSueldo = computed(() => {
+  if (!props.diasTrabajados?.usuarios) return [];
+  return props.diasTrabajados.usuarios.filter(u => props.getSueldoHora(u.idUsuario) > 0);
+});
+
+const calendarioDias = computed(() => {
+  const dt = props.diasTrabajados;
+  if (!dt) return [];
+  type DiaCal = { numero: number; esHoy: boolean; trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }>; esVacio: boolean; horasTotales: number; esOverflow: boolean };
+  const dias: DiaCal[] = [];
+  const rawDay = new Date(dt.anio, dt.mes - 1, 1).getDay();
+  const firstDay = (rawDay + 6) % 7;
+  const daysInMonth = new Date(dt.anio, dt.mes, 0).getDate();
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  const hoy = new Date();
+  const empty: DiaCal = { numero: 0, esHoy: false, trabajadores: [], esVacio: true, horasTotales: 0, esOverflow: true };
+
+  const prevMonth = dt.mes === 1 ? 12 : dt.mes - 1;
+  const prevYear = dt.mes === 1 ? dt.anio - 1 : dt.anio;
+  const daysInPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
+  const nextMonth = dt.mes === 12 ? 1 : dt.mes + 1;
+  const nextYear = dt.mes === 12 ? dt.anio + 1 : dt.anio;
+
+  function getOverflowWorkers(user: UsuarioDiasData, fechaStr: string): Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> {
+    const workers: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    if (!user.overflow) return workers;
+    const entry = user.overflow.find(o => o.fecha === fechaStr);
+    if (entry && entry.horas > 0) {
+      workers.push({
+        nombre: user.nombreUsuario,
+        horas: entry.horas,
+        apertura: entry.apertura || '',
+        cierre: entry.cierre || null
+      });
+    }
+    return workers;
+  }
+
+  for (let i = 0; i < firstDay; i++) {
+    const dayNum = daysInPrevMonth - firstDay + 1 + i;
+    const fechaStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    let horasTotales = 0;
+    if (dt.usuarios) {
+      for (const user of dt.usuarios) {
+        const workers = getOverflowWorkers(user, fechaStr);
+        trabajadores.push(...workers);
+        horasTotales += workers.reduce((s, w) => s + w.horas, 0);
+      }
+    }
+    dias.push({ numero: dayNum, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    let horasTotales = 0;
+    if (dt.usuarios) {
+      for (const user of dt.usuarios) {
+        if (user.diasLaborados?.includes(d)) {
+          const horas = props.getHorasDelDia(user, d);
+          horasTotales += horas;
+          trabajadores.push({
+            nombre: user.nombreUsuario,
+            horas,
+            apertura: user.aperturas?.[d] || '',
+            cierre: user.cierres?.[d] || null
+          });
+        }
+      }
+    }
+    const esHoy = d === hoy.getDate() && dt.mes === hoy.getMonth() + 1 && dt.anio === hoy.getFullYear();
+    dias.push({ numero: d, esHoy, trabajadores, esVacio: false, horasTotales, esOverflow: false });
+  }
+
+  const remaining = totalCells - dias.length;
+  for (let i = 1; i <= remaining; i++) {
+    const fechaStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    let horasTotales = 0;
+    if (dt.usuarios) {
+      for (const user of dt.usuarios) {
+        const workers = getOverflowWorkers(user, fechaStr);
+        trabajadores.push(...workers);
+        horasTotales += workers.reduce((s, w) => s + w.horas, 0);
+      }
+    }
+    dias.push({ numero: i, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
+  }
+
+  return dias;
+});
 
 const emit = defineEmits<{
   'cargar-asistencias': [];
@@ -70,16 +162,16 @@ const emit = defineEmits<{
 
         <div class="calendario-dias">
           <div
-            v-for="(dia, index) in getDiasCalendario()"
+            v-for="(dia, index) in calendarioDias"
             :key="index"
             class="dia-cell"
             :class="{
-              'dia-vacio': !dia.numero,
+              'dia-vacio': dia.esVacio,
               'dia-hoy': dia.esHoy,
               'dia-trabajado': dia.trabajadores.length > 0
             }"
           >
-            <span v-if="dia.numero" class="dia-numero">{{ dia.numero }}</span>
+            <span v-if="!dia.esVacio" class="dia-numero">{{ dia.numero }}</span>
             <div v-if="dia.trabajadores.length > 0" class="dia-trabajadores">
               <div
                 v-for="(trabajador, idx) in dia.trabajadores.slice(0, 3)"
@@ -97,9 +189,9 @@ const emit = defineEmits<{
                 +{{ dia.trabajadores.length - 3 }}
               </div>
             </div>
-            <span v-else-if="dia.numero && !dia.esHoy" class="dia-vacio-text">-</span>
+            <span v-else-if="!dia.esVacio && !dia.esHoy" class="dia-vacio-text">-</span>
             <span v-if="dia.esHoy && dia.trabajadores.length === 0" class="dia-hoy-text">Hoy</span>
-            <span v-if="dia.horasTotales > 0 && dia.numero" class="dia-total-horas">
+            <span v-if="dia.horasTotales > 0 && !dia.esVacio" class="dia-total-horas">
               {{ getHorasFormateadas(dia.horasTotales) }}
             </span>
           </div>
@@ -110,7 +202,7 @@ const emit = defineEmits<{
         <h3>👥 Resumen por Usuario</h3>
         <div class="usuarios-asistencia-grid">
           <div
-            v-for="usuario in diasTrabajados.usuarios"
+            v-for="usuario in usuariosConSueldo"
             :key="usuario.idUsuario"
             class="usuario-asistencia-card"
           >
@@ -172,14 +264,14 @@ const emit = defineEmits<{
               </tr>
             </thead>
             <tbody>
-              <tr v-for="usuario in diasTrabajados.usuarios" :key="usuario.idUsuario">
+              <tr v-for="usuario in usuariosConSueldo" :key="usuario.idUsuario">
                 <td class="pago-usuario">
                   <div class="pago-usuario-info">
                     <img v-if="usuario.avatar" :src="formatAvatarUrl(usuario.avatar)" :alt="usuario.nombreUsuario" class="pago-avatar" />
                     <div v-else class="pago-avatar-placeholder">{{ usuario.nombreUsuario?.charAt(0)?.toUpperCase() || '?' }}</div>
                     <div class="pago-usuario-nombre">
                       <span>{{ usuario.nombreUsuario }}</span>
-                      <small v-if="getSueldoHora(usuario) > 0">${{ getSueldoHora(usuario).toFixed(2) }}/h</small>
+                      <small v-if="getSueldoHora(usuario.idUsuario) > 0">${{ getSueldoHora(usuario.idUsuario).toFixed(2) }}/h</small>
                       <small v-else class="sin-sueldo">Sin sueldo configurado</small>
                     </div>
                   </div>

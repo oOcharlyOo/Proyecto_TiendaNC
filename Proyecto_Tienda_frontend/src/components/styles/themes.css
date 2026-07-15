@@ -1,517 +1,466 @@
 /* ================================================
-   SISTEMA DE TEMAS
-   Define los colores y variables visuales de cada tema.
-   
-   📌 CÓMO AGREGAR UN NUEVO TEMA:
-   1. Copia un bloque [data-theme="nombre"] existente
-   2. Pégalo abajo en la sección de temas
-   3. Cambia "nombre" por el identificador del nuevo tema
-   4. Ajusta los colores a tu gusto
-   5. El tema estará disponible automáticamente via useTheme()
+   DESIGN TOKENS - Sistema de Temas
+
+   Cada tema define tokens semánticos que los
+   componentes consumen. Para agregar un tema:
+
+   1. Copia un bloque [data-theme] existente
+   2. Cambia el nombre del data-theme
+   3. Ajusta los colores
+   4. El tema estará disponible automáticamente
    ================================================ */
 
-/* ---------- Variables base (fallback) ---------- */
+/* ================================================
+   TOKENS POR CATEGORÍA (valores en :root)
+
+   Superficie:    --color-bg-*
+   Texto:         --color-text-*
+   Bordes:        --color-border-*
+   Acento/Marca:  --color-brand, --color-accent-*
+   Estado:        --color-success, --color-error, --color-warning, --color-info
+   Sombras:       --color-shadow
+   Gradientes:    --gradient-btn-*, --gradient-bg-*
+   Tipografía:    --font-title
+   ================================================ */
+
 :root {
+  /* --- Superficie (Backgrounds) --- */
+  --color-bg-primary: #0a1510;
+  --color-bg-secondary: #1a2f20;
+  --color-bg-panel: #2a4030;
+
+  /* --- Texto --- */
+  --color-text-primary: #e8e0d0;
+  --color-text-secondary: #b0a890;
+  --color-text-muted: #787060;
+
+  /* --- Bordes --- */
+  --color-border: #4a3520;
+  --border-width: 3px;
+  --border-width-thick: 4px;
+
+  /* --- Acento / Marca --- */
+  --color-brand: #d4a84b;
+  --color-brand-hover: #e8c06a;
+  --color-accent: #d4a84b;
+  --color-accent-hover: #e8c06a;
+  --color-on-brand: #1a1510;
+
+  /* --- Estado / Feedback --- */
+  --color-success: #5cb85c;
+  --color-error: #c75a5a;
+  --color-warning: #e8a83c;
+  --color-info: #5090d0;
+
+  /* --- Sombras --- */
+  --color-shadow: rgba(0, 0, 0, 0.5);
+
+  /* --- Gradientes (Botones) --- */
+  --gradient-btn-start: #e8c06a;
+  --gradient-btn-mid: #c9a045;
+  --gradient-btn-end: #9a7530;
+
+  /* --- Gradientes (Fondo) --- */
+  --gradient-bg-start: #1a2f20;
+  --gradient-bg-mid: #0f1a12;
+
+  /* --- Tipografía --- */
+  --font-title: 'Cinzel', serif;
+  --font-body: 'HyliaSerif', 'Palatino Linotype', 'Book Antiqua', Palatino, 'Courier New', serif;
+
+  /* --- Transiciones --- */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+
+  /* --- Bordes redondeados --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* --- Espaciado --- */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* --- Aliases de compatibilidad (nombres antiguos) --- */
+  --zelda-gold: #d4a84b;
+  --infoBlueColor: #5090d0;
+  --btn-text: #1a1510;
+  --accent-color: #d4a84b;
+  --accent-hover: #e8c06a;
   --bg-primary: #0a1510;
   --bg-secondary: #1a2f20;
   --bg-panel: #2a4030;
   --text-primary: #e8e0d0;
   --text-secondary: #b0a890;
   --border-color: #4a3520;
-  --accent-color: #d4a84b;
-  --accent-hover: #e8c06a;
   --success-color: #5cb85c;
   --error-color: #c75a5a;
   --warning-color: #e8a83c;
   --shadow-color: rgba(0, 0, 0, 0.5);
-
-  --gradient-btn-start: #e8c06a;
-  --gradient-btn-mid: #c9a045;
-  --gradient-btn-end: #9a7530;
-  --gradient-panel-start: #2a4030;
-  --gradient-panel-end: #1a2f20;
-  --gradient-bg-start: #1a2f20;
-  --gradient-bg-mid: #0f1a12;
-
-  --chart-border: #4a3520;
-  --chart-border-light: #d4a84b;
-  --chart-bg: #1a2f20;
-  --chart-text: #e8e0d0;
   --chart-item-bg: rgba(212, 168, 75, 0.1);
-  --chart-qty: #b0a890;
-  --chart-amount: #5cb85c;
-  --zelda-gold: #d4a84b;
-  --hystorybtn: #9a7530;
-  --infoBlueColor: #5090d0;
-  --btn-text: #1a1510;
-
-  --border-width: 3px;
-  --border-width-thick: 4px;
-  --shadow-outer: 0 4px 0;
-  --shadow-inner: inset 0 0 0 2px;
 }
 
 /* ================================================
-   TEMAS DISPONIBLES
-   Copia cualquiera de estos bloques para crear
-   un nuevo tema. Solo cambia el nombre y colores.
+   TEMA: ZELDA (Hyrule Clásico)
    ================================================ */
-
-/* --- Tema: Zelda (Hyrule Clásico) --- */
 [data-theme="zelda"] {
+  --color-bg-primary: #0a1510;
+  --color-bg-secondary: #1a2f20;
+  --color-bg-panel: #2a4030;
+  --color-text-primary: #e8e0d0;
+  --color-text-secondary: #b0a890;
+  --color-text-muted: #787060;
+  --color-border: #4a3520;
+  --color-brand: #d4a84b;
+  --color-brand-hover: #e8c06a;
+  --color-accent: #d4a84b;
+  --color-accent-hover: #e8c06a;
+  --color-on-brand: #1a1510;
+  --color-success: #5cb85c;
+  --color-error: #c75a5a;
+  --color-warning: #e8a83c;
+  --color-info: #5090d0;
+  --color-shadow: rgba(0, 0, 0, 0.5);
+  --gradient-btn-start: #e8c06a;
+  --gradient-btn-mid: #c9a045;
+  --gradient-btn-end: #9a7530;
+  --gradient-bg-start: #1a2f20;
+  --gradient-bg-mid: #0f1a12;
+  --chart-item-bg: rgba(212, 168, 75, 0.1);
+
+  /* Aliases de compatibilidad */
+  --zelda-gold: #d4a84b;
+  --infoBlueColor: #5090d0;
+  --btn-text: #1a1510;
+  --accent-color: #d4a84b;
+  --accent-hover: #e8c06a;
   --bg-primary: #0a1510;
   --bg-secondary: #1a2f20;
   --bg-panel: #2a4030;
   --text-primary: #e8e0d0;
   --text-secondary: #b0a890;
   --border-color: #4a3520;
-  --accent-color: #d4a84b;
-  --accent-hover: #e8c06a;
   --success-color: #5cb85c;
   --error-color: #c75a5a;
   --warning-color: #e8a83c;
   --shadow-color: rgba(0, 0, 0, 0.5);
-  --gradient-btn-start: #e8c06a;
-  --gradient-btn-mid: #c9a045;
-  --gradient-btn-end: #9a7530;
-  --gradient-panel-start: #2a4030;
-  --gradient-panel-end: #1a2f20;
-  --gradient-bg-start: #1a2f20;
-  --gradient-bg-mid: #0f1a12;
-  --btn-text: #1a1510;
-  --chart-border: #4a3520;
-  --chart-border-light: #d4a84b;
-  --chart-bg: #1a2f20;
-  --chart-text: #e8e0d0;
-  --chart-item-bg: rgba(212, 168, 75, 0.1);
-  --chart-qty: #b0a890;
-  --chart-amount: #5cb85c;
-  --zelda-gold: #d4a84b;
-  --hystorybtn: #9a7530;
 }
 
-/* --- Tema: Death Mountain (Volcán) --- */
+/* ================================================
+   TEMA: DEATH MOUNTAIN (Volcán)
+   ================================================ */
 [data-theme="deathmountain"] {
+  --color-bg-primary: #1a0808;
+  --color-bg-secondary: #3a1515;
+  --color-bg-panel: #5a2525;
+  --color-text-primary: #f0e8e0;
+  --color-text-secondary: #c8a8a8;
+  --color-text-muted: #886868;
+  --color-border: #4a2020;
+  --color-brand: #e86a3a;
+  --color-brand-hover: #ff8855;
+  --color-accent: #e86a3a;
+  --color-accent-hover: #ff8855;
+  --color-on-brand: #1a0808;
+  --color-success: #7ab87a;
+  --color-error: #e85555;
+  --color-warning: #e8a03a;
+  --color-info: #5090d0;
+  --color-shadow: rgba(20, 0, 0, 0.6);
+  --gradient-btn-start: #ff8855;
+  --gradient-btn-mid: #d86a35;
+  --gradient-btn-end: #a84a20;
+  --gradient-bg-start: #4a1a1a;
+  --gradient-bg-mid: #1a0808;
+  --chart-item-bg: rgba(232, 106, 58, 0.1);
+
+  --zelda-gold: #e86a3a;
+  --infoBlueColor: #5090d0;
+  --btn-text: #1a0808;
+  --accent-color: #e86a3a;
+  --accent-hover: #ff8855;
   --bg-primary: #1a0808;
   --bg-secondary: #3a1515;
   --bg-panel: #5a2525;
   --text-primary: #f0e8e0;
   --text-secondary: #c8a8a8;
   --border-color: #4a2020;
-  --accent-color: #e86a3a;
-  --accent-hover: #ff8855;
   --success-color: #7ab87a;
   --error-color: #e85555;
   --warning-color: #e8a03a;
   --shadow-color: rgba(20, 0, 0, 0.6);
-  --gradient-btn-start: #ff8855;
-  --gradient-btn-mid: #d86a35;
-  --gradient-btn-end: #a84a20;
-  --gradient-panel-start: #5a2525;
-  --gradient-panel-end: #3a1515;
-  --gradient-bg-start: #4a1a1a;
-  --gradient-bg-mid: #1a0808;
-  --btn-text: #1a0808;
-  --chart-border: #4a2020;
-  --chart-border-light: #e86a3a;
-  --chart-bg: #3a1515;
-  --chart-text: #f0e8e0;
-  --chart-item-bg: rgba(232, 106, 58, 0.1);
-  --chart-qty: #c8a8a8;
-  --chart-amount: #7ab87a;
-  --zelda-gold: #e86a3a;
-  --hystorybtn: #a84a20;
 }
 
-/* --- Tema: Skyward Sword (Cielo) --- */
+/* ================================================
+   TEMA: SKYWARD SWORD (Cielo)
+   ================================================ */
 [data-theme="skyward"] {
+  --color-bg-primary: #0a1828;
+  --color-bg-secondary: #1a3060;
+  --color-bg-panel: #2a4890;
+  --color-text-primary: #e8f0ff;
+  --color-text-secondary: #90b0d8;
+  --color-text-muted: #6080a8;
+  --color-border: #1a2840;
+  --color-brand: #f0d040;
+  --color-brand-hover: #ffe060;
+  --color-accent: #f0d040;
+  --color-accent-hover: #ffe060;
+  --color-on-brand: #0a1828;
+  --color-success: #60c8a0;
+  --color-error: #e87070;
+  --color-warning: #e8b030;
+  --color-info: #5090d0;
+  --color-shadow: rgba(10, 20, 40, 0.5);
+  --gradient-btn-start: #ffe060;
+  --gradient-btn-mid: #d8b840;
+  --gradient-btn-end: #a88820;
+  --gradient-bg-start: #1a3870;
+  --gradient-bg-mid: #0a1828;
+  --chart-item-bg: rgba(240, 208, 64, 0.1);
+
+  --zelda-gold: #f0d040;
+  --infoBlueColor: #5090d0;
+  --btn-text: #0a1828;
+  --accent-color: #f0d040;
+  --accent-hover: #ffe060;
   --bg-primary: #0a1828;
   --bg-secondary: #1a3060;
   --bg-panel: #2a4890;
   --text-primary: #e8f0ff;
   --text-secondary: #90b0d8;
   --border-color: #1a2840;
-  --accent-color: #f0d040;
-  --accent-hover: #ffe060;
   --success-color: #60c8a0;
   --error-color: #e87070;
   --warning-color: #e8b030;
   --shadow-color: rgba(10, 20, 40, 0.5);
-  --gradient-btn-start: #ffe060;
-  --gradient-btn-mid: #d8b840;
-  --gradient-btn-end: #a88820;
-  --gradient-panel-start: #2a4888;
-  --gradient-panel-end: #1a3060;
-  --gradient-bg-start: #1a3870;
-  --gradient-bg-mid: #0a1828;
-  --btn-text: #0a1828;
-  --chart-border: #1a2840;
-  --chart-border-light: #f0d040;
-  --chart-bg: #1a3060;
-  --chart-text: #e8f0ff;
-  --chart-item-bg: rgba(240, 208, 64, 0.1);
-  --chart-qty: #90b0d8;
-  --chart-amount: #60c8a0;
-  --zelda-gold: #f0d040;
-  --hystorybtn: #a88820;
 }
 
-/* --- Tema: Alforja (Pergamino Antiguo) --- */
+/* ================================================
+   TEMA: ALFORJA (Pergamino Antiguo)
+   ================================================ */
 [data-theme="alforja"] {
+  --color-bg-primary: #18100a;
+  --color-bg-secondary: #3a2820;
+  --color-bg-panel: #5a4030;
+  --color-text-primary: #f0e8d8;
+  --color-text-secondary: #b8a890;
+  --color-text-muted: #7a6848;
+  --color-border: #3a2818;
+  --color-brand: #c9a050;
+  --color-brand-hover: #ddb868;
+  --color-accent: #c9a050;
+  --color-accent-hover: #ddb868;
+  --color-on-brand: #18100a;
+  --color-success: #78a858;
+  --color-error: #c06060;
+  --color-warning: #d8a040;
+  --color-info: #5090d0;
+  --color-shadow: rgba(20, 12, 8, 0.5);
+  --gradient-btn-start: #ddb868;
+  --gradient-btn-mid: #b89048;
+  --gradient-btn-end: #886828;
+  --gradient-bg-start: #4a3525;
+  --gradient-bg-mid: #18100a;
+  --chart-item-bg: rgba(201, 160, 80, 0.1);
+
+  --zelda-gold: #c9a050;
+  --infoBlueColor: #5090d0;
+  --btn-text: #18100a;
+  --accent-color: #c9a050;
+  --accent-hover: #ddb868;
   --bg-primary: #18100a;
   --bg-secondary: #3a2820;
   --bg-panel: #5a4030;
   --text-primary: #f0e8d8;
   --text-secondary: #b8a890;
   --border-color: #3a2818;
-  --accent-color: #c9a050;
-  --accent-hover: #ddb868;
   --success-color: #78a858;
   --error-color: #c06060;
   --warning-color: #d8a040;
   --shadow-color: rgba(20, 12, 8, 0.5);
-  --gradient-btn-start: #ddb868;
-  --gradient-btn-mid: #b89048;
-  --gradient-btn-end: #886828;
-  --gradient-panel-start: #5a4030;
-  --gradient-panel-end: #3a2820;
-  --gradient-bg-start: #4a3525;
-  --gradient-bg-mid: #18100a;
-  --btn-text: #18100a;
-  --chart-border: #3a2818;
-  --chart-border-light: #c9a050;
-  --chart-bg: #3a2820;
-  --chart-text: #f0e8d8;
-  --chart-item-bg: rgba(201, 160, 80, 0.1);
-  --chart-qty: #b8a890;
-  --chart-amount: #78a858;
-  --zelda-gold: #c9a050;
-  --hystorybtn: #886828;
 }
 
-/* --- Tema: Dark Forest (Bosque Oscuro) --- */
+/* ================================================
+   TEMA: DARK FOREST (Bosque Oscuro)
+   ================================================ */
 [data-theme="darkforest"] {
+  --color-bg-primary: #0a120a;
+  --color-bg-secondary: #152515;
+  --color-bg-panel: #1f3820;
+  --color-text-primary: #d8e8d0;
+  --color-text-secondary: #88a888;
+  --color-text-muted: #506848;
+  --color-border: #1a3018;
+  --color-brand: #50c878;
+  --color-brand-hover: #70e098;
+  --color-accent: #50c878;
+  --color-accent-hover: #70e098;
+  --color-on-brand: #0a120a;
+  --color-success: #50c878;
+  --color-error: #d86868;
+  --color-warning: #d8a840;
+  --color-info: #5090d0;
+  --color-shadow: rgba(0, 10, 0, 0.6);
+  --gradient-btn-start: #70e098;
+  --gradient-btn-mid: #50b868;
+  --gradient-btn-end: #308848;
+  --gradient-bg-start: #182a18;
+  --gradient-bg-mid: #0a120a;
+  --chart-item-bg: rgba(80, 200, 120, 0.1);
+
+  --zelda-gold: #50c878;
+  --infoBlueColor: #5090d0;
+  --btn-text: #0a120a;
+  --accent-color: #50c878;
+  --accent-hover: #70e098;
   --bg-primary: #0a120a;
   --bg-secondary: #152515;
   --bg-panel: #1f3820;
   --text-primary: #d8e8d0;
   --text-secondary: #88a888;
   --border-color: #1a3018;
-  --accent-color: #50c878;
-  --accent-hover: #70e098;
   --success-color: #50c878;
   --error-color: #d86868;
   --warning-color: #d8a840;
   --shadow-color: rgba(0, 10, 0, 0.6);
-  --gradient-btn-start: #70e098;
-  --gradient-btn-mid: #50b868;
-  --gradient-btn-end: #308848;
-  --gradient-panel-start: #1f3820;
-  --gradient-panel-end: #152515;
-  --gradient-bg-start: #182a18;
-  --gradient-bg-mid: #0a120a;
-  --btn-text: #0a120a;
-  --chart-border: #1a3018;
-  --chart-border-light: #50c878;
-  --chart-bg: #152515;
-  --chart-text: #d8e8d0;
-  --chart-item-bg: rgba(80, 200, 120, 0.1);
-  --chart-qty: #88a888;
-  --chart-amount: #50c878;
-  --zelda-gold: #50c878;
-  --hystorybtn: #308848;
 }
 
-/* --- Tema: Dark Mountain (Montaña Oscura) --- */
+/* ================================================
+   TEMA: DARK MOUNTAIN (Montaña Oscura)
+   ================================================ */
 [data-theme="darkmountain"] {
+  --color-bg-primary: #121212;
+  --color-bg-secondary: #282828;
+  --color-bg-panel: #3a3a3a;
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #a0a0a0;
+  --color-text-muted: #606060;
+  --color-border: #383838;
+  --color-brand: #a0a0b0;
+  --color-brand-hover: #c0c0d0;
+  --color-accent: #a0a0b0;
+  --color-accent-hover: #c0c0d0;
+  --color-on-brand: #121212;
+  --color-success: #70b870;
+  --color-error: #d07070;
+  --color-warning: #d0b060;
+  --color-info: #5090d0;
+  --color-shadow: rgba(0, 0, 0, 0.7);
+  --gradient-btn-start: #c0c0d0;
+  --gradient-btn-mid: #909098;
+  --gradient-btn-end: #686870;
+  --gradient-bg-start: #303030;
+  --gradient-bg-mid: #121212;
+  --chart-item-bg: rgba(160, 160, 176, 0.1);
+
+  --zelda-gold: #a0a0b0;
+  --infoBlueColor: #5090d0;
+  --btn-text: #121212;
+  --accent-color: #a0a0b0;
+  --accent-hover: #c0c0d0;
   --bg-primary: #121212;
   --bg-secondary: #282828;
   --bg-panel: #3a3a3a;
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --border-color: #383838;
-  --accent-color: #a0a0b0;
-  --accent-hover: #c0c0d0;
   --success-color: #70b870;
   --error-color: #d07070;
   --warning-color: #d0b060;
   --shadow-color: rgba(0, 0, 0, 0.7);
-  --gradient-btn-start: #c0c0d0;
-  --gradient-btn-mid: #909098;
-  --gradient-btn-end: #686870;
-  --gradient-panel-start: #3a3a3a;
-  --gradient-panel-end: #282828;
-  --gradient-bg-start: #303030;
-  --gradient-bg-mid: #121212;
-  --btn-text: #121212;
-  --chart-border: #383838;
-  --chart-border-light: #a0a0b0;
-  --chart-bg: #282828;
-  --chart-text: #e0e0e0;
-  --chart-item-bg: rgba(160, 160, 176, 0.1);
-  --chart-qty: #a0a0a0;
-  --chart-amount: #70b870;
-  --zelda-gold: #a0a0b0;
-  --hystorybtn: #686870;
 }
 
-/* --- Tema: Dark Skyward (Cielo Nocturno) --- */
+/* ================================================
+   TEMA: DARK SKYWARD (Cielo Nocturno)
+   ================================================ */
 [data-theme="darkskyward"] {
+  --color-bg-primary: #080a12;
+  --color-bg-secondary: #101828;
+  --color-bg-panel: #182540;
+  --color-text-primary: #d0e0f0;
+  --color-text-secondary: #8090a8;
+  --color-text-muted: #506070;
+  --color-border: #182030;
+  --color-brand: #5090d0;
+  --color-brand-hover: #70b0f0;
+  --color-accent: #5090d0;
+  --color-accent-hover: #70b0f0;
+  --color-on-brand: #080a12;
+  --color-success: #60b890;
+  --color-error: #d07070;
+  --color-warning: #d0a050;
+  --color-info: #5090d0;
+  --color-shadow: rgba(0, 5, 15, 0.6);
+  --gradient-btn-start: #70b0f0;
+  --gradient-btn-mid: #4888c8;
+  --gradient-btn-end: #3060a0;
+  --gradient-bg-start: #142030;
+  --gradient-bg-mid: #080a12;
+  --chart-item-bg: rgba(80, 144, 208, 0.1);
+
+  --zelda-gold: #5090d0;
+  --infoBlueColor: #5090d0;
+  --btn-text: #080a12;
+  --accent-color: #5090d0;
+  --accent-hover: #70b0f0;
   --bg-primary: #080a12;
   --bg-secondary: #101828;
   --bg-panel: #182540;
   --text-primary: #d0e0f0;
   --text-secondary: #8090a8;
   --border-color: #182030;
-  --accent-color: #5090d0;
-  --accent-hover: #70b0f0;
   --success-color: #60b890;
   --error-color: #d07070;
   --warning-color: #d0a050;
   --shadow-color: rgba(0, 5, 15, 0.6);
-  --gradient-btn-start: #70b0f0;
-  --gradient-btn-mid: #4888c8;
-  --gradient-btn-end: #3060a0;
-  --gradient-panel-start: #182540;
-  --gradient-panel-end: #101828;
-  --gradient-bg-start: #142030;
-  --gradient-bg-mid: #080a12;
-  --btn-text: #080a12;
-  --chart-border: #182030;
-  --chart-border-light: #5090d0;
-  --chart-bg: #101828;
-  --chart-text: #d0e0f0;
-  --chart-item-bg: rgba(80, 144, 208, 0.1);
-  --chart-qty: #8090a8;
-  --chart-amount: #60b890;
-  --zelda-gold: #5090d0;
-  --hystorybtn: #3060a0;
 }
 
-/* --- Tema: Dark Night (Noche Estrellada) --- */
+/* ================================================
+   TEMA: DARK NIGHT (Noche Estrellada)
+   ================================================ */
 [data-theme="darknight"] {
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a10;
+  --color-bg-panel: #141418;
+  --color-text-primary: #f0f0f8;
+  --color-text-secondary: #9090a0;
+  --color-text-muted: #505060;
+  --color-border: #202028;
+  --color-brand: #f0d020;
+  --color-brand-hover: #ffe840;
+  --color-accent: #f0d020;
+  --color-accent-hover: #ffe840;
+  --color-on-brand: #000000;
+  --color-success: #40d080;
+  --color-error: #e06060;
+  --color-warning: #e0b020;
+  --color-info: #5090d0;
+  --color-shadow: rgba(0, 0, 0, 0.9);
+  --gradient-btn-start: #ffe840;
+  --gradient-btn-mid: #d8b820;
+  --gradient-btn-end: #a88810;
+  --gradient-bg-start: #0c0c14;
+  --gradient-bg-mid: #000000;
+  --chart-item-bg: rgba(240, 208, 32, 0.1);
+
+  --zelda-gold: #f0d020;
+  --infoBlueColor: #5090d0;
+  --btn-text: #000000;
+  --accent-color: #f0d020;
+  --accent-hover: #ffe840;
   --bg-primary: #000000;
   --bg-secondary: #0a0a10;
   --bg-panel: #141418;
   --text-primary: #f0f0f8;
   --text-secondary: #9090a0;
   --border-color: #202028;
-  --accent-color: #f0d020;
-  --accent-hover: #ffe840;
   --success-color: #40d080;
   --error-color: #e06060;
   --warning-color: #e0b020;
   --shadow-color: rgba(0, 0, 0, 0.9);
-  --gradient-btn-start: #ffe840;
-  --gradient-btn-mid: #d8b820;
-  --gradient-btn-end: #a88810;
-  --gradient-panel-start: #141418;
-  --gradient-panel-end: #0a0a10;
-  --gradient-bg-start: #0c0c14;
-  --gradient-bg-mid: #000000;
-  --btn-text: #000000;
-  --chart-border: #202028;
-  --chart-border-light: #f0d020;
-  --chart-bg: #0a0a10;
-  --chart-text: #f0f0f8;
-  --chart-item-bg: rgba(240, 208, 32, 0.1);
-  --chart-qty: #9090a0;
-  --chart-amount: #40d080;
-  --zelda-gold: #f0d020;
-  --hystorybtn: #a88810;
-}
-
-/* ================================================
-   ESTILOS BASE POR TEMA
-   Se aplican cuando un tema está activo.
-   ================================================ */
-
-:root[data-theme] body {
-  background: linear-gradient(180deg, var(--gradient-bg-start, var(--bg-secondary)) 0%, var(--gradient-bg-mid, var(--bg-primary)) 50%, var(--bg-primary) 100%);
-  color: var(--text-primary);
-  min-height: 100vh;
-}
-
-:root[data-theme] .panel,
-:root[data-theme] .card,
-:root[data-theme] .zelda-panel {
-  border: var(--border-width-thick) solid var(--accent-color);
-  box-shadow: var(--shadow-inner) var(--border-color), var(--shadow-outer) var(--border-color), 0 8px 12px var(--shadow-color);
-}
-
-:root[data-theme] h1,
-:root[data-theme] h2,
-:root[data-theme] h3,
-:root[data-theme] h4,
-:root[data-theme] h5,
-:root[data-theme] h6 {
-  color: var(--accent-color) !important;
-  text-shadow: 2px 2px 0 var(--border-color);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-:where(:root[data-theme]) :where(button),
-:where(:root[data-theme]) :where(.btn) {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  padding: 0.7rem 1rem;
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  color: var(--btn-text, var(--text-primary));
-  transition: transform 120ms steps(2), filter 120ms linear, box-shadow 120ms linear;
-}
-
-:where(:root[data-theme]) :where(button):hover,
-:where(:root[data-theme]) :where(.btn):hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
-}
-
-:where(:root[data-theme]) :where(button):active,
-:where(:root[data-theme]) :where(.btn):active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, white), 0 2px 0 var(--border-color);
-}
-
-:root[data-theme] input,
-:root[data-theme] select,
-:root[data-theme] textarea {
-  background: var(--bg-primary);
-  border: var(--border-width) solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.5rem;
-  font-family: inherit;
-}
-
-:root[data-theme] input:focus,
-:root[data-theme] select:focus,
-:root[data-theme] textarea:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 8px var(--accent-color);
-  outline: none;
-}
-
-:root[data-theme] ::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
-}
-
-:root[data-theme] .modal-overlay {
-  background: rgba(0, 0, 0, 0.85);
-}
-
-:root[data-theme] .modal-card,
-:root[data-theme] .modal-content {
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-  border: var(--border-width-thick) solid var(--accent-color);
-  box-shadow: 0 10px 40px var(--shadow-color);
-}
-
-:root[data-theme] .modal-header {
-  background: var(--bg-primary);
-  border-bottom: 2px solid var(--accent-color);
-}
-
-:root[data-theme] .modal-header h3 {
-  color: var(--accent-color) !important;
-}
-
-:root[data-theme] table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-:root[data-theme] th {
-  background: var(--bg-secondary);
-  color: var(--accent-color);
-  border-bottom: 2px solid var(--accent-color);
-  font-family: 'HyliaSerif', 'Palatino Linotype', serif;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.75rem;
-}
-
-:root[data-theme] td {
-  border-bottom: 1px solid var(--border-color);
-  padding: 0.5rem;
-}
-
-:root[data-theme] tr:hover td {
-  background: var(--chart-item-bg);
-}
-
-:root[data-theme] .toggle-slider {
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-}
-
-:root[data-theme] input:checked + .toggle-slider {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-}
-
-:root[data-theme] input:checked + .toggle-slider::after {
-  background: var(--bg-primary);
-}
-
-:root[data-theme] .badge,
-:root[data-theme] .tag {
-  background: var(--accent-color);
-  color: var(--btn-text, var(--bg-primary));
-}
-
-:root[data-theme] [data-tooltip]::after {
-  background: var(--bg-panel);
-  border: 1px solid var(--accent-color);
-  color: var(--text-primary);
-}
-
-/* --- Scrollbar visible classes --- */
-.custom-scrollbar::-webkit-scrollbar {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 45%, var(--gradient-btn-end) 100%);
-  border: 2px solid var(--border-color);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  filter: brightness(1.05);
-}
-
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent-color) var(--border-color);
-  -ms-overflow-style: auto;
-}
-
-.scroll-visible::-webkit-scrollbar {
-  display: block;
-  width: 8px;
-  height: 8px;
-  background: var(--bg-primary);
-}
-
-.scroll-visible::-webkit-scrollbar-thumb {
-  background: var(--accent-color);
-  border-radius: 4px;
-}
-
-.scroll-visible {
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent-color) var(--bg-primary);
-  -ms-overflow-style: auto;
 }

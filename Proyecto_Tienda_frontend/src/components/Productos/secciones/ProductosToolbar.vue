@@ -17,31 +17,31 @@ defineEmits<{
 }>();
 </script>
 <template>
-  <header class="toolbar">
+  <header v-if="tabActiva === 'productos'" class="toolbar">
     <div class="toolbar-left">
       <h1 class="toolbar-title"><span class="title-icon">🍬</span><span class="title-text">Catálogo de Productos</span></h1>
       <p class="toolbar-subtitle">Administra altas, cambios y bajas del catálogo</p>
     </div>
     <div class="toolbar-right">
-      <select :value="categoriaFiltro" @change="$emit('update:categoriaFiltro', ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)" class="category-filter">
-        <option :value="null">Todas las categorías</option>
+      <span class="select-wrap"><select :value="categoriaFiltro ?? ''" @change="$emit('update:categoriaFiltro', ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)" class="category-filter">
+        <option value="">Todas las categorías</option>
         <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">{{ cat.nombre }}</option>
-      </select>
-      <select :value="subcategoriaFiltro" @change="$emit('update:subcategoriaFiltro', ($event.target as HTMLSelectElement).value === 'general' ? 'general' : Number(($event.target as HTMLSelectElement).value) || null)" class="category-filter" :disabled="categoriaFiltro === null">
-        <option :value="null">{{ categoriaFiltro === null ? 'Selecciona categoría' : 'Todas las subcategorías' }}</option>
+      </select></span>
+      <span class="select-wrap"><select :value="subcategoriaFiltro ?? ''" @change="$emit('update:subcategoriaFiltro', ($event.target as HTMLSelectElement).value === 'general' ? 'general' : Number(($event.target as HTMLSelectElement).value) || null)" class="category-filter" :disabled="categoriaFiltro === null">
+        <option value="">{{ categoriaFiltro === null ? 'Selecciona categoría' : 'Todas las subcategorías' }}</option>
         <option value="general">General</option>
         <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">{{ sub.nombre }}</option>
-      </select>
-      <select :value="ordenStock" @change="$emit('update:ordenStock', ($event.target as HTMLSelectElement).value || null)" class="category-filter">
-        <option :value="null">Stock: Todos</option>
+      </select></span>
+      <span class="select-wrap"><select :value="ordenStock ?? ''" @change="$emit('update:ordenStock', ($event.target as HTMLSelectElement).value || null)" class="category-filter">
+        <option value="">Stock: Todos</option>
         <option value="mayor">Mayor stock</option>
         <option value="menor">Menor stock</option>
-      </select>
-      <select :value="filtroTipo" @change="$emit('update:filtroTipo', ($event.target as HTMLSelectElement).value || null)" class="category-filter">
-        <option :value="null">Tipo: Todos</option>
+      </select></span>
+      <span class="select-wrap"><select :value="filtroTipo ?? ''" @change="$emit('update:filtroTipo', ($event.target as HTMLSelectElement).value || null)" class="category-filter">
+        <option value="">Tipo: Todos</option>
         <option value="unidad">📦 Unidad</option>
         <option value="gramaje">⚖️ Gramaje</option>
-      </select>
+      </select></span>
       <div class="search-wrapper">
         <span class="search-icon">🔍</span>
         <input :value="terminoBusqueda" @input="$emit('update:terminoBusqueda', ($event.target as HTMLInputElement).value)" type="text" placeholder="Buscar producto..." class="search-input" />

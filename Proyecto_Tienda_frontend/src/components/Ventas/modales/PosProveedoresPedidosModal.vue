@@ -285,3 +285,76 @@ const emit = defineEmits<{
   'pedido-creado': []
 }>()
 </script>
+
+
+<style scoped>
+.pos-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);z-index: 200;display:grid;place-items:center;padding:1rem}
+.pos-modal-card{background:var(--color-bg-panel);border-radius:var(--radius-lg);width:min(100%,560px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:8px 8px 24px rgba(0,0,0,0.35),-4px -4px 16px rgba(255,255,255,0.03)}
+.pp-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:var(--color-bg-secondary);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.pp-header h3{margin:0;font-size:1.1rem;color:var(--color-accent)}
+.btn-close{width:34px;height:34px;border-radius:50%;border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
+.btn-close:hover{background:var(--color-error);color:#fff}
+.pp-tabs{display:flex;gap:.3rem;padding:.5rem 1rem;background:var(--color-bg-secondary);border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.pp-tab{padding:.4rem .8rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,0.1)}
+.pp-tab:hover{color:var(--color-text-primary)}
+.pp-tab.active{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,0.2)}
+.pp-body{flex:1;overflow-y:auto;padding:1rem}
+.pp-section{display:flex;flex-direction:column;gap:.75rem}
+.pp-toolbar{display:flex;align-items:center;gap:.5rem}
+.pp-btn-add{padding:.5rem 1rem;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--color-accent),var(--color-accent-hover));color:var(--color-on-brand);font-size:.85rem;font-weight:600;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
+.pp-btn-add:hover{box-shadow:5px 5px 10px rgba(0,0,0,0.2);transform:translateY(-1px)}
+.pp-views{display:flex;gap:.3rem;margin-left:auto}
+.pp-vbtn{width:32px;height:32px;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s}
+.pp-vbtn.on{background:var(--color-accent);color:var(--color-on-brand)}
+.pp-empty{text-align:center;padding:2rem;color:var(--color-text-secondary)}
+.pp-list{display:flex;flex-direction:column;gap:.4rem}
+.pp-item{display:flex;align-items:center;gap:.75rem;padding:.6rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);box-shadow:2px 2px 4px rgba(0,0,0,0.1)}
+.pp-item-avatar{width:36px;height:36px;border-radius:50%;background:var(--color-accent);color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+.pp-item-info{flex:1;min-width:0}
+.pp-item-name{display:block;font-weight:600;color:var(--color-text-primary);font-size:.9rem}
+.pp-item-detail{display:block;font-size:.75rem;color:var(--color-text-secondary)}
+.pp-item-actions{display:flex;gap:.3rem;flex-shrink:0}
+.pp-btn-sm{width:30px;height:30px;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s}
+.pp-btn-sm:hover{color:var(--color-accent)}
+.pp-btn-del:hover{color:var(--color-error)}
+.pp-btn-ok:hover{color:var(--color-success)}
+.pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
+.pp-card{background:var(--color-bg-secondary);border-radius:var(--radius-sm);padding:.8rem;box-shadow:3px 3px 6px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;gap:.4rem}
+.pp-card-avatar{width:40px;height:40px;border-radius:50%;background:var(--color-accent);color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem}
+.pp-card-name{margin:0;font-size:.85rem;color:var(--color-text-primary)}
+.pp-card-details{display:flex;flex-direction:column;gap:.2rem;width:100%}
+.pp-card-detail{font-size:.7rem;color:var(--color-text-secondary)}
+.pp-card-actions{display:flex;gap:.3rem;margin-top:auto}
+.pp-card-btn{width:28px;height:28px;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s}
+.pp-card-btn:hover{color:var(--color-accent)}
+.pp-card-btn-del:hover{color:var(--color-error)}
+.pp-card-btn-ok:hover{color:var(--color-success)}
+.pp-pedido-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:.2rem}
+.pp-pedido-prov{font-weight:700;font-size:.85rem;color:var(--color-text-primary)}
+.pp-pedido-date{font-size:.73rem;color:var(--color-text-secondary)}
+.pp-pedido-total{font-size:.8rem;font-weight:700;color:var(--color-success);font-family:Courier New,monospace}
+.pp-form-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index: 300;display:grid;place-items:center;padding:1rem}
+.pp-form-card{background:var(--color-bg-panel);border-radius:var(--radius-lg);width:min(100%,480px);max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:8px 8px 24px rgba(0,0,0,0.35)}
+.pp-form-card h4{margin:0 0 1rem;color:var(--color-accent)}
+.pp-field{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem}
+.pp-field-label{font-size:.78rem;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600}
+.pp-input{padding:.65rem .75rem;background:var(--color-bg-secondary);border:none;border-radius:var(--radius-sm);color:var(--color-text-primary);font-family:inherit;box-shadow:inset 2px 2px 4px rgba(0,0,0,0.15);transition:all .2s}
+.pp-input:focus{outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,0.15),0 0 0 2px var(--color-accent)}
+.pp-form-actions{display:flex;gap:.75rem;margin-top:1rem}
+.pp-btn-cancel{flex:1;padding:.7rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-secondary);color:var(--color-text-secondary);font-weight:600;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
+.pp-btn-cancel:hover{color:var(--color-text-primary)}
+.pp-btn-save{flex:1;padding:.7rem;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--color-accent),var(--color-accent-hover));color:var(--color-on-brand);font-weight:600;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
+.pp-btn-save:hover{box-shadow:5px 5px 10px rgba(0,0,0,0.2);transform:translateY(-1px)}
+.pp-btn-remove{padding:.2rem .4rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;font-size:.8rem}
+.pp-btn-remove:hover{color:var(--color-error)}
+.pp-product-search-wrap{display:flex;gap:.5rem;align-items:center}
+.pp-search-wrapper{position:relative;flex:1}
+.pp-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--color-bg-panel);border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,0.3);max-height:200px;overflow-y:auto;z-index:10}
+.pp-dropdown-item{padding:.5rem .75rem;cursor:pointer;font-size:.85rem;color:var(--color-text-primary)}
+.pp-dropdown-item:hover{background:color-mix(in srgb,var(--color-accent) 10%,transparent)}
+.pp-qty,.pp-price{width:70px}
+.pp-detalle-row{display:flex;align-items:center;gap:.5rem;padding:.4rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);margin-bottom:.3rem;font-size:.85rem}
+.pp-detalle-name{flex:1}
+.pp-checkbox-label{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--color-text-secondary);cursor:pointer}
+@media(max-width:768px){.pos-modal-card{width:95vw}.pp-tabs{overflow-x:auto;flex-wrap:nowrap}.pp-form-card{width:95vw;padding:1rem}}
+</style>

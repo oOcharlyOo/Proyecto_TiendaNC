@@ -68,3 +68,34 @@ defineEmits<{
     </div>
   </div>
 </template>
+
+<style scoped>
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; animation: fadeIn 0.2s ease;  }
+.modal-overlay.inner { position: absolute; background: rgba(0,0,0,0.5); z-index: 1001; }
+.modal-container { background: var(--color-bg-panel); border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); border-radius: 20px; width: 100%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 1.5rem; position: relative; animation: modalSlideIn 0.3s ease; }
+.modal-container.small { max-width: 450px; }
+.modal-decoration { position: absolute; top: 10px; right: 20px; font-size: 2rem; color: var(--color-accent); opacity: 0.1; pointer-events: none; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.modal-header h2 {  font-size: 1.3rem; color: var(--color-accent); margin: 0; }
+.modal-close { background: none; border: none; color: var(--color-text-secondary); font-size: 1.5rem; cursor: pointer; padding: 0.3rem; line-height: 1; transition: color 0.2s; }
+.modal-close:hover { color: var(--color-text-primary); }
+.modal-actions { display: flex; justify-content: center; gap: 1rem; margin-top: 1.5rem; }
+.apartado-stats { text-align: center; padding: 0.8rem; background: color-mix(in srgb, var(--color-accent) 8%, transparent); border-radius: 10px; margin-bottom: 1rem; }
+.apartado-stats span { font-size: 1rem; color: var(--color-text-primary); }
+.apartado-stats strong { color: var(--color-accent); }
+.crear-apartado { background: rgba(255,255,255,.02); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; }
+.crear-apartado h3 { font-size: 1rem; color: var(--color-accent); margin: 0 0 1rem; }
+.apartados-list h3 { font-size: 1rem; color: var(--color-accent); display: flex; align-items: center; gap: 0.5rem; }
+.apartado-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem; border-radius: 10px; background: rgba(255,255,255,.02); margin-bottom: 0.5rem; gap: 0.5rem; }
+.apartado-item.completado { opacity: 0.7; }
+.apartado-info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+.apartado-info strong { font-size: 0.9rem; }
+.apartado-info span { font-size: 0.8rem; color: var(--color-text-secondary); }
+.apartado-acciones { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.historial-pagos { margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,.02); border-radius: 12px; }
+.historial-pagos h3 { font-size: 0.9rem; color: var(--color-accent); margin: 0 0 0.5rem; }
+.pago-item { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,.02); font-size: 0.85rem; }
+.error-msg { color: var(--color-error); font-size: 0.8rem; margin: 0.3rem 0; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalSlideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>

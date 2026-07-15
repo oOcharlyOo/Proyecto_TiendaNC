@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import type { ApiRespuesta, VentaDTO, VentaDetalleDTO, Producto } from './usePosTipos';
 import { getJson, mostrarMensaje, formatoMoneda, formatoMonedaRedondeada } from './usePosTicket';
-import { cargarHistorialVentasDia } from './usePosCobro';
+import { cargarHistorialVentasDia, modalDetalleVentaAbierto, detalleCreditoInfo, detalleAbonos, historialVentaTieneDiscrepancia, historialDiscrepanciaMonto } from './usePosCobro';
 
 const modoEdicionDetalle = ref(false);
 const montoTotalEditado = ref(0);
@@ -186,7 +186,6 @@ async function eliminarTodosLosDetalles() {
 }
 
 function cerrarDetalleVenta() {
-  const { modalDetalleVentaAbierto, detalleCreditoInfo, detalleAbonos, historialVentaTieneDiscrepancia, historialDiscrepanciaMonto } = require('./usePosCobro');
   modalDetalleVentaAbierto.value = false;
   historialVentaSeleccionada.value = null;
   historialVentaDetalle.value = [];

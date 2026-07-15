@@ -1,3 +1,13 @@
+/* ================================================
+   BASE - Reset y estilos globales mínimos
+
+   Solo resetea valores por defecto del navegador
+   y define estilos base del body. Los estilos de
+   componentes (modals, tables, buttons) se manejan
+   en sus respectivos componentes/base.
+   ================================================ */
+
+/* --- Font Face --- */
 @font-face {
   font-family: 'HyliaSerif';
   src: url('/src/assets/fonts/HyliaSerifBeta-Regular.otf') format('opentype');
@@ -5,7 +15,10 @@
   font-style: normal;
 }
 
-* {
+/* --- Reset --- */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -22,10 +35,11 @@ html, body {
 }
 
 body {
-  font-family: 'HyliaSerif', 'Palatino Linotype', 'Book Antiqua', Palatino, 'Courier New', serif;
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
@@ -33,10 +47,35 @@ body {
 }
 
 a {
-  color: var(--accent-color);
+  color: var(--color-accent);
   text-decoration: none;
+  transition: filter var(--transition-fast);
 }
 
 a:hover {
   filter: brightness(1.08);
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font: inherit;
+}
+
+/* --- Background con gradiente del tema --- */
+[data-theme] body {
+  background: linear-gradient(
+    180deg,
+    var(--gradient-bg-start, var(--color-bg-secondary)) 0%,
+    var(--gradient-bg-mid, var(--color-bg-primary)) 50%,
+    var(--color-bg-primary) 100%
+  );
 }
