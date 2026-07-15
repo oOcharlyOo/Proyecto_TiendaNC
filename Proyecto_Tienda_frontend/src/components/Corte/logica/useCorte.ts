@@ -539,6 +539,7 @@ async function generarReporteDiario() {
     detallesDiario.value = todosDetalles;
     totalEnvase.value = todosDetalles.reduce((sum, d) => sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0), 0);
     calcularProductosReporte(todosDetalles, 'diario');
+    calcularProductosMasVendidos(todosDetalles);
     if (idUsuario.value) {
       try {
         const [totalApartadoData, apartadosData] = await Promise.all([
