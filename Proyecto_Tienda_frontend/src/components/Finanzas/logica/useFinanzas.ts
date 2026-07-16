@@ -44,7 +44,7 @@ function formatoMoneda(valor: number) {
 function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info') {
   mensaje.value = texto;
   mensajeTipo.value = tipo;
-  setTimeout(() => mensaje.value = '', 5000);
+  setTimeout(() => mensaje.value = '', 1000);
 }
 
 async function cargarDatos(pagina = 0) {

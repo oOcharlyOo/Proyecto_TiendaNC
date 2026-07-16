@@ -71,10 +71,10 @@ export type ProductoTopData = { nombreProducto: string; cantidadVendida: number;
 export type ProductoVendido = { nombre: string; cantidadTotal: number; montoTotal: number; isGramaje: boolean };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
-let router: ReturnType<typeof useRouter>;
+  let router: ReturnType<typeof useRouter>;
 
 // --- Auth ---
-const idUsuario = ref<number>(Number(localStorage.getItem('idUsuario') || 0));
+const idUsuario = computed(() => Number(localStorage.getItem('idUsuario') || 0));
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || 'Usuario');
 const tipoUsuario = ref<number>(Number(localStorage.getItem('tipoUsuario') || 2));
 const esAdministrador = computed(() => tipoUsuario.value === 1);
@@ -87,6 +87,7 @@ export function useCorte() {
   router = useRouter();
 
   onMounted(() => {
+    limpiarReporte();
     window.addEventListener('resize', updateWidth);
     verificarCajaActiva();
     cargarUsuariosConSueldo();
@@ -123,6 +124,30 @@ const mensajeTipo = ref<'ok' | 'error' | 'info'>('info');
 function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info') {
   mensaje.value = texto;
   mensajeTipo.value = tipo;
+  setTimeout(() => mensaje.value = '', 1000);
+}
+
+function limpiarReporte() {
+  corteActual.value = null;
+  mostrarReporte.value = false;
+  mostrarCerrarTurno.value = false;
+  ventasEfectivo.value = 0;
+  ventasTarjeta.value = 0;
+  ventasTransferencia.value = 0;
+  abonoTotalDia.value = 0;
+  totalEnvase.value = 0;
+  totalTicketsDia.value = 0;
+  horaInicioCaja.value = null;
+  horaFinCaja.value = null;
+  productosMasVendidos.value = [];
+  productosUnitarios.value = [];
+  productosGranel.value = [];
+  detallesDiario.value = [];
+  totalApartarDiario.value = 0;
+  apartadosActivos.value = [];
+  egresosDia.value = [];
+  entradasDia.value = [];
+  mensaje.value = '';
 }
 
 // --- Loading states ---
@@ -456,45 +481,60 @@ async function generarCorte() {
   if (!idUsuario.value) { mostrarMensaje('No se encontro idUsuario en sesion.', 'error'); return; }
   cargandoCorte.value = true;
   try {
-    const corte = await fetchApi<CorteDTO | null>(`/caja/corte/consulta?idUsuario=${idUsuario.value}`);
-    if (!corte) {
+    const cajaActiva = await fetchApi<{ monto?: number } | null>(`/caja/apertura/activa?idUsuario=${idUsuario.value}`);
+    if (!cajaActiva || cajaActiva.monto === undefined) {
       mostrarMensaje('No hay una caja abierta. Inicia sesion para abrir caja.', 'error');
       return;
     }
-    const fechaCorte = new Date(corte.fechaCorte);
-    ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
-    ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
-    totalTicketsDia.value = Number(corte.totalTickets || 0);
-    const montoInicialCorte = Number(corte.montoInicial || 0);
-    const otrosIngresosCorte = Number(corte.otrosIngresos || 0);
-    const totalEgresosCorte = Number(corte.totalEgresos || 0);
-    const saldoFinalEfectivo = montoInicialCorte + Number(ventasEfectivo.value || 0) + otrosIngresosCorte - totalEgresosCorte;
-    corteActual.value = { ...corte, saldoFinalEfectivo };
+    const montoInicial = Number(cajaActiva.monto || 0);
+    const hoy = new Date().toISOString().slice(0, 10);
+    const reporte = await fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${hoy}`);
+    const ventas = reporte.ventas || [];
+    for (const venta of ventas) {
+      const detalles = venta.detalles || [];
+      venta.tieneDiscrepancia = verificarDiscrepancia(detalles as any, Number(venta.montoTotal ?? 0));
+    }
+    ventasEfectivo.value = Number(reporte.ventasEfectivo || 0);
+    ventasTarjeta.value = Number(reporte.ventasTarjeta || 0);
+    ventasTransferencia.value = Number(reporte.ventasTransferencia || 0);
+    abonoTotalDia.value = Number((reporte as any).abonoTotal || 0);
+    const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
+    usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
+    const otrosIngresos = Number(reporte.otrosIngresos || 0);
+    const totalEgresos = Number(reporte.totalEgresos || 0);
+    horaInicioCaja.value = reporte.horaInicio || null;
+    horaFinCaja.value = reporte.horaFin || null;
+    if (reporte.nombreUsuario) nombreUsuario.value = reporte.nombreUsuario;
+    const totalVentas = Number(reporte.cobroTotal || 0);
+    const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
+    const saldoFinalEfectivo = montoInicial + Number(ventasEfectivo.value || 0) + otrosIngresos - totalEgresos;
+    const gananciaBruta = Number(reporte.gananciaTotal || 0);
+    corteActual.value = {
+      fechaCorte: `${hoy}T00:00:00`, montoInicial, totalVentas, totalEgresos, otrosIngresos,
+      saldoFinalCalculado: saldoFinal, saldoFinalEfectivo, gananciaTotal: gananciaBruta,
+      gananciaNeta: Math.max(0, gananciaBruta - dineroApartarDiario.value),
+      ventasTarjeta: Number(ventasTarjeta.value || 0), ventasEfectivo: Number(ventasEfectivo.value || 0),
+      ventasTransferencia: Number(ventasTransferencia.value || 0)
+    };
+    const todosDetalles = reporte.todosDetalles || [];
+    detallesDiario.value = todosDetalles;
+    totalEnvase.value = todosDetalles.reduce((sum, d) => sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0), 0);
+    calcularProductosReporte(todosDetalles, 'diario');
+    calcularProductosMasVendidos(todosDetalles);
+    if (idUsuario.value) {
+      try {
+        const [totalApartadoData, apartadosData] = await Promise.all([
+          fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`),
+          fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`)
+        ]);
+        totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+        apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
+      } catch (e) { totalApartarDiario.value = 0; apartadosActivos.value = []; }
+    }
+    totalTicketsDia.value = reporte.totalTickets ?? ventas.length;
     reporteTitulo.value = 'Reporte del Corte Actual';
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
-    const hoy = fechaCorte.toISOString().slice(0, 10);
-    await Promise.all([
-      (async () => {
-        try {
-          const reporteDiario = await fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${hoy}`);
-          const detallesCorte = reporteDiario.todosDetalles || [];
-          totalEnvase.value = detallesCorte.reduce((sum, d) => sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0), 0);
-        } catch (e) { console.error('Error al calcular total envases:', e); totalEnvase.value = 0; }
-      })(),
-      (async () => {
-        if (idUsuario.value) {
-          try {
-            const [totalApartadoData, apartadosData] = await Promise.all([
-              fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`),
-              fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`)
-            ]);
-            totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
-            apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
-          } catch (e) { totalApartarDiario.value = 0; apartadosActivos.value = []; }
-        }
-      })()
-    ]);
     mostrarMensaje('Corte de caja generado con exito.', 'ok');
   } catch (error) {
     mostrarMensaje(`Error al generar corte: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
@@ -601,9 +641,9 @@ function calcularProductosMasVendidos(detalles: VentaDetalleDTO[]) {
     if (isGramaje) producto.isGramaje = true;
   }
   const sorted = Array.from(productosMap.values()).sort((a, b) => b.cantidadTotal - a.cantidadTotal);
-  const unitarios = sorted.filter(p => !p.isGramaje);
-  const granel = sorted.filter(p => p.isGramaje);
-  productosMasVendidos.value = sorted;
+  const unitarios = sorted.filter(p => !p.isGramaje).slice(0, 8);
+  const granel = sorted.filter(p => p.isGramaje).slice(0, 8);
+  productosMasVendidos.value = sorted.slice(0, 8);
   productosUnitarios.value = unitarios;
   productosGranel.value = granel;
   return sorted;
@@ -670,6 +710,12 @@ function getChartOptions(productosList: ProductoVendido[]) {
     scales: {
       x: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: textColor, font: { size: fontSize } } },
       y: { grid: { display: false }, ticks: { color: textColor, font: { size: fontSize } } }
+    },
+    datasets: {
+      bar: {
+        barPercentage: 0.8,
+        categoryPercentage: 0.85
+      }
     }
   };
 }
@@ -695,20 +741,20 @@ function getHorarioSlot(hora: number): string {
 
 // ===== CHARTS: Corte =====
 
-const chartData = computed(() => getChartData(productosMasVendidos.value));
-const chartDataUnitarios = computed(() => getChartData(productosUnitarios.value));
-const chartDataGranel = computed(() => getChartData(productosGranel.value));
+const chartData = computed(() => getChartData(productosMasVendidos.value.slice(0, 8)));
+const chartDataUnitarios = computed(() => getChartData(productosUnitarios.value.slice(0, 8)));
+const chartDataGranel = computed(() => getChartData(productosGranel.value.slice(0, 8)));
 
 const chartDataCombinado = computed(() => {
-  const all = [...productosUnitarios.value, ...productosGranel.value];
+  const all = [...productosUnitarios.value.slice(0, 8), ...productosGranel.value.slice(0, 8)];
   if (!all.length) return { labels: [], datasets: [] };
   const isGramaje = all.map(p => p.isGramaje);
   return { labels: all.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 17) + '...' : p.nombre), datasets: [{ label: 'Cantidad Vendida', data: all.map(p => p.cantidadTotal), backgroundColor: isGramaje.map(g => g ? 'rgba(75, 192, 192, 0.8)' : 'rgba(54, 162, 235, 0.8)'), borderColor: isGramaje.map(g => g ? 'rgb(75, 192, 192)' : 'rgb(54, 162, 235)'), borderWidth: 2, borderRadius: 6, borderSkipped: false }] };
 });
-const chartOptionsCombinado = computed(() => getChartOptions([...productosUnitarios.value, ...productosGranel.value]));
-const chartOptions = computed(() => getChartOptions(productosMasVendidos.value));
-const chartOptionsUnitarios = computed(() => getChartOptions(productosUnitarios.value));
-const chartOptionsGranel = computed(() => getChartOptions(productosGranel.value));
+const chartOptionsCombinado = computed(() => getChartOptions(productosUnitarios.value.slice(0, 8)));
+const chartOptions = computed(() => getChartOptions(productosMasVendidos.value.slice(0, 8)));
+const chartOptionsUnitarios = computed(() => getChartOptions(productosUnitarios.value.slice(0, 8)));
+const chartOptionsGranel = computed(() => getChartOptions(productosGranel.value.slice(0, 8)));
 
 const cortePieChartData = computed(() => {
   if (!mostrarReporte.value || !corteActual.value) return { labels: [], datasets: [] };

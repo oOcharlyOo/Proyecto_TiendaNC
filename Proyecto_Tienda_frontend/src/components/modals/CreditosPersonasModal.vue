@@ -109,7 +109,7 @@ async function getJson<T>(url: string, opts?: RequestInit): Promise<T> {
 function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info' = 'ok') {
   mensaje.value = texto;
   tipoMsj.value = tipo;
-  setTimeout(() => { mensaje.value = ''; }, 3000);
+  setTimeout(() => { mensaje.value = ''; }, 1000);
 }
 
 function formatoMoneda(valor: number) {

@@ -67,9 +67,10 @@ export type CategoriaStats = {
 export type CategoriaJerarquica = {
   categoria: string;
   totalMonto: number;
+  totalCosto: number;
   totalCantidad: number;
   totalGanancia: number;
-  subcategorias: { nombre: string; monto: number; cantidad: number; ganancia: number }[];
+  subcategorias: { nombre: string; monto: number; cantidad: number; ganancia: number; costo: number }[];
 };
 
 export type DiaStats = {
@@ -220,7 +221,7 @@ export const metodosStats = computed<MetodoStats[]>(() => {
 
 export const categoriasJerarquicas = computed<CategoriaJerarquica[]>(() => {
   const catMap = new Map<string, CategoriaJerarquica>();
-  const subMap = new Map<string, Map<string, { nombre: string; monto: number; cantidad: number; ganancia: number }>>();
+  const subMap = new Map<string, Map<string, { nombre: string; monto: number; cantidad: number; ganancia: number; costo: number }>>();
   
   for (const d of detalles.value) {
     if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
@@ -245,23 +246,25 @@ export const categoriasJerarquicas = computed<CategoriaJerarquica[]>(() => {
     const ganancia = monto - costo;
     
     if (!catMap.has(cat)) {
-      catMap.set(cat, { categoria: cat, totalMonto: 0, totalCantidad: 0, totalGanancia: 0, subcategorias: [] });
+      catMap.set(cat, { categoria: cat, totalMonto: 0, totalCosto: 0, totalCantidad: 0, totalGanancia: 0, subcategorias: [] });
       subMap.set(cat, new Map());
     }
     
     const catEntry = catMap.get(cat)!;
     catEntry.totalMonto += monto;
+    catEntry.totalCosto += costo;
     catEntry.totalCantidad += cantidad;
     catEntry.totalGanancia += ganancia;
     
     const subCatMap = subMap.get(cat)!;
     if (!subCatMap.has(sub)) {
-      subCatMap.set(sub, { nombre: sub, monto: 0, cantidad: 0, ganancia: 0 });
+      subCatMap.set(sub, { nombre: sub, monto: 0, cantidad: 0, ganancia: 0, costo: 0 });
     }
     const subEntry = subCatMap.get(sub)!;
     subEntry.monto += monto;
     subEntry.cantidad += cantidad;
     subEntry.ganancia += ganancia;
+    subEntry.costo += costo;
   }
   
   for (const [cat, subCatMap] of subMap.entries()) {
@@ -741,6 +744,69 @@ export const chartGananciaCategoria = computed(() => {
   };
 });
 
+export const chartCategoriaComparativa = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [
+      {
+        label: 'Total Ventas ($)',
+        data: cats.map(c => Math.round(c.totalMonto * 100) / 100),
+        backgroundColor: '#c99234',
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'Costo Total ($)',
+        data: cats.map(c => Math.round(c.totalCosto * 100) / 100),
+        backgroundColor: '#dc3545',
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'Ganancia ($)',
+        data: cats.map(c => Math.round(c.totalGanancia * 100) / 100),
+        backgroundColor: '#28a745',
+        borderRadius: 4,
+        borderSkipped: false
+      }
+    ]
+  };
+});
+
+export const chartOptionsCategoriaComparativa = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: {
+    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12 } },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: false,
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      stacked: false,
+      ticks: { color: '#f6f2de', font: { size: 11 } },
+      grid: { display: false }
+    }
+  }
+};
+
 export const chartTopProductos = computed(() => ({
   labels: productosTop.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
   datasets: [{
@@ -1042,6 +1108,12 @@ export const chartOptionsBar = {
       ticks: { color: '#f6f2de', font: { size: 11 } },
       grid: { display: false }
     }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
   }
 };
 
@@ -1151,6 +1223,12 @@ export const chartOptionsProductosCategoria = {
       ticks: { color: '#f6f2de', font: { size: 11 } },
       grid: { display: false }
     }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
   }
 };
 
@@ -1220,6 +1298,12 @@ export const chartOptionsCategoria = {
       stacked: true,
       ticks: { color: '#f6f2de', font: { size: 12, weight: 'bold' as const } },
       grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
     }
   }
 };

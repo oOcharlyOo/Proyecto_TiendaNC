@@ -83,7 +83,7 @@ defineEmits<{
         <div class="bar-chart-container" v-if="tipoGraficaCorte === 'unitario'"><Bar :data="chartDataUnitarios" :options="chartOptionsUnitarios" /></div>
         <div class="bar-chart-container" v-else-if="tipoGraficaCorte === 'gramaje'"><Bar :data="chartDataGranel" :options="chartOptionsGranel" /></div>
         <div class="bar-chart-container" v-else><Bar :data="chartDataCombinado" :options="chartOptionsCombinado" /></div>
-        <div class="products-list"><div v-for="(p, idx) in productosMasVendidos.slice(0, 10)" :key="idx" class="product-item"><span class="product-rank" :class="getRankClass(idx)">{{ getRankIcon(idx) }}</span><div class="product-info"><span class="product-name">{{ p.nombre }}</span><span class="product-category">{{ p.isGramaje ? 'Granel' : 'Unitario' }}</span></div><span class="product-amount">{{ formatearCantidad(p.cantidadTotal, p.isGramaje) }}</span></div></div>
+        <div class="products-list"><div v-for="(p, idx) in productosMasVendidos.slice(0, 8)" :key="idx" class="product-item"><span class="product-rank" :class="getRankClass(idx)">{{ getRankIcon(idx) }}</span><div class="product-info"><span class="product-name">{{ p.nombre }}</span><span class="product-category">{{ p.isGramaje ? 'Granel' : 'Unitario' }}</span></div><span class="product-amount">{{ formatearCantidad(p.cantidadTotal, p.isGramaje) }}</span></div></div>
         <div class="panel-footer"><div class="footer-ornament">⏣</div></div>
       </div>
       <div class="products-panel">

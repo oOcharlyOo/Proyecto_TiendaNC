@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { Bar, Pie, Line } from 'vue-chartjs';
 import * as r from './logica/useReporteVentas';
 import { useReporteVentas } from './logica/useReporteVentas';
 useReporteVentas();
+
+const categoriasExpandidas = ref<Record<string, boolean>>({});
+function toggleCategoria(cat: string) {
+  categoriasExpandidas.value[cat] = !categoriasExpandidas.value[cat];
+}
 </script>
 
 <template>
@@ -242,6 +248,53 @@ useReporteVentas();
         </div>
 
         <div class="chart-card chart-wide">
+          <h3 class="chart-title">📊 Ventas vs Costo vs Ganancia por Categoría</h3>
+          <div class="tabla-container">
+            <table class="tabla-productos">
+              <thead>
+                <tr>
+                  <th>Categoría / Subcategoría</th>
+                  <th class="text-right">Ventas</th>
+                  <th class="text-right">Costo</th>
+                  <th class="text-right">Ganancia</th>
+                  <th class="text-right">Margen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-for="cat in r.categoriasJerarquicas.value.slice(0, 10)" :key="cat.categoria">
+                  <tr class="cat-total-row" @click="toggleCategoria(cat.categoria)">
+                    <td>
+                      <span class="expand-icon">{{ categoriasExpandidas[cat.categoria] ? '▼' : '▶' }}</span>
+                      <strong>{{ cat.categoria }}</strong>
+                      <span class="modal-icon" @click.stop="r.categoriaSeleccionada.value = cat.categoria; r.subCategoriaSeleccionada.value = ''; r.modalCategoriaOpen.value = true" title="Ver productos">🔍</span>
+                    </td>
+                    <td class="text-right monto"><strong>{{ r.formatoMoneda(cat.totalMonto) }}</strong></td>
+                    <td class="text-right costo"><strong>{{ r.formatoMoneda(cat.totalCosto) }}</strong></td>
+                    <td class="text-right ganancia"><strong>{{ r.formatoMoneda(cat.totalGanancia) }}</strong></td>
+                    <td class="text-right" :style="{ color: cat.totalMonto > 0 ? (cat.totalGanancia / cat.totalMonto * 100 >= 30 ? '#28a745' : '#c99234') : '#888', fontWeight: 'bold' }">
+                      {{ cat.totalMonto > 0 ? (cat.totalGanancia / cat.totalMonto * 100).toFixed(1) + '%' : '—' }}
+                    </td>
+                  </tr>
+                  <tr v-for="sub in cat.subcategorias" :key="sub.nombre" class="sub-row" v-show="categoriasExpandidas[cat.categoria]">
+                    <td>
+                      <span class="sub-indent">└─ </span>
+                      <span class="sub-name">{{ sub.nombre }}</span>
+                      <span class="modal-icon" @click.stop="r.categoriaSeleccionada.value = cat.categoria; r.subCategoriaSeleccionada.value = sub.nombre; r.modalCategoriaOpen.value = true" title="Ver productos">🔍</span>
+                    </td>
+                    <td class="text-right monto">{{ r.formatoMoneda(sub.monto) }}</td>
+                    <td class="text-right costo">{{ r.formatoMoneda(sub.costo) }}</td>
+                    <td class="text-right ganancia">{{ r.formatoMoneda(sub.ganancia) }}</td>
+                    <td class="text-right" :style="{ color: sub.monto > 0 ? (sub.ganancia / sub.monto * 100 >= 30 ? '#28a745' : '#c99234') : '#888' }">
+                      {{ sub.monto > 0 ? (sub.ganancia / sub.monto * 100).toFixed(1) + '%' : '—' }}
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="chart-card chart-wide">
           <h3 class="chart-title">💵 Top Productos por Ganancia</h3>
           <div class="chart-container">
             <Bar :data="r.chartTopGanancia.value" :options="r.chartOptionsBar" />
@@ -428,6 +481,7 @@ useReporteVentas();
 .reporte-ventas :deep(.modal-overlay-cat){position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}.reporte-ventas :deep(.modal-card-cat){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,700px);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}.reporte-ventas :deep(.modal-movimientos){max-width:600px}.reporte-ventas :deep(.modal-header-cat){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}.reporte-ventas :deep(.modal-header-cat h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.modal-close-cat){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}.reporte-ventas :deep(.modal-close-cat:hover){background:var(--color-error);color:#fff}.reporte-ventas :deep(.modal-body-cat){padding:1rem;overflow-y:auto;flex:1}.reporte-ventas :deep(.modal-empty){padding:2rem;text-align:center;color:var(--color-text-secondary)}.reporte-ventas :deep(.chart-container-modal){height:250px;margin-bottom:.75rem}
 .reporte-ventas :deep(.tabla-modal table){width:100%;border-collapse:collapse;font-size:.7rem}.reporte-ventas :deep(.tabla-modal th){padding:.35rem .5rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-modal td){padding:.3rem .5rem;border-bottom:1px solid rgba(255,255,255,.02)}
 .reporte-ventas :deep(.tabla-movimientos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-movimientos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-movimientos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02)}.reporte-ventas :deep(.tabla-movimientos tfoot td){font-weight:700;border-top:1px solid var(--color-border)}.reporte-ventas :deep(.fecha-col){white-space:nowrap;font-family:monospace;font-size:.68rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.desc-text){color:var(--color-text-primary)}.reporte-ventas :deep(.edit-desc-input){padding:.25rem .4rem;background:var(--color-bg-primary);border:none;border-radius:4px;color:var(--color-text-primary);font-size:.7rem;width:100%;box-shadow:inset 2px 2px 3px rgba(0,0,0,.1)}.reporte-ventas :deep(.edit-actions){display:inline-flex;gap:.2rem;margin-left:.3rem}.reporte-ventas :deep(.btn-edit-save){border:none;border-radius:3px;background:var(--color-success);color:#fff;font-size:.6rem;cursor:pointer;padding:.1rem .25rem}.reporte-ventas :deep(.btn-edit-cancel),.reporte-ventas :deep(.btn-edit-icon){border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;border-radius:3px;padding:0 .25rem;font-size:.65rem;box-shadow:1px 1px 2px rgba(0,0,0,.05)}.reporte-ventas :deep(.btn-edit-cancel:hover),.reporte-ventas :deep(.btn-edit-icon:hover){color:var(--color-accent)}
+.reporte-ventas :deep(.cat-total-row td){border-bottom:2px solid var(--color-border);background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.cat-total-row){cursor:pointer}.reporte-ventas :deep(.cat-total-row:hover td){background:color-mix(in srgb,var(--color-accent) 10%,transparent)!important}.reporte-ventas :deep(.sub-row td){padding-left:1.5rem!important;font-size:.68rem}.reporte-ventas :deep(.sub-indent){color:var(--color-text-secondary);opacity:.5;margin-right:2px}.reporte-ventas :deep(.expand-icon){display:inline-block;width:12px;margin-right:4px;font-size:.6rem;color:var(--color-accent)}.reporte-ventas :deep(.modal-icon){margin-left:6px;font-size:.7rem;cursor:pointer;opacity:0;transition:opacity .15s}.reporte-ventas :deep(tr:hover .modal-icon){opacity:1}.reporte-ventas :deep(.sub-name){color:var(--color-text-primary)}
 
 @media(max-width:768px){.reporte-ventas :deep(.summary-cards){grid-template-columns:repeat(2,1fr)}.reporte-ventas :deep(.chart-card){grid-column:span 2}}
 @media(max-width:480px){.reporte-ventas{padding:.4rem}.reporte-ventas :deep(.reporte-header){flex-direction:column;align-items:stretch}.reporte-ventas :deep(.reporte-controls){flex-direction:column}.reporte-ventas :deep(.summary-cards){grid-template-columns:1fr 1fr;gap:.35rem}}

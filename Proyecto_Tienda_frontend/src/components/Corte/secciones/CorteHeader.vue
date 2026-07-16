@@ -3,14 +3,16 @@ defineProps<{ mensaje: string; mensajeTipo: 'ok' | 'error' | 'info' }>();
 defineEmits<{ 'cerrar-mensaje': [] }>();
 </script>
 <template>
-  <section class="hero-section">
-    <div class="bg-fog"></div>
-    <div class="bg-scanlines"></div>
+  <Teleport to="body">
     <div v-if="mensaje" class="mensaje-flash" :class="mensajeTipo">
       <span class="mensaje-icono">{{ mensajeTipo === 'ok' ? '✓' : mensajeTipo === 'error' ? '✕' : 'ℹ' }}</span>
       <span class="mensaje-texto">{{ mensaje }}</span>
       <button class="mensaje-cerrar" @click="$emit('cerrar-mensaje')">✕</button>
     </div>
+  </Teleport>
+  <section class="hero-section">
+    <div class="bg-fog"></div>
+    <div class="bg-scanlines"></div>
     <div class="hero-decoration left">❧</div>
     <div class="hero-content">
       <h1 class="hero-title">Corte de Caja</h1>

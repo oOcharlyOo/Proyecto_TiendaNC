@@ -50,7 +50,7 @@ export function useCategorias(emit?: (event: 'categorias-changed') => void) {
     toasts.value.push({ id, mensaje: texto, tipo });
     setTimeout(() => {
       toasts.value = toasts.value.filter(t => t.id !== id);
-    }, 3000);
+    }, 1000);
   }
 
   async function fetchApi<T>(url: string, init?: RequestInit): Promise<T> {

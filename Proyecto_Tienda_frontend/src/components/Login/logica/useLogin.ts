@@ -135,7 +135,7 @@ export function useLogin() {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(20px)';
       toast.addEventListener('transitionend', () => toast.remove());
-    }, 3000);
+    }, 1000);
   }
 
   return {
