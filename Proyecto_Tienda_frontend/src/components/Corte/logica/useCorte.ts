@@ -456,9 +456,11 @@ async function generarCorte() {
   if (!idUsuario.value) { mostrarMensaje('No se encontro idUsuario en sesion.', 'error'); return; }
   cargandoCorte.value = true;
   try {
-    const cajaActiva = await fetchApi<{ monto?: number }>(`/caja/apertura/activa?idUsuario=${idUsuario.value}`);
-    const montoInicial = Number(cajaActiva?.monto || 0);
-    const corte = await fetchApi<CorteDTO>(`/caja/corte?idUsuario=${idUsuario.value}&montoInicial=${montoInicial}`, { method: 'POST' });
+    const corte = await fetchApi<CorteDTO | null>(`/caja/corte/consulta?idUsuario=${idUsuario.value}`);
+    if (!corte) {
+      mostrarMensaje('No hay una caja abierta. Inicia sesion para abrir caja.', 'error');
+      return;
+    }
     const fechaCorte = new Date(corte.fechaCorte);
     ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
     ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
@@ -1084,6 +1086,8 @@ async function cerrarTurno() {
   if (!corteActual.value || !idUsuario.value) { mostrarMensaje('Genera primero un corte de caja.', 'error'); return; }
   cargandoCerrarTurno.value = true;
   try {
+    const montoInicialCorte = Number(corteActual.value.montoInicial || 0);
+    await fetchApi<CorteDTO>(`/caja/corte?idUsuario=${idUsuario.value}&montoInicial=${montoInicialCorte}`, { method: 'POST' });
     await fetchApi<unknown>('/caja/ventas/status', { method: 'PUT', body: JSON.stringify({ idUsuario: idUsuario.value, startDate: new Date(new Date(corteActual.value.fechaCorte).setHours(0, 0, 0, 0)).toISOString(), endDate: new Date(corteActual.value.fechaCorte).toISOString() }) });
     try { await fetchApi<string>('/corte/cierreTurno', { method: 'POST' }); } catch (e) { console.warn('Backup warning:', e); }
     mostrarMensaje('Turno cerrado con exito. Cerrando sesion...', 'ok');
