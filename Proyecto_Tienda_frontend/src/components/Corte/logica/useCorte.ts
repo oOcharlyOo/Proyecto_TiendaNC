@@ -128,6 +128,7 @@ function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info') {
 }
 
 function limpiarReporte() {
+  tipoUsuario.value = Number(localStorage.getItem('tipoUsuario') || 2);
   corteActual.value = null;
   mostrarReporte.value = false;
   mostrarCerrarTurno.value = false;
@@ -175,10 +176,10 @@ const modalSueldoHoraAbierto = ref(false);
 const modalGramajeAbierto = ref(false);
 
 // --- Date filters ---
-const fechaDiaria = ref(new Date().toISOString().slice(0, 10));
-const mesMensual = ref(new Date().toISOString().slice(0, 7));
-const fechaRangoInicio = ref(new Date().toISOString().slice(0, 10));
-const fechaRangoFin = ref(new Date().toISOString().slice(0, 10));
+const fechaDiaria = ref(new Date().toLocaleDateString('en-CA'));
+const mesMensual = ref(new Date().toLocaleDateString('en-CA').slice(0, 7));
+const fechaRangoInicio = ref(new Date().toLocaleDateString('en-CA'));
+const fechaRangoFin = ref(new Date().toLocaleDateString('en-CA'));
 const anioReporte = ref(new Date().getFullYear());
 
 // --- Corte/report data ---
@@ -260,7 +261,7 @@ const errorMontoPago = ref('');
 
 const nuevoApartado = ref({
   nombreProducto: '', montoTotal: 0, frecuenciaPago: 'mensual',
-  plazoMeses: 1, fechaInicio: new Date().toISOString().slice(0, 10)
+  plazoMeses: 1, fechaInicio: new Date().toLocaleDateString('en-CA')
 });
 
 // --- Chart toggle ---
@@ -487,52 +488,67 @@ async function generarCorte() {
       return;
     }
     const montoInicial = Number(cajaActiva.monto || 0);
-    const hoy = new Date().toISOString().slice(0, 10);
-    const reporte = await fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${hoy}`);
-    const ventas = reporte.ventas || [];
-    for (const venta of ventas) {
-      const detalles = venta.detalles || [];
-      venta.tieneDiscrepancia = verificarDiscrepancia(detalles as any, Number(venta.montoTotal ?? 0));
-    }
-    ventasEfectivo.value = Number(reporte.ventasEfectivo || 0);
-    ventasTarjeta.value = Number(reporte.ventasTarjeta || 0);
-    ventasTransferencia.value = Number(reporte.ventasTransferencia || 0);
-    abonoTotalDia.value = Number((reporte as any).abonoTotal || 0);
-    const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
-    usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
-    const otrosIngresos = Number(reporte.otrosIngresos || 0);
-    const totalEgresos = Number(reporte.totalEgresos || 0);
-    horaInicioCaja.value = reporte.horaInicio || null;
-    horaFinCaja.value = reporte.horaFin || null;
-    if (reporte.nombreUsuario) nombreUsuario.value = reporte.nombreUsuario;
-    const totalVentas = Number(reporte.cobroTotal || 0);
-    const saldoFinal = montoInicial + totalVentas + otrosIngresos - totalEgresos;
-    const saldoFinalEfectivo = montoInicial + Number(ventasEfectivo.value || 0) + otrosIngresos - totalEgresos;
-    const gananciaBruta = Number(reporte.gananciaTotal || 0);
-    corteActual.value = {
-      fechaCorte: `${hoy}T00:00:00`, montoInicial, totalVentas, totalEgresos, otrosIngresos,
-      saldoFinalCalculado: saldoFinal, saldoFinalEfectivo, gananciaTotal: gananciaBruta,
-      gananciaNeta: Math.max(0, gananciaBruta - dineroApartarDiario.value),
-      ventasTarjeta: Number(ventasTarjeta.value || 0), ventasEfectivo: Number(ventasEfectivo.value || 0),
-      ventasTransferencia: Number(ventasTransferencia.value || 0)
-    };
-    const todosDetalles = reporte.todosDetalles || [];
-    detallesDiario.value = todosDetalles;
-    totalEnvase.value = todosDetalles.reduce((sum, d) => sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0), 0);
-    calcularProductosReporte(todosDetalles, 'diario');
-    calcularProductosMasVendidos(todosDetalles);
-    if (idUsuario.value) {
-      try {
-        const [totalApartadoData, apartadosData] = await Promise.all([
-          fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`),
-          fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`)
-        ]);
-        totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
-        apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
-      } catch (e) { totalApartarDiario.value = 0; apartadosActivos.value = []; }
-    }
-    totalTicketsDia.value = reporte.totalTickets ?? ventas.length;
+    const corte = await fetchApi<CorteDTO>(`/caja/corte?idUsuario=${idUsuario.value}&montoInicial=${montoInicial}`, { method: 'POST' });
+    const hoy = new Date().toLocaleDateString('en-CA');
+    ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
+    ventasTransferencia.value = Number(corte.ventasTransferencia || 0);
+    totalTicketsDia.value = Number(corte.totalTickets || 0);
+    const montoInicialCorte = Number(corte.montoInicial || 0);
+    const otrosIngresosCorte = Number(corte.otrosIngresos || 0);
+    const totalEgresosCorte = Number(corte.totalEgresos || 0);
+    const saldoFinalEfectivo = montoInicialCorte + Number(ventasEfectivo.value || 0) + otrosIngresosCorte - totalEgresosCorte;
+    corteActual.value = { ...corte, saldoFinalEfectivo };
     reporteTitulo.value = 'Reporte del Corte Actual';
+    try {
+      const [reporteDiario] = await Promise.all([
+        fetchApi<ReporteDiarioCompletoDTO>(`/ventas/reporteDiarioCompleto/${hoy}`),
+        (async () => {
+          try {
+            const [totalApartadoData, apartadosData, egresosRes, entradasRes] = await Promise.all([
+              fetchApi<number | { datos: number }>(`/apartado/totalDiario?idUsuario=${idUsuario.value}`).catch(() => 0),
+              fetchApi<ApartadoDTO[] | { datos: ApartadoDTO[] }>(`/apartado/activos?idUsuario=${idUsuario.value}`).catch(() => []),
+              fetchApi<EgresoDTO[]>(`/caja/egresos/${hoy}`).catch(() => [] as EgresoDTO[]),
+              fetchApi<EgresoDTO[]>(`/caja/entradas/${hoy}`).catch(() => [] as EgresoDTO[])
+            ]);
+            totalApartarDiario.value = typeof totalApartadoData === 'number' ? totalApartadoData : (totalApartadoData?.datos || 0);
+            apartadosActivos.value = Array.isArray(apartadosData) ? apartadosData : (apartadosData?.datos || []);
+            egresosDia.value = (egresosRes || []).sort((a, b) => new Date(a.fechaMovimiento).getTime() - new Date(b.fechaMovimiento).getTime());
+            entradasDia.value = (entradasRes || []).sort((a, b) => new Date(a.fechaMovimiento).getTime() - new Date(b.fechaMovimiento).getTime());
+            cargandoEgresos.value = false;
+            cargandoEntradas.value = false;
+          } catch (e) {
+            totalApartarDiario.value = 0; apartadosActivos.value = []; egresosDia.value = []; entradasDia.value = [];
+          }
+        })()
+      ]);
+      const ventas = reporteDiario.ventas || [];
+      for (const venta of ventas) {
+        const detalles = venta.detalles || [];
+        venta.tieneDiscrepancia = verificarDiscrepancia(detalles as any, Number(venta.montoTotal ?? 0));
+      }
+      ventasTarjeta.value = Number(reporteDiario.ventasTarjeta || 0);
+      abonoTotalDia.value = Number((reporteDiario as any).abonoTotal || 0);
+      if (!corte.ventasTransferencia) ventasTransferencia.value = Number(reporteDiario.ventasTransferencia || 0);
+      const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
+      usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
+      horaInicioCaja.value = reporteDiario.horaInicio || null;
+      horaFinCaja.value = reporteDiario.horaFin || null;
+      if (reporteDiario.nombreUsuario) nombreUsuario.value = reporteDiario.nombreUsuario;
+      const todosDetalles = reporteDiario.todosDetalles || [];
+      detallesDiario.value = todosDetalles;
+      let envaseCalc = todosDetalles.reduce((sum, d) => sum + Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0), 0);
+      if (envaseCalc === 0 && ventas.length > 0) {
+        envaseCalc = ventas.reduce((sum, v) => {
+          const dets = (v as any).detalles || [];
+          return sum + dets.reduce((s: number, d: any) => s + Number(d.cobroEnvaseTotal ?? d.cobro_envase_total ?? 0), 0);
+        }, 0);
+      }
+      totalEnvase.value = envaseCalc;
+      calcularProductosReporte(todosDetalles, 'diario');
+      calcularProductosMasVendidos(todosDetalles);
+    } catch (e) {
+      console.error('Error al cargar datos del reporte:', e);
+    }
     mostrarReporte.value = true;
     mostrarCerrarTurno.value = true;
     mostrarMensaje('Corte de caja generado con exito.', 'ok');
@@ -1352,7 +1368,7 @@ async function crearApartado() {
   try {
     await fetchApi<ApartadoDTO>('/apartado', { method: 'POST', body: JSON.stringify({ ...nuevoApartado.value, idUsuario: idUsuario.value }) });
     mostrarMensaje('Apartado creado exitosamente', 'ok');
-    nuevoApartado.value = { nombreProducto: '', montoTotal: 0, frecuenciaPago: 'mensual', plazoMeses: 1, fechaInicio: new Date().toISOString().slice(0, 10) };
+    nuevoApartado.value = { nombreProducto: '', montoTotal: 0, frecuenciaPago: 'mensual', plazoMeses: 1, fechaInicio: new Date().toLocaleDateString('en-CA') };
     await abrirModalApartados();
   } catch { mostrarMensaje('Error al crear apartado', 'error'); }
 }

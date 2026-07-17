@@ -445,7 +445,7 @@ export const diasEnPeriodo = computed(() => {
   if (periodo.value === 'semana') return 7;
   if (periodo.value === 'anio') return 365;
   
-  const mesStr = fechaSeleccionada.value || now.toISOString().slice(0, 7);
+  const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
   const [y, m] = mesStr.split('-').map(Number);
   return new Date(y, m, 0).getDate();
 });
@@ -883,7 +883,7 @@ export const rangoActual = computed(() => {
   let fechaFin: string;
   
   if (periodo.value === 'dia') {
-    fechaInicio = fechaSeleccionada.value || now.toISOString().slice(0, 10);
+    fechaInicio = fechaSeleccionada.value || now.toLocaleDateString('en-CA');
     fechaFin = fechaInicio;
   } else if (periodo.value === 'semana') {
     const start = fechaSeleccionada.value ? parseLocalDate(fechaSeleccionada.value) : new Date(now);
@@ -892,10 +892,10 @@ export const rangoActual = computed(() => {
     start.setDate(start.getDate() - daysToMonday);
     const end = new Date(start);
     end.setDate(start.getDate() + 6);
-    fechaInicio = start.toISOString().slice(0, 10);
-    fechaFin = end.toISOString().slice(0, 10);
+    fechaInicio = start.toLocaleDateString('en-CA');
+    fechaFin = end.toLocaleDateString('en-CA');
   } else if (periodo.value === 'mes') {
-    const mesStr = fechaSeleccionada.value || now.toISOString().slice(0, 7);
+    const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
     fechaInicio = `${mesStr}-01`;
     const [y, m] = mesStr.split('-').map(Number);
     const lastDay = new Date(y, m, 0).getDate();
@@ -1420,15 +1420,15 @@ export const chartOptionsFlujo = computed(() => ({
 export function inicializarFecha() {
   const now = new Date();
   if (periodo.value === 'dia') {
-    fechaSeleccionada.value = now.toISOString().slice(0, 10);
+    fechaSeleccionada.value = now.toLocaleDateString('en-CA');
   } else if (periodo.value === 'semana') {
     const startOfWeek = new Date(now);
     const dayOfWeek = now.getDay();
     const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     startOfWeek.setDate(now.getDate() - daysToMonday);
-    fechaSeleccionada.value = startOfWeek.toISOString().slice(0, 10);
+    fechaSeleccionada.value = startOfWeek.toLocaleDateString('en-CA');
   } else if (periodo.value === 'mes') {
-    fechaSeleccionada.value = now.toISOString().slice(0, 7);
+    fechaSeleccionada.value = now.toLocaleDateString('en-CA').slice(0, 7);
   } else {
     fechaSeleccionada.value = now.getFullYear().toString();
   }
@@ -1442,7 +1442,7 @@ export async function cargarDatos() {
     const now = new Date();
     
     if (periodo.value === 'dia') {
-      fechaInicio = fechaSeleccionada.value || now.toISOString().slice(0, 10);
+      fechaInicio = fechaSeleccionada.value || now.toLocaleDateString('en-CA');
       fechaFin = fechaInicio;
     } else if (periodo.value === 'semana') {
       const start = fechaSeleccionada.value ? parseLocalDate(fechaSeleccionada.value) : new Date(now);
@@ -1451,10 +1451,10 @@ export async function cargarDatos() {
       start.setDate(start.getDate() - daysToMonday);
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
-      fechaInicio = start.toISOString().slice(0, 10);
-      fechaFin = end.toISOString().slice(0, 10);
+      fechaInicio = start.toLocaleDateString('en-CA');
+      fechaFin = end.toLocaleDateString('en-CA');
     } else if (periodo.value === 'mes') {
-      const mesStr = fechaSeleccionada.value || now.toISOString().slice(0, 7);
+      const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
       fechaInicio = `${mesStr}-01`;
       const [y, m] = mesStr.split('-').map(Number);
       const lastDay = new Date(y, m, 0).getDate();

@@ -8,7 +8,7 @@ defineEmits<{
 <template>
   <section class="actions-section">
     <div class="actions-grid" :class="{ 'solo-corte': !esAdministrador }">
-      <button v-if="esAdministrador" class="action-btn corte-btn" :disabled="cargandoCorte" @click="$emit('generar-corte')">
+      <button class="action-btn corte-btn" :disabled="cargandoCorte" @click="$emit('generar-corte')">
         <span class="action-icon">⚔️</span> Generar Corte
       </button>
       <button v-if="esAdministrador" class="action-btn diario-btn" @click="$emit('abrir-modal-diario')">
