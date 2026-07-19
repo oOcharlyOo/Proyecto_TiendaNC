@@ -1,0 +1,516 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "7bfd736547a3cc9b7abc8dbccd26d879",
+    "entities": [
+      {
+        "tableName": "productos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_producto` INTEGER, `nombre` TEXT, `precio_costo` TEXT, `precio_venta` TEXT, `stock` INTEGER, `cantidad_min` INTEGER, `cantidad_max` INTEGER, `precio_mayoreo` TEXT, `is_gramaje` INTEGER, `requiere_envase` INTEGER, `precio_envase` TEXT, `codigo_barras` TEXT, `id_categoria` INTEGER, `id_subcategoria` INTEGER, `estatus` TEXT, `presentacion_caja` TEXT, PRIMARY KEY(`id_producto`))",
+        "fields": [
+          {
+            "fieldPath": "idProducto",
+            "columnName": "id_producto",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "precioCosto",
+            "columnName": "precio_costo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "precioVenta",
+            "columnName": "precio_venta",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stock",
+            "columnName": "stock",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "cantidadMin",
+            "columnName": "cantidad_min",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "cantidadMax",
+            "columnName": "cantidad_max",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "precioMayoreo",
+            "columnName": "precio_mayoreo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isGramaje",
+            "columnName": "is_gramaje",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "requiereEnvase",
+            "columnName": "requiere_envase",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "precioEnvase",
+            "columnName": "precio_envase",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "codigoBarras",
+            "columnName": "codigo_barras",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "idCategoria",
+            "columnName": "id_categoria",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "idSubcategoria",
+            "columnName": "id_subcategoria",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "estatus",
+            "columnName": "estatus",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "presentacionCaja",
+            "columnName": "presentacion_caja",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_producto"
+          ]
+        }
+      },
+      {
+        "tableName": "categorias",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_categoria` INTEGER, `nombre` TEXT, `descripcion` TEXT, `estatus` TEXT, PRIMARY KEY(`id_categoria`))",
+        "fields": [
+          {
+            "fieldPath": "idCategoria",
+            "columnName": "id_categoria",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "descripcion",
+            "columnName": "descripcion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "estatus",
+            "columnName": "estatus",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_categoria"
+          ]
+        }
+      },
+      {
+        "tableName": "subcategorias",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_subcategoria` INTEGER, `nombre` TEXT, `descripcion` TEXT, `id_categoria` INTEGER, `estatus` TEXT, PRIMARY KEY(`id_subcategoria`))",
+        "fields": [
+          {
+            "fieldPath": "idSubcategoria",
+            "columnName": "id_subcategoria",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "descripcion",
+            "columnName": "descripcion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "idCategoria",
+            "columnName": "id_categoria",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "estatus",
+            "columnName": "estatus",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_subcategoria"
+          ]
+        }
+      },
+      {
+        "tableName": "usuarios",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_usuario` INTEGER, `usuario` TEXT, `nombre` TEXT, `apellido_p` TEXT, `apellido_m` TEXT, `password_hash` TEXT, `id_tipo_usuario` INTEGER, `avatar` TEXT, `sueldo_hora` REAL, `dias_semana` INTEGER, `horas_trabajadas` INTEGER, PRIMARY KEY(`id_usuario`))",
+        "fields": [
+          {
+            "fieldPath": "idUsuario",
+            "columnName": "id_usuario",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "usuario",
+            "columnName": "usuario",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "apellidoP",
+            "columnName": "apellido_p",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "apellidoM",
+            "columnName": "apellido_m",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "passwordHash",
+            "columnName": "password_hash",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "idTipoUsuario",
+            "columnName": "id_tipo_usuario",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "avatar",
+            "columnName": "avatar",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sueldoHora",
+            "columnName": "sueldo_hora",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "diasSemana",
+            "columnName": "dias_semana",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "horasTrabajadas",
+            "columnName": "horas_trabajadas",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_usuario"
+          ]
+        }
+      },
+      {
+        "tableName": "ventas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_venta` INTEGER, `id_usuario` INTEGER, `fecha_venta` TEXT, `monto_total` TEXT, `estatus` TEXT, `numero_ticket` INTEGER NOT NULL, `metodo_pago` TEXT, `descripcion_pendiente` TEXT, `nombre_cliente` TEXT, `sincronizado` INTEGER NOT NULL, PRIMARY KEY(`id_venta`))",
+        "fields": [
+          {
+            "fieldPath": "idVenta",
+            "columnName": "id_venta",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "idUsuario",
+            "columnName": "id_usuario",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fechaVenta",
+            "columnName": "fecha_venta",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "montoTotal",
+            "columnName": "monto_total",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "estatus",
+            "columnName": "estatus",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "numeroTicket",
+            "columnName": "numero_ticket",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metodoPago",
+            "columnName": "metodo_pago",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "descripcionPendiente",
+            "columnName": "descripcion_pendiente",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nombreCliente",
+            "columnName": "nombre_cliente",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sincronizado",
+            "columnName": "sincronizado",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_venta"
+          ]
+        }
+      },
+      {
+        "tableName": "ventas_detalle",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_venta_detalle` INTEGER, `id_venta` INTEGER, `id_producto` INTEGER, `cantidad` INTEGER, `precio_unitario_venta` TEXT, `tipo_precio_aplicado` TEXT, `cobro_envase` TEXT, `cantidad_envase` INTEGER, PRIMARY KEY(`id_venta_detalle`))",
+        "fields": [
+          {
+            "fieldPath": "idVentaDetalle",
+            "columnName": "id_venta_detalle",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "idVenta",
+            "columnName": "id_venta",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "idProducto",
+            "columnName": "id_producto",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "cantidad",
+            "columnName": "cantidad",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "precioUnitarioVenta",
+            "columnName": "precio_unitario_venta",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tipoPrecioAplicado",
+            "columnName": "tipo_precio_aplicado",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cobroEnvase",
+            "columnName": "cobro_envase",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cantidadEnvase",
+            "columnName": "cantidad_envase",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_venta_detalle"
+          ]
+        }
+      },
+      {
+        "tableName": "tickets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_ticket` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id_venta_servidor` INTEGER, `numero_ticket` INTEGER NOT NULL, `monto_total` TEXT, `metodo_pago` TEXT, `estado` TEXT, `creado_en` INTEGER NOT NULL, `descripcion_pendiente` TEXT, `nombre_cliente` TEXT, `id_usuario` INTEGER, `desde_backend` INTEGER NOT NULL, `nombre_usuario` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "idTicket",
+            "columnName": "id_ticket",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idVentaServidor",
+            "columnName": "id_venta_servidor",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "numeroTicket",
+            "columnName": "numero_ticket",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "montoTotal",
+            "columnName": "monto_total",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "metodoPago",
+            "columnName": "metodo_pago",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creado_en",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descripcionPendiente",
+            "columnName": "descripcion_pendiente",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nombreCliente",
+            "columnName": "nombre_cliente",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "idUsuario",
+            "columnName": "id_usuario",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "desdeBackend",
+            "columnName": "desde_backend",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombreUsuario",
+            "columnName": "nombre_usuario",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id_ticket"
+          ]
+        }
+      },
+      {
+        "tableName": "ticket_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_item` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id_ticket` INTEGER NOT NULL, `id_producto` INTEGER, `nombre` TEXT, `cantidad` INTEGER NOT NULL, `precio_unitario` TEXT, `tipo_precio` TEXT, `is_gramaje` INTEGER NOT NULL, `precio_envase` TEXT, `cobro_envase` INTEGER NOT NULL, `cantidad_envase` INTEGER NOT NULL, `id_venta_detalle_servidor` INTEGER, `id_promocion` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "idItem",
+            "columnName": "id_item",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idTicket",
+            "columnName": "id_ticket",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idProducto",
+            "columnName": "id_producto",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cantidad",
+            "columnName": "cantidad",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precioUnitario",
+            "columnName": "precio_unitario",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tipoPrecio",
+            "columnName": "tipo_precio",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isGramaje",
+            "columnName": "is_gramaje",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precioEnvase",
+            "columnName": "precio_envase",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cobroEnvase",
+            "columnName": "cobro_envase",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cantidadEnvase",
+            "columnName": "cantidad_envase",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idVentaDetalleServidor",
+            "columnName": "id_venta_detalle_servidor",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "idPromocion",
+            "columnName": "id_promocion",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id_item"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7bfd736547a3cc9b7abc8dbccd26d879')"
+    ]
+  }
+}

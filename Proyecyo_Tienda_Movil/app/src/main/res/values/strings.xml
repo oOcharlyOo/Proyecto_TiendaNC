@@ -1,3 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">La Leyenda del Dulce</string>
+    <string name="app_name">Dulces NC POS</string>
+    <string name="login_title">Iniciar Sesión</string>
+    <string name="login_user">Usuario</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_button">Entrar</string>
+    <string name="sucursal_title">Seleccionar Sucursal</string>
+    <string name="sucursal_dulceria">Dulcería</string>
+    <string name="sucursal_abarrotera">Abarrotera</string>
+    <string name="nav_ventas">Ventas</string>
+    <string name="nav_productos">Productos</string>
+    <string name="nav_usuarios">Usuarios</string>
+    <string name="nav_inventario">Inventario</string>
+    <string name="nav_corte">Corte</string>
+    <string name="nav_finanzas">Finanzas</string>
+    <string name="nav_rental">Rental</string>
 </resources>

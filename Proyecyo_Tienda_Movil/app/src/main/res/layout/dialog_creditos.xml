@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC060d09">
+
+    <LinearLayout
+        android:layout_width="420dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/zelda_panel"
+        android:padding="@dimen/space_xl">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Créditos"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_xl"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/gold_dark"
+            android:layout_marginBottom="@dimen/space_sm" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="@dimen/space_sm">
+
+            <EditText
+                android:id="@+id/etNuevaPersona"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/card_height_md"
+                android:layout_weight="1"
+                android:background="@drawable/zelda_panel_active"
+                android:hint="Nueva persona de credito"
+                android:textColor="@color/white"
+                android:textColorHint="@color/text_secondary"
+                android:paddingHorizontal="@dimen/space_lg"
+                android:textSize="@dimen/text_body" />
+
+            <TextView
+                android:id="@+id/btnAgregarPersona"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/card_height_md"
+                android:layout_marginStart="@dimen/space_xs"
+                android:background="@drawable/zelda_selector"
+                android:gravity="center"
+                android:paddingHorizontal="@dimen/space_md"
+                android:text="+"
+                android:textColor="@color/gold_light"
+                android:textSize="@dimen/text_lg"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Personas"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_md"
+            android:textStyle="bold"
+            android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvPersonas"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@drawable/zelda_panel_active"
+            android:clipToPadding="false"
+            android:padding="@dimen/space_xs"
+            android:layout_marginBottom="@dimen/space_sm" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Creditos activos"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_md"
+            android:textStyle="bold"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvCreditos"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:background="@drawable/zelda_panel_active"
+            android:clipToPadding="false"
+            android:padding="@dimen/space_xs" />
+
+        <TextView
+            android:id="@+id/tvVacio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No hay creditos activos"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_body"
+            android:gravity="center"
+            android:layout_marginTop="@dimen/space_lg" />
+
+        <TextView
+            android:id="@+id/btnCerrar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/touch_target_large"
+            android:layout_marginTop="@dimen/space_lg"
+            android:background="@drawable/zelda_btn_cancel"
+            android:gravity="center"
+            android:text="Cerrar"
+            android:textColor="@color/white"
+            android:textSize="@dimen/text_lg"
+            android:textStyle="bold" />
+    </LinearLayout>
+</FrameLayout>

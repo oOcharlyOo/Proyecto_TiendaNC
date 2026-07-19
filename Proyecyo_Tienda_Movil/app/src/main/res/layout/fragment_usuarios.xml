@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?><androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"    xmlns:app="http://schemas.android.com/apk/res-auto"    xmlns:tools="http://schemas.android.com/tools"    android:layout_width="match_parent"    android:layout_height="match_parent"    android:background="@color/bg_main"    android:padding="@dimen/padding_screen">    <TextView        android:id="@+id/tvTitle"        android:layout_width="0dp"        android:layout_height="wrap_content"        android:layout_marginBottom="@dimen/space_md"        android:text="👥 Usuarios"        android:textColor="@color/gold_light"        android:textSize="@dimen/text_title"        android:textStyle="bold"        app:layout_constraintEnd_toEndOf="parent"        app:layout_constraintStart_toStartOf="parent"        app:layout_constraintTop_toTopOf="parent" />    <androidx.cardview.widget.CardView        android:id="@+id/cardSearch"        android:layout_width="0dp"        android:layout_height="@dimen/card_height_sm"        android:background="@drawable/zelda_panel"        app:cardBackgroundColor="@android:color/transparent"        app:cardCornerRadius="@dimen/corner_md"        app:cardElevation="0dp"        app:layout_constraintEnd_toEndOf="parent"        app:layout_constraintStart_toStartOf="parent"        app:layout_constraintTop_toBottomOf="@id/tvTitle">        <com.google.android.material.textfield.TextInputLayout            android:layout_width="match_parent"            android:layout_height="match_parent"            app:boxBackgroundMode="none"            app:hintEnabled="false">            <com.google.android.material.textfield.TextInputEditText                android:id="@+id/etBuscar"                android:layout_width="match_parent"                android:layout_height="match_parent"                android:background="@android:color/transparent"                android:drawableStart="@android:drawable/ic_menu_search"                android:drawableTint="@color/white"                android:hint="Buscar usuario..."                android:imeOptions="actionSearch"                android:inputType="text"                android:paddingHorizontal="@dimen/space_lg"                android:textColor="@color/white"                android:textColorHint="@color/white"                android:textSize="@dimen/text_body" />        </com.google.android.material.textfield.TextInputLayout>    </androidx.cardview.widget.CardView>        <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvUsuarios"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/space_sm"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cardSearch"
+        tools:listitem="@layout/item_usuario" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnAgregar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_lg"
+        android:src="@android:drawable/ic_menu_add"
+        app:backgroundTint="@color/gold_dark"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" /></androidx.constraintlayout.widget.ConstraintLayout>

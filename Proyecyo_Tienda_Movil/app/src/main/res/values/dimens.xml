@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Touch targets -->
+    <dimen name="touch_target">44dp</dimen>
+    <dimen name="touch_target_small">36dp</dimen>
+    <dimen name="touch_target_large">52dp</dimen>
+
+    <!-- Spacing -->
+    <dimen name="space_xxs">2dp</dimen>
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_sm">8dp</dimen>
+    <dimen name="space_md">12dp</dimen>
+    <dimen name="space_lg">16dp</dimen>
+    <dimen name="space_xl">20dp</dimen>
+    <dimen name="space_xxl">24dp</dimen>
+    <dimen name="space_xxxl">32dp</dimen>
+
+    <!-- Padding -->
+    <dimen name="padding_screen">12dp</dimen>
+    <dimen name="padding_card">16dp</dimen>
+    <dimen name="padding_input">14dp</dimen>
+
+    <!-- Corner radius -->
+    <dimen name="corner_sm">8dp</dimen>
+    <dimen name="corner_md">12dp</dimen>
+    <dimen name="corner_lg">14dp</dimen>
+    <dimen name="corner_xl">16dp</dimen>
+    <dimen name="corner_xxl">24dp</dimen>
+
+    <!-- Card heights -->
+    <dimen name="card_height_xs">44dp</dimen>
+    <dimen name="card_height_sm">48dp</dimen>
+    <dimen name="card_height_md">56dp</dimen>
+    <dimen name="card_height_lg">72dp</dimen>
+    <dimen name="card_height_xl">90dp</dimen>
+    <dimen name="card_height_xxl">120dp</dimen>
+    <dimen name="card_height_xxxl">140dp</dimen>
+
+    <!-- Icon / Emoji sizes -->
+    <dimen name="icon_sm">18sp</dimen>
+    <dimen name="icon_md">20sp</dimen>
+    <dimen name="icon_lg">24sp</dimen>
+    <dimen name="icon_xl">28sp</dimen>
+    <dimen name="icon_emoji">24sp</dimen>
+    <dimen name="icon_emoji_lg">64sp</dimen>
+
+    <!-- Text sizes -->
+    <dimen name="text_xxs">10sp</dimen>
+    <dimen name="text_xs">11sp</dimen>
+    <dimen name="text_sm">12sp</dimen>
+    <dimen name="text_body">14sp</dimen>
+    <dimen name="text_md">15sp</dimen>
+    <dimen name="text_lg">16sp</dimen>
+    <dimen name="text_xl">18sp</dimen>
+    <dimen name="text_xxl">20sp</dimen>
+    <dimen name="text_title">22sp</dimen>
+    <dimen name="text_display">24sp</dimen>
+    <dimen name="text_display_lg">28sp</dimen>
+    <dimen name="text_display_xl">32sp</dimen>
+
+    <!-- Width -->
+    <dimen name="drawer_width">300dp</dimen>
+    <dimen name="ticket_rail_width">96dp</dimen>
+    <dimen name="splash_card_width">280dp</dimen>
+    <dimen name="module_menu_width">320dp</dimen>
+
+    <!-- Nav bar padding -->
+    <dimen name="nav_bar_padding">80dp</dimen>
+
+    <!-- Ticket item quantity pill -->
+    <dimen name="ticket_qty_width">28dp</dimen>
+</resources>

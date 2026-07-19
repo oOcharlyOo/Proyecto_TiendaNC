@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC060d09">
+
+    <LinearLayout
+        android:layout_width="380dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/zelda_panel"
+        android:padding="@dimen/space_xl">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚖️ Calculadora de Gramaje"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_xl"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/gold_dark"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <TextView
+            android:id="@+id/tvProducto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/white"
+            android:textSize="@dimen/text_body"
+            android:gravity="center"
+            android:layout_marginBottom="@dimen/space_md" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginEnd="@dimen/space_xs">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Gramaje (g)"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_xs"
+                    android:layout_marginBottom="@dimen/space_xxs" />
+
+                <EditText
+                    android:id="@+id/etGramos"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/card_height_md"
+                    android:background="@drawable/zelda_panel_active"
+                    android:inputType="number"
+                    android:textColor="@color/white"
+                    android:textSize="@dimen/text_lg"
+                    android:gravity="center"
+                    android:paddingHorizontal="@dimen/space_sm" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_xxs">
+
+                    <TextView
+                        android:id="@+id/btn250"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="250g"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <TextView
+                        android:id="@+id/btn500"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginHorizontal="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="500g"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <TextView
+                        android:id="@+id/btn1000"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="1kg"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="@dimen/space_xs">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Total a cobrar"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_xs"
+                    android:layout_marginBottom="@dimen/space_xxs" />
+
+                <EditText
+                    android:id="@+id/etTotal"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/card_height_md"
+                    android:background="@drawable/zelda_panel_active"
+                    android:inputType="numberDecimal"
+                    android:textColor="@color/white"
+                    android:textSize="@dimen/text_lg"
+                    android:gravity="center"
+                    android:paddingHorizontal="@dimen/space_sm" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_xxs">
+
+                    <TextView
+                        android:id="@+id/btn10"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="$10"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <TextView
+                        android:id="@+id/btn20"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginHorizontal="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="$20"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                    <TextView
+                        android:id="@+id/btn30"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="@dimen/space_xxs"
+                        android:background="@drawable/zelda_selector"
+                        android:gravity="center"
+                        android:paddingVertical="@dimen/space_xxs"
+                        android:text="$30"
+                        android:textColor="@color/gold_light"
+                        android:textSize="@dimen/text_xs"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPrecioKilo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Precio por kilo: $0.00"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_sm"
+            android:gravity="center"
+            android:layout_marginTop="@dimen/space_md" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/space_lg">
+
+            <TextView
+                android:id="@+id/btnCancelar"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/touch_target_large"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/space_sm"
+                android:background="@drawable/zelda_btn_cancel"
+                android:gravity="center"
+                android:text="Cancelar"
+                android:textColor="@color/white"
+                android:textSize="@dimen/text_lg"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnAgregar"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/touch_target_large"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/space_sm"
+                android:background="@drawable/zelda_btn_confirm"
+                android:gravity="center"
+                android:text="Agregar"
+                android:textColor="@color/white"
+                android:textSize="@dimen/text_lg"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
