@@ -2,9 +2,10 @@
 import { computed } from 'vue';
 import type { VentaDTO, VentaDetalleDTO } from '../logica/useCorte';
 const props = defineProps<{
-  abierto: boolean; cargando: boolean; historialFiltrado: { venta: VentaDTO; detalles: VentaDetalleDTO[] }[];
-  historialTotalFiltrado: number; historialMeses: string[]; historialDias: string[];
-  filtroMesHistorial: string; filtroDiaHistorial: string; filtroDiscrepanciaHistorial: boolean;
+  abierto: boolean; cargando: boolean; historialData: { venta: VentaDTO; detalles: VentaDetalleDTO[] }[];
+  historialTotalFiltrado: number;
+  filtroMesHistorial: string; filtroAnioHistorial: number; filtroDiscrepanciaHistorial: boolean;
+  historialPagina: number; historialTotalPaginas: number; historialTotalElementos: number;
   ventasHistorialSeleccionadas: Set<number>; corrigiendoHistorial: boolean; correccionHistorialMsg: string;
   modalDetalleAbierto: boolean; ventaDetalleSeleccionada: VentaDTO | null;
   ventaDetalleItems: VentaDetalleDTO[]; ventaDetalleEditando: boolean;
@@ -18,7 +19,8 @@ const props = defineProps<{
   getRankIcon: (i: number) => string; getRankClass: (i: number) => string;
 }>();
 defineEmits<{
-  'cerrar': []; 'cambiar-filtro-mes': [v: string]; 'cambiar-filtro-dia': [v: string]; 'toggle-filtro-discrepancia': [];
+  'cerrar': []; 'cambiar-filtro-mes': [v: string]; 'cambiar-filtro-anio': [v: number]; 'toggle-filtro-discrepancia': [];
+  'cambiar-pagina': [n: number];
   'abrir-detalle': [id: number]; 'toggle-seleccion': [id: number]; 'seleccionar-todas': [];
   'corregir-seleccionadas': []; 'iniciar-edicion': []; 'iniciar-edicion-total': [];
   'guardar-edicion': []; 'cancelar-edicion': [];
@@ -44,11 +46,10 @@ const nombreUsuario = computed(() => {
       <div class="modal-body">
         <div class="filtros-historial">
           <select :value="filtroMesHistorial" @change="$emit('cambiar-filtro-mes', ($event.target as HTMLSelectElement).value)">
-            <option value="all">Todos los meses</option><option v-for="m in historialMeses" :key="m" :value="m">{{ new Date(2024, Number(m)).toLocaleString('es-MX', { month: 'long' }) }}</option>
+            <option value="all">Todos los meses</option>
+            <option v-for="m in 12" :key="m - 1" :value="String(m - 1)">{{ new Date(2024, m - 1).toLocaleString('es-MX', { month: 'long' }) }}</option>
           </select>
-          <select :value="filtroDiaHistorial" @change="$emit('cambiar-filtro-dia', ($event.target as HTMLSelectElement).value)">
-            <option value="all">Todos los días</option><option v-for="d in historialDias" :key="d" :value="d">{{ d }}</option>
-          </select>
+          <input type="number" :value="filtroAnioHistorial" @change="$emit('cambiar-filtro-anio', Number(($event.target as HTMLInputElement).value))" class="input-year" placeholder="Año" min="2020" />
           <label class="checkbox-label"><input type="checkbox" :checked="filtroDiscrepanciaHistorial" @change="$emit('toggle-filtro-discrepancia')" /> Solo discrepancias</label>
         </div>
         <div v-if="correccionHistorialMsg" class="correccion-msg">{{ correccionHistorialMsg }}</div>
@@ -59,7 +60,7 @@ const nombreUsuario = computed(() => {
         <div class="historial-total">Total filtrado: {{ formatoMoneda(historialTotalFiltrado) }}</div>
         <div v-if="cargando" class="loading">Cargando historial...</div>
         <div v-else class="historial-list">
-          <div v-for="item in historialFiltrado" :key="item.venta.idVenta" class="historial-item" :class="{ discrepancia: item.venta.tieneDiscrepancia }">
+          <div v-for="item in historialData" :key="item.venta.idVenta" class="historial-item" :class="{ discrepancia: item.venta.tieneDiscrepancia }">
             <div class="historial-main" @click="$emit('abrir-detalle', item.venta.idVenta)">
               <div class="venta-info">
                 <span class="venta-id">#{{ item.venta.idVenta }}</span>
@@ -74,6 +75,11 @@ const nombreUsuario = computed(() => {
             </label>
             <div v-if="item.venta.tieneDiscrepancia" class="discrepancia-badge">⚠️ Discrepancia</div>
           </div>
+        </div>
+        <div v-if="historialTotalPaginas > 1" class="pagination">
+          <button class="pagination-btn" :disabled="historialPagina === 0" @click="$emit('cambiar-pagina', historialPagina - 1)">‹ Anterior</button>
+          <span class="pagination-info">Página {{ historialPagina + 1 }} de {{ historialTotalPaginas }} ({{ historialTotalElementos }} resultados)</span>
+          <button class="pagination-btn" :disabled="historialPagina >= historialTotalPaginas - 1" @click="$emit('cambiar-pagina', historialPagina + 1)">Siguiente ›</button>
         </div>
       </div>
     </div>
@@ -185,8 +191,16 @@ const nombreUsuario = computed(() => {
 .btn-icon:hover { transform: scale(1.2); }
 .btn-icon.danger:hover { filter: brightness(1.5); }
 .input-small { width: 80px; padding: 0.3rem 0.5rem; border-radius: 6px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 0.8rem; font-family: inherit; }
+.input-year { width: 80px; padding: 0.5rem; border-radius: 8px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-family: inherit; text-align: center; }
 .cancel-btn { border-color: color-mix(in srgb, var(--color-error) 30%, transparent); color: var(--color-error); }
 .cancel-btn:hover { background: color-mix(in srgb, var(--color-error) 10%, transparent); }
+
+/* Pagination */
+.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem 0; margin-top: 0.5rem; border-top: 1px solid var(--color-border); }
+.pagination-btn { padding: 0.5rem 1rem; border-radius: 8px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-family: inherit; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+.pagination-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent); }
+.pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pagination-info { font-size: 0.85rem; color: var(--color-text-secondary); }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalSlideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

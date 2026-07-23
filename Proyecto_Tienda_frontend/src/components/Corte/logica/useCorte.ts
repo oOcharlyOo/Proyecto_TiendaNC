@@ -69,6 +69,15 @@ export type HorarioData = { horario: string; numeroVentas: number; totalVentas: 
 export type ProductoHorarioData = { horario: string; nombreProducto: string; cantidadVendida: number; totalVendido: number; isGramaje: boolean };
 export type ProductoTopData = { nombreProducto: string; cantidadVendida: number; totalVendido: number; isGramaje: boolean; posicion: number };
 export type ProductoVendido = { nombre: string; cantidadTotal: number; montoTotal: number; isGramaje: boolean };
+export type VentaHistorialDTO = {
+  idVenta: number; idUsuario?: number; nombreUsuario?: string;
+  fechaVenta?: string; montoTotal?: number; estatus?: string;
+  metodoPago?: string; numeroTicket?: number;
+  detalles: VentaDetalleDTO[]; tieneDiscrepancia: boolean; ganancia: number;
+};
+export type PaginatedResponse<T> = {
+  content: T[]; page: number; size: number; totalElements: number; totalPages: number;
+};
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
   let router: ReturnType<typeof useRouter>;
@@ -291,9 +300,13 @@ const productosGranelMensual = shallowRef<ProductoVendido[]>([]);
 const detallesMensual = shallowRef<VentaDetalleDTO[]>([]);
 
 // --- History ---
-const historialDetalles = ref<VentaDetalleDTO[]>([]);
+const historialData = ref<{ venta: VentaDTO; detalles: VentaDetalleDTO[] }[]>([]);
+const historialPagina = ref(0);
+const historialTamano = ref(20);
+const historialTotalElementos = ref(0);
+const historialTotalPaginas = ref(0);
 const filtroMesHistorial = ref('all');
-const filtroDiaHistorial = ref('all');
+const filtroAnioHistorial = ref(new Date().getFullYear());
 const filtroDiscrepanciaHistorial = ref(false);
 const ventaDetalleSeleccionada = ref<VentaDTO | null>(null);
 const ventaDetalleItems = shallowRef<VentaDetalleDTO[]>([]);
@@ -339,54 +352,9 @@ const ventaDetalleEnvaseTotal = computed(() => {
   }, 0);
 });
 
-const historialVentasAgrupadas = computed(() => {
-  const map = new Map<number, { venta: VentaDTO; detalles: VentaDetalleDTO[] }>();
-  for (const d of historialDetalles.value) {
-    const idVenta = Number(d?.Venta?.idVenta || 0);
-    if (!idVenta) continue;
-    if (!map.has(idVenta)) {
-      const montoVenta = Number(d.Venta?.montoTotal ?? 0);
-      map.set(idVenta, { venta: { ...d.Venta, tieneDiscrepancia: verificarDiscrepancia([d], montoVenta) }, detalles: [] });
-    }
-    map.get(idVenta)?.detalles.push(d);
-  }
-  for (const item of map.values()) {
-    item.venta.tieneDiscrepancia = verificarDiscrepancia(item.detalles, Number(item.venta.montoTotal ?? 0));
-  }
-  return Array.from(map.values()).sort((a, b) => {
-    return new Date(b.venta.fechaVenta || '').getTime() - new Date(a.venta.fechaVenta || '').getTime();
-  });
-});
-
-const historialMeses = computed(() => {
-  const meses = new Set<string>();
-  for (const item of historialVentasAgrupadas.value) {
-    const date = new Date(item.venta.fechaVenta || '');
-    if (Number.isNaN(date.getTime())) continue;
-    meses.add(String(date.getMonth()));
-  }
-  return [...meses].sort((a, b) => Number(a) - Number(b));
-});
-
-const historialDias = computed(() => {
-  const dias = new Set<string>();
-  for (const item of historialVentasAgrupadas.value) {
-    const date = new Date(item.venta.fechaVenta || '');
-    if (Number.isNaN(date.getTime())) continue;
-    dias.add(String(date.getDate()));
-  }
-  return [...dias].sort((a, b) => Number(a) - Number(b));
-});
-
 const historialFiltrado = computed(() => {
-  return historialVentasAgrupadas.value.filter((item) => {
-    const date = new Date(item.venta.fechaVenta || '');
-    if (Number.isNaN(date.getTime())) return false;
-    const monthOk = filtroMesHistorial.value === 'all' || String(date.getMonth()) === filtroMesHistorial.value;
-    const dayOk = filtroDiaHistorial.value === 'all' || String(date.getDate()) === filtroDiaHistorial.value;
-    const discrepancyOk = !filtroDiscrepanciaHistorial.value || item.venta.tieneDiscrepancia === true;
-    return monthOk && dayOk && discrepancyOk;
-  });
+  if (!filtroDiscrepanciaHistorial.value) return historialData.value;
+  return historialData.value.filter(item => item.venta.tieneDiscrepancia);
 });
 
 const historialTotalFiltrado = computed(() => {
@@ -474,8 +442,8 @@ async function verificarCajaActiva() {
     if (res.ok && data.datos !== null) {
       montoInicialCajaActiva.value = Number(data.datos.monto || 0);
       localStorage.setItem('montoInicialCaja', String(data.datos.monto || 0));
-    } else { montoInicialCajaActiva.value = 0; }
-  } catch (err) { console.error("Error al verificar caja activa:", err); montoInicialCajaActiva.value = 0; }
+    } else { montoInicialCajaActiva.value = Number(localStorage.getItem('montoInicialCaja') || 0); }
+  } catch (err) { console.error("Error al verificar caja activa:", err); montoInicialCajaActiva.value = Number(localStorage.getItem('montoInicialCaja') || 0); }
 }
 
 async function generarCorte() {
@@ -488,6 +456,7 @@ async function generarCorte() {
       return;
     }
     const montoInicial = Number(cajaActiva.monto || 0);
+    montoInicialCajaActiva.value = montoInicial;
     const corte = await fetchApi<CorteDTO>(`/caja/corte?idUsuario=${idUsuario.value}&montoInicial=${montoInicial}`, { method: 'POST' });
     const hoy = new Date().toLocaleDateString('en-CA');
     ventasEfectivo.value = Number(corte.ventasEfectivo || 0);
@@ -575,6 +544,7 @@ async function generarReporteDiario() {
     const idsUsuariosUnicos = [...new Set(ventas.map(v => v.idUsuario).filter((id): id is number => !!id))];
     usuariosQueTrabajaronElDia.value = idsUsuariosUnicos;
     const montoInicial = Number(reporte.montoInicial || 0);
+    montoInicialCajaActiva.value = montoInicial;
     const otrosIngresos = Number(reporte.otrosIngresos || 0);
     const totalEgresos = Number(reporte.totalEgresos || 0);
     horaInicioCaja.value = reporte.horaInicio || null;
@@ -1164,18 +1134,45 @@ async function cerrarTurno() {
 
 async function abrirHistorialVentas() {
   modalHistorialAbierto.value = true;
+  historialPagina.value = 0;
   cargandoHistorial.value = true;
   try {
-    historialDetalles.value = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
-    filtroMesHistorial.value = 'all'; filtroDiaHistorial.value = 'all';
+    const params = new URLSearchParams();
+    params.set('page', String(historialPagina.value));
+    params.set('size', String(historialTamano.value));
+    if (filtroMesHistorial.value !== 'all') {
+      params.set('mes', String(Number(filtroMesHistorial.value) + 1));
+      params.set('anio', String(filtroAnioHistorial.value));
+    }
+    const response = await fetchApi<PaginatedResponse<VentaHistorialDTO>>(`/ventasDetalle/historialPaginado?${params.toString()}`);
+    historialData.value = response.content.map(item => ({
+      venta: {
+        idVenta: item.idVenta, idUsuario: item.idUsuario, nombreUsuario: item.nombreUsuario,
+        fechaVenta: item.fechaVenta, montoTotal: item.montoTotal, estatus: item.estatus,
+        metodoPago: item.metodoPago, numeroTicket: item.numeroTicket,
+        tieneDiscrepancia: item.tieneDiscrepancia,
+      },
+      detalles: item.detalles,
+    }));
+    historialPagina.value = response.page;
+    historialTotalElementos.value = response.totalElements;
+    historialTotalPaginas.value = response.totalPages;
   } catch (error) {
-    historialDetalles.value = [];
+    historialData.value = [];
+    historialTotalElementos.value = 0;
+    historialTotalPaginas.value = 0;
     mostrarMensaje(`Error: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
   } finally { cargandoHistorial.value = false; }
 }
 
+function cambiarPaginaHistorial(nuevaPagina: number) {
+  if (nuevaPagina < 0 || nuevaPagina >= historialTotalPaginas.value) return;
+  historialPagina.value = nuevaPagina;
+  abrirHistorialVentas();
+}
+
 function abrirDetalleVenta(idVenta: number) {
-  const grouped = historialVentasAgrupadas.value.find(x => Number(x.venta.idVenta) === Number(idVenta));
+  const grouped = historialData.value.find(x => Number(x.venta.idVenta) === Number(idVenta));
   if (!grouped) return;
   ventaDetalleSeleccionada.value = grouped.venta;
   ventaDetalleItems.value = [...grouped.detalles];
@@ -1199,7 +1196,7 @@ async function guardarEdicionVentaDetalle() {
     mostrarMensaje('Venta actualizada correctamente', 'ok');
     ventaDetalleEditando.value = false;
     modalDetalleAbierto.value = false;
-    historialDetalles.value = await fetchApi<VentaDetalleDTO[]>('/ventasDetalle/obtenerTodosLosVentasDetalles');
+    await abrirHistorialVentas();
   } catch (error) { mostrarMensaje('Error al guardar cambios', 'error'); }
 }
 
@@ -1290,7 +1287,7 @@ function toggleSeleccionHistorial(idVenta: number) {
 }
 
 function seleccionarTodasHistorial() {
-  const discrepancias = historialFiltrado.value.filter(v => v.venta.tieneDiscrepancia);
+  const discrepancias = historialData.value.filter(v => v.venta.tieneDiscrepancia);
   const todasSel = discrepancias.length > 0 && discrepancias.every(v => ventasHistorialSeleccionadas.value.has(v.venta.idVenta));
   if (todasSel) ventasHistorialSeleccionadas.value.clear();
   else discrepancias.forEach(v => ventasHistorialSeleccionadas.value.add(v.venta.idVenta));
@@ -1577,7 +1574,8 @@ export {
   productosMasVendidos, productosUnitarios, productosGranel,
   productosDiario, productosUnitariosDiario, productosGranelDiario, detallesDiario,
   productosMensual, productosUnitariosMensual, productosGranelMensual, detallesMensual,
-  historialDetalles, filtroMesHistorial, filtroDiaHistorial, filtroDiscrepanciaHistorial,
+  historialData, historialPagina, historialTotalElementos, historialTotalPaginas,
+  filtroMesHistorial, filtroAnioHistorial, filtroDiscrepanciaHistorial,
   ventaDetalleSeleccionada, ventaDetalleItems, ventaDetalleEditando, ventaDetalleMontoEditado,
   ventaDetalleItemEditando, ventaDetalleCantidadTemp, ventaDetallePrecioTemp,
   modalProductoGramaje, gramajeEditandoIndice, gramajeEditandoCantidad, gramajeEditandoPrecio,
@@ -1585,8 +1583,8 @@ export {
   ventaDetalleEnvases, ventaDetalleEnvaseTotal,
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
-  selectedFile, dragOver,
-  historialVentasAgrupadas, historialMeses, historialDias, historialFiltrado, historialTotalFiltrado,
+  dragOver,
+  historialFiltrado, historialTotalFiltrado,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
   cortePieChartData, cortePieChartOptions,
@@ -1610,7 +1608,7 @@ export {
   getProductosPorHorario,
   generarReporteMensual, generarReporteRangoFechas,
   generarReporteAnual, cerrarTurno,
-  abrirHistorialVentas, abrirDetalleVenta,
+  abrirHistorialVentas, abrirDetalleVenta, cambiarPaginaHistorial,
   iniciarEdicionVentaDetalle, iniciarEdicionSoloTotal, guardarEdicionVentaDetalle,
   cancelarEdicionVentaDetalle, iniciarEditarItemDetalle, confirmarEdicionGramaje,
   recalcularTotalDetalle, confirmarEditarItemDetalle, cancelarEditarItemDetalle,

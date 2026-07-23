@@ -41,7 +41,8 @@ import {
   productosMasVendidos, productosUnitarios, productosGranel,
   productosDiario, productosUnitariosDiario, productosGranelDiario, detallesDiario,
   productosMensual, productosUnitariosMensual, productosGranelMensual, detallesMensual,
-  historialDetalles, filtroMesHistorial, filtroDiaHistorial, filtroDiscrepanciaHistorial,
+  historialData, historialPagina, historialTotalElementos, historialTotalPaginas,
+  filtroMesHistorial, filtroAnioHistorial, filtroDiscrepanciaHistorial,
   ventaDetalleSeleccionada, ventaDetalleItems, ventaDetalleEditando, ventaDetalleMontoEditado,
   ventaDetalleItemEditando, ventaDetalleCantidadTemp, ventaDetallePrecioTemp,
   modalProductoGramaje, gramajeEditandoIndice, gramajeEditandoCantidad, gramajeEditandoPrecio,
@@ -50,7 +51,7 @@ import {
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
   selectedFiles, dragOver,
-  historialVentasAgrupadas, historialMeses, historialDias, historialFiltrado, historialTotalFiltrado,
+  historialFiltrado, historialTotalFiltrado,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
   cortePieChartData, cortePieChartOptions,
@@ -69,7 +70,7 @@ import {
   getRankIcon, getRankClass,
   generarReporteMensual, generarReporteRangoFechas,
   generarReporteAnual, cerrarTurno,
-  abrirHistorialVentas, abrirDetalleVenta,
+  abrirHistorialVentas, abrirDetalleVenta, cambiarPaginaHistorial,
   iniciarEdicionVentaDetalle, iniciarEdicionSoloTotal, guardarEdicionVentaDetalle,
   cancelarEdicionVentaDetalle, iniciarEditarItemDetalle, confirmarEdicionGramaje,
   recalcularTotalDetalle, confirmarEditarItemDetalle, cancelarEditarItemDetalle,
@@ -95,37 +96,39 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       @cerrar-mensaje="mostrarMensaje('', 'info')"
     />
 
-    <CorteStatsCards
-      :ventasEfectivo="ventasEfectivo"
-      :ventasTransferencia="ventasTransferencia"
-      :ventasTarjeta="ventasTarjeta"
-      :totalEnvase="totalEnvase"
-      :abonoTotalDia="abonoTotalDia"
-      :totalTicketsDia="totalTicketsDia"
-      :montoInicialCajaActiva="montoInicialCajaActiva"
-      :formatoMoneda="formatoMoneda"
-      @abrir-modal-entradas="abrirModalEntradas"
-      @abrir-modal-egresos="abrirModalEgresos"
-      @abrir-modal-apartados="abrirModalApartados"
-    />
+    <!-- Vista del Día: se muestra solo cuando NO hay reporte generado -->
+    <template v-if="!mostrarReporte">
+      <CorteStatsCards
+        :montoInicialCajaActiva="montoInicialCajaActiva"
+        :totalTicketsDia="totalTicketsDia"
+        :horasTrabajadas="horasTrabajadas"
+        :formatoMoneda="formatoMoneda"
+        @abrir-modal-entradas="abrirModalEntradas"
+        @abrir-modal-egresos="abrirModalEgresos"
+        @abrir-modal-apartados="abrirModalApartados"
+      />
 
-    <CorteActions
-      :esAdministrador="esAdministrador"
-      :cargandoCorte="cargandoCorte"
-      @generar-corte="generarCorte"
-      @abrir-modal-diario="modalDiarioAbierto = true"
-      @abrir-modal-mensual="modalMensualAbierto = true"
-      @abrir-historial="abrirHistorialVentas"
-      @abrir-modal-apartados="abrirModalApartados"
-      @abrir-modal-anual="modalAnualAbierto = true"
-    />
+      <CorteActions
+        :esAdministrador="esAdministrador"
+        :cargandoCorte="cargandoCorte"
+        @generar-corte="generarCorte"
+        @abrir-modal-diario="modalDiarioAbierto = true"
+        @abrir-modal-mensual="modalMensualAbierto = true"
+        @abrir-historial="abrirHistorialVentas"
+        @abrir-modal-apartados="abrirModalApartados"
+        @abrir-modal-anual="modalAnualAbierto = true"
+      />
+    </template>
 
+    <!-- Vista del Reporte: se muestra solo cuando hay reporte generado -->
     <CorteReportPanel
+      v-if="mostrarReporte"
       :mostrarReporte="mostrarReporte"
       :corteActual="corteActual"
       :reporteTitulo="reporteTitulo"
       :mostrarCerrarTurno="mostrarCerrarTurno"
       :cargandoCerrarTurno="cargandoCerrarTurno"
+      :esAdministrador="esAdministrador"
       :ventasEfectivo="ventasEfectivo"
       :ventasTransferencia="ventasTransferencia"
       :ventasTarjeta="ventasTarjeta"
@@ -136,6 +139,9 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :nombreApartadoActivo="nombreApartadoActivo"
       :totalApartarDiario="totalApartarDiario"
       :dineroApartarDiario="dineroApartarDiario"
+      :horasTrabajadas="horasTrabajadas"
+      :horaInicioCaja="horaInicioCaja"
+      :horaFinCaja="horaFinCaja"
       :tipoGraficaCorte="tipoGraficaCorte"
       :productosMasVendidos="productosMasVendidos"
       :productosUnitarios="productosUnitarios"
@@ -164,8 +170,14 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       @abrir-entradas="abrirModalEntradas"
       @abrir-apartados="abrirModalApartados"
       @cambiar-tipo-grafica="(t) => { tipoGraficaCorte = t as 'unitario' | 'gramaje' | 'combinado' }"
+      @volver="mostrarReporte = false"
+      @abrir-modal-diario="modalDiarioAbierto = true"
+      @abrir-modal-mensual="modalMensualAbierto = true"
+      @abrir-historial="abrirHistorialVentas"
+      @abrir-modal-anual="modalAnualAbierto = true"
     />
 
+    <!-- Modales -->
     <CorteDailyModal
       :abierto="modalDiarioAbierto"
       :fechaDiaria="fechaDiaria"
@@ -234,13 +246,14 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
     <CorteHistorialModal
       :abierto="modalHistorialAbierto"
       :cargando="cargandoHistorial"
-      :historialFiltrado="historialFiltrado"
+      :historialData="historialFiltrado"
       :historialTotalFiltrado="historialTotalFiltrado"
-      :historialMeses="historialMeses"
-      :historialDias="historialDias"
       :filtroMesHistorial="filtroMesHistorial"
-      :filtroDiaHistorial="filtroDiaHistorial"
+      :filtroAnioHistorial="filtroAnioHistorial"
       :filtroDiscrepanciaHistorial="filtroDiscrepanciaHistorial"
+      :historialPagina="historialPagina"
+      :historialTotalPaginas="historialTotalPaginas"
+      :historialTotalElementos="historialTotalElementos"
       :ventasHistorialSeleccionadas="ventasHistorialSeleccionadas"
       :corrigiendoHistorial="corrigiendoHistorial"
       :correccionHistorialMsg="correccionHistorialMsg"
@@ -264,8 +277,9 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :getRankIcon="getRankIcon"
       :getRankClass="getRankClass"
       @cerrar="modalHistorialAbierto = false"
-      @cambiar-filtro-mes="(v) => { filtroMesHistorial = v }"
-      @cambiar-filtro-dia="(v) => { filtroDiaHistorial = v }"
+      @cambiar-filtro-mes="(v) => { filtroMesHistorial = v; historialPagina = 0; abrirHistorialVentas() }"
+      @cambiar-filtro-anio="(v) => { filtroAnioHistorial = v; historialPagina = 0; abrirHistorialVentas() }"
+      @cambiar-pagina="cambiarPaginaHistorial"
       @toggle-filtro-discrepancia="filtroDiscrepanciaHistorial = !filtroDiscrepanciaHistorial"
       @abrir-detalle="abrirDetalleVenta"
       @toggle-seleccion="toggleSeleccionHistorial"
@@ -364,5 +378,3 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
     />
   </div>
 </template>
-
-
