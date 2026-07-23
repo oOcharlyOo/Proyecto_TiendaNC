@@ -114,6 +114,20 @@ const calendarioDias = computed(() => {
   return dias;
 });
 
+const totalesPago = computed(() => {
+  const usuarios = usuariosConSueldo.value;
+  const semanas = props.semanasDelMes;
+  const horasPorSemana = semanas.map(semana =>
+    usuarios.reduce((sum, u) => sum + props.getHorasSemana(u, semana), 0)
+  );
+  const pagoPorSemana = semanas.map(semana =>
+    usuarios.reduce((sum, u) => sum + props.getPagoSemanal(u, semana), 0)
+  );
+  const totalHoras = horasPorSemana.reduce((a, b) => a + b, 0);
+  const totalPago = pagoPorSemana.reduce((a, b) => a + b, 0);
+  return { horasPorSemana, pagoPorSemana, totalHoras, totalPago };
+});
+
 const emit = defineEmits<{
   'cargar-asistencias': [];
   'update:filtro-mes-ventas': [value: string];
@@ -290,6 +304,23 @@ const emit = defineEmits<{
                 </td>
               </tr>
             </tbody>
+            <tfoot v-if="usuariosConSueldo.length > 0">
+              <tr>
+                <td><strong>💰 Monto Total</strong></td>
+                <td v-for="(semana, idx) in semanasDelMes" :key="'tot-'+semana.numero" class="pago-cell total">
+                  <div class="pago-cell-content">
+                    <span class="pago-cell-horas">{{ getHorasFormateadas(totalesPago.horasPorSemana[idx]) }}</span>
+                    <span class="pago-cell-monto">{{ formatoMoneda(totalesPago.pagoPorSemana[idx]) }}</span>
+                  </div>
+                </td>
+                <td class="pago-cell total">
+                  <div class="pago-cell-content">
+                    <span class="pago-cell-horas total">{{ getHorasFormateadas(totalesPago.totalHoras) }}</span>
+                    <span class="pago-cell-monto total">{{ formatoMoneda(totalesPago.totalPago) }}</span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

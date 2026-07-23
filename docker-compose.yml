@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./Proyecto_TiendaNC
-      dockerfile: src/main/docker/Dockerfile.legacy-jar
+      dockerfile: Dockerfile.jvm
     ports:
       - "8080:8080"
     container_name: backend
