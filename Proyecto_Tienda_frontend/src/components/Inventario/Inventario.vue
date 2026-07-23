@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useInventario } from './logica/useInventario';
-const { cargando, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, modalFormOpen, modalProductoEditando, guardando, vistaLista, cargar, guardar, editar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
+const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
 
 import InvHeader from './secciones/InvHeader.vue';
 import InvKpisBar from './secciones/InvKpisBar.vue';
@@ -31,8 +31,8 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
       <p v-else-if="mensaje" class="inv__err">⚠️ {{ mensaje }}</p>
       <p v-else-if="productosFiltrados.length === 0" class="inv__nil">📭 {{ verSoloProblemas ? 'Sin alertas' : 'Sin resultados' }}</p>
 
-      <InvTabla v-else-if="vistaLista" :productos="productosFiltrados" @editar="editar" />
-      <InvGrilla v-else :productos="productosFiltrados" @editar="editar" />
+      <InvTabla v-else-if="vistaLista" :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @cargar-mas="cargarMas" />
+      <InvGrilla v-else :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @cargar-mas="cargarMas" />
     </div>
 
     <ProductoFormModal :open="modalFormOpen" :data="modalProductoEditando" :loading="guardando"

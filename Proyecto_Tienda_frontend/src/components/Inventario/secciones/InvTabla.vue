@@ -2,8 +2,8 @@
 import type { ProductoDTO } from '../logica/useInvTipos';
 import { moneda, numero, stockClass, stockLabel, esGaming, catNombre } from '../logica/useInventario';
 
-defineProps<{ productos: ProductoDTO[] }>();
-defineEmits<{ editar: [producto: ProductoDTO] }>();
+defineProps<{ productos: ProductoDTO[]; cargandoMas: boolean; hayMas: boolean }>();
+defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
 </script>
 
 <template>
@@ -41,5 +41,17 @@ defineEmits<{ editar: [producto: ProductoDTO] }>();
         </tr>
       </tbody>
     </table>
+    <div v-if="hayMas" class="inv__load-more-wrap">
+      <button class="inv__load-more" :disabled="cargandoMas" @click="$emit('cargar-mas')">
+        {{ cargandoMas ? '⏳ Cargando...' : '📦 Cargar más productos' }}
+      </button>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.inv__load-more-wrap{display:flex;justify-content:center;padding:.75rem}
+.inv__load-more{padding:.5rem 1.2rem;border:none;border-radius:8px;background:var(--color-bg-panel);color:var(--color-accent);font-size:.8rem;font-weight:700;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,.1);transition:all .2s;font-family:inherit}
+.inv__load-more:hover:not(:disabled){transform:translateY(-2px);box-shadow:5px 5px 12px rgba(0,0,0,.16);background:var(--color-accent);color:var(--color-on-brand)}
+.inv__load-more:disabled{opacity:.5;cursor:not-allowed}
+</style>

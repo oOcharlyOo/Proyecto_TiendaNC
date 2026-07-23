@@ -1,9 +1,10 @@
-import { computed, onMounted, ref, shallowRef } from 'vue';
-import type { ApiRespuesta, CategoriaDTO, ProductoDTO } from './useInvTipos';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import type { ApiRespuesta, CategoriaDTO, PaginatedResponse, ProductoDTO, ResumenInventarioDTO } from './useInvTipos';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const cargando = ref(false);
+const cargandoMas = ref(false);
 const mensaje = ref('');
 const productos = shallowRef<ProductoDTO[]>([]);
 const categorias = shallowRef<CategoriaDTO[]>([]);
@@ -16,26 +17,77 @@ const modalProductoEditando = ref<ProductoDTO | undefined>(undefined);
 const guardando = ref(false);
 const vistaLista = ref(true);
 
+const pagina = ref(0);
+const totalPaginas = ref(0);
+const resumen = ref<ResumenInventarioDTO>({ totalItems: 0, bajoStock: 0, productosAgotados: 0, costoTotal: 0, gananciaPot: 0 });
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json() as Promise<T>;
 }
 
-async function cargar() {
+function paramsParaFiltros(pag: number): URLSearchParams {
+  const p = new URLSearchParams({ page: String(pag), size: '50', ordenarPor: ordenarPor.value });
+  if (filtroBusqueda.value.trim()) p.set('q', filtroBusqueda.value.trim());
+  if (filtroCategoria.value !== null) p.set('idCategoria', String(filtroCategoria.value));
+  return p;
+}
+
+async function cargarPrimeraPagina() {
   cargando.value = true;
+  pagina.value = 0;
   try {
-    const d = await api<ApiRespuesta<ProductoDTO[]>>(`${API_BASE}/productos/listarProductos`);
-    productos.value = Array.isArray(d?.datos) ? [...d.datos].sort((a, b) => a.nombre.localeCompare(b.nombre)) : [];
+    const d = await api<ApiRespuesta<PaginatedResponse<ProductoDTO>>>(`${API_BASE}/productos/listarPaginado?${paramsParaFiltros(0)}`);
+    if (d?.codigo === 200 && d.datos) {
+      productos.value = d.datos.content;
+      totalPaginas.value = d.datos.totalPages;
+    } else {
+      productos.value = [];
+      totalPaginas.value = 0;
+    }
     mensaje.value = '';
   } catch (e) { productos.value = []; mensaje.value = `Error: ${e instanceof Error ? e.message : 'Desconocido'}`; }
   finally { cargando.value = false; }
+}
+
+async function cargarResumen() {
+  try {
+    const d = await api<ApiRespuesta<ResumenInventarioDTO>>(`${API_BASE}/productos/resumen`);
+    if (d?.codigo === 200 && d.datos) resumen.value = d.datos;
+  } catch { /* ignore */ }
+}
+
+async function cargarMas() {
+  if (cargandoMas.value || pagina.value >= totalPaginas.value - 1) return;
+  cargandoMas.value = true;
+  const sigPagina = pagina.value + 1;
+  try {
+    const d = await api<ApiRespuesta<PaginatedResponse<ProductoDTO>>>(`${API_BASE}/productos/listarPaginado?${paramsParaFiltros(sigPagina)}`);
+    if (d?.codigo === 200 && d.datos) {
+      productos.value = [...productos.value, ...d.datos.content];
+      pagina.value = sigPagina;
+    }
+  } catch { /* ignore */ }
+  finally { cargandoMas.value = false; }
+}
+
+async function cargar() {
+  await Promise.all([cargarPrimeraPagina(), cargarResumen()]);
 }
 
 async function cargarCats() {
   try { const d = await api<ApiRespuesta<CategoriaDTO[]>>(`${API_BASE}/categorias/listarCategorias`); categorias.value = Array.isArray(d?.datos) ? d.datos : []; }
   catch { categorias.value = []; }
 }
+
+let debounceTimer: ReturnType<typeof setTimeout>;
+watch(filtroBusqueda, () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => cargarPrimeraPagina(), 300);
+});
+watch(filtroCategoria, () => cargarPrimeraPagina());
+watch(ordenarPor, () => cargarPrimeraPagina());
 
 async function guardar(payload: ProductoDTO) {
   if (!payload.nombre.trim()) { mensaje.value = 'Nombre obligatorio.'; return; }
@@ -74,35 +126,16 @@ export function stockLabel(p: ProductoDTO) {
 }
 
 const productosFiltrados = computed(() => {
-  let r = [...productos.value];
+  let r = productos.value;
   if (verSoloProblemas.value) r = r.filter(p => Number(p.stock) < Number(p.cantidad_min));
-  if (filtroBusqueda.value.trim()) { const t = filtroBusqueda.value.toLowerCase(); r = r.filter(p => p.nombre.toLowerCase().includes(t) || String(p.idProducto).includes(t)); }
-  if (filtroCategoria.value !== null) r = r.filter(p => p.idCategoria === filtroCategoria.value);
-  switch (ordenarPor.value) {
-    case 'stock': return r.sort((a, b) => Number(a.stock) - Number(b.stock));
-    case 'stock-desc': return r.sort((a, b) => Number(b.stock) - Number(a.stock));
-    case 'precio': return r.sort((a, b) => Number(a.precio_venta) - Number(b.precio_venta));
-    default: return r.sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }
+  return r;
 });
 
-const bajoStock = computed(() => productosFiltrados.value.filter(p => !esGaming(p.idCategoria) && Number(p.stock) > 0 && Number(p.stock) < Number(p.cantidad_min)));
-const productosAgotados = computed(() => productosFiltrados.value.filter(p => !esGaming(p.idCategoria) && Number(p.stock) === 0));
-
-const costoTotal = computed(() => productosFiltrados.value.reduce((s, p) => {
-  if (esGaming(p.idCategoria) || Number(p.stock) <= 0) return s;
-  const st = Number(p.stock);
-  return s + (p.is_gramaje ? (st / 1000) * Number(p.precio_costo) : st * Number(p.precio_costo));
-}, 0));
-
-const valorVenta = computed(() => productosFiltrados.value.reduce((s, p) => {
-  if (esGaming(p.idCategoria) || Number(p.stock) <= 0) return s;
-  const st = Number(p.stock);
-  return s + (p.is_gramaje ? (st / 1000) * Number(p.precio_venta) : st * Number(p.precio_venta));
-}, 0));
-
-const gananciaPot = computed(() => valorVenta.value - costoTotal.value);
-const totalItems = computed(() => productosFiltrados.value.filter(p => !esGaming(p.idCategoria)).length);
+const costoTotal = computed(() => resumen.value.costoTotal);
+const gananciaPot = computed(() => resumen.value.gananciaPot);
+const totalItems = computed(() => resumen.value.totalItems);
+const bajoStock = computed(() => resumen.value.bajoStock);
+const productosAgotados = computed(() => resumen.value.productosAgotados);
 
 const catsConTodas = computed(() => [{ idCategoria: null as number | null, nombre: 'Todas' }, ...categorias.value]);
 export function catNombre(id?: number) { if (!id) return '—'; return categorias.value.find(c => c.idCategoria === id)?.nombre ?? '—'; }
@@ -115,10 +148,11 @@ export function useInventario() {
   onMounted(async () => { await cargar(); await cargarCats(); });
 
   return {
-    cargando, mensaje, productos, categorias, filtroBusqueda, filtroCategoria,
+    cargando, cargandoMas, mensaje, productos, categorias, filtroBusqueda, filtroCategoria,
     ordenarPor, verSoloProblemas, modalFormOpen, modalProductoEditando, guardando, vistaLista,
-    cargar, guardar, editar, esGaming, stockClass, stockLabel,
-    productosFiltrados, bajoStock, productosAgotados, costoTotal, valorVenta, gananciaPot, totalItems,
+    pagina, totalPaginas, resumen,
+    cargarMas, cargar, guardar, editar, esGaming, stockClass, stockLabel,
+    productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems,
     catsConTodas, catNombre, moneda, numero, gamingCategoryId
   };
 }
