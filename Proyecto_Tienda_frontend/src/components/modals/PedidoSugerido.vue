@@ -462,6 +462,9 @@ defineExpose({ cargar });
                         <span v-if="s.categoria" class="badge badge-cat">{{ s.categoria }}</span>
                         <span v-if="s.subcategoria && s.subcategoria !== 'Sin subcategoría'" class="badge badge-sub">{{ s.subcategoria }}</span>
                         <span v-if="s.isGramaje" class="badge badge-gram">⚖️</span>
+                <span v-if="s.precioCosto && s.precioVenta && s.precioVenta > s.precioCosto" class="badge badge-margin">
+                  {{ ((s.precioVenta - s.precioCosto) / s.precioCosto * 100).toFixed(0) }}%
+                </span>
                       </div>
                     </div>
                     <div class="s-alert">
@@ -565,6 +568,9 @@ defineExpose({ cargar });
                 <span v-if="s.subcategoria && s.subcategoria !== 'Sin subcategoría'" class="badge badge-sub">{{ s.subcategoria }}</span>
                 <span v-if="s.isGramaje" class="badge badge-gram">⚖️</span>
                 <span v-if="s.nombreProveedor" class="badge badge-prov">{{ s.nombreProveedor }}</span>
+                <span v-if="s.precioCosto && s.precioVenta && s.precioVenta > s.precioCosto" class="badge badge-margin">
+                  {{ ((s.precioVenta - s.precioCosto) / s.precioCosto * 100).toFixed(0) }}%
+                </span>
               </div>
             </div>
             <div class="s-alert">
@@ -1347,6 +1353,10 @@ defineExpose({ cargar });
 .badge-prov {
   background: rgba(99, 102, 241, 0.15);
   color: #818cf8;
+}
+.badge-margin {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
 }
 
 /* VIEW TOGGLE */

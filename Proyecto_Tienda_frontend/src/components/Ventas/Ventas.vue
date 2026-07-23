@@ -50,7 +50,7 @@ import {
   abrirModalPendientes, cobrarVentaPendiente, guardarVentaPendiente,
   editarDescripcionPendiente, guardarEdicionDescripcion,
   eliminarVentaPendiente, agregarAVentaPendiente, agregarProductoAPendiente,
-  quitarProductoPendiente, confirmarAgregarPendiente,
+  quitarProductoPendiente, confirmarAgregarPendiente, eliminarProductoPendiente,
   cargarHistorialVentasDia, verDetalleVenta, cancelarVentaDesdeHistorial,
   historialVentasAbrir, onVentasCorregidas,
   registrarEntradaEfectivo, registrarSalidaEfectivo,
@@ -148,8 +148,9 @@ const ventasPendientesAgrupadas = computed(() => {
       if (grouped[key]) {
         grouped[key].cantidad += d.cantidad || 1;
         grouped[key].subtotal = Number(grouped[key].cantidad) * Number(d.precioUnitarioVenta || 0);
+        if (d.idVentaDetalle != null) grouped[key].idsVentaDetalle.push(d.idVentaDetalle);
       } else {
-        grouped[key] = { ...d, cantidad: d.cantidad || 1, subtotal: Number(d.cantidad || 1) * Number(d.precioUnitarioVenta || 0) };
+        grouped[key] = { ...d, cantidad: d.cantidad || 1, subtotal: Number(d.cantidad || 1) * Number(d.precioUnitarioVenta || 0), idsVentaDetalle: d.idVentaDetalle != null ? [d.idVentaDetalle] : [] };
       }
     }
     return { ...v, detallesAgrupados: Object.values(grouped) };
@@ -547,6 +548,7 @@ onUnmounted(() => {
       @cobrar="cobrarVentaPendiente"
       @editar-descripcion="editarDescripcionPendiente"
       @eliminar="eliminarVentaPendiente"
+      @eliminar-producto="eliminarProductoPendiente"
       @agregar-productos="agregarAVentaPendiente"
     />
 

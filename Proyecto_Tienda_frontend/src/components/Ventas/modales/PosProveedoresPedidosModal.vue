@@ -10,6 +10,7 @@
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'pedidos' }]" @click="emit('update:pedidoProveedorTab', 'pedidos')">Pedidos ({{ pedidosProveedor.length }})</button>
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'sugerido' }]" @click="emit('update:pedidoProveedorTab', 'sugerido')">🧙 Sugerido</button>
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'sugeridoHoy' }]" @click="emit('update:pedidoProveedorTab', 'sugeridoHoy')">📅 Sugerido Hoy</button>
+          <button :class="['pp-tab', { active: pedidoProveedorTab === 'inteligencia' }]" @click="emit('update:pedidoProveedorTab', 'inteligencia')">📊 Inteligencia</button>
         </div>
         <div class="pp-body">
           <!-- PROVEEDORES -->
@@ -104,6 +105,10 @@
           <!-- SUGERIDO HOY -->
           <div v-if="pedidoProveedorTab === 'sugeridoHoy'" class="pp-section pp-section-sugerido">
             <SugeridoHoy @pedido-creado="emit('pedido-creado')" />
+          </div>
+          <!-- INTELIGENCIA -->
+          <div v-if="pedidoProveedorTab === 'inteligencia'" class="pp-section pp-section-sugerido">
+            <AnalisisInventario />
           </div>
         </div>
 
@@ -235,10 +240,11 @@
 import { formatoMoneda } from '../logica/usePosTicket'
 import PedidoSugerido from '../../modals/PedidoSugerido.vue'
 import SugeridoHoy from '../../modals/SugeridoHoy.vue'
+import AnalisisInventario from '../../Proveedores/secciones/AnalisisInventario.vue'
 
 interface Props {
   open: boolean
-  pedidoProveedorTab: 'proveedores' | 'pedidos' | 'sugerido' | 'sugeridoHoy'
+  pedidoProveedorTab: 'proveedores' | 'pedidos' | 'sugerido' | 'sugeridoHoy' | 'inteligencia'
   ppVistaListaProv: boolean
   ppVistaListaPed: boolean
   proveedores: any[]

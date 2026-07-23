@@ -34,26 +34,16 @@ const emit = defineEmits<{
 <template>
   <aside class="pos-right" :class="{ 'is-open': ticketVisibleMobile }">
     <div v-if="ticketVisibleMobile" class="ticket-backdrop" @click="emit('update:ticketVisibleMobile', false)"></div>
-    <!-- Activador para móviles con resize handle -->
-    <div class="mobile-ticket-trigger" @click="emit('update:ticketVisibleMobile', !ticketVisibleMobile)">
-      <div class="resize-handle-trigger" @mousedown.stop="emit('start-resize', $event)" @touchstart.stop="emit('start-resize', $event)">
-        <span class="resize-dots">⋮⋮</span>
-      </div>
-      <div class="trigger-info">
-        <span class="icon">🛒</span>
-        <span class="count">{{ ticketInfoText }}</span>
-      </div>
-      <div class="trigger-total">{{ formatoMoneda(totalVenta) }}</div>
-      <span class="chevron">{{ ticketVisibleMobile ? '▼' : '▲' }}</span>
-    </div>
-
     <div class="checkout-container parchment-bg">
       <header class="checkout-header">
         <div class="header-title">
           <span class="icon">📜</span>
           <h3>Cuenta #{{ ticketActual?.numero ?? '-' }}</h3>
         </div>
-        <button class="btn-clear-all" @click="emit('limpiar-ticket')" v-if="ticket.length > 0">Limpiar</button>
+        <button class="btn-toggle-mobile" @click="emit('update:ticketVisibleMobile', !ticketVisibleMobile)" title="Minimizar ticket">🛒 {{ ticketInfoText }} · {{ formatoMoneda(totalVenta) }} {{ ticketVisibleMobile ? '▼' : '▲' }}</button>
+        <div class="header-actions">
+          <button class="btn-clear-all" @click="emit('limpiar-ticket')" v-if="ticket.length > 0">Limpiar</button>
+        </div>
       </header>
 
       <!-- LISTA DE ITEMS EN EL TICKET -->
@@ -156,10 +146,22 @@ const emit = defineEmits<{
             </button>
 
             <div class="extra-actions">
-              <button class="btn-checkout secondary" @click="emit('abrir-proveedores-pedidos')" title="Proveedores y Pedidos">🚚</button>
-              <button class="btn-checkout secondary" @click="emit('historial-ventas-abrir')" title="Historial">📜</button>
-              <button class="btn-checkout secondary" @click="emit('entrada-efectivo')" title="Entrada Cash">📥</button>
-              <button class="btn-checkout secondary" @click="emit('salida-efectivo')" title="Salida Cash">📤</button>
+              <button class="btn-checkout secondary" @click="emit('abrir-proveedores-pedidos')" title="Proveedores y Pedidos">
+                <span class="sec-icon">🚚</span>
+                <span class="sec-label">Provee.</span>
+              </button>
+              <button class="btn-checkout secondary" @click="emit('historial-ventas-abrir')" title="Historial">
+                <span class="sec-icon">📜</span>
+                <span class="sec-label">Historial</span>
+              </button>
+              <button class="btn-checkout secondary" @click="emit('entrada-efectivo')" title="Entrada Efectivo">
+                <span class="sec-icon">📥</span>
+                <span class="sec-label">Entrada</span>
+              </button>
+              <button class="btn-checkout secondary" @click="emit('salida-efectivo')" title="Salida Efectivo">
+                <span class="sec-icon">📤</span>
+                <span class="sec-label">Salida</span>
+              </button>
             </div>
           </div>
         </div>
@@ -205,6 +207,20 @@ const emit = defineEmits<{
   }
 }
 
+/* Toggle movil — hidden on desktop */
+.pos-container .ticket-backdrop {
+  display: none;
+}
+.pos-container .btn-toggle-mobile {
+  display: none;
+}
+
+.pos-container .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 @media (max-width: 991px) {
   .pos-container .pos-right {
     position: fixed;
@@ -222,9 +238,9 @@ const emit = defineEmits<{
     overflow: hidden;
   }
   .pos-container .pos-right:not(.is-open) {
-    transform: translateY(calc(100% - 52px));
+    transform: translateY(calc(100% - 48px));
     height: auto;
-    min-height: 52px;
+    min-height: 48px;
   }
   .pos-container .pos-right.is-open {
     transform: translateY(0);
@@ -237,9 +253,42 @@ const emit = defineEmits<{
     background: rgba(0,0,0,.35);
     z-index: -1;
   }
-  .pos-container .mobile-ticket-trigger {
-    display: flex;
-    flex-shrink: 0;
+  .pos-container .checkout-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+  }
+  .pos-container .header-title {
+    justify-self: start;
+  }
+  .pos-container .header-actions {
+    justify-self: end;
+  }
+  .pos-container .btn-toggle-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.3rem 0.7rem;
+    font-family: inherit;
+    transition: all 0.15s;
+    box-shadow: 2px 2px 6px rgba(0,0,0,.1), -1px -1px 4px rgba(255,255,255,.02);
+    white-space: nowrap;
+    justify-self: center;
+  }
+  .pos-container .btn-toggle-mobile:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .pos-container .btn-toggle-mobile:active {
+    transform: scale(0.97);
   }
   .pos-container .checkout-container {
     flex: 1;
@@ -248,61 +297,11 @@ const emit = defineEmits<{
   }
 }
 
-/* Mobile ticket trigger — hidden on desktop */
-.pos-container .ticket-backdrop {
-  display: none;
-}
-.pos-container .mobile-ticket-trigger {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  background: var(--color-bg-secondary);
-  border-top: none;
-  cursor: pointer;
-  user-select: none;
-  flex-shrink: 0;
-  gap: 0.5rem;
-  min-height: 48px;
-  box-shadow: 0 -2px 8px rgba(0,0,0,.1);
-}
-
-.pos-container .resize-handle-trigger{display:none}.pos-container .mobile-ticket-trigger .resize-handle-trigger{display:flex;align-items:center;justify-content:center;height:24px;cursor:row-resize;flex-shrink:0}
-.pos-container .resize-dots{font-size:18px;color:var(--color-text-secondary);opacity:.8}
-.pos-container .resize-handle-trigger:active .resize-dots{opacity:1;color:var(--color-accent)}
-
-.pos-container .trigger-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.pos-container .trigger-info .icon {
-  font-size: 1.1rem;
-}
-
-.pos-container .trigger-total {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--success-color);
-}
-
-.pos-container .chevron {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
 @media (max-width: 480px) {
-  .pos-container .mobile-ticket-trigger {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    min-height: 36px;
-  }
-  .pos-container .trigger-info .icon {
-    font-size: 0.9rem;
-  }
-  .pos-container .trigger-total {
-    font-size: 0.9rem;
+  .pos-container .btn-toggle-mobile {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    gap: 0.2rem;
   }
 }
 
@@ -824,11 +823,11 @@ const emit = defineEmits<{
 
 .pos-container .checkout-footer {
   margin-top: auto;
-  padding-top: 1rem;
+  padding-top: 0.7rem;
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.6rem;
   flex-shrink: 0;
 }
 
@@ -883,11 +882,11 @@ const emit = defineEmits<{
   color: var(--text-secondary);
 }
 .pos-container .summary-row.total {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   color: var(--accent-color);
   border-top: 1px solid var(--border-color);
-  padding-top: 0.4rem;
-  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  margin-top: 0.2rem;
 }
 
 .pos-container .pos-total-amount { 
@@ -897,10 +896,10 @@ const emit = defineEmits<{
 
 @media (max-width: 991px) {
   .pos-container .summary-row {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
   }
   .pos-container .summary-row.total {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
 }
 
@@ -914,23 +913,23 @@ const emit = defineEmits<{
 
 .pos-container .checkout-actions-scroll .checkout-actions {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   gap: 0.5rem;
-  min-width: min-content;
-  align-items: center;
+  min-width: 0;
+  width: 100%;
 }
 
 .pos-container .checkout-actions-scroll .btn-checkout.primary {
-  width: auto;
-  min-width: 140px;
-  max-width: 220px;
+  width: 100%;
+  min-width: unset;
+  max-width: unset;
   height: auto;
-  min-height: 42px;
+  min-height: 48px;
   white-space: normal;
   background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 60%, black));
   border: none;
   transition: all 0.15s;
-  padding: 0.5rem 0.8rem;
+  padding: 0.6rem 0.8rem;
   box-shadow:
     4px 4px 8px rgba(0, 0, 0, 0.2),
     -2px -2px 6px rgba(255, 255, 255, 0.03);
@@ -963,8 +962,10 @@ const emit = defineEmits<{
 }
 
 .pos-container .checkout-actions-scroll .extra-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
+  width: 100%;
 }
 .pos-container .extra-actions {
   justify-content: center;
@@ -974,6 +975,12 @@ const emit = defineEmits<{
   background: var(--color-bg-primary);
   border: none;
   transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.2rem;
   box-shadow:
     3px 3px 6px rgba(0, 0, 0, 0.15),
     -2px -2px 4px rgba(255, 255, 255, 0.02);
@@ -991,10 +998,11 @@ const emit = defineEmits<{
 }
 
 .pos-container .checkout-actions-scroll .btn-checkout.secondary {
-  width: 42px;
-  min-width: 42px;
-  height: 42px;
-  padding: 0;
+  width: 100%;
+  min-width: unset;
+  height: auto;
+  min-height: 48px;
+  padding: 0.35rem 0.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1070,9 +1078,14 @@ const emit = defineEmits<{
 
 .pos-container .extra-actions { 
   display: grid; 
-  grid-template-columns: repeat(3, 1fr); 
-  gap: 0.4rem; 
+  grid-template-columns: repeat(4, 1fr); 
+  gap: 0.35rem; 
 }
+
+.pos-container .sec-icon { font-size: 1.1rem; line-height: 1; }
+.pos-container .sec-label { font-size: 0.65rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }
+.pos-container .checkout-actions-scroll .sec-label { white-space: normal; text-align: center; line-height: 1.15; word-break: break-word; }
+.pos-container .btn-checkout.secondary:hover .sec-label { color: var(--color-accent); }
 
 .pos-container .btn-checkout.secondary {
   height: 42px;
@@ -1108,26 +1121,34 @@ const emit = defineEmits<{
 
 @media (max-width: 991px) {
   .pos-container .btn-checkout.primary {
-    height: 48px;
-    font-size: 1rem;
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+  .pos-container .checkout-actions-scroll .btn-checkout.primary {
+    min-height: 44px;
   }
   .pos-container .btn-checkout.secondary {
     height: 38px;
     font-size: 1rem;
   }
+  .pos-container .checkout-actions-scroll .btn-checkout.secondary {
+    min-height: 42px;
+  }
+  .pos-container .sec-label { font-size: 0.6rem; }
 }
 
 @media (max-width: 767px) {
-  .pos-container .btn-checkout.primary {
-    height: 48px;
-    font-size: 0.95rem;
+  .pos-container .checkout-actions-scroll .btn-checkout.primary {
+    min-height: 42px;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.6rem;
   }
-  .pos-container .extra-actions {
+  .pos-container .checkout-actions-scroll .extra-actions {
     gap: 0.3rem;
   }
-  .pos-container .btn-checkout.secondary {
-    height: 36px;
-    font-size: 0.95rem;
+  .pos-container .checkout-actions-scroll .btn-checkout.secondary {
+    min-height: 38px;
+    font-size: 0.9rem;
   }
 }
 

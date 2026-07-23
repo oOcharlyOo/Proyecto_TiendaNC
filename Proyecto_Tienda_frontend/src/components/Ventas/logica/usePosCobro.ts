@@ -291,6 +291,20 @@ async function confirmarAgregarPendiente() {
   } catch (e: any) { mostrarMensaje('Error de red: ' + e.message, 'error'); }
 }
 
+async function eliminarProductoPendiente(detalle: any) {
+  if (!detalle.idsVentaDetalle || detalle.idsVentaDetalle.length === 0) return;
+  const nombre = detalle.productoNombre || detalle.Producto?.nombre || 'producto';
+  const cantidad = detalle.cantidad || 1;
+  if (!confirm(`¿Eliminar ${cantidad} × ${nombre} de la venta pendiente?`)) return;
+  try {
+    for (const id of detalle.idsVentaDetalle) {
+      await getJson<ApiRespuesta<unknown>>(`/ventasDetalle/eliminarVentaDetalle/${id}`, { method: 'DELETE' });
+    }
+    await cargarVentasPendientesFn();
+    mostrarMensaje(`Eliminado: ${nombre}`, 'ok');
+  } catch (e: any) { mostrarMensaje('Error de red: ' + e.message, 'error'); }
+}
+
 // Sales history
 async function cargarHistorialVentasDia() {
   historialCargando.value = true;
@@ -406,7 +420,7 @@ export {
   cobrarVentaPendiente, guardarVentaPendiente, editarDescripcionPendiente,
   guardarEdicionDescripcion, eliminarVentaPendiente,
   agregarAVentaPendiente, agregarProductoAPendiente, quitarProductoPendiente,
-  confirmarAgregarPendiente, cargarHistorialVentasDia, verDetalleVenta,
+  confirmarAgregarPendiente, eliminarProductoPendiente, cargarHistorialVentasDia, verDetalleVenta,
   cancelarVentaDesdeHistorial, historialVentasAbrir, onVentasCorregidas,
   registrarEntradaEfectivo, registrarSalidaEfectivo, entradaEfectivo, salidaEfectivo
 };

@@ -213,17 +213,20 @@ onUnmounted(() => {
                 <span class="btn-rune">◈</span>
               </button>
               
-              <button v-if="!esAbono" class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
-                <span class="btn-rune">◈</span>
-                <span class="btn-label">Pendiente</span>
-                <span class="btn-shortcut">F5</span>
-                <span class="btn-rune">◈</span>
-              </button>
-              
               <button v-if="!esAbono" class="pay-btn credito" @click="emit('confirmar-credito')">
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Crédito</span>
                 <span class="btn-shortcut">F6</span>
+                <span class="btn-rune">◈</span>
+              </button>
+            </div>
+
+            <div v-if="!esAbono" class="pendiente-row">
+              <div class="pendiente-separator"><span>Otras opciones</span></div>
+              <button class="pay-btn pendiente" @click="emit('confirmar-pendiente')">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Guardar como Pendiente</span>
+                <span class="btn-shortcut">F5</span>
                 <span class="btn-rune">◈</span>
               </button>
             </div>
@@ -325,6 +328,11 @@ onUnmounted(() => {
 .btn-rune { font-size: .55rem; opacity: .5; flex-shrink: 0; }
 .btn-label { flex: 1; text-align: center; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
 .btn-shortcut { font-size: .55rem; opacity: .5; background: rgba(0,0,0,0.2); padding: .1rem .25rem; border-radius: 3px; font-family: monospace; flex-shrink: 0; }
+
+.pendiente-row { display: flex; flex-direction: column; gap: .35rem; }
+.pendiente-separator { display: flex; align-items: center; gap: .5rem; font-size: .65rem; color: var(--color-text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: .05em; }
+.pendiente-separator::before, .pendiente-separator::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
+.pendiente-row .pay-btn.pendiente { width: 100%; background: linear-gradient(135deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 50%, black)); }
 
 .cancel-btn { width: 100%; padding: .55rem; border: none; border-radius: var(--radius-sm); background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; box-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
 .cancel-btn:hover { color: var(--color-accent); box-shadow: 4px 4px 8px rgba(0,0,0,0.15); }

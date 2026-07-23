@@ -4,6 +4,7 @@ const { activeTab, showProveedorModal, editingProveedor, proveedorForm, showPedi
 import PedidoSugerido from '../modals/PedidoSugerido.vue';
 import SugeridoHoy from '../modals/SugeridoHoy.vue';
 import AsignarProductosProveedor from '../modals/AsignarProductosProveedor.vue';
+import AnalisisInventario from './secciones/AnalisisInventario.vue';
 </script>
 
 <template>
@@ -38,6 +39,10 @@ import AsignarProductosProveedor from '../modals/AsignarProductosProveedor.vue';
       <button :class="['tab-btn', { active: activeTab === 'asignar' }]" @click="activeTab = 'asignar'">
         <span class="tab-icon">🔗</span>
         <span class="tab-label">Asignar Productos</span>
+      </button>
+      <button :class="['tab-btn', { active: activeTab === 'inteligencia' }]" @click="activeTab = 'inteligencia'">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Inteligencia</span>
       </button>
     </div>
 
@@ -320,6 +325,11 @@ import AsignarProductosProveedor from '../modals/AsignarProductosProveedor.vue';
     <!-- ASIGNAR PRODUCTOS -->
     <div v-if="activeTab === 'asignar'" class="tab-content tab-asignar">
       <AsignarProductosProveedor />
+    </div>
+
+    <!-- INTELIGENCIA -->
+    <div v-if="activeTab === 'inteligencia'" class="tab-content tab-inteligencia">
+      <AnalisisInventario />
     </div>
 
     <!-- MODAL PROVEEDOR -->

@@ -613,7 +613,7 @@ const emit = defineEmits<{
 
 .pos-container .products-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.8rem;
   width: 100%;
   max-width: 100%;

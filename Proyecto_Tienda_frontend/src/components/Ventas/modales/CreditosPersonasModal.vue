@@ -49,6 +49,20 @@ type CreditoAbonoDTO = {
   nombreUsuario: string;
 };
 
+const personas = ref<CreditoPersonaDTO[]>([]);
+const creditos = ref<CreditoVentaDTO[]>([]);
+const creditosFiltrados = ref<CreditoVentaDTO[]>([]);
+const personaSeleccionada = ref<CreditoPersonaDTO | null>(null);
+const mostrarFormPersona = ref(false);
+const editandoPersona = ref(false);
+const formPersona = ref<{ idPersona?: number; nombre: string; telefono: string; direccion: string; correo: string }>({
+  nombre: '', telefono: '', direccion: '', correo: ''
+});
+const abrirCreditosPersona = ref<CreditoPersonaDTO | null>(null);
+const modalAbonoAbierto = ref(false);
+const creditoAbonando = ref<CreditoVentaDTO | null>(null);
+
+
 type VentaDetalleProducto = {
   idProducto: number;
   nombre: string;
@@ -66,23 +80,6 @@ type VentaDetalleDTO = {
   tipoPrecioAplicado?: string;
 };
 
-const personas = ref<CreditoPersonaDTO[]>([]);
-const creditos = ref<CreditoVentaDTO[]>([]);
-const creditosFiltrados = ref<CreditoVentaDTO[]>([]);
-const personaSeleccionada = ref<CreditoPersonaDTO | null>(null);
-const mostrarFormPersona = ref(false);
-const editandoPersona = ref(false);
-const formPersona = ref<{ idPersona?: number; nombre: string; telefono: string; direccion: string; correo: string }>({
-  nombre: '', telefono: '', direccion: '', correo: ''
-});
-const abrirCreditosPersona = ref<CreditoPersonaDTO | null>(null);
-const modalAbonoAbierto = ref(false);
-const creditoAbonando = ref<CreditoVentaDTO | null>(null);
-const expandidoId = ref<number | null>(null);
-const detallesMap = ref<Record<number, VentaDetalleDTO[]>>({});
-const discrepanciasMap = ref<Record<number, number>>({});
-const cargandoDetalle = ref(false);
-
 type DetalleAgrupado = {
   nombre: string;
   cantidad: number;
@@ -90,6 +87,12 @@ type DetalleAgrupado = {
   subtotal: number;
   isGramaje: boolean;
 };
+
+const expandidoId = ref<number | null>(null);
+const detallesMap = ref<Record<number, VentaDetalleDTO[]>>({});
+const discrepanciasMap = ref<Record<number, number>>({});
+const cargandoDetalle = ref(false);
+
 const cargando = ref(false);
 const mensaje = ref('');
 const tipoMsj = ref<'ok' | 'error' | 'info'>('ok');
@@ -277,6 +280,22 @@ async function confirmarAbono(payload: { monto: number; metodoPago: string }) {
   }
 }
 
+function abrirWhatsApp(credito: CreditoVentaDTO) {
+  const telefono = credito.telefonoPersona || '';
+  const saldo = credito.saldoPendiente;
+  const montoTotal = credito.montoTotal;
+  const montoPagado = credito.montoPagado;
+  const mensaje = encodeURIComponent(
+    `Hola ${credito.nombrePersona}, te recordamos que tienes un saldo pendiente de $${saldo.toFixed(2)} (Total: $${montoTotal.toFixed(2)}, Pagado: $${montoPagado.toFixed(2)}) en "Tienda El Orejas". ¡Agradecemos tu pago!`
+  );
+  if (telefono) {
+    const limpio = telefono.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/52${limpio}?text=${mensaje}`, '_blank');
+  } else {
+    mostrarMensaje('La persona no tiene teléfono registrado.', 'error');
+  }
+}
+
 async function toggleDetalles(credito: CreditoVentaDTO) {
   if (expandidoId.value === credito.idCreditoVenta) {
     expandidoId.value = null;
@@ -294,15 +313,13 @@ async function toggleDetalles(credito: CreditoVentaDTO) {
     if (res.codigo === 200) {
       const detalles = res.datos || [];
       detallesMap.value[credito.idCreditoVenta] = detalles;
-
       const sumaDetalles = detalles.reduce((acc, d) => {
         const prod = d.Producto || d.producto;
         const esGramaje = prod?.is_gramaje ?? false;
         return acc + (esGramaje ? Number(d.precioUnitarioVenta) : d.cantidad * Number(d.precioUnitarioVenta));
       }, 0);
-      const montoTotal = Number(credito.montoTotal);
-      if (Math.abs(sumaDetalles - montoTotal) > 0.01) {
-        discrepanciasMap.value[credito.idCreditoVenta] = montoTotal - sumaDetalles;
+      if (Math.abs(sumaDetalles - Number(credito.montoTotal)) > 0.01) {
+        discrepanciasMap.value[credito.idCreditoVenta] = Number(credito.montoTotal) - sumaDetalles;
       }
     } else {
       mostrarMensaje('Error al obtener detalles.', 'error');
@@ -339,22 +356,6 @@ function detallesAgrupados(creditoId: number): DetalleAgrupado[] {
     }
   }
   return Array.from(map.values());
-}
-
-function abrirWhatsApp(credito: CreditoVentaDTO) {
-  const telefono = credito.telefonoPersona || '';
-  const saldo = credito.saldoPendiente;
-  const montoTotal = credito.montoTotal;
-  const montoPagado = credito.montoPagado;
-  const mensaje = encodeURIComponent(
-    `Hola ${credito.nombrePersona}, te recordamos que tienes un saldo pendiente de $${saldo.toFixed(2)} (Total: $${montoTotal.toFixed(2)}, Pagado: $${montoPagado.toFixed(2)}) en "Tienda El Orejas". ¡Agradecemos tu pago!`
-  );
-  if (telefono) {
-    const limpio = telefono.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/52${limpio}?text=${mensaje}`, '_blank');
-  } else {
-    mostrarMensaje('La persona no tiene teléfono registrado.', 'error');
-  }
 }
 
 const totalDeudaGeneral = computed(() => {
@@ -470,38 +471,42 @@ watch(() => props.open, (val) => {
                 </div>
                   <div v-for="cv in creditosFiltrados" :key="cv.idCreditoVenta" class="credito-item" :class="[cv.estatus.toLowerCase(), { 'is-expanded': expandidoId === cv.idCreditoVenta }]">
                     <div class="credito-head">
-                      <span class="credito-ticket" v-if="cv.numeroTicket">#{{ cv.numeroTicket }}</span>
-                      <span :class="['credito-status', cv.estatus === 'PENDIENTE' ? 'badge-pendiente' : 'badge-pagado']">{{ cv.estatus }}</span>
+                      <div class="credito-head-left">
+                        <span class="credito-ticket" v-if="cv.numeroTicket">#{{ cv.numeroTicket }}</span>
+                        <span :class="['credito-status', cv.estatus === 'PENDIENTE' ? 'badge-pendiente' : 'badge-pagado']">{{ cv.estatus === 'PENDIENTE' ? 'Pendiente' : 'Pagado' }}</span>
+                      </div>
+                      <div class="credito-head-right">
+                        <span class="credito-fecha" v-if="cv.fechaCreacion">{{ formatearFecha(cv.fechaCreacion) }}</span>
+                        <button class="credito-toggle" @click="toggleDetalles(cv)" :title="expandidoId === cv.idCreditoVenta ? 'Ocultar productos' : 'Ver productos'">
+                          <span v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta] && expandidoId === cv.idCreditoVenta" class="toggle-spinner">⏳</span>
+                          <span v-else>{{ expandidoId === cv.idCreditoVenta ? '▲' : '▼' }}</span>
+                        </button>
+                      </div>
                     </div>
-                    <div class="credito-monto">
-                      <span class="credito-label">Total:</span>
-                      <span class="credito-valor">{{ formatoMoneda(cv.montoTotal) }}</span>
+                    <div class="credito-saldo-row">
+                      <div class="credito-saldo-info">
+                        <span class="credito-saldo-label">Saldo</span>
+                        <span class="credito-saldo-valor" :class="cv.saldoPendiente > 0 ? 'pendiente' : 'pagado'">{{ formatoMoneda(cv.saldoPendiente) }}</span>
+                      </div>
+                      <div class="credito-totals">
+                        <span class="credito-totals-item">Total <strong>{{ formatoMoneda(cv.montoTotal) }}</strong></span>
+                        <span class="credito-totals-item">Pagado <strong class="pagado">{{ formatoMoneda(cv.montoPagado) }}</strong></span>
+                      </div>
                     </div>
-                    <div class="credito-monto">
-                      <span class="credito-label">Pagado:</span>
-                      <span class="credito-valor pagado">{{ formatoMoneda(cv.montoPagado) }}</span>
+                    <div v-if="cv.estatus === 'PENDIENTE'" class="credito-actions">
+                      <button class="btn-abonar" @click="abrirAbono(cv)">💰 Abonar</button>
+                      <button class="btn-whatsapp" @click="abrirWhatsApp(cv)">📱 WhatsApp</button>
                     </div>
-                    <div class="credito-monto">
-                      <span class="credito-label">Saldo:</span>
-                      <span class="credito-valor saldo">{{ formatoMoneda(cv.saldoPendiente) }}</span>
-                    </div>
-                    <div class="credito-fecha" v-if="cv.fechaCreacion">
-                      📅 {{ formatearFecha(cv.fechaCreacion) }}
-                    </div>
-                    <div class="credito-actions">
-                      <button class="btn-ver-detalle" :class="{ active: expandidoId === cv.idCreditoVenta }" @click="toggleDetalles(cv)" title="Ver productos">📦</button>
-                      <button v-if="cv.estatus === 'PENDIENTE'" class="btn-abonar" @click="abrirAbono(cv)">💰 Abonar</button>
-                      <button v-if="cv.estatus === 'PENDIENTE'" class="btn-whatsapp" @click="abrirWhatsApp(cv)">📱 WhatsApp</button>
-                    </div>
+                    <div v-if="cv.estatus === 'PAGADO'" class="credito-pagado-msg">✅ Pagado</div>
                     <Transition name="expand">
                       <div v-if="expandidoId === cv.idCreditoVenta" class="detalle-inline">
-                        <div v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta]" class="detalle-loading">Cargando...</div>
+                        <div v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta]" class="detalle-loading">Cargando productos...</div>
                         <template v-else>
                           <div v-if="discrepanciasMap[cv.idCreditoVenta] !== undefined" class="detalle-discrepancia">
                             ⚠️ Discrepancia: {{ formatoMoneda(Math.abs(discrepanciasMap[cv.idCreditoVenta])) }}
                             <span class="disc-signo">{{ discrepanciasMap[cv.idCreditoVenta] > 0 ? ' (sobra)' : ' (falta)' }}</span>
                           </div>
-                          <div v-if="detallesMap[cv.idCreditoVenta]?.length === 0" class="detalle-loading">Sin productos</div>
+                          <div v-if="!detallesMap[cv.idCreditoVenta] || detallesMap[cv.idCreditoVenta].length === 0" class="detalle-loading">Sin productos</div>
                           <div v-else class="detalle-productos">
                             <div class="detalle-producto" v-for="(d, idx) in detallesAgrupados(cv.idCreditoVenta)" :key="idx">
                               <span class="dp-nombre">{{ d.nombre }}</span>
@@ -513,6 +518,7 @@ watch(() => props.open, (val) => {
                       </div>
                     </Transition>
                     <div v-if="cv.abonos && cv.abonos.length > 0" class="abonos-list">
+                      <span class="abonos-title">Historial de pagos</span>
                       <div v-for="ab in cv.abonos" :key="ab.idAbono" class="abono-item">
                         <span class="abono-monto">{{ formatoMoneda(ab.monto) }}</span>
                         <span class="abono-fecha">{{ ab.fechaAbono?.slice(11, 16) }} {{ ab.fechaAbono?.slice(0, 10) }}</span>
@@ -594,8 +600,7 @@ watch(() => props.open, (val) => {
 }
 
 .pos-modal-card {
-  background: var(--color-bg-panel);
-  border: none;
+  background: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
   box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03);
   width: min(100%, 900px);
@@ -617,7 +622,7 @@ watch(() => props.open, (val) => {
 
 .modal-h {
   padding: 1rem 1.25rem;
-  background: var(--color-bg-panel);
+  background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -626,34 +631,30 @@ watch(() => props.open, (val) => {
 
 .modal-h h3 {
   color: var(--color-accent);
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   margin: 0;
 }
 
 .close-x {
-  background: var(--color-bg-panel);
-  border: none;
-  color: var(--color-text-primary);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 1.1rem;
+  width: 34px; height: 34px;
+  border: none; border-radius: 50%;
+  background: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-size: 1rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  transition: all .15s;
 }
 
 .close-x:hover {
   background: var(--color-error);
-  border-color: var(--color-error);
-  color: white;
+  color: #fff;
 }
 
 .modal-b {
-  padding: 1.5rem;
+  padding: 1.25rem;
   overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
@@ -674,100 +675,109 @@ watch(() => props.open, (val) => {
 }
 
 .resumen-bar {
-  display: flex; gap: 1rem; justify-content: center;
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1rem; margin-bottom: 0.75rem;
+  display: flex; gap: 1.25rem; justify-content: center;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 0.65rem 1rem; margin-bottom: 1rem;
 }
 
 .resumen-item {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 .total-deuda {
   color: var(--color-accent);
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
   gap: 0.5rem;
 }
 
 .btn-add {
-  padding: 0.4rem 0.8rem;
-  background: var(--color-bg-panel);
+  padding: 0.5rem 0.9rem;
+  background: var(--color-bg-primary);
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--color-accent);
-  font-size: 0.8rem;
-  font-weight: bold;
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.08);
 }
 
 .btn-add:hover {
-  border-color: var(--color-accent);
+  color: var(--color-on-brand);
+  background: var(--color-accent);
 }
 
 .vbtn {
-  padding: 0.3rem 0.5rem;
-  border: none;
-  border-radius: 4px;
-  background: var(--color-bg-panel);
+  width: 32px; height: 32px;
+  border: none; border-radius: 5px;
+  background: var(--color-bg-primary);
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  transition: all 0.15s;
+  color: var(--color-text-secondary);
+  display: flex; align-items: center; justify-content: center;
 }
 
 .vbtn.on {
-  background: var(--color-bg-panel);
-  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-brand);
+}
+
+.vbtn:hover:not(.on) {
+  color: var(--color-text-primary);
 }
 
 .empty-state {
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 3rem 1rem;
   color: var(--color-text-secondary);
 }
 
 .empty-state .empty-ico {
-  font-size: 2rem;
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
 .empty-state p {
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .empty-state.small {
-  padding: 1rem;
+  padding: 1.5rem;
 }
 
 .personas-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .persona-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+  gap: 0.6rem;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
   transition: all 0.15s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
 }
 
 .persona-row:hover {
-  border-color: var(--color-accent);
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
 }
 
 .persona-row.clickable {
@@ -775,11 +785,11 @@ watch(() => props.open, (val) => {
 }
 
 .persona-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-bg-primary);
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, black));
+  color: var(--color-on-brand);
   display: flex; align-items: center; justify-content: center;
-  font-weight: bold; font-size: 1rem; flex-shrink: 0;
+  font-weight: 700; font-size: 1.1rem; flex-shrink: 0;
 }
 
 .persona-info {
@@ -790,82 +800,89 @@ watch(() => props.open, (val) => {
 }
 
 .persona-name {
-  font-weight: bold;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 0.95rem;
   color: var(--color-text-primary);
 }
 
 .persona-detail {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--color-text-secondary);
+  margin-top: 0.1rem;
 }
 
 .persona-deuda {
   text-align: right;
   flex-shrink: 0;
+  margin-left: 0.5rem;
 }
 
 .deuda-amount {
   display: block;
-  font-weight: bold;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 1rem;
   color: var(--color-text-primary);
 }
 
 .deuda-count {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 
 .deuda-count.paga {
   color: var(--color-success);
+  font-weight: 600;
 }
 
 .persona-actions {
   display: flex;
-  gap: 0.3rem;
+  gap: 0.35rem;
   flex-shrink: 0;
+  margin-left: 0.5rem;
 }
 
 .action-btn {
-  padding: 0.3rem 0.4rem;
-  border: none;
-  border-radius: 4px;
-  background: var(--color-bg-panel);
+  width: 34px; height: 34px;
+  border: none; border-radius: 6px;
+  background: var(--color-bg-secondary);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   transition: all 0.15s;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
+  display: flex; align-items: center; justify-content: center;
 }
 
 .action-btn:hover {
-  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-secondary));
 }
 
-.action-del:hover {
-  border-color: var(--color-error);
+.action-btn.action-del:hover {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 10%, var(--color-bg-secondary));
 }
 
 .personas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
 }
 
 .persona-card {
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 8px;
-  padding: 0.75rem;
+  background: var(--color-bg-primary);
+  border-radius: 10px;
+  padding: 1rem 0.85rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
   transition: all 0.15s;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.06);
 }
 
 .persona-card:hover {
-  border-color: var(--color-accent);
+  box-shadow: 4px 4px 10px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
 }
 
 .persona-card.clickable {
@@ -873,75 +890,80 @@ watch(() => props.open, (val) => {
 }
 
 .card-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-bg-primary);
+  width: 50px; height: 50px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, black));
+  color: var(--color-on-brand);
   display: flex; align-items: center; justify-content: center;
-  font-weight: bold; font-size: 1.2rem;
+  font-weight: 700; font-size: 1.3rem;
 }
 
 .card-name {
-  margin: 0;
-  font-size: 0.9rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
   color: var(--color-text-primary);
   text-align: center;
+  font-weight: 700;
 }
 
 .card-details {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 
 .card-detail {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 
 .card-deuda {
   text-align: center;
+  margin-top: 0.15rem;
 }
 
 .card-deuda-amount {
   display: block;
-  font-weight: bold;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 1rem;
   color: var(--color-text-primary);
 }
 
 .card-deuda-count {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 
 .card-deuda-count.paga {
   color: var(--color-success);
+  font-weight: 600;
 }
 
 .card-actions {
   display: flex;
   gap: 0.4rem;
-  margin-top: 0.3rem;
+  margin-top: 0.4rem;
 }
 
 .card-btn {
-  padding: 0.3rem 0.5rem;
-  border: none;
-  border-radius: 4px;
-  background: var(--color-bg-panel);
+  width: 34px; height: 34px;
+  border: none; border-radius: 6px;
+  background: var(--color-bg-secondary);
   cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--color-text-primary);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
   transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
 }
 
 .card-btn:hover {
-  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-secondary));
 }
 
-.card-btn-del:hover {
-  border-color: var(--color-error);
+.card-btn.card-btn-del:hover {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 10%, var(--color-bg-secondary));
 }
 
 /* Inner overlays (creditos panel, forms, abono) */
@@ -952,14 +974,13 @@ watch(() => props.open, (val) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 210;
 }
 
 .inner-panel {
-  background: var(--color-bg-panel);
-  border: none;
+  background: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
-  width: min(95%, 620px);
+  width: min(95%, 660px);
   max-height: 82vh;
   min-height: 40vh;
   display: flex;
@@ -968,17 +989,15 @@ watch(() => props.open, (val) => {
   box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03);
 }
 
-.inner-overlay .inner-panel {
-  width: min(95%, 620px);
-}
-
 .inner-panel--sm {
-  padding: 1.25rem;
-  width: min(95%, 420px);
+  padding: 1.5rem;
+  width: min(95%, 440px);
+  min-height: unset;
 }
 
 .inner-panel h4 {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
   color: var(--color-accent);
 }
 
@@ -986,58 +1005,67 @@ watch(() => props.open, (val) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .inner-header h3 {
   margin: 0;
-  font-size: 1rem;
-  color: var(--color-text-primary);
+  font-size: 1.05rem;
+  color: var(--color-accent);
 }
 
 .inner-list {
-  padding: 0.5rem;
+  padding: 0.65rem;
   overflow-y: auto;
   flex: 1;
 }
 
 .credito-item {
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 6px;
-  padding: 0.6rem;
-  margin-bottom: 0.4rem;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
 }
 
 .credito-item.pagado {
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 .credito-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.credito-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .credito-ticket {
-  font-weight: bold;
-  font-size: 0.8rem;
+  font-weight: 700;
+  font-size: 0.9rem;
   color: var(--color-accent);
 }
 
 .credito-status {
   font-size: 0.65rem;
   padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  font-weight: bold;
+  border-radius: 4px;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .badge-pendiente {
   background: var(--color-accent);
-  color: var(--color-bg-primary);
+  color: var(--color-on-brand);
 }
 
 .badge-pagado {
@@ -1045,272 +1073,165 @@ watch(() => props.open, (val) => {
   color: white;
 }
 
-.credito-monto {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  padding: 0.1rem 0;
-}
-
-.credito-label {
-  color: var(--color-text-secondary);
-}
-
-.credito-valor {
-  color: var(--color-text-primary);
-}
-
-.credito-valor.pagado {
-  color: var(--color-success);
-  font-weight: bold;
-}
-
-.credito-valor.saldo {
-  color: var(--color-error);
-  font-weight: bold;
-}
-
 .credito-fecha {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--color-text-secondary);
-  margin-top: 0.2rem;
+}
+
+.credito-saldo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.credito-saldo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.credito-saldo-label {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.credito-saldo-valor {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.credito-saldo-valor.pendiente {
+  color: var(--color-error);
+}
+
+.credito-saldo-valor.pagado {
+  color: var(--color-success);
+}
+
+.credito-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.credito-totals-item {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.credito-totals-item strong {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.credito-totals-item strong.pagado {
+  color: var(--color-success);
 }
 
 .credito-actions {
   display: flex;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .btn-abonar {
-  padding: 0.35rem 0.6rem;
-  background: var(--color-success);
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 70%, black));
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   color: white;
-  font-size: 0.75rem;
-  font-weight: bold;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  flex: 1;
 }
 
 .btn-abonar:hover {
-  filter: brightness(1.15);
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
 }
 
 .btn-whatsapp {
-  padding: 0.35rem 0.6rem;
+  padding: 0.5rem 0.8rem;
   background: #25d366;
-  border: 1px solid #128C7E;
-  border-radius: 4px;
+  border: none;
+  border-radius: 6px;
   color: #fff;
-  font-size: 0.75rem;
-  font-weight: bold;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
 
 .btn-whatsapp:hover {
-  filter: brightness(1.15);
+  filter: brightness(1.1);
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
 }
 
-.abonos-list {
-  margin-top: 0.4rem;
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.3rem;
-}
-
-.abono-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.7rem;
-  padding: 0.1rem 0;
-  color: var(--color-text-secondary);
-}
-
-.abono-monto {
-  font-weight: bold;
-  color: var(--color-text-primary);
-}
-
-.abono-fecha {
-  color: var(--color-text-secondary);
-}
-
-.abono-user {
-  color: var(--color-text-secondary);
-}
-
-/* Form */
-.form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.field-label {
-  font-size: 0.75rem;
-  color: var(--color-accent);
+.credito-pagado-msg {
+  font-size: 0.8rem;
+  color: var(--color-success);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-top: 0.15rem;
 }
 
-.input-field {
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 5px;
-  padding: 0.5rem 0.7rem;
-  font-size: 0.9rem;
-  color: var(--color-text-primary);
-  outline: none;
-}
-
-.input-field:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
-}
-
-.form-actions {
+.credito-head-right {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.btn-cancel {
-  padding: 0.4rem 0.8rem;
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 5px;
-  color: var(--color-text-primary);
-  font-size: 0.8rem;
-  font-weight: bold;
+.credito-toggle {
+  width: 24px; height: 24px;
+  border: none; border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.6rem;
   cursor: pointer;
-}
-
-.btn-cancel:hover {
-  border-color: var(--color-accent);
-}
-
-.btn-save {
-  padding: 0.4rem 0.8rem;
-  background: var(--color-accent);
-  border: none;
-  border-radius: 5px;
-  color: var(--color-bg-primary);
-  font-size: 0.8rem;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.abono-info p {
-  margin: 0.2rem 0;
-  font-size: 0.85rem;
-  color: var(--color-text-primary);
-}
-
-.modal-f {
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-panel);
-}
-
-.cancel-btn {
-  width: 100%;
-  padding: 0.5rem;
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: var(--color-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.cancel-btn:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.toast { z-index: 9999;
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: bold;
-  
-}
-
-.toast-ok {
-  background: var(--color-success);
-  color: white;
-}
-
-.toast-error {
-  background: var(--color-error);
-  color: white;
-}
-
-.toast-info {
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-}
-
-.btn-ver-detalle {
-  padding: 0.35rem 0.5rem;
-  background: var(--color-bg-panel);
-  border: none;
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.8rem;
-  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 
-.btn-ver-detalle:hover {
-  border-color: var(--color-accent);
+.credito-toggle:hover {
+  opacity: 1;
+  background: var(--color-bg-secondary);
+  color: var(--color-accent);
 }
 
-/* --- Detalle inline expandible --- */
+.toggle-spinner {
+  font-size: 0.75rem;
+}
 
 .credito-item.is-expanded {
-  border-color: var(--color-accent);
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06), 0 0 0 1px var(--color-accent);
 }
 
 .detalle-inline {
-  margin-top: 0.4rem;
-  padding-top: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
   border-top: 1px solid var(--color-border);
-  animation: fadeSlideIn 200ms ease-out;
-}
-
-@keyframes fadeSlideIn {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 500px; }
+  overflow: hidden;
 }
 
 .detalle-loading {
   text-align: center;
   padding: 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--color-text-secondary);
 }
 
@@ -1324,13 +1245,10 @@ watch(() => props.open, (val) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.3rem 0;
-  font-size: 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
-}
-
-.detalle-producto:last-child {
-  border-bottom: none;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
 }
 
 .dp-nombre {
@@ -1347,6 +1265,7 @@ watch(() => props.open, (val) => {
   color: var(--color-text-secondary);
   white-space: nowrap;
   text-align: right;
+  font-size: 0.72rem;
 }
 
 .dp-subtotal {
@@ -1355,24 +1274,27 @@ watch(() => props.open, (val) => {
   white-space: nowrap;
   text-align: right;
   min-width: 4.5rem;
+  font-size: 0.8rem;
 }
 
-@media (max-width: 480px) {
-  .detalle-producto {
-    font-size: 0.7rem;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-  }
-  .dp-nombre {
-    width: 100%;
-    margin-bottom: 0.1rem;
-  }
-  .dp-subtotal {
-    min-width: auto;
-  }
+.detalle-discrepancia {
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
+  color: var(--color-error);
+  padding: 0.35rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
-/* Transición expand */
+.disc-signo {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
 .expand-enter-active,
 .expand-leave-active {
   transition: all 0.2s ease;
@@ -1393,25 +1315,200 @@ watch(() => props.open, (val) => {
   max-height: 500px;
 }
 
-/* --- Discrepancia --- */
+.abonos-list {
+  margin-top: 0.45rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.4rem;
+}
 
-.detalle-discrepancia {
-  background: color-mix(in srgb, var(--color-error) 12%, transparent);
-  color: var(--color-error);
-  padding: 0.35rem 0.5rem;
-  border-radius: 5px;
-  font-size: 0.75rem;
+.abonos-title {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   font-weight: 600;
-  margin-bottom: 0.4rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+  margin-bottom: 0.25rem;
 }
 
-.disc-signo {
-  font-weight: 400;
-  opacity: 0.85;
+.abono-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  padding: 0.15rem 0;
+  color: var(--color-text-secondary);
+  gap: 0.5rem;
 }
+
+.abono-monto {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.abono-fecha {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.abono-user {
+  color: var(--color-text-secondary);
+  text-align: right;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Form */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.input-field {
+  background: var(--color-bg-primary);
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.92rem;
+  color: var(--color-text-primary);
+  outline: none;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.08);
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.08), 0 0 0 2px var(--color-accent);
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  padding: 0.55rem 1.1rem;
+  background: var(--color-bg-primary);
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
+}
+
+.btn-cancel:hover {
+  color: var(--color-text-primary);
+  box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
+}
+
+.btn-save {
+  padding: 0.55rem 1.1rem;
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, black));
+  border: none;
+  border-radius: 6px;
+  color: var(--color-on-brand);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
+}
+
+.btn-save:hover {
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.abono-info p {
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+
+.modal-f {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.cancel-btn {
+  width: 100%;
+  padding: 0.6rem;
+  background: var(--color-bg-primary);
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
+}
+
+.cancel-btn:hover {
+  color: var(--color-accent);
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.1);
+}
+
+.toast {
+  z-index: 9999;
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.7rem 1.4rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.toast-ok {
+  background: var(--color-success);
+  color: white;
+}
+
+.toast-error {
+  background: var(--color-error);
+  color: white;
+}
+
+.toast-info {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+
+
 
 .modal-fade-enter-active,
 .modal-fade-leave-active {

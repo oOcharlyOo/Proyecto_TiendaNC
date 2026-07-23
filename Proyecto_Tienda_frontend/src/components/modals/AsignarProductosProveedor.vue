@@ -356,6 +356,18 @@ function onGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
+function calcMargin(costo: number, venta: number) {
+  if (costo <= 0) return 0;
+  return Math.round((venta - costo) / costo * 100);
+}
+
+function getMarginClass(costo: number, venta: number) {
+  const m = calcMargin(costo, venta);
+  if (m >= 40) return 'margin-alta';
+  if (m >= 20) return 'margin-media';
+  return 'margin-baja';
+}
+
 function formatoMoneda(v?: number) {
   if (v == null) return '-';
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
@@ -598,6 +610,9 @@ onUnmounted(() => {
                   <span v-if="getProductInfo(asig.idProducto)?.codigoBarras" class="ap-barcode">🏷️ {{ getProductInfo(asig.idProducto)?.codigoBarras }}</span>
                   <span v-if="getProductInfo(asig.idProducto)?.isGramaje" class="ap-gramaje">⚖️ Gramaje</span>
                   <span v-if="asig.precioAcordado" class="ap-agreed-price">Precio acordado: {{ formatoMoneda(asig.precioAcordado) }}</span>
+                  <span v-if="getProductInfo(asig.idProducto)?.precioCosto && getProductInfo(asig.idProducto)?.precioVenta" class="ap-margin-badge" :class="getMarginClass(getProductInfo(asig.idProducto)!.precioCosto!, getProductInfo(asig.idProducto)!.precioVenta!)">
+                    {{ calcMargin(getProductInfo(asig.idProducto)!.precioCosto!, getProductInfo(asig.idProducto)!.precioVenta!) }}%
+                  </span>
                 </div>
               </div>
               <button class="btn-remove" @click="eliminarAsignacion(asig.id)">🗑️</button>
@@ -1173,6 +1188,16 @@ onUnmounted(() => {
   font-weight: 600;
   font-family: monospace;
 }
+.ap-margin-badge {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-weight: 700;
+  font-family: monospace;
+}
+.ap-margin-badge.margin-alta { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.ap-margin-badge.margin-media { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.ap-margin-badge.margin-baja { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 
 .btn-remove {
   background: transparent;

@@ -2,6 +2,7 @@
 
 import { formatoMoneda, obtenerIniciales } from '../logica/usePosTicket';
 import type { Ticket } from '../logica/usePosTipos';
+import PosAlertasWidget from '../modales/PosAlertasWidget.vue';
 
 defineProps<{
   tickets: Ticket[];
@@ -70,6 +71,7 @@ const emit = defineEmits<{
         <span class="pending-badge" v-if="ventasPendientesCount > 0">{{ ventasPendientesCount }}</span>
         P
       </button>
+      <PosAlertasWidget />
     </div>
   </aside>
 </template>
@@ -122,7 +124,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .sidebar-header h3 { 
-  font-size: 0.7rem; 
+  font-size: 0.8rem; 
   text-transform: uppercase; 
   color: var(--accent-color);
   font-weight: 700;
@@ -218,35 +220,36 @@ const emit = defineEmits<{
   gap: 2px;
 }
 .pos-container .ticket-num { 
-  font-weight: 600; 
-  font-size: 0.8rem; 
+  font-weight: 700; 
+  font-size: 0.9rem; 
   color: var(--accent-color); 
 }
 .pos-container .ticket-nav-item .ticket-total {
   display: block;
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   color: var(--success-color);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   padding: 0;
   margin-top: 0;
   border-top: none;
 }
 .pos-container .ticket-status { 
-  font-size: 0.45rem; 
+  font-size: 0.65rem; 
   color: var(--text-secondary); 
   text-transform: uppercase; 
+  font-weight: 600;
 }
 .pos-container .ticket-initials {
-  font-size: 0.45rem;
+  font-size: 0.65rem;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 .pos-container .chip-user {
-  font-size: 0.45rem;
+  font-size: 0.65rem;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   margin-left: 4px;
   flex-shrink: 0;
@@ -306,10 +309,10 @@ const emit = defineEmits<{
   right: -4px;
   background: color-mix(in srgb, var(--infoBlueColor) 50%, var(--accent-color));
   color: var(--text-primary);
-  font-size: 0.6rem;
-  font-weight: 600;
-  min-width: 16px;
-  height: 16px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -344,8 +347,8 @@ const emit = defineEmits<{
   right: -4px;
   background: var(--error-color);
   color: var(--text-primary);
-  font-size: 0.6rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   min-width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -361,8 +364,8 @@ const emit = defineEmits<{
     max-width: 48px;
     height: 54px;
   }
-  .pos-container .ticket-num { font-size: 0.75rem; }
-  .pos-container .ticket-total { font-size: 0.5rem; }
+  .pos-container .ticket-num { font-size: 0.85rem; }
+  .pos-container .ticket-total { font-size: 0.65rem; }
 }
 
 @media (max-width: 991px) {

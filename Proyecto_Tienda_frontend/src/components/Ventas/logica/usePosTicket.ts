@@ -106,7 +106,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 function mostrarMensaje(texto: string, tipo: 'ok' | 'error' | 'info') {
   mensaje.value = texto;
   mensajeTipo.value = tipo;
-  setTimeout(() => { mensaje.value = ''; }, 1000);
+  setTimeout(() => { mensaje.value = ''; }, 3000);
 }
 
 async function cargarSiguienteTicket() {
