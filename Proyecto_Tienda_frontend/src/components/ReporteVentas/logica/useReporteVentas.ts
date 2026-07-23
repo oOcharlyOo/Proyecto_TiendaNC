@@ -151,8 +151,8 @@ export const productosTop = computed<ProductoStats[]>(() => {
     let monto: number;
     let costo: number;
     
-    if (d.productoIsGramaje) {
-      monto = precioVenta * (cantidad / 1000);
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
       costo = (precioCostoKg / 1000) * cantidad;
     } else {
       monto = precioVenta * cantidad;
@@ -177,7 +177,7 @@ export const productosTop = computed<ProductoStats[]>(() => {
       });
     }
   }
-  return Array.from(map.values()).sort((a, b) => b.montoTotal - a.montoTotal).slice(0, 15);
+  return Array.from(map.values()).sort((a, b) => b.montoTotal - a.montoTotal);
 });
 
 export const productosUnitarios = computed<ProductoStats[]>(() => {
@@ -197,7 +197,10 @@ export const productosUnitariosGanancia = computed<ProductoStats[]>(() => {
 });
 
 export const productosGramajeGanancia = computed<ProductoStats[]>(() => {
-  return productosTopGanancia.value.filter(p => p.isGramaje).slice(0, 10);
+  return productosTop.value
+    .filter(p => p.isGramaje)
+    .sort((a, b) => b.gananciaTotal - a.gananciaTotal)
+    .slice(0, 10);
 });
 
 export const metodosStats = computed<MetodoStats[]>(() => {
@@ -807,12 +810,14 @@ export const chartOptionsCategoriaComparativa = {
   }
 };
 
+export const top15 = computed(() => productosTop.value.slice(0, 15));
+
 export const chartTopProductos = computed(() => ({
-  labels: productosTop.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  labels: top15.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
   datasets: [{
     label: 'Monto ($)',
-    data: productosTop.value.map(p => Math.round(p.montoTotal * 100) / 100),
-    backgroundColor: chartColors.slice(0, productosTop.value.length),
+    data: top15.value.map(p => Math.round(p.montoTotal * 100) / 100),
+    backgroundColor: chartColors.slice(0, top15.value.length),
     borderRadius: 6,
     borderSkipped: false
   }]
