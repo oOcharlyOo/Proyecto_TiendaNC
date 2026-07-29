@@ -307,6 +307,7 @@ const historialTotalElementos = ref(0);
 const historialTotalPaginas = ref(0);
 const filtroMesHistorial = ref('all');
 const filtroAnioHistorial = ref(new Date().getFullYear());
+const filtroDiaHistorial = ref<number | null>(null);
 const filtroDiscrepanciaHistorial = ref(false);
 const ventaDetalleSeleccionada = ref<VentaDTO | null>(null);
 const ventaDetalleItems = shallowRef<VentaDetalleDTO[]>([]);
@@ -1143,6 +1144,9 @@ async function abrirHistorialVentas() {
     if (filtroMesHistorial.value !== 'all') {
       params.set('mes', String(Number(filtroMesHistorial.value) + 1));
       params.set('anio', String(filtroAnioHistorial.value));
+      if (filtroDiaHistorial.value !== null) {
+        params.set('dia', String(filtroDiaHistorial.value));
+      }
     }
     const response = await fetchApi<PaginatedResponse<VentaHistorialDTO>>(`/ventasDetalle/historialPaginado?${params.toString()}`);
     historialData.value = response.content.map(item => ({
@@ -1575,7 +1579,7 @@ export {
   productosDiario, productosUnitariosDiario, productosGranelDiario, detallesDiario,
   productosMensual, productosUnitariosMensual, productosGranelMensual, detallesMensual,
   historialData, historialPagina, historialTotalElementos, historialTotalPaginas,
-  filtroMesHistorial, filtroAnioHistorial, filtroDiscrepanciaHistorial,
+  filtroMesHistorial, filtroAnioHistorial, filtroDiaHistorial, filtroDiscrepanciaHistorial,
   ventaDetalleSeleccionada, ventaDetalleItems, ventaDetalleEditando, ventaDetalleMontoEditado,
   ventaDetalleItemEditando, ventaDetalleCantidadTemp, ventaDetallePrecioTemp,
   modalProductoGramaje, gramajeEditandoIndice, gramajeEditandoCantidad, gramajeEditandoPrecio,

@@ -42,7 +42,7 @@ import {
   productosDiario, productosUnitariosDiario, productosGranelDiario, detallesDiario,
   productosMensual, productosUnitariosMensual, productosGranelMensual, detallesMensual,
   historialData, historialPagina, historialTotalElementos, historialTotalPaginas,
-  filtroMesHistorial, filtroAnioHistorial, filtroDiscrepanciaHistorial,
+  filtroMesHistorial, filtroAnioHistorial, filtroDiaHistorial, filtroDiscrepanciaHistorial,
   ventaDetalleSeleccionada, ventaDetalleItems, ventaDetalleEditando, ventaDetalleMontoEditado,
   ventaDetalleItemEditando, ventaDetalleCantidadTemp, ventaDetallePrecioTemp,
   modalProductoGramaje, gramajeEditandoIndice, gramajeEditandoCantidad, gramajeEditandoPrecio,
@@ -250,6 +250,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :historialTotalFiltrado="historialTotalFiltrado"
       :filtroMesHistorial="filtroMesHistorial"
       :filtroAnioHistorial="filtroAnioHistorial"
+      :filtroDiaHistorial="filtroDiaHistorial"
       :filtroDiscrepanciaHistorial="filtroDiscrepanciaHistorial"
       :historialPagina="historialPagina"
       :historialTotalPaginas="historialTotalPaginas"
@@ -277,8 +278,9 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :getRankIcon="getRankIcon"
       :getRankClass="getRankClass"
       @cerrar="modalHistorialAbierto = false"
-      @cambiar-filtro-mes="(v) => { filtroMesHistorial = v; historialPagina = 0; abrirHistorialVentas() }"
+      @cambiar-filtro-mes="(v) => { filtroMesHistorial = v; if (v === 'all') filtroDiaHistorial = null; historialPagina = 0; abrirHistorialVentas() }"
       @cambiar-filtro-anio="(v) => { filtroAnioHistorial = v; historialPagina = 0; abrirHistorialVentas() }"
+      @cambiar-filtro-dia="(v) => { filtroDiaHistorial = v; historialPagina = 0; abrirHistorialVentas() }"
       @cambiar-pagina="cambiarPaginaHistorial"
       @toggle-filtro-discrepancia="filtroDiscrepanciaHistorial = !filtroDiscrepanciaHistorial"
       @abrir-detalle="abrirDetalleVenta"

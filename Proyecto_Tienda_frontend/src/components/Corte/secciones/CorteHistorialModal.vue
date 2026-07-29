@@ -4,7 +4,7 @@ import type { VentaDTO, VentaDetalleDTO } from '../logica/useCorte';
 const props = defineProps<{
   abierto: boolean; cargando: boolean; historialData: { venta: VentaDTO; detalles: VentaDetalleDTO[] }[];
   historialTotalFiltrado: number;
-  filtroMesHistorial: string; filtroAnioHistorial: number; filtroDiscrepanciaHistorial: boolean;
+  filtroMesHistorial: string; filtroAnioHistorial: number; filtroDiaHistorial: number | null; filtroDiscrepanciaHistorial: boolean;
   historialPagina: number; historialTotalPaginas: number; historialTotalElementos: number;
   ventasHistorialSeleccionadas: Set<number>; corrigiendoHistorial: boolean; correccionHistorialMsg: string;
   modalDetalleAbierto: boolean; ventaDetalleSeleccionada: VentaDTO | null;
@@ -19,7 +19,7 @@ const props = defineProps<{
   getRankIcon: (i: number) => string; getRankClass: (i: number) => string;
 }>();
 defineEmits<{
-  'cerrar': []; 'cambiar-filtro-mes': [v: string]; 'cambiar-filtro-anio': [v: number]; 'toggle-filtro-discrepancia': [];
+  'cerrar': []; 'cambiar-filtro-mes': [v: string]; 'cambiar-filtro-anio': [v: number]; 'cambiar-filtro-dia': [v: number | null]; 'toggle-filtro-discrepancia': [];
   'cambiar-pagina': [n: number];
   'abrir-detalle': [id: number]; 'toggle-seleccion': [id: number]; 'seleccionar-todas': [];
   'corregir-seleccionadas': []; 'iniciar-edicion': []; 'iniciar-edicion-total': [];
@@ -50,6 +50,7 @@ const nombreUsuario = computed(() => {
             <option v-for="m in 12" :key="m - 1" :value="String(m - 1)">{{ new Date(2024, m - 1).toLocaleString('es-MX', { month: 'long' }) }}</option>
           </select>
           <input type="number" :value="filtroAnioHistorial" @change="$emit('cambiar-filtro-anio', Number(($event.target as HTMLInputElement).value))" class="input-year" placeholder="Año" min="2020" />
+          <input v-if="filtroMesHistorial !== 'all'" type="number" :value="filtroDiaHistorial" @change="$emit('cambiar-filtro-dia', ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null)" class="input-day" placeholder="Día" min="1" max="31" />
           <label class="checkbox-label"><input type="checkbox" :checked="filtroDiscrepanciaHistorial" @change="$emit('toggle-filtro-discrepancia')" /> Solo discrepancias</label>
         </div>
         <div v-if="correccionHistorialMsg" class="correccion-msg">{{ correccionHistorialMsg }}</div>
@@ -191,7 +192,7 @@ const nombreUsuario = computed(() => {
 .btn-icon:hover { transform: scale(1.2); }
 .btn-icon.danger:hover { filter: brightness(1.5); }
 .input-small { width: 80px; padding: 0.3rem 0.5rem; border-radius: 6px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 0.8rem; font-family: inherit; }
-.input-year { width: 80px; padding: 0.5rem; border-radius: 8px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-family: inherit; text-align: center; }
+.input-year, .input-day { width: 80px; padding: 0.5rem; border-radius: 8px; border:none;box-shadow:3px 3px 8px rgba(0,0,0,.12),-1px -1px 4px rgba(255,255,255,.02); background: var(--color-bg-primary); color: var(--color-text-primary); font-family: inherit; text-align: center; }
 .cancel-btn { border-color: color-mix(in srgb, var(--color-error) 30%, transparent); color: var(--color-error); }
 .cancel-btn:hover { background: color-mix(in srgb, var(--color-error) 10%, transparent); }
 
