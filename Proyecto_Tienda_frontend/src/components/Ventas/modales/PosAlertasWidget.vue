@@ -12,6 +12,8 @@ type Alerta = {
 const alertas = ref<Alerta[]>([]);
 const cargando = ref(false);
 const abierto = ref(false);
+const bellBtnRef = ref<HTMLElement | null>(null);
+const dropdownStyle = ref<Record<string, string>>({});
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 function getIcon(sev: string) {
@@ -59,6 +61,30 @@ async function cargarAlertas() {
 
 function toggle() {
   abierto.value = !abierto.value;
+  if (abierto.value) {
+    setTimeout(() => updateDropdownPosition(), 0);
+  }
+}
+
+function updateDropdownPosition() {
+  if (bellBtnRef.value) {
+    const rect = bellBtnRef.value.getBoundingClientRect();
+    const dropdownHeight = 320;
+    const spaceBelow = window.innerHeight - rect.top;
+
+    let top = rect.top;
+    if (spaceBelow < dropdownHeight + 16) {
+      top = rect.bottom - dropdownHeight;
+      if (top < 8) top = 8;
+    }
+
+    dropdownStyle.value = {
+      position: 'fixed',
+      left: (rect.right + 8) + 'px',
+      top: top + 'px',
+      zIndex: '9999',
+    };
+  }
 }
 
 function handleClickOutside(e: MouseEvent) {
@@ -82,34 +108,36 @@ onUnmounted(() => {
 
 <template>
   <div class="paw-widget">
-    <button class="paw-bell-btn" @click="toggle" title="Alertas de inventario">
+    <button class="paw-bell-btn" @click="toggle" ref="bellBtnRef" title="Alertas de inventario">
       <span class="paw-bell-icon">🔔</span>
       <span v-if="alertas.length > 0" class="paw-badge" :class="{ urgent: alertas.some(a => a.severidad === 'alta') }">
         {{ alertas.length }}
       </span>
     </button>
 
-    <Transition name="paw-drop">
-      <div v-if="abierto" class="paw-dropdown">
-        <div class="paw-drop-header">
-          <span>🔔 Alertas</span>
-          <button v-if="!cargando" class="paw-refresh-btn" @click.stop="cargarAlertas">🔄</button>
-        </div>
-        <div v-if="cargando" class="paw-drop-loading">Cargando...</div>
-        <div v-else-if="alertas.length === 0" class="paw-drop-empty">
-          ✅ Sin alertas
-        </div>
-        <div v-else class="paw-drop-list">
-          <div v-for="(a, i) in alertas" :key="i" class="paw-drop-item" :class="'paw-sev-' + a.severidad">
-            <span class="paw-item-icon">{{ getIcon(a.severidad) }}</span>
-            <div class="paw-item-info">
-              <span class="paw-item-msg">{{ a.mensaje }}</span>
-              <span class="paw-item-tipo">{{ a.tipo }}</span>
+    <Teleport to="body">
+      <Transition name="paw-drop">
+        <div v-if="abierto" class="paw-dropdown" :style="dropdownStyle">
+          <div class="paw-drop-header">
+            <span>🔔 Alertas</span>
+            <button v-if="!cargando" class="paw-refresh-btn" @click.stop="cargarAlertas">🔄</button>
+          </div>
+          <div v-if="cargando" class="paw-drop-loading">Cargando...</div>
+          <div v-else-if="alertas.length === 0" class="paw-drop-empty">
+            ✅ Sin alertas
+          </div>
+          <div v-else class="paw-drop-list">
+            <div v-for="(a, i) in alertas" :key="i" class="paw-drop-item" :class="'paw-sev-' + a.severidad">
+              <span class="paw-item-icon">{{ getIcon(a.severidad) }}</span>
+              <div class="paw-item-info">
+                <span class="paw-item-msg">{{ a.mensaje }}</span>
+                <span class="paw-item-tipo">{{ a.tipo }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -122,7 +150,7 @@ onUnmounted(() => {
 .paw-badge.urgent{background:var(--color-error,#ef4444)}
 @keyframes pawPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 
-.paw-dropdown{position:absolute;left:calc(100% + 8px);top:0;width:300px;background:var(--color-bg-panel,#1e1e32);border:1px solid var(--color-border,#333);border-radius:10px;box-shadow:8px 8px 24px rgba(0,0,0,.4);z-index:999;overflow:hidden}
+.paw-dropdown{width:300px;background:var(--color-bg-panel,#1e1e32);border:1px solid var(--color-border,#333);border-radius:10px;box-shadow:8px 8px 24px rgba(0,0,0,.4);overflow:hidden}
 .paw-drop-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;border-bottom:1px solid var(--color-border,#333);font-size:.8rem;font-weight:700;color:var(--color-accent)}
 .paw-refresh-btn{background:none;border:none;color:var(--color-text-secondary);cursor:pointer;font-size:.8rem;padding:.2rem}
 .paw-refresh-btn:hover{color:var(--color-accent)}
