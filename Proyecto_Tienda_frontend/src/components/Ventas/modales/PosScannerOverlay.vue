@@ -320,9 +320,9 @@ const emit = defineEmits<{
 
 /* PROVEEDORES Y PEDIDOS MODAL */
 .pos-container .proveedores-pedidos-modal {
-  max-width: 600px;
+  max-width: 960px;
   width: 95%;
-  max-height: 85vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
