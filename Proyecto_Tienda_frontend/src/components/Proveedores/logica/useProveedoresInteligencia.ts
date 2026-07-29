@@ -84,17 +84,36 @@ async function cargarAnalytics() {
   try {
     const year = new Date().getFullYear();
 
-    const [reporteAnual, resumen, productos, sugerencias] = await Promise.all([
+    const [reporteAnual, resumen, productos, sugerencias, categoriasResp] = await Promise.all([
       fetch(API_BASE + '/ventas/reporteAnual/' + year).then(r => r.json()).catch(() => ({ datos: null })),
       fetch(API_BASE + '/productos/resumen').then(r => r.json()).catch(() => ({ datos: null })),
       fetch(API_BASE + '/productos/listarProductos').then(r => r.json()).catch(() => ({ datos: [] })),
-      fetch(API_BASE + '/pedidos-proveedor/sugerido?periodo=mensual&presupuesto=medio').then(r => r.json()).catch(() => ({ datos: [] }))
+      fetch(API_BASE + '/pedidos-proveedor/sugerido?periodo=mensual&presupuesto=medio').then(r => r.json()).catch(() => ({ datos: [] })),
+      fetch(API_BASE + '/categorias/listarCategorias').then(r => r.json()).catch(() => ({ datos: [] }))
     ]);
 
     const datosAnual = reporteAnual.datos ?? reporteAnual;
     const datosResumen = resumen.datos ?? resumen;
     const datosProductos = (productos.datos ?? productos) as any[];
     const datosSugerencia = (sugerencias.datos ?? sugerencias) as any[];
+    const categoriasList = (categoriasResp.datos ?? categoriasResp) as any[];
+    const categoriaMap = new Map<number, string>();
+    for (const c of categoriasList) {
+      const id = Number(c.idCategoria);
+      if (!isNaN(id) && id > 0 && c.nombre) {
+        categoriaMap.set(id, c.nombre);
+      }
+    }
+    
+    // Debug: log de categorías cargadas
+    console.log('[Inteligencia] Respuesta categorías:', categoriasResp);
+    console.log('[Inteligencia] Lista categorías:', categoriasList);
+    console.log('[Inteligencia] Tamaño categoriaMap:', categoriaMap.size);
+    if (categoriaMap.size === 0) {
+      console.warn('[Inteligencia] No se cargaron categorías. Respuesta:', categoriasResp);
+    } else {
+      console.log('[Inteligencia] Categorías cargadas:', categoriaMap.size, Array.from(categoriaMap.entries()).slice(0, 5));
+    }
 
     resumenInventario.value = datosResumen;
 
@@ -163,22 +182,22 @@ async function cargarAnalytics() {
       const ventaDiaria = s.ventasDiariasPromedio || 0;
       const stock = s.stockActual || 0;
 
-      if (diasRestante === -1 && stock > 0) {
+      if ((diasRestante === -1 || diasRestante == null) && stock > 0 && sid > 0) {
         noMov.push({
-          idProducto: isNaN(sid) ? undefined : sid,
+          idProducto: sid,
           nombre: s.nombreProducto,
           cantidadVendida: 0,
           totalVendido: 0,
           isGramaje: s.isGramaje || false,
           diasSinVenta: 999,
           stock,
-          categoria: s.categoria,
+          categoria: s.categoria || categoriaMap.get(Number(s.idCategoria)) || '',
           proveedor: s.nombreProveedor,
           ventaDiaria: 0,
           precioCosto: s.precioCosto || 0,
           precioVenta: s.precioVenta || 0,
         });
-        if (sid) idProductosVistos.add(sid);
+        idProductosVistos.add(sid);
       }
 
       if (stock > 0 && ventaDiaria > 0 && stock / ventaDiaria > 60) {
@@ -199,11 +218,46 @@ async function cargarAnalytics() {
     }
 
     // Buscar productos con stock que no esten en sugerencia (sin ventas nunca)
+    let productosSinCategoria = 0;
+    let productosSinPrecio = 0;
+    let productosProcesados = 0;
+    
     for (const p of datosProductos) {
       const id = Number(p.idProducto);
-      if (isNaN(id) || sugerenciaMap.has(id)) continue;
+      if (isNaN(id) || id <= 0 || sugerenciaMap.has(id)) continue;
       const stock = Number(p.stock || 0);
       if (stock > 0) {
+        productosProcesados++;
+        // Resolver categoría con fallback inteligente
+        let categoriaNombre = '';
+        const idCategoria = Number(p.idCategoria);
+        if (!isNaN(idCategoria) && idCategoria > 0) {
+          categoriaNombre = categoriaMap.get(idCategoria) || '';
+          if (!categoriaNombre) {
+            productosSinCategoria++;
+            if (productosSinCategoria <= 3) {
+              console.warn(`[Inteligencia] Producto ${p.nombre} (ID: ${id}) tiene idCategoria=${idCategoria} pero no se encontró en categoriaMap`);
+            }
+          }
+        } else {
+          productosSinCategoria++;
+          if (productosSinCategoria <= 3) {
+            console.warn(`[Inteligencia] Producto ${p.nombre} (ID: ${id}) tiene idCategoria inválido: ${p.idCategoria}`);
+          }
+        }
+        
+        // Log de ejemplo para los primeros 3 productos
+        if (productosProcesados <= 3) {
+          console.log(`[Inteligencia] Producto ${productosProcesados}: ${p.nombre}, idCategoria=${idCategoria}, categoriaNombre="${categoriaNombre}"`);
+        }
+        
+        // Validar precios
+        const precioCosto = Number(p.precio_costo || 0);
+        const precioVenta = Number(p.precio_venta || 0);
+        if (precioCosto === 0 && precioVenta === 0) {
+          productosSinPrecio++;
+        }
+        
         const item: ProductoRank = {
           idProducto: id,
           nombre: p.nombre,
@@ -212,19 +266,49 @@ async function cargarAnalytics() {
           isGramaje: p.is_gramaje || false,
           diasSinVenta: 999,
           stock,
-          precioCosto: Number(p.precio_costo || 0),
-          precioVenta: Number(p.precio_venta || 0),
+          categoria: categoriaNombre,
+          precioCosto: precioCosto,
+          precioVenta: precioVenta,
         };
         noMov.push(item);
-        if (id) idProductosVistos.add(id);
+        idProductosVistos.add(id);
       }
+    }
+    
+    // Logs de depuración
+    if (productosSinCategoria > 0) {
+      console.warn(`[Inteligencia] ${productosSinCategoria} producto(s) sin categoría válida`);
+    }
+    if (productosSinPrecio > 0) {
+      console.warn(`[Inteligencia] ${productosSinPrecio} producto(s) sin precio de costo ni venta`);
+    }
+    console.log('[Inteligencia] Productos sin movimiento encontrados:', noMov.length);
+    
+    // Debug: mostrar primeros 3 items de noMov
+    if (noMov.length > 0) {
+      console.log('[Inteligencia] Primeros 3 items de noMov:', noMov.slice(0, 3).map(i => ({
+        id: i.idProducto,
+        nombre: i.nombre,
+        stock: i.stock,
+        categoria: i.categoria
+      })));
     }
 
     // Filtrar items sin identificador valido
-    const noMovValidos = noMov.filter(i => i.idProducto != null && !isNaN(i.idProducto as number));
+    const noMovValidos = noMov.filter(i => i.idProducto != null && i.idProducto > 0 && !isNaN(i.idProducto as number) && i.nombre);
     const noMovDescartados = noMov.length - noMovValidos.length;
     if (noMovDescartados > 0) {
       console.warn(`[Inteligencia] Se descartaron ${noMovDescartados} producto(s) sin idProducto valido en Sin Movimiento.`, noMov.filter(i => !i.idProducto || isNaN(i.idProducto as number)));
+    }
+    
+    // Debug: mostrar primeros 3 items de noMovValidos
+    if (noMovValidos.length > 0) {
+      console.log('[Inteligencia] Primeros 3 items de noMovValidos:', noMovValidos.slice(0, 3).map(i => ({
+        id: i.idProducto,
+        nombre: i.nombre,
+        stock: i.stock,
+        categoria: i.categoria
+      })));
     }
 
     slow.sort((a, b) => (b.rotacion || 0) - (a.rotacion || 0));

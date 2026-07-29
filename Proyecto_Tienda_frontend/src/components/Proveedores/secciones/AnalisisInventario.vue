@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useProveedoresInteligencia } from '../logica/useProveedoresInteligencia';
 import type { ProductoRank } from '../logica/useProveedoresInteligencia';
 
@@ -14,6 +14,14 @@ const {
 } = useProveedoresInteligencia();
 
 onMounted(() => cargarAnalytics());
+
+// Debug: watch para ver cuándo cambian los datos
+watch(sinMovimiento, (newVal) => {
+  console.log('[AnalisisInventario] sinMovimiento cambió:', newVal.length, 'items');
+  if (newVal.length > 0) {
+    console.log('[AnalisisInventario] Primer item de sinMovimiento:', newVal[0]);
+  }
+}, { immediate: true });
 
 /* ---------- helpers ---------- */
 function getSeveridadClass(s: string) {
@@ -38,13 +46,15 @@ function margenItem(item: ProductoRank) {
 }
 
 function categoriaItem(item: ProductoRank) {
-  return item.categoria || 'Sin categoría';
+  const cat = item.categoria;
+  if (cat && cat !== '0' && cat !== '' && cat !== 'Sin categoría') return cat;
+  return 'Sin categoría';
 }
 
 /* ---------- sin movimiento state ---------- */
 const smFilter = ref<'todos' | 'eliminar' | 'promocionar' | 'revisar'>('todos');
 const selectedIds = ref<Set<number>>(new Set());
-const expandedCats = ref<Set<string>>(new Set());
+const expandedCats = ref<Record<string, boolean>>({});
 const pendingDelete = ref<Set<number>>(new Set());
 const eliminandoLote = ref(false);
 const confirmarLote = ref(false);
@@ -56,11 +66,30 @@ const sinMovimientoFiltrado = computed(() => {
   return items.filter(item => {
     const v = valorItem(item);
     const m = margenItem(item);
-    if (smFilter.value === 'eliminar') return v < 200;
-    if (smFilter.value === 'promocionar') return v >= 200 && m >= 20;
-    if (smFilter.value === 'revisar') return v >= 200 && m < 20;
+    const stock = item.stock || 0;
+    
+    if (smFilter.value === 'eliminar') {
+      // Productos con poco valor retenido Y poco stock
+      return v < 500 && stock < 10;
+    }
+    if (smFilter.value === 'promocionar') {
+      // Productos con valor significativo Y margen decente
+      return v >= 500 && m >= 15;
+    }
+    if (smFilter.value === 'revisar') {
+      // Productos con valor significativo Y margen bajo
+      return v >= 500 && m < 15;
+    }
     return true;
   });
+});
+
+// Debug: watch para ver cuándo cambia sinMovimientoFiltrado
+watch(sinMovimientoFiltrado, (newVal) => {
+  console.log('[AnalisisInventario] sinMovimientoFiltrado cambió:', newVal.length, 'items');
+  if (newVal.length > 0) {
+    console.log('[AnalisisInventario] Primer item de sinMovimientoFiltrado:', newVal[0]);
+  }
 });
 
 const sinMovimientoAgrupado = computed(() => {
@@ -70,10 +99,15 @@ const sinMovimientoAgrupado = computed(() => {
     if (!map.has(cat)) map.set(cat, []);
     map.get(cat)!.push(item);
   }
-  return map;
+  const result: { cat: string; items: ProductoRank[] }[] = [];
+  for (const [key, value] of map) {
+    result.push({ cat: key, items: value });
+  }
+  console.log('[AnalisisInventario] sinMovimientoAgrupado:', result.length, 'categorías', result.map(e => ({ cat: e.cat, count: e.items.length, primerNombre: e.items[0]?.nombre })));
+  return result;
 });
 
-const categoriasAfectadas = computed(() => sinMovimientoAgrupado.value.size);
+const categoriasAfectadas = computed(() => sinMovimientoAgrupado.value.length);
 
 const smSelectAll = computed(() => {
   const ids = sinMovimientoFiltrado.value.map(i => i.idProducto).filter(Boolean) as number[];
@@ -95,9 +129,17 @@ function countByFilter(filter: 'todos' | 'eliminar' | 'promocionar' | 'revisar')
   return sinMovimiento.value.filter(item => {
     const v = valorItem(item);
     const m = margenItem(item);
-    if (filter === 'eliminar') return v < 200;
-    if (filter === 'promocionar') return v >= 200 && m >= 20;
-    if (filter === 'revisar') return v >= 200 && m < 20;
+    const stock = item.stock || 0;
+    
+    if (filter === 'eliminar') {
+      return v < 500 && stock < 10;
+    }
+    if (filter === 'promocionar') {
+      return v >= 500 && m >= 15;
+    }
+    if (filter === 'revisar') {
+      return v >= 500 && m < 15;
+    }
     return true;
   }).length;
 }
@@ -119,10 +161,25 @@ function toggleSelectAll() {
 }
 
 function toggleCategoria(cat: string) {
-  const next = new Set(expandedCats.value);
-  if (next.has(cat)) next.delete(cat); else next.add(cat);
-  expandedCats.value = next;
+  expandedCats.value = { ...expandedCats.value, [cat]: !expandedCats.value[cat] };
 }
+
+function expandirTodo() {
+  const nuevo: Record<string, boolean> = {};
+  for (const entry of sinMovimientoAgrupado.value) {
+    nuevo[entry.cat] = true;
+  }
+  expandedCats.value = nuevo;
+}
+
+function colapsarTodo() {
+  expandedCats.value = {};
+}
+
+const todasExpandidas = computed(() => {
+  const cats = sinMovimientoAgrupado.value.map(e => e.cat);
+  return cats.length > 0 && cats.every(cat => expandedCats.value[cat]);
+});
 
 function iniciarEliminar(id: number) {
   const next = new Set(pendingDelete.value);
@@ -373,18 +430,31 @@ async function ejecutarEliminarLote() {
 
         <!-- Filter tabs -->
         <div class="sm-tabs">
-          <button :class="['sm-tab', { active: smFilter === 'todos' }]" @click="smFilter = 'todos'">
+          <button :class="['sm-tab', { active: smFilter === 'todos' }]" @click="smFilter = 'todos'" title="Mostrar todos los productos sin movimiento">
             Todos <span class="sm-tab-count">{{ sinMovimiento.length }}</span>
           </button>
-          <button :class="['sm-tab', { active: smFilter === 'eliminar' }]" @click="smFilter = 'eliminar'">
+          <button :class="['sm-tab', { active: smFilter === 'eliminar' }]" @click="smFilter = 'eliminar'" title="Productos con valor retenido < $500 y stock < 10 unidades. Candidatos a eliminar del catálogo.">
             🗑️ Para eliminar <span class="sm-tab-count">{{ countByFilter('eliminar') }}</span>
           </button>
-          <button :class="['sm-tab', { active: smFilter === 'promocionar' }]" @click="smFilter = 'promocionar'">
+          <button :class="['sm-tab', { active: smFilter === 'promocionar' }]" @click="smFilter = 'promocionar'" title="Productos con valor retenido ≥ $500 y margen ≥ 15%. Hacer promociones para moverlos.">
             🏷️ Para promocionar <span class="sm-tab-count">{{ countByFilter('promocionar') }}</span>
           </button>
-          <button :class="['sm-tab', { active: smFilter === 'revisar' }]" @click="smFilter = 'revisar'">
+          <button :class="['sm-tab', { active: smFilter === 'revisar' }]" @click="smFilter = 'revisar'" title="Productos con valor retenido ≥ $500 y margen < 15%. Revisar si el precio es competitivo.">
             🔍 Revisar precio <span class="sm-tab-count">{{ countByFilter('revisar') }}</span>
           </button>
+        </div>
+
+        <!-- Expand/Collapse controls -->
+        <div class="sm-controls" v-if="sinMovimientoFiltrado.length > 0">
+          <button class="sm-control-btn" @click="expandirTodo" :disabled="todasExpandidas">
+            📂 Expandir todo
+          </button>
+          <button class="sm-control-btn" @click="colapsarTodo" :disabled="!todasExpandidas">
+            📁 Colapsar todo
+          </button>
+          <span class="sm-controls-info">
+            {{ sinMovimientoFiltrado.length }} producto(s) en {{ categoriasAfectadas }} categoría(s)
+          </span>
         </div>
 
         <!-- Batch action bar -->
@@ -417,19 +487,22 @@ async function ejecutarEliminarLote() {
 
         <!-- Categories accordion -->
         <div class="sm-categorias">
-          <div v-for="(items, cat) in sinMovimientoAgrupado" :key="cat" class="sm-cat">
-            <div class="sm-cat-header" @click="toggleCategoria(cat)">
-              <span class="sm-cat-chevron">{{ expandedCats.has(cat) ? '▼' : '▶' }}</span>
+          <div v-for="entry in sinMovimientoAgrupado" :key="entry.cat" class="sm-cat">
+            <div class="sm-cat-header" @click="toggleCategoria(entry.cat)">
+              <span class="sm-cat-chevron">{{ expandedCats[entry.cat] ? '▼' : '▶' }}</span>
               <span class="sm-cat-icon">📁</span>
-              <span class="sm-cat-name">{{ cat }}</span>
-              <span class="sm-cat-count">{{ items.length }} producto(s)</span>
-              <span class="sm-cat-valor">{{ formatoMoneda(items.reduce((s, i) => s + valorItem(i), 0)) }}</span>
+              <span class="sm-cat-name">{{ entry.cat }}</span>
+              <span class="sm-cat-count">{{ entry.items.length }} producto(s)</span>
+              <span class="sm-cat-valor">{{ formatoMoneda(entry.items.reduce((s, i) => s + valorItem(i), 0)) }}</span>
+              <span class="sm-cat-margen" :class="getMargenClass(entry.items.reduce((s, i) => s + margenItem(i), 0) / entry.items.length)">
+                {{ (entry.items.reduce((s, i) => s + margenItem(i), 0) / entry.items.length).toFixed(0) }}% margen
+              </span>
             </div>
-            <div v-if="expandedCats.has(cat)" class="sm-cat-body">
-              <div v-for="(item, i) in items" :key="item.idProducto || i" class="sm-item" :class="{ 'sm-item-pending': pendingDelete.has(item.idProducto!) }">
+            <div v-if="expandedCats[entry.cat]" class="sm-cat-body">
+              <div v-for="(item, i) in entry.items" :key="item.idProducto || i" class="sm-item" :class="{ 'sm-item-pending': pendingDelete.has(item.idProducto!) }">
                 <input type="checkbox" class="sm-item-cb" :checked="item.idProducto ? selectedIds.has(item.idProducto) : false" @change="item.idProducto && toggleSelect(item.idProducto)">
-                <span class="sm-item-name" :title="item.nombre || 'Producto sin nombre'">{{ item.nombre || '(sin nombre #' + item.idProducto + ')' }}</span>
-                <span class="sm-item-stock">{{ item.stock }} {{ item.isGramaje ? 'kg' : 'uds' }}</span>
+                <span class="sm-item-name" :title="item.nombre || 'Producto sin nombre'">{{ item.nombre || '(sin nombre)' }}</span>
+                <span class="sm-item-stock">{{ (item.stock ?? 0) }} {{ item.isGramaje ? 'kg' : 'uds' }}</span>
                 <span class="sm-item-costo">{{ formatoMoneda(item.precioCosto || 0) }}</span>
                 <span class="sm-item-valor sm-item-valor-warn">{{ formatoMoneda(valorItem(item)) }}</span>
                 <span class="sm-item-dias">30+ días</span>
@@ -559,6 +632,13 @@ async function ejecutarEliminarLote() {
 .sm-tab-count{font-size:.52rem;padding:.05rem .3rem;border-radius:4px;background:color-mix(in srgb,var(--color-text-primary) 10%,transparent);font-weight:700}
 .sm-tab.active .sm-tab-count{background:color-mix(in srgb,var(--color-accent) 20%,transparent)}
 
+/* ---------- SIN MOVIMIENTO: CONTROLS ---------- */
+.sm-controls{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;background:var(--color-bg-secondary);border-radius:6px;margin-top:.25rem}
+.sm-control-btn{padding:.25rem .5rem;border:1px solid var(--color-border);border-radius:4px;background:transparent;color:var(--color-text-secondary);font-size:.58rem;font-weight:600;cursor:pointer;transition:all .15s}
+.sm-control-btn:hover:not(:disabled){border-color:var(--color-accent);color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 5%,transparent)}
+.sm-control-btn:disabled{opacity:.4;cursor:not-allowed}
+.sm-controls-info{margin-left:auto;font-size:.58rem;color:var(--color-text-secondary);font-weight:600}
+
 /* ---------- SIN MOVIMIENTO: ACTION BAR ---------- */
 .sm-bar{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;background:var(--color-bg-primary);border:none;border-radius:6px;flex-wrap:wrap}
 .sm-bar-selectall{display:flex;align-items:center;gap:.3rem;font-size:.62rem;color:var(--color-text-secondary);cursor:pointer;user-select:none}
@@ -589,6 +669,10 @@ async function ejecutarEliminarLote() {
 .sm-cat-name{font-size:.7rem;font-weight:600;color:var(--color-text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sm-cat-count{font-size:.55rem;color:var(--color-text-secondary);background:var(--color-bg-secondary);padding:.05rem .35rem;border-radius:4px}
 .sm-cat-valor{font-size:.6rem;font-weight:700;color:var(--color-warning);font-family:monospace;text-align:right}
+.sm-cat-margen{font-size:.55rem;font-weight:700;padding:.05rem .3rem;border-radius:4px;font-family:monospace}
+.sm-cat-margen.margen-alta{background:rgba(16,185,129,.15);color:#34d399}
+.sm-cat-margen.margen-media{background:rgba(251,191,36,.15);color:#fbbf24}
+.sm-cat-margen.margen-baja{background:rgba(239,68,68,.15);color:#ef4444}
 
 /* ---------- SIN MOVIMIENTO: ITEMS ---------- */
 .sm-cat-body{display:flex;flex-direction:column;border-top:1px solid var(--color-border)}
