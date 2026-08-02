@@ -107,6 +107,9 @@ import PosAgregarPendienteModal from './modales/PosAgregarPendienteModal.vue';
 import PosProveedoresPedidosModal from './modales/PosProveedoresPedidosModal.vue';
 import PosToastNotification from './modales/PosToastNotification.vue';
 import PosScannerOverlay from './modales/PosScannerOverlay.vue';
+import OllamaModelManager from './modales/OllamaModelManager.vue';
+import VoiceStockConfirmModal from './modales/VoiceStockConfirmModal.vue';
+import VoiceOpcionesVentaModal from './modales/VoiceOpcionesVentaModal.vue';
 
 
 // --- Orchestration state ---
@@ -115,6 +118,11 @@ const ticketVisibleMobile = ref(false);
 const isKeyboardVisible = ref(false);
 watch(isKeyboardVisible, (v) => { if (v) ticketVisibleMobile.value = false; });
 const modalPromocionesAbierto = ref(false);
+const modalModelosIaAbierto = ref(false);
+const modalStockVozAbierto = ref(false);
+const stockData = ref<any>(null);
+const modalOpcionesVozAbierto = ref(false);
+const voiceOpcionesVenta = ref<any>(null);
 const vpVistaLista = ref(true);
 
 const recognition = ref<any>(null);
@@ -251,33 +259,165 @@ async function procesarEscaneo(codigo: string) {
 }
 
 // --- Voice ---
-function startVoiceCommand() {
+async function startVoiceCommand() {
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SpeechRecognition) { mostrarMensaje('Reconocimiento de voz no soportado', 'error'); return; }
   if (isRecording.value) { isRecording.value = false; recognition.value?.stop(); return; }
   isRecording.value = true;
-  recognition.value = new SpeechRecognition();
+  reconocerVoz();
+}
+
+async function reconocerVoz() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop());
+  } catch { }
+  recognition.value = new ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)();
   recognition.value.lang = 'es-MX';
   recognition.value.interimResults = false;
   recognition.value.onresult = async (event: any) => {
-    const transcript = event.results[0][0].transcript.toLowerCase();
-    if (transcript.includes('buscar')) {
-      const termino = transcript.replace('buscar', '').trim();
-      if (termino) { terminoBusqueda.value = termino; }
-    } else {
-      buscarProducto(transcript);
+    if (modalOpcionesVozAbierto.value || modalStockVozAbierto.value) {
+      recognition.value?.stop();
+      isRecording.value = false;
+      return;
     }
+    const transcriptRaw = event.results[0][0].transcript.toLowerCase().trim();
+    mostrarMensaje(`Procesando: "${transcriptRaw}"...`, 'ok');
+
+    const stockKeywords = /\b(stock|inventario|existencia|actualiza)\b/i;
+    if (stockKeywords.test(transcriptRaw)) {
+      const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        const resp = await fetch(`${API_BASE}/voice/stock/parse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: transcriptRaw }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.accion && data.accion !== 'ERROR') {
+            stockData.value = data;
+            modalStockVozAbierto.value = true;
+            recognition.value?.stop();
+            isRecording.value = false;
+            return;
+          }
+        }
+        mostrarMensaje('No se pudo interpretar el comando de stock', 'error');
+      } catch {
+        mostrarMensaje('Error al procesar comando de stock', 'error');
+      }
+      isRecording.value = false;
+      return;
+    }
+
+    try {
+      const { buscarProducto, agregarProductoATicket } = await import('./logica/usePosProductos');
+      const { agregarProductoGramaje } = await import('./logica/usePosGramaje');
+      const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      const resp = await fetch(`${API_BASE}/voice/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: transcriptRaw }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.opciones && data.opciones.length > 1) {
+          voiceOpcionesVenta.value = data;
+          modalOpcionesVozAbierto.value = true;
+          recognition.value?.stop();
+          isRecording.value = false;
+          return;
+        }
+        if (data.productoId && data.confianza >= 0.5) {
+          const producto = productos.value.find((p: any) => p.id === data.productoId);
+          if (producto) {
+            await agregarPorIA(producto, data);
+            recognition.value?.stop();
+            isRecording.value = false;
+            return;
+          }
+        }
+      }
+    } catch { }
+    await fallbackVoiceCommand(transcriptRaw);
     isRecording.value = false;
   };
   recognition.value.onerror = () => { isRecording.value = false; mostrarMensaje('Error en reconocimiento de voz', 'error'); };
+  recognition.value.onend = () => { isRecording.value = false; };
   recognition.value.start();
 }
 
-async function buscarProducto(termino: string) {
-  terminoBusqueda.value = termino;
-  const producto = await (await import('./logica/usePosProductos')).buscarProducto(termino);
-  if (producto) { await agregarProductoATicket(producto); terminoBusqueda.value = ''; }
-  else { mostrarMensaje(`"${termino}" no encontrado`, 'error'); }
+async function agregarOpcionVoz(opcion: any) {
+  const data = voiceOpcionesVenta.value;
+  const producto = productos.value.find((p: any) => p.id === opcion.productoId);
+  if (producto && data) {
+    await agregarPorIA(producto, data);
+  }
+  modalOpcionesVozAbierto.value = false;
+  voiceOpcionesVenta.value = null;
+}
+
+async function agregarPorIA(producto: any, data: any) {
+  const { agregarProductoGramaje } = await import('./logica/usePosGramaje');
+  const { agregarProductoATicket } = await import('./logica/usePosProductos');
+  if (data.tipo === 'PRECIO' && producto.is_gramaje && data.monto > 0) {
+    const gramos = Math.round((data.monto / (producto.precio || Number(producto.dto?.precio_venta || 1))) * 1000);
+    await agregarProductoGramaje({ gramos, precioTotal: data.monto });
+    mostrarMensaje(`Agregado ${gramos}g de ${producto.nombre} por ${formatoMoneda(data.monto)}`, 'ok');
+  } else if (data.tipo === 'PESO' && producto.is_gramaje && data.monto > 0) {
+    const precioTotal = Math.round((data.monto / 1000) * (producto.precio || Number(producto.dto?.precio_venta || 1)) * 100) / 100;
+    await agregarProductoGramaje({ gramos: data.monto, precioTotal });
+    mostrarMensaje(`Agregado ${data.monto}g de ${producto.nombre} por ${formatoMoneda(precioTotal)}`, 'ok');
+  } else if (data.tipo === 'UNIDAD' && data.monto > 1) {
+    for (let i = 0; i < Math.min(data.monto, 50); i++) {
+      await agregarProductoATicket(producto);
+    }
+    mostrarMensaje(`Agregado ${data.monto}x ${producto.nombre}`, 'ok');
+  } else {
+    await agregarProductoATicket(producto);
+    mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
+  }
+}
+
+async function fallbackVoiceCommand(transcriptRaw: string) {
+  let transcript = transcriptRaw.toLowerCase().trim();
+  const articulos = /\b(un|una|unos|unas|el|la|los|las|del|de|y|o|a|con|en|por|para|se)\b/g;
+  transcript = transcript.replace(articulos, '').replace(/\s+/g, ' ').trim();
+  let monto = 0;
+  let nombreProducto = transcript;
+  const precioMatch = transcript.match(/(?:\$?\s*(\d+(?:\.\d+)?)\s*(?:\$|pesos|dolares|peso|dolar|)|(\d+(?:\.\d+)?)\s*(?:\$|pesos|dolares|peso|dolar))\s*(?:de)?\s*/i);
+  if (precioMatch) {
+    monto = parseFloat(precioMatch[1] || precioMatch[2] || '0');
+    nombreProducto = transcript.replace(precioMatch[0], '').trim();
+  }
+  if (nombreProducto.includes('buscar')) {
+    const q = nombreProducto.replace('buscar', '').trim();
+    if (q) { terminoBusqueda.value = q; }
+  } else if (nombreProducto) {
+    const { buscarProducto, agregarProductoATicket } = await import('./logica/usePosProductos');
+    const producto = await buscarProducto(nombreProducto);
+    if (producto) {
+      if (producto.is_gramaje && monto > 0) {
+        const gramos = Math.round((monto / (producto.precio || Number(producto.dto?.precio_venta || 1))) * 1000);
+        const { agregarProductoGramaje } = await import('./logica/usePosGramaje');
+        await agregarProductoGramaje({ gramos, precioTotal: monto });
+        mostrarMensaje(`Agregado ${gramos}g de ${producto.nombre} por ${formatoMoneda(monto)}`, 'ok');
+      } else {
+        await agregarProductoATicket(producto);
+      }
+    } else {
+      mostrarMensaje(`"${nombreProducto}" no encontrado`, 'error');
+    }
+  }
 }
 
 function buscarYAgregarPendiente() {
@@ -372,11 +512,14 @@ onUnmounted(() => {
       :creando-ticket="creandoTicket"
       :total-personas-credito="totalPersonasCredito"
       :ventas-pendientes-count="ventasPendientes.length"
+      :es-admin="esAdmin"
       @crear-nuevo-ticket="crearNuevoTicket"
       @seleccionar-ticket="seleccionarTicket"
       @eliminar-ticket="eliminarTicket"
       @abrir-creditos="cargarCreditosResumen(); modalCreditosAbierto = true; modalCreditosSeleccionar = false"
       @abrir-pendientes="abrirModalPendientes"
+      @abrir-modelos-ia="modalModelosIaAbierto = true"
+      @abrir-stock-voz="modalStockVozAbierto = true"
     />
 
     <PosCatalogo
@@ -612,6 +755,22 @@ onUnmounted(() => {
       @pedido-creado="cargarProveedoresPedidos"
     />
 
+    <OllamaModelManager
+      :open="modalModelosIaAbierto"
+      @close="modalModelosIaAbierto = false"
+    />
+    <VoiceStockConfirmModal
+      :open="modalStockVozAbierto"
+      :stock-data="stockData"
+      @close="modalStockVozAbierto = false; stockData = null"
+      @done="modalStockVozAbierto = false; stockData = null; cargarProductos()"
+    />
+    <VoiceOpcionesVentaModal
+      :open="modalOpcionesVozAbierto"
+      :data="voiceOpcionesVenta"
+      @seleccionar="agregarOpcionVoz"
+      @cancelar="modalOpcionesVozAbierto = false; voiceOpcionesVenta = null"
+    />
     <PosToastNotification :mensaje="mensaje" :mensaje-tipo="mensajeTipo" />
     <PosScannerOverlay :scanner-activo="scannerActivo" @stop-scanner="stopScanner" />
   </main>

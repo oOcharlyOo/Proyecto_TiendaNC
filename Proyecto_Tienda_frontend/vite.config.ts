@@ -5,6 +5,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 import compression from 'vite-plugin-compression'
 
 export default defineConfig({
+  server: {
+    proxy: {
+      '/voice/': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     vue(),
     compression({

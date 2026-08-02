@@ -16,6 +16,10 @@ const gamingCategoryId = computed(() => {
   return cat ? cat.idCategoria : null;
 });
 
+function normalizarTexto(s: string): string {
+  return (s || '').toLowerCase().replace(/[-\s–—]/g, '');
+}
+
 function esCategoriaGaming(idCategoria: number | undefined): boolean {
   if (!idCategoria || !gamingCategoryId.value) return false;
   return idCategoria === gamingCategoryId.value;
@@ -96,8 +100,9 @@ const productosParaMostrar = computed(() => {
   }
   if (query) {
     const queryNormalizado = query.replace(/^0+/, '') || '0';
+    const queryNorm = normalizarTexto(query);
     resultados = resultados.filter(p =>
-      p.nombre.toLowerCase().includes(query) ||
+      normalizarTexto(p.nombre).includes(queryNorm) ||
       (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
       ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
     );
@@ -118,9 +123,10 @@ const sugerenciasPorNombre = computed(() => {
   const query = terminoBusqueda.value.trim().toLowerCase();
   if (!query) return [];
   const queryNormalizado = query.replace(/^0+/, '') || '0';
+  const queryNorm = normalizarTexto(query);
   return productos.value.filter(p =>
     !esCategoriaGaming(p.idCategoria) && (
-      p.nombre.toLowerCase().includes(query) ||
+      normalizarTexto(p.nombre).includes(queryNorm) ||
       (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
       ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
     )
@@ -159,13 +165,40 @@ async function buscarProductoPorCodigoBarras(codigo: string): Promise<Producto |
 async function buscarProducto(termino: string): Promise<Producto | undefined> {
   const query = termino.trim().toLowerCase();
   if (!query) return undefined;
+  const queryNorm = normalizarTexto(query);
   const porCodigo = productos.value.find((p) => (p.codigo_barras || '').toLowerCase() === query);
   if (porCodigo) return porCodigo;
-  const porNombreExacto = productos.value.find((p) => p.nombre.toLowerCase() === query);
+  const porNombreExacto = productos.value.find((p) => normalizarTexto(p.nombre) === queryNorm);
   if (porNombreExacto) return porNombreExacto;
-  const porNombreParcial = productos.value.find((p) => p.nombre.toLowerCase().includes(query));
+  const words = query.split(/\s+/);
+  const porPalabras = productos.value.find((p) => {
+    const nombreNorm = normalizarTexto(p.nombre);
+    return words.every((w) => w.length > 0 && nombreNorm.includes(normalizarTexto(w)));
+  });
+  if (porPalabras) return porPalabras;
+  const porNombreParcial = productos.value.find((p) => normalizarTexto(p.nombre).includes(queryNorm));
   if (porNombreParcial) return porNombreParcial;
+  const porApiNombre = await buscarPorNombreApi(query);
+  if (porApiNombre) return porApiNombre;
+  const stopWords = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'y', 'o', 'a', 'con', 'en', 'por', 'para', 'se', 'su', 'que', 'es', 'no', 'lo', 'como', 'mas', 'pero', 'sus', 'le', 'ya', 'este', 'entre', 'porque', 'ese', 'esa']);
+  for (const word of words) {
+    if (word.length > 2 && !stopWords.has(word)) {
+      const porWord = await buscarPorNombreApi(word);
+      if (porWord) return porWord;
+    }
+  }
   return await buscarProductoPorCodigoBarras(query);
+}
+
+async function buscarPorNombreApi(query: string): Promise<Producto | undefined> {
+  try {
+    const data = await getJson<ApiRespuesta<ProductoDTO[]>>(`/productos/buscarPorNombre?nombre=${encodeURIComponent(query)}`);
+    if (data?.datos && data.datos.length > 0) {
+      const normalizados = normalizarProductos(data.datos);
+      return normalizados[0];
+    }
+    return undefined;
+  } catch { return undefined; }
 }
 
 function manejarFocusBusqueda() { sugerenciasVisibles.value = true; }

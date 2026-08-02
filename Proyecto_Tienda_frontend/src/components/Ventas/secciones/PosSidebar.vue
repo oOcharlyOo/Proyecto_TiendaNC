@@ -10,6 +10,7 @@ defineProps<{
   creandoTicket: boolean;
   totalPersonasCredito: number;
   ventasPendientesCount: number;
+  esAdmin: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   'eliminar-ticket': [id: number];
   'abrir-creditos': [];
   'abrir-pendientes': [];
+  'abrir-modelos-ia': [];
+  'abrir-stock-voz': [];
 }>();
 </script>
 
@@ -72,6 +75,12 @@ const emit = defineEmits<{
         P
       </button>
       <PosAlertasWidget />
+      <button v-if="esAdmin" class="btn-ia-sidebar" @click="emit('abrir-modelos-ia')" title="Gestionar Modelos de IA">
+        🤖
+      </button>
+      <button v-if="esAdmin" class="btn-stock-voz-sidebar" @click="emit('abrir-stock-voz')" title="Stock por Voz">
+        📦
+      </button>
     </div>
   </aside>
 </template>
@@ -371,6 +380,48 @@ const emit = defineEmits<{
 @media (max-width: 991px) {
   .pos-container .pos-sidebar {
   }
+}
+
+.pos-container .btn-ia-sidebar {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: color-mix(in srgb, var(--accent-color) 60%, transparent);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pos-container .btn-ia-sidebar:hover {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+  color: var(--accent-color);
+}
+
+.pos-container .btn-stock-voz-sidebar {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: color-mix(in srgb, var(--success-color) 60%, transparent);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pos-container .btn-stock-voz-sidebar:hover {
+  border-color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+  color: var(--success-color);
 }
 
 @keyframes badge-pulse {

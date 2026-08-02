@@ -16,6 +16,8 @@ services:
       - MINIO_PUBLIC_URL=https://minio.laleyendadeldulce.com
       - QUARKUS_HTTP_CORS=true
       - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:8081,https://laleyendadeldulce.com,https://api.laleyendadeldulce.com
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:7b
     volumes:
       - backup-trigger:/trigger
       - ./db/backups:/deployments/db/backups
@@ -89,6 +91,50 @@ services:
     depends_on:
       - database
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - tienda-red
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["sh", "-c", "
+      apt-get update -qq && apt-get install -y -qq curl && rm -rf /var/lib/apt/lists/*;
+      echo 'Esperando a que Ollama inicie...';
+      for i in $$(seq 1 30); do
+        if curl -s http://ollama:11434/api/tags > /dev/null 2>&1; then
+echo 'Ollama listo. Descargando llama3.1:8b...';
+      ollama pull llama3.1:8b;
+          echo 'Descarga completa.';
+          exit 0;
+        fi;
+        echo \"Intento $$i - esperando...\";
+        sleep 2;
+      done;
+      echo 'No se pudo conectar con Ollama';
+      exit 1
+    "]
+    restart: "no"
+    depends_on:
+      - ollama
+    networks:
+      - tienda-red
+
   tunnel:
     container_name: cloudflared-tunnel
     image: cloudflare/cloudflared:latest
@@ -123,3 +169,4 @@ volumes:
   db-data:
   minio-data:
   backup-trigger:
+  ollama_data:
