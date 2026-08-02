@@ -303,7 +303,6 @@ const emit = defineEmits<{
 .pp-tabs{display:flex;gap:.3rem;padding:.5rem 1rem;background:var(--color-bg-secondary);border-bottom:1px solid var(--color-border);flex-wrap:wrap}
 .pp-tab{padding:.4rem .8rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,0.1);white-space:nowrap}
 .pp-tab-icon,.pp-tab-text{display:inline;vertical-align:middle}
-@media(max-width:768px){.pp-tab{padding:.3rem .5rem;font-size:.72rem}}
 .pp-tab:hover{color:var(--color-text-primary)}
 .pp-tab.active{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,0.2)}
 .pp-body{flex:1;overflow-y:auto;padding:1rem}
@@ -364,5 +363,6 @@ const emit = defineEmits<{
 .pp-detalle-row{display:flex;align-items:center;gap:.5rem;padding:.4rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);margin-bottom:.3rem;font-size:.85rem}
 .pp-detalle-name{flex:1}
 .pp-checkbox-label{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--color-text-secondary);cursor:pointer}
-@media(max-width:768px){.pos-modal-card{width:95vw}.pp-tabs{overflow-x:auto;flex-wrap:nowrap}.pp-form-card{width:95vw;padding:1rem}.pp-tab-text{display:none}}
+@media(max-width:768px){.pos-modal-card{width:95vw}.pp-tabs{gap:.2rem}.pp-tab{flex:1;padding:.35rem .3rem;font-size:.72rem;text-align:center}.pp-tab-text{display:none}.pp-tab-icon{font-size:.95rem}.pp-form-card{width:95vw;padding:1rem}}
+@media(max-width:480px){.pp-tabs{padding:.4rem .5rem;gap:.15rem}.pp-tab{padding:.3rem .2rem}.pp-tab-icon{font-size:.85rem}}
 </style>
