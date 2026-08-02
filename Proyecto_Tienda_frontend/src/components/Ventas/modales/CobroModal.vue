@@ -242,7 +242,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); z-index: 200; display: grid; place-items: center; padding: 1rem; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); z-index: 220; display: grid; place-items: center; padding: 1rem; }
 
 .pergamino {
   --perg-bg: var(--color-bg-primary);
