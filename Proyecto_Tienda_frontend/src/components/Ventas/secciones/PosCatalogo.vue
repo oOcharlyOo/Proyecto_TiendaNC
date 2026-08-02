@@ -59,7 +59,7 @@ const emit = defineEmits<{
 
     <header class="catalog-header">
       <div class="search-bar-pos">
-        <div class="pos-input-wrapper">
+        <div class="search-input-row">
           <span class="pos-search-icon">🔍</span>
           <input
             :value="terminoBusqueda"
@@ -71,6 +71,8 @@ const emit = defineEmits<{
             @keydown="emit('keydown-sugerencias', $event)"
             @keydown.enter.prevent="emit('agregar-desde-buscador')"
           >
+        </div>
+        <div class="search-controls-row">
           <span class="select-wrap">
             <select
               :value="categoriaFiltro ?? ''"
@@ -340,7 +342,7 @@ const emit = defineEmits<{
   position: relative;
 }
 
-.pos-container .pos-input-wrapper {
+.pos-container .search-input-row {
   display: flex;
   align-items: center;
   background: var(--bg-secondary);
@@ -351,10 +353,33 @@ const emit = defineEmits<{
   box-sizing: border-box;
 }
 
+.pos-container .search-input-row:focus-within {
+  border-color: var(--accent-color);
+}
+
+.pos-container .search-input-row input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  outline: none;
+}
+
+.pos-container .search-input-row input::placeholder {
+  color: var(--text-secondary);
+}
+
+.pos-container .search-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
 .pos-container .select-wrap {
   position: relative;
   display: inline-flex;
-  flex-shrink: 0;
 }
 
 .pos-container .select-wrap::after {
@@ -369,7 +394,7 @@ const emit = defineEmits<{
   z-index: 1;
 }
 
-.pos-container .pos-input-wrapper .category-filter-select {
+.pos-container .category-filter-select {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -384,82 +409,30 @@ const emit = defineEmits<{
   max-width: 150px;
 }
 
-.pos-container .pos-input-wrapper .category-filter-select:focus {
+.pos-container .category-filter-select:focus {
   outline: none;
   border-color: var(--accent-color);
 }
 
-.pos-container .pos-input-wrapper .category-filter-select option {
+.pos-container .category-filter-select option {
   background: var(--bg-primary);
   color: var(--text-primary);
 }
 
-@media (max-width: 767px) {
-  .pos-container .pos-input-wrapper {
-    padding: 0.4rem 0.6rem;
-    gap: 0.4rem;
-    border-radius: 8px;
-    flex-wrap: wrap;
-  }
-  .pos-container .pos-input-wrapper input {
-    font-size: 1rem;
-    flex: 1;
-    min-width: 0;
-  }
-  .pos-container .pos-input-wrapper .category-filter-select {
-    min-width: 80px;
-    max-width: 120px;
-    font-size: 0.75rem;
-    padding: 0.3rem 1.5rem 0.3rem 0.5rem;
-  }
-  .pos-container .select-wrap::after {
-    right: 6px;
-    font-size: 0.65rem;
-  }
-  .pos-container .tool-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 1rem;
-  }
-  .pos-container .catalog-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .pos-container .provision-total-badge {
-    align-items: center;
-    text-align: center;
-    min-width: auto;
-    width: 100%;
-  }
+.pos-container .action-tools {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
 }
-
-.pos-container .pos-input-wrapper:focus-within { 
-  border-color: var(--accent-color); 
-}
-
-.pos-container .pos-input-wrapper input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 1rem;
-  outline: none;
-}
-
-.pos-container .pos-input-wrapper input::placeholder {
-  color: var(--text-secondary);
-}
-
-.pos-container .action-tools { display: flex; gap: 0.5rem; }
 
 .pos-container .tool-btn {
   background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--radius-sm);
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,7 +443,7 @@ const emit = defineEmits<{
     -2px -2px 4px rgba(255, 255, 255, 0.02);
 }
 
-.pos-container .tool-btn:hover { 
+.pos-container .tool-btn:hover {
   color: var(--color-accent);
   box-shadow:
     5px 5px 10px rgba(0, 0, 0, 0.2),
@@ -485,8 +458,8 @@ const emit = defineEmits<{
   transform: scale(0.95);
 }
 
-.pos-container .btn-mic.is-recording { 
-  background: var(--error-color); 
+.pos-container .btn-mic.is-recording {
+  background: var(--error-color);
   color: var(--text-primary);
 }
 
@@ -494,6 +467,84 @@ const emit = defineEmits<{
   background: var(--accent-color);
   border-color: var(--accent-color);
   color: var(--bg-primary);
+}
+
+@media (max-width: 767px) {
+  .pos-container .search-input-row {
+    padding: 0.4rem 0.6rem;
+    gap: 0.4rem;
+  }
+  .pos-container .search-input-row input {
+    font-size: 1rem;
+  }
+  .pos-container .category-filter-select {
+    min-width: 80px;
+    max-width: 120px;
+    font-size: 0.75rem;
+    padding: 0.3rem 1.5rem 0.3rem 0.5rem;
+  }
+  .pos-container .select-wrap::after {
+    right: 6px;
+    font-size: 0.65rem;
+  }
+  .pos-container .search-controls-row {
+    gap: 0.35rem;
+  }
+  .pos-container .tool-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  .pos-container .catalog-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pos-container .provision-total-badge {
+    align-items: center;
+    text-align: center;
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .pos-container .search-input-row {
+    padding: 0.3rem 0.5rem;
+    gap: 0.3rem;
+  }
+  .pos-container .pos-search-icon {
+    font-size: 0.85rem;
+  }
+  .pos-container .search-input-row input {
+    font-size: 0.9rem;
+  }
+  .pos-container .search-controls-row {
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+  }
+  .pos-container .category-filter-select {
+    min-width: 0;
+    max-width: none;
+    flex: 1;
+    font-size: 0.7rem;
+    padding: 0.25rem 1.4rem 0.25rem 0.4rem;
+  }
+  .pos-container .select-wrap::after {
+    font-size: 0.55rem;
+    right: 5px;
+  }
+  .pos-container .action-tools {
+    gap: 0.2rem;
+    margin-left: 0;
+  }
+  .pos-container .tool-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+  .pos-container .catalog-header {
+    padding: 0.5rem 0.4rem;
+  }
 }
 
 /* Sugerencias */
