@@ -47,6 +47,13 @@ type CreditoAbonoDTO = {
   fechaAbono: string;
   idUsuario: number;
   nombreUsuario: string;
+  metodoPago?: string;
+};
+
+type CreditoPersonaDetalleDTO = CreditoPersonaDTO & {
+  totalPagado: number;
+  creditos: CreditoVentaDTO[];
+  abonos: CreditoAbonoDTO[];
 };
 
 const personas = ref<CreditoPersonaDTO[]>([]);
@@ -59,8 +66,9 @@ const formPersona = ref<{ idPersona?: number; nombre: string; telefono: string; 
   nombre: '', telefono: '', direccion: '', correo: ''
 });
 const abrirCreditosPersona = ref<CreditoPersonaDTO | null>(null);
-const modalAbonoAbierto = ref(false);
-const creditoAbonando = ref<CreditoVentaDTO | null>(null);
+const detallePersona = ref<CreditoPersonaDetalleDTO | null>(null);
+const modalAbonoPersonaAbierto = ref(false);
+const showVentaHistorial = ref(false);
 
 
 type VentaDetalleProducto = {
@@ -122,6 +130,26 @@ function formatoMoneda(valor: number) {
 function formatearFecha(fecha?: string) {
   if (!fecha) return '';
   return fecha.slice(0, 10);
+}
+
+function abonosAgrupados(abonos: CreditoAbonoDTO[]): { monto: number; fechaAbono: string; metodoPago: string; nombreUsuario: string; idUsuario: number }[] {
+  const grupos = new Map<string, { monto: number; fechaAbono: string; metodoPago: string; nombreUsuario: string; idUsuario: number }>();
+  for (const ab of abonos) {
+    const key = (ab.fechaAbono?.slice(0, 16) || '') + '-' + (ab.idUsuario || 0) + '-' + (ab.metodoPago || '');
+    const existente = grupos.get(key);
+    if (existente) {
+      existente.monto += ab.monto;
+    } else {
+      grupos.set(key, {
+        monto: ab.monto,
+        fechaAbono: ab.fechaAbono || '',
+        metodoPago: ab.metodoPago || '',
+        nombreUsuario: ab.nombreUsuario || '',
+        idUsuario: ab.idUsuario || 0,
+      });
+    }
+  }
+  return Array.from(grupos.values()).sort((a, b) => (b.fechaAbono || '').localeCompare(a.fechaAbono || ''));
 }
 
 async function cargarPersonas() {
@@ -232,10 +260,12 @@ function seleccionarPersona(persona: CreditoPersonaDTO) {
 
 async function verCreditos(persona: CreditoPersonaDTO) {
   abrirCreditosPersona.value = persona;
+  detallePersona.value = null;
   try {
-    const res = await getJson<{ codigo: number; datos: CreditoVentaDTO[] }>(`/credito/venta/persona/${persona.idPersona}`);
+    const res = await getJson<{ codigo: number; datos: CreditoPersonaDetalleDTO }>(`/credito/persona/${persona.idPersona}/detalle`);
     if (res.codigo === 200) {
-      creditosFiltrados.value = res.datos;
+      detallePersona.value = res.datos;
+      creditosFiltrados.value = res.datos.creditos;
     }
   } catch (e) {
     console.error(e);
@@ -244,28 +274,27 @@ async function verCreditos(persona: CreditoPersonaDTO) {
 
 function cerrarCreditosPersona() {
   abrirCreditosPersona.value = null;
+  detallePersona.value = null;
   creditosFiltrados.value = [];
 }
 
-async function abrirAbono(credito: CreditoVentaDTO) {
-  creditoAbonando.value = credito;
-  modalAbonoAbierto.value = true;
+async function abrirAbonoPersona() {
+  modalAbonoPersonaAbierto.value = true;
 }
 
-async function confirmarAbono(payload: { monto: number; metodoPago: string }) {
-  if (!creditoAbonando.value || payload.monto <= 0) {
+async function confirmarAbonoPersona(payload: { monto: number; metodoPago: string }) {
+  if (!detallePersona.value || payload.monto <= 0) {
     mostrarMensaje('Monto inválido.', 'error');
     return;
   }
   const idUsuario = Number(localStorage.getItem('idUsuario')) || 1;
   try {
-    const res = await getJson<{ codigo: number; mensaje: string }>(`/credito/abono/${creditoAbonando.value.idCreditoVenta}?monto=${payload.monto}&idUsuario=${idUsuario}&metodoPago=${payload.metodoPago}`, {
+    const res = await getJson<{ codigo: number; mensaje: string }>(`/credito/abono/persona/${detallePersona.value.idPersona}?monto=${payload.monto}&idUsuario=${idUsuario}&metodoPago=${payload.metodoPago}`, {
       method: 'POST'
     });
     if (res.codigo === 200) {
       mostrarMensaje(`Abono de ${formatoMoneda(payload.monto)} registrado vía ${payload.metodoPago}.`, 'ok');
-      modalAbonoAbierto.value = false;
-      creditoAbonando.value = null;
+      modalAbonoPersonaAbierto.value = false;
       await cargarPersonas();
       await cargarCreditos();
       if (abrirCreditosPersona.value) {
@@ -466,66 +495,96 @@ watch(() => props.open, (val) => {
                 <button class="close-x" @click="cerrarCreditosPersona">×</button>
               </header>
               <div class="inner-list">
+
+                <!-- Resumen agregado -->
+                <div v-if="detallePersona" class="resumen-agregado">
+                  <div class="resumen-agregado-row">
+                    <div class="resumen-agregado-item total-deuda">
+                      <span class="ra-label">Deuda total</span>
+                      <span class="ra-valor">{{ formatoMoneda(detallePersona.totalDeuda) }}</span>
+                    </div>
+                    <div class="resumen-agregado-item">
+                      <span class="ra-label">Pagado</span>
+                      <span class="ra-valor pagado">{{ formatoMoneda(detallePersona.totalPagado) }}</span>
+                    </div>
+                    <div class="resumen-agregado-item">
+                      <span class="ra-label">Créditos</span>
+                      <span class="ra-valor">{{ detallePersona.ventasActivas }} act{{ detallePersona.ventasActivas !== 1 ? 's' : '' }}</span>
+                    </div>
+                  </div>
+                  <div v-if="detallePersona.ventasActivas > 0" class="resumen-agregado-abonar">
+                    <button class="btn-abonar-persona" @click="abrirAbonoPersona">💰 Abonar {{ formatoMoneda(detallePersona.totalDeuda) }}</button>
+                  </div>
+                </div>
+
+                <!-- Historial de abonos consolidado -->
+                <div v-if="detallePersona?.abonos && detallePersona.abonos.length > 0" class="abonos-global">
+                  <span class="abonos-global-title">Historial de pagos</span>
+                  <div v-for="(grp, idx) in abonosAgrupados(detallePersona.abonos)" :key="idx" class="abono-global-item">
+                    <span class="abono-global-monto">{{ formatoMoneda(grp.monto) }}</span>
+                    <span class="abono-global-fecha">{{ grp.fechaAbono?.slice(11, 16) }} {{ grp.fechaAbono?.slice(0, 10) }}</span>
+                    <span class="abono-global-metodo">{{ grp.metodoPago }}</span>
+                    <span class="abono-global-user">👤 {{ grp.nombreUsuario }}</span>
+                  </div>
+                </div>
+
+                <!-- Botón historial de ventas -->
+                <div v-if="creditosFiltrados.length > 0" class="historial-toggle">
+                  <button class="btn-historial" @click="showVentaHistorial = !showVentaHistorial">
+                    📋 Historial de ventas crédito
+                    <span class="historial-arrow">{{ showVentaHistorial ? '▲' : '▼' }}</span>
+                  </button>
+                </div>
                 <div v-if="creditosFiltrados.length === 0" class="empty-state small">
                   <p>Sin créditos registrados</p>
                 </div>
-                  <div v-for="cv in creditosFiltrados" :key="cv.idCreditoVenta" class="credito-item" :class="[cv.estatus.toLowerCase(), { 'is-expanded': expandidoId === cv.idCreditoVenta }]">
-                    <div class="credito-head">
-                      <div class="credito-head-left">
-                        <span class="credito-ticket" v-if="cv.numeroTicket">#{{ cv.numeroTicket }}</span>
-                        <span :class="['credito-status', cv.estatus === 'PENDIENTE' ? 'badge-pendiente' : 'badge-pagado']">{{ cv.estatus === 'PENDIENTE' ? 'Pendiente' : 'Pagado' }}</span>
+
+                <!-- Ventas expandibles -->
+                <Transition name="expand">
+                  <div v-if="showVentaHistorial" class="ventas-list">
+                    <div v-for="cv in creditosFiltrados" :key="cv.idCreditoVenta" class="venta-item" :class="[cv.estatus.toLowerCase(), { 'is-expanded': expandidoId === cv.idCreditoVenta }]">
+                      <div class="venta-item-head" @click="toggleDetalles(cv)" style="cursor:pointer">
+                        <div class="venta-item-left">
+                          <span class="venta-ticket" v-if="cv.numeroTicket">#{{ cv.numeroTicket }}</span>
+                          <span :class="['venta-status', cv.estatus === 'PENDIENTE' ? 'st-pendiente' : 'st-pagado']">{{ cv.estatus === 'PENDIENTE' ? 'Pendiente' : 'Pagado' }}</span>
+                        </div>
+                        <div class="venta-item-right">
+                          <span class="venta-fecha">{{ formatearFecha(cv.fechaCreacion) }}</span>
+                          <span class="venta-monto">{{ formatoMoneda(cv.montoTotal) }}</span>
+                          <button class="venta-whatsapp" @click.stop="abrirWhatsApp(cv)" title="WhatsApp">📱</button>
+                          <span class="venta-expand-icon">{{ expandidoId === cv.idCreditoVenta ? '▲' : '▼' }}</span>
+                        </div>
                       </div>
-                      <div class="credito-head-right">
-                        <span class="credito-fecha" v-if="cv.fechaCreacion">{{ formatearFecha(cv.fechaCreacion) }}</span>
-                        <button class="credito-toggle" @click="toggleDetalles(cv)" :title="expandidoId === cv.idCreditoVenta ? 'Ocultar productos' : 'Ver productos'">
-                          <span v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta] && expandidoId === cv.idCreditoVenta" class="toggle-spinner">⏳</span>
-                          <span v-else>{{ expandidoId === cv.idCreditoVenta ? '▲' : '▼' }}</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="credito-saldo-row">
-                      <div class="credito-saldo-info">
-                        <span class="credito-saldo-label">Saldo</span>
-                        <span class="credito-saldo-valor" :class="cv.saldoPendiente > 0 ? 'pendiente' : 'pagado'">{{ formatoMoneda(cv.saldoPendiente) }}</span>
-                      </div>
-                      <div class="credito-totals">
-                        <span class="credito-totals-item">Total <strong>{{ formatoMoneda(cv.montoTotal) }}</strong></span>
-                        <span class="credito-totals-item">Pagado <strong class="pagado">{{ formatoMoneda(cv.montoPagado) }}</strong></span>
-                      </div>
-                    </div>
-                    <div v-if="cv.estatus === 'PENDIENTE'" class="credito-actions">
-                      <button class="btn-abonar" @click="abrirAbono(cv)">💰 Abonar</button>
-                      <button class="btn-whatsapp" @click="abrirWhatsApp(cv)">📱 WhatsApp</button>
-                    </div>
-                    <div v-if="cv.estatus === 'PAGADO'" class="credito-pagado-msg">✅ Pagado</div>
-                    <Transition name="expand">
-                      <div v-if="expandidoId === cv.idCreditoVenta" class="detalle-inline">
-                        <div v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta]" class="detalle-loading">Cargando productos...</div>
-                        <template v-else>
-                          <div v-if="discrepanciasMap[cv.idCreditoVenta] !== undefined" class="detalle-discrepancia">
-                            ⚠️ Discrepancia: {{ formatoMoneda(Math.abs(discrepanciasMap[cv.idCreditoVenta])) }}
-                            <span class="disc-signo">{{ discrepanciasMap[cv.idCreditoVenta] > 0 ? ' (sobra)' : ' (falta)' }}</span>
-                          </div>
-                          <div v-if="!detallesMap[cv.idCreditoVenta] || detallesMap[cv.idCreditoVenta].length === 0" class="detalle-loading">Sin productos</div>
-                          <div v-else class="detalle-productos">
-                            <div class="detalle-producto" v-for="(d, idx) in detallesAgrupados(cv.idCreditoVenta)" :key="idx">
-                              <span class="dp-nombre">{{ d.nombre }}</span>
-                              <span class="dp-cant">{{ d.cantidad }} {{ d.isGramaje ? 'g' : 'pza' }}</span>
-                              <span class="dp-subtotal">{{ formatoMoneda(d.subtotal) }}</span>
+                      <Transition name="expand">
+                        <div v-if="expandidoId === cv.idCreditoVenta" class="detalle-inline">
+                          <div v-if="cargandoDetalle && !detallesMap[cv.idCreditoVenta]" class="detalle-loading">Cargando productos...</div>
+                          <template v-else>
+                            <div v-if="discrepanciasMap[cv.idCreditoVenta] !== undefined" class="detalle-discrepancia">
+                              ⚠️ Discrepancia: {{ formatoMoneda(Math.abs(discrepanciasMap[cv.idCreditoVenta])) }}
+                              <span class="disc-signo">{{ discrepanciasMap[cv.idCreditoVenta] > 0 ? ' (sobra)' : ' (falta)' }}</span>
                             </div>
-                          </div>
-                        </template>
-                      </div>
-                    </Transition>
-                    <div v-if="cv.abonos && cv.abonos.length > 0" class="abonos-list">
-                      <span class="abonos-title">Historial de pagos</span>
-                      <div v-for="ab in cv.abonos" :key="ab.idAbono" class="abono-item">
-                        <span class="abono-monto">{{ formatoMoneda(ab.monto) }}</span>
-                        <span class="abono-fecha">{{ ab.fechaAbono?.slice(11, 16) }} {{ ab.fechaAbono?.slice(0, 10) }}</span>
-                        <span class="abono-user">👤 {{ ab.nombreUsuario }}</span>
+                            <div v-if="!detallesMap[cv.idCreditoVenta] || detallesMap[cv.idCreditoVenta].length === 0" class="detalle-loading">Sin productos</div>
+                            <div v-else class="detalle-productos">
+                              <div class="detalle-producto" v-for="(d, idx) in detallesAgrupados(cv.idCreditoVenta)" :key="idx">
+                                <span class="dp-nombre">{{ d.nombre }}</span>
+                                <span class="dp-cant">{{ d.cantidad }} {{ d.isGramaje ? 'g' : 'pza' }}</span>
+                                <span class="dp-subtotal">{{ formatoMoneda(d.subtotal) }}</span>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </Transition>
+                      <div v-if="cv.abonos && cv.abonos.length > 0" class="abonos-list">
+                        <span class="abonos-title">Pagos de este crédito</span>
+                        <div v-for="ab in cv.abonos" :key="ab.idAbono" class="abono-item">
+                          <span class="abono-monto">{{ formatoMoneda(ab.monto) }}</span>
+                          <span class="abono-fecha">{{ ab.fechaAbono?.slice(11, 16) }} {{ ab.fechaAbono?.slice(0, 10) }}</span>
+                          <span class="abono-user">👤 {{ ab.nombreUsuario }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                </Transition>
               </div>
             </div>
           </div>
@@ -559,18 +618,16 @@ watch(() => props.open, (val) => {
             </div>
           </div>
 
-          <!-- Modal abono con CobroModal -->
+          <!-- Modal abono por persona (consolidado) -->
           <CobroModal 
-            :open="modalAbonoAbierto"
+            :open="modalAbonoPersonaAbierto"
             :modo="'abono'"
-            :total="creditoAbonando?.saldoPendiente || 0"
-            :saldo-pendiente="creditoAbonando?.saldoPendiente || 0"
-            :nombre-persona="creditoAbonando?.nombrePersona || ''"
-            @close="modalAbonoAbierto = false; creditoAbonando = null"
-            @confirmar-abono="confirmarAbono"
+            :total="detallePersona?.totalDeuda || 0"
+            :saldo-pendiente="detallePersona?.totalDeuda || 0"
+            :nombre-persona="detallePersona?.nombre || ''"
+            @close="modalAbonoPersonaAbierto = false"
+            @confirmar-abono="confirmarAbonoPersona"
           />
-
-
 
         </div>
 
@@ -1023,230 +1080,166 @@ watch(() => props.open, (val) => {
   flex: 1;
 }
 
-.credito-item {
+.venta-item {
   background: var(--color-bg-primary);
-  border-radius: 8px;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
-}
-
-.credito-item.pagado {
-  opacity: 0.65;
-}
-
-.credito-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
   margin-bottom: 0.35rem;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
 }
 
-.credito-head-left {
+.venta-item.pagado {
+  opacity: 0.55;
+}
+
+.venta-item-head {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.credito-ticket {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--color-accent);
-}
-
-.credito-status {
-  font-size: 0.65rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.badge-pendiente {
-  background: var(--color-accent);
-  color: var(--color-on-brand);
-}
-
-.badge-pagado {
-  background: var(--color-success);
-  color: white;
-}
-
-.credito-fecha {
-  font-size: 0.72rem;
-  color: var(--color-text-secondary);
-}
-
-.credito-saldo-row {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.4rem;
-}
-
-.credito-saldo-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-}
-
-.credito-saldo-label {
-  font-size: 0.65rem;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-}
-
-.credito-saldo-valor {
-  font-size: 1.3rem;
-  font-weight: 700;
-  font-family: 'Courier New', monospace;
-}
-
-.credito-saldo-valor.pendiente {
-  color: var(--color-error);
-}
-
-.credito-saldo-valor.pagado {
-  color: var(--color-success);
-}
-
-.credito-totals {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.1rem;
-  flex-shrink: 0;
-}
-
-.credito-totals-item {
-  font-size: 0.72rem;
-  color: var(--color-text-secondary);
-}
-
-.credito-totals-item strong {
-  font-weight: 700;
-  color: var(--color-text-primary);
-  font-family: 'Courier New', monospace;
-}
-
-.credito-totals-item strong.pagado {
-  color: var(--color-success);
-}
-
-.credito-actions {
-  display: flex;
+  align-items: center;
   gap: 0.5rem;
-  margin-top: 0.35rem;
 }
 
-.btn-abonar {
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 70%, black));
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-  flex: 1;
-}
-
-.btn-abonar:hover {
-  box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
-  transform: translateY(-1px);
-}
-
-.btn-whatsapp {
-  padding: 0.5rem 0.8rem;
-  background: #25d366;
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-}
-
-.btn-whatsapp:hover {
-  filter: brightness(1.1);
-  box-shadow: 4px 4px 8px rgba(0,0,0,0.15);
-  transform: translateY(-1px);
-}
-
-.credito-pagado-msg {
-  font-size: 0.8rem;
-  color: var(--color-success);
-  font-weight: 600;
-  margin-top: 0.15rem;
-}
-
-.credito-head-right {
+.venta-item-left {
   display: flex;
   align-items: center;
   gap: 0.4rem;
 }
 
-.credito-toggle {
-  width: 24px; height: 24px;
-  border: none; border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-secondary);
+.venta-ticket {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-accent);
+}
+
+.venta-status {
   font-size: 0.6rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.st-pendiente {
+  background: var(--color-accent);
+  color: var(--color-on-brand);
+}
+
+.st-pagado {
+  background: var(--color-success);
+  color: white;
+}
+
+.venta-item-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.venta-fecha {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.venta-monto {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  min-width: 4rem;
+  text-align: right;
+}
+
+.venta-whatsapp {
+  width: 26px; height: 26px;
+  border: none; border-radius: 4px;
+  background: #25d366;
+  color: #fff;
+  font-size: 0.75rem;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
   flex-shrink: 0;
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
-.credito-toggle:hover {
+.venta-whatsapp:hover {
   opacity: 1;
-  background: var(--color-bg-secondary);
+  transform: scale(1.1);
+}
+
+.venta-expand-icon {
+  font-size: 0.55rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.venta-item.is-expanded {
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.05), 0 0 0 1px var(--color-accent);
+}
+
+.ventas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.historial-toggle {
+  margin-bottom: 0.4rem;
+}
+
+.btn-historial {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: var(--color-bg-primary);
+  border: none;
+  border-radius: 6px;
   color: var(--color-accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.06);
+  transition: all 0.15s;
 }
 
-.toggle-spinner {
-  font-size: 0.75rem;
+.btn-historial:hover {
+  box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
+  color: var(--color-on-brand);
+  background: var(--color-accent);
 }
 
-.credito-item.is-expanded {
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.06), 0 0 0 1px var(--color-accent);
+.historial-arrow {
+  font-size: 0.7rem;
 }
 
 .detalle-inline {
-  margin-top: 0.5rem;
-  padding-top: 0.45rem;
+  margin-top: 0.4rem;
+  padding-top: 0.35rem;
   border-top: 1px solid var(--color-border);
   overflow: hidden;
 }
 
 .detalle-loading {
   text-align: center;
-  padding: 0.5rem;
-  font-size: 0.78rem;
+  padding: 0.4rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 
 .detalle-productos {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .detalle-producto {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.4rem;
-  font-size: 0.78rem;
+  gap: 0.4rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.75rem;
   border-radius: 4px;
   background: var(--color-bg-secondary);
 }
@@ -1265,7 +1258,7 @@ watch(() => props.open, (val) => {
   color: var(--color-text-secondary);
   white-space: nowrap;
   text-align: right;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .dp-subtotal {
@@ -1273,21 +1266,21 @@ watch(() => props.open, (val) => {
   font-weight: 700;
   white-space: nowrap;
   text-align: right;
-  min-width: 4.5rem;
-  font-size: 0.8rem;
+  min-width: 4rem;
+  font-size: 0.78rem;
 }
 
 .detalle-discrepancia {
   background: color-mix(in srgb, var(--color-error) 12%, transparent);
   color: var(--color-error);
-  padding: 0.35rem 0.5rem;
-  border-radius: 5px;
-  font-size: 0.72rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
   font-weight: 600;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
 }
 
 .disc-signo {
@@ -1295,50 +1288,30 @@ watch(() => props.open, (val) => {
   opacity: 0.85;
 }
 
-.expand-enter-active,
-.expand-leave-active {
-  transition: all 0.2s ease;
-  overflow: hidden;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  margin-top: 0;
-}
-
-.expand-enter-to,
-.expand-leave-from {
-  opacity: 1;
-  max-height: 500px;
-}
-
 .abonos-list {
-  margin-top: 0.45rem;
+  margin-top: 0.35rem;
   border-top: 1px solid var(--color-border);
-  padding-top: 0.4rem;
+  padding-top: 0.3rem;
 }
 
 .abonos-title {
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
 .abono-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.72rem;
-  padding: 0.15rem 0;
+  font-size: 0.7rem;
+  padding: 0.1rem 0;
   color: var(--color-text-secondary);
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .abono-monto {
@@ -1359,6 +1332,26 @@ watch(() => props.open, (val) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.expand-enter-active,
+.expand-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.expand-enter-to,
+.expand-leave-from {
+  opacity: 1;
+  max-height: 500px;
 }
 
 /* Form */
@@ -1510,6 +1503,156 @@ watch(() => props.open, (val) => {
 
 
 
+.resumen-agregado {
+  background: var(--color-bg-primary);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.08);
+}
+
+.resumen-agregado-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-around;
+}
+
+.resumen-agregado-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.ra-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.ra-valor {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  color: var(--color-text-primary);
+}
+
+.ra-valor.total-deuda {
+  color: var(--color-error);
+}
+
+.ra-valor.pagado {
+  color: var(--color-success);
+}
+
+.resumen-agregado-abonar {
+  margin-top: 0.6rem;
+  text-align: center;
+}
+
+.btn-abonar-persona {
+  width: 100%;
+  padding: 0.7rem;
+  background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 70%, black));
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 3px 3px 6px rgba(0,0,0,0.12);
+}
+
+.btn-abonar-persona:hover {
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.18);
+  transform: translateY(-1px);
+}
+
+.abonos-global {
+  margin-bottom: 0.75rem;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.abonos-global-title {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.abono-global-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  padding: 0.25rem 0;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.abono-global-item:last-child {
+  border-bottom: none;
+}
+
+.abono-global-monto {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+  min-width: 3.8rem;
+}
+
+.abono-global-fecha {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.abono-global-metodo {
+  font-size: 0.65rem;
+  background: var(--color-bg-secondary);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.abono-global-user {
+  flex: 1 1 auto;
+  min-width: 5rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .abono-global-item {
+    font-size: 0.65rem;
+    gap: 0.2rem 0.4rem;
+  }
+  .abono-global-monto {
+    min-width: 3rem;
+  }
+}
+
+.ventas-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+  padding: 0 0.15rem;
+}
+
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: all 0.3s ease;
@@ -1523,5 +1666,78 @@ watch(() => props.open, (val) => {
 .modal-fade-enter-from .pos-modal-card,
 .modal-fade-leave-to .pos-modal-card {
   transform: scale(0.97);
+}
+
+@media (max-width: 480px) {
+  .resumen-agregado-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .resumen-agregado-item {
+    min-width: 5rem;
+  }
+  .ra-valor {
+    font-size: 1rem;
+  }
+  .venta-item-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+  .venta-item-right {
+    justify-content: space-between;
+  }
+  .venta-item-left {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 380px) {
+  .pos-modal-card {
+    width: 100%;
+  }
+  .modal-b {
+    padding: 0.75rem;
+  }
+  .inner-list {
+    padding: 0.4rem;
+  }
+  .persona-row {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .persona-deuda {
+    margin-left: 0;
+    text-align: left;
+  }
+  .persona-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .resumen-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+  .resumen-item {
+    font-size: 0.75rem;
+  }
+  .venta-fecha {
+    font-size: 0.6rem;
+  }
+  .btn-historial {
+    font-size: 0.75rem;
+    padding: 0.45rem 0.5rem;
+  }
+  .btn-abonar-persona {
+    font-size: 0.82rem;
+    padding: 0.6rem;
+  }
+  .inner-panel {
+    width: 100%;
+    max-height: 90vh;
+    min-height: unset;
+  }
 }
 </style>
