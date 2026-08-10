@@ -62,6 +62,35 @@ async function eliminarProducto(idProducto: number): Promise<boolean> {
   }
 }
 
+async function vaciarStock(idProducto: number): Promise<boolean> {
+  try {
+    const res = await fetch(API_BASE + '/productos/vaciarStock/' + idProducto, { method: 'PUT' });
+    const data = await res.json();
+    if (data.codigo === 200) {
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Error vaciando stock:', e);
+    return false;
+  }
+}
+
+async function vaciarStocksLote(ids: number[]): Promise<{ exitosos: number; fallidos: number }> {
+  let exitosos = 0;
+  let fallidos = 0;
+  for (const id of ids) {
+    try {
+      const ok = await vaciarStock(id);
+      if (ok) exitosos++; else fallidos++;
+    } catch {
+      fallidos++;
+    }
+  }
+  await cargarAnalytics();
+  return { exitosos, fallidos };
+}
+
 async function eliminarProductosLote(ids: number[]): Promise<{ exitosos: number; fallidos: number }> {
   let exitosos = 0;
   let fallidos = 0;
@@ -77,18 +106,35 @@ async function eliminarProductosLote(ids: number[]): Promise<{ exitosos: number;
   return { exitosos, fallidos };
 }
 
+const CACHE_TTL = 10 * 60 * 1000;
+let cacheReporteAnual: { year: number; ts: number; data: any } | null = null;
+let cacheSugerido: { ts: number; data: any } | null = null;
+
 async function cargarAnalytics() {
   cargando.value = true;
   error.value = '';
   ultimaActualizacion.value = new Date().toLocaleTimeString('es-MX');
   try {
     const year = new Date().getFullYear();
+    const now = Date.now();
 
-    const [reporteAnual, resumen, productos, sugerencias, categoriasResp] = await Promise.all([
-      fetch(API_BASE + '/ventas/reporteAnual/' + year).then(r => r.json()).catch(() => ({ datos: null })),
+    const reporteAnual = cacheReporteAnual && cacheReporteAnual.year === year && now - cacheReporteAnual.ts < CACHE_TTL
+      ? cacheReporteAnual.data
+      : await fetch(API_BASE + '/ventas/reporteAnual/' + year).then(r => r.json()).catch(() => ({ datos: null }));
+    if (reporteAnual && reporteAnual.codigo === 200) {
+      cacheReporteAnual = { year, ts: now, data: reporteAnual };
+    }
+
+    const sugerencias = cacheSugerido && now - cacheSugerido.ts < CACHE_TTL
+      ? cacheSugerido.data
+      : await fetch(API_BASE + '/pedidos-proveedor/sugerido?periodo=mensual&presupuesto=medio').then(r => r.json()).catch(() => ({ datos: [] }));
+    if (sugerencias && Array.isArray(sugerencias.datos)) {
+      cacheSugerido = { ts: now, data: sugerencias };
+    }
+
+    const [resumen, productos, categoriasResp] = await Promise.all([
       fetch(API_BASE + '/productos/resumen').then(r => r.json()).catch(() => ({ datos: null })),
       fetch(API_BASE + '/productos/listarProductos').then(r => r.json()).catch(() => ({ datos: [] })),
-      fetch(API_BASE + '/pedidos-proveedor/sugerido?periodo=mensual&presupuesto=medio').then(r => r.json()).catch(() => ({ datos: [] })),
       fetch(API_BASE + '/categorias/listarCategorias').then(r => r.json()).catch(() => ({ datos: [] }))
     ]);
 
@@ -103,16 +149,6 @@ async function cargarAnalytics() {
       if (!isNaN(id) && id > 0 && c.nombre) {
         categoriaMap.set(id, c.nombre);
       }
-    }
-    
-    // Debug: log de categorías cargadas
-    console.log('[Inteligencia] Respuesta categorías:', categoriasResp);
-    console.log('[Inteligencia] Lista categorías:', categoriasList);
-    console.log('[Inteligencia] Tamaño categoriaMap:', categoriaMap.size);
-    if (categoriaMap.size === 0) {
-      console.warn('[Inteligencia] No se cargaron categorías. Respuesta:', categoriasResp);
-    } else {
-      console.log('[Inteligencia] Categorías cargadas:', categoriaMap.size, Array.from(categoriaMap.entries()).slice(0, 5));
     }
 
     resumenInventario.value = datosResumen;
@@ -218,46 +254,20 @@ async function cargarAnalytics() {
     }
 
     // Buscar productos con stock que no esten en sugerencia (sin ventas nunca)
-    let productosSinCategoria = 0;
-    let productosSinPrecio = 0;
-    let productosProcesados = 0;
-    
     for (const p of datosProductos) {
       const id = Number(p.idProducto);
       if (isNaN(id) || id <= 0 || sugerenciaMap.has(id)) continue;
       const stock = Number(p.stock || 0);
       if (stock > 0) {
-        productosProcesados++;
-        // Resolver categoría con fallback inteligente
         let categoriaNombre = '';
         const idCategoria = Number(p.idCategoria);
         if (!isNaN(idCategoria) && idCategoria > 0) {
           categoriaNombre = categoriaMap.get(idCategoria) || '';
-          if (!categoriaNombre) {
-            productosSinCategoria++;
-            if (productosSinCategoria <= 3) {
-              console.warn(`[Inteligencia] Producto ${p.nombre} (ID: ${id}) tiene idCategoria=${idCategoria} pero no se encontró en categoriaMap`);
-            }
-          }
-        } else {
-          productosSinCategoria++;
-          if (productosSinCategoria <= 3) {
-            console.warn(`[Inteligencia] Producto ${p.nombre} (ID: ${id}) tiene idCategoria inválido: ${p.idCategoria}`);
-          }
         }
-        
-        // Log de ejemplo para los primeros 3 productos
-        if (productosProcesados <= 3) {
-          console.log(`[Inteligencia] Producto ${productosProcesados}: ${p.nombre}, idCategoria=${idCategoria}, categoriaNombre="${categoriaNombre}"`);
-        }
-        
-        // Validar precios
+
         const precioCosto = Number(p.precio_costo || 0);
         const precioVenta = Number(p.precio_venta || 0);
-        if (precioCosto === 0 && precioVenta === 0) {
-          productosSinPrecio++;
-        }
-        
+
         const item: ProductoRank = {
           idProducto: id,
           nombre: p.nombre,
@@ -274,42 +284,9 @@ async function cargarAnalytics() {
         idProductosVistos.add(id);
       }
     }
-    
-    // Logs de depuración
-    if (productosSinCategoria > 0) {
-      console.warn(`[Inteligencia] ${productosSinCategoria} producto(s) sin categoría válida`);
-    }
-    if (productosSinPrecio > 0) {
-      console.warn(`[Inteligencia] ${productosSinPrecio} producto(s) sin precio de costo ni venta`);
-    }
-    console.log('[Inteligencia] Productos sin movimiento encontrados:', noMov.length);
-    
-    // Debug: mostrar primeros 3 items de noMov
-    if (noMov.length > 0) {
-      console.log('[Inteligencia] Primeros 3 items de noMov:', noMov.slice(0, 3).map(i => ({
-        id: i.idProducto,
-        nombre: i.nombre,
-        stock: i.stock,
-        categoria: i.categoria
-      })));
-    }
 
     // Filtrar items sin identificador valido
     const noMovValidos = noMov.filter(i => i.idProducto != null && i.idProducto > 0 && !isNaN(i.idProducto as number) && i.nombre);
-    const noMovDescartados = noMov.length - noMovValidos.length;
-    if (noMovDescartados > 0) {
-      console.warn(`[Inteligencia] Se descartaron ${noMovDescartados} producto(s) sin idProducto valido en Sin Movimiento.`, noMov.filter(i => !i.idProducto || isNaN(i.idProducto as number)));
-    }
-    
-    // Debug: mostrar primeros 3 items de noMovValidos
-    if (noMovValidos.length > 0) {
-      console.log('[Inteligencia] Primeros 3 items de noMovValidos:', noMovValidos.slice(0, 3).map(i => ({
-        id: i.idProducto,
-        nombre: i.nombre,
-        stock: i.stock,
-        categoria: i.categoria
-      })));
-    }
 
     slow.sort((a, b) => (b.rotacion || 0) - (a.rotacion || 0));
     bajaRotacion.value = slow.slice(0, 10);
@@ -363,6 +340,8 @@ export function useProveedoresInteligencia() {
     cargarAnalytics,
     eliminarProducto,
     eliminarProductosLote,
+    vaciarStock,
+    vaciarStocksLote,
     formatoMoneda,
     kpiValorInventario,
     kpiValorVentaPotencial,

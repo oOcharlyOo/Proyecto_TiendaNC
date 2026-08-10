@@ -311,6 +311,12 @@ CREATE INDEX IF NOT EXISTS idx_apartado_usuario ON tiendadb.apartado(id_usuario)
 CREATE INDEX IF NOT EXISTS idx_apartado_estatus ON tiendadb.apartado(estatus);
 CREATE INDEX IF NOT EXISTS idx_apartado_pago_apartado ON tiendadb.apartado_pago(id_apartado);
 CREATE INDEX IF NOT EXISTS idx_apartado_pago_usuario ON tiendadb.apartado_pago(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON tiendadb.ventas(fecha_venta);
+CREATE INDEX IF NOT EXISTS idx_ventas_estatus ON tiendadb.ventas(estatus);
+CREATE INDEX IF NOT EXISTS idx_ventas_detalle_venta ON tiendadb.ventas_detalle(id_venta);
+CREATE INDEX IF NOT EXISTS idx_ventas_detalle_producto ON tiendadb.ventas_detalle(id_producto);
+CREATE INDEX IF NOT EXISTS idx_producto_proveedor_producto ON tiendadb.producto_proveedor(id_producto);
+CREATE INDEX IF NOT EXISTS idx_presentacion_caja_producto ON tiendadb.producto_presentacion_caja(id_producto);
 
 -- ========================================
 -- FUNCIONES Y TRIGGERS
@@ -680,6 +686,12 @@ CREATE INDEX IF NOT EXISTS idx_apartado_usuario ON tiendadb_abarrotera.apartado(
 CREATE INDEX IF NOT EXISTS idx_apartado_estatus ON tiendadb_abarrotera.apartado(estatus);
 CREATE INDEX IF NOT EXISTS idx_apartado_pago_apartado ON tiendadb_abarrotera.apartado_pago(id_apartado);
 CREATE INDEX IF NOT EXISTS idx_apartado_pago_usuario ON tiendadb_abarrotera.apartado_pago(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON tiendadb_abarrotera.ventas(fecha_venta);
+CREATE INDEX IF NOT EXISTS idx_ventas_estatus ON tiendadb_abarrotera.ventas(estatus);
+CREATE INDEX IF NOT EXISTS idx_ventas_detalle_venta ON tiendadb_abarrotera.ventas_detalle(id_venta);
+CREATE INDEX IF NOT EXISTS idx_ventas_detalle_producto ON tiendadb_abarrotera.ventas_detalle(id_producto);
+CREATE INDEX IF NOT EXISTS idx_producto_proveedor_producto ON tiendadb_abarrotera.producto_proveedor(id_producto);
+CREATE INDEX IF NOT EXISTS idx_presentacion_caja_producto ON tiendadb_abarrotera.producto_presentacion_caja(id_producto);
 
 -- Funciones
 CREATE OR REPLACE FUNCTION tiendadb_abarrotera.fn_limpiar_codigo_barras()

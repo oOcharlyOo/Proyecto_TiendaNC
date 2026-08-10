@@ -9,19 +9,11 @@ const {
   totalVentasGranel, totalVentasUnitario,
   bajaRotacion, mayorUtilidad, sinMovimiento,
   alertas, resumenInventario, ultimaActualizacion,
-  cargarAnalytics, eliminarProducto, eliminarProductosLote, formatoMoneda,
+  cargarAnalytics, eliminarProducto, eliminarProductosLote, vaciarStock, vaciarStocksLote, formatoMoneda,
   kpiValorInventario, valorRetenidoSinMov
 } = useProveedoresInteligencia();
 
 onMounted(() => cargarAnalytics());
-
-// Debug: watch para ver cuándo cambian los datos
-watch(sinMovimiento, (newVal) => {
-  console.log('[AnalisisInventario] sinMovimiento cambió:', newVal.length, 'items');
-  if (newVal.length > 0) {
-    console.log('[AnalisisInventario] Primer item de sinMovimiento:', newVal[0]);
-  }
-}, { immediate: true });
 
 /* ---------- helpers ---------- */
 function getSeveridadClass(s: string) {
@@ -56,8 +48,11 @@ const smFilter = ref<'todos' | 'eliminar' | 'promocionar' | 'revisar'>('todos');
 const selectedIds = ref<Set<number>>(new Set());
 const expandedCats = ref<Record<string, boolean>>({});
 const pendingDelete = ref<Set<number>>(new Set());
+const pendingVaciar = ref<Set<number>>(new Set());
 const eliminandoLote = ref(false);
+const vaciandoLote = ref(false);
 const confirmarLote = ref(false);
+const confirmarVaciarLote = ref(false);
 
 /* ---------- sin movimiento computed ---------- */
 const sinMovimientoFiltrado = computed(() => {
@@ -85,13 +80,6 @@ const sinMovimientoFiltrado = computed(() => {
 });
 
 // Debug: watch para ver cuándo cambia sinMovimientoFiltrado
-watch(sinMovimientoFiltrado, (newVal) => {
-  console.log('[AnalisisInventario] sinMovimientoFiltrado cambió:', newVal.length, 'items');
-  if (newVal.length > 0) {
-    console.log('[AnalisisInventario] Primer item de sinMovimientoFiltrado:', newVal[0]);
-  }
-});
-
 const sinMovimientoAgrupado = computed(() => {
   const map = new Map<string, ProductoRank[]>();
   for (const item of sinMovimientoFiltrado.value) {
@@ -103,7 +91,6 @@ const sinMovimientoAgrupado = computed(() => {
   for (const [key, value] of map) {
     result.push({ cat: key, items: value });
   }
-  console.log('[AnalisisInventario] sinMovimientoAgrupado:', result.length, 'categorías', result.map(e => ({ cat: e.cat, count: e.items.length, primerNombre: e.items[0]?.nombre })));
   return result;
 });
 
@@ -209,6 +196,39 @@ async function ejecutarEliminarLote() {
   confirmarLote.value = false;
   selectedIds.value = new Set();
   const msg = exitosos > 0 ? '✅ ' + exitosos + ' eliminado(s)' : '';
+  const err = fallidos > 0 ? ' ❌ ' + fallidos + ' fallido(s)' : '';
+  alert(msg + err);
+}
+
+/* ---------- vaciar stock actions ---------- */
+function iniciarVaciar(id: number) {
+  const next = new Set(pendingVaciar.value);
+  next.add(id);
+  pendingVaciar.value = next;
+}
+
+function cancelVaciar(id: number) {
+  const next = new Set(pendingVaciar.value);
+  next.delete(id);
+  pendingVaciar.value = next;
+}
+
+async function ejecutarVaciar(item: ProductoRank) {
+  if (!item.idProducto) return;
+  const exito = await vaciarStock(item.idProducto);
+  cancelVaciar(item.idProducto);
+  if (!exito) alert('Error al vaciar stock de ' + (item.nombre || '(sin nombre)'));
+}
+
+async function ejecutarVaciarLote() {
+  const ids = Array.from(selectedIds.value);
+  if (ids.length === 0) return;
+  vaciandoLote.value = true;
+  const { exitosos, fallidos } = await vaciarStocksLote(ids);
+  vaciandoLote.value = false;
+  confirmarVaciarLote.value = false;
+  selectedIds.value = new Set();
+  const msg = exitosos > 0 ? '✅ ' + exitosos + ' con stock en 0' : '';
   const err = fallidos > 0 ? ' ❌ ' + fallidos + ' fallido(s)' : '';
   alert(msg + err);
 }
@@ -467,6 +487,14 @@ async function ejecutarEliminarLote() {
             {{ selectedIds.size }} seleccionados · {{ formatoMoneda(smSeleccionadosValor) }}
           </span>
           <div class="sm-bar-actions">
+            <button v-if="confirmarVaciarLote" class="sm-btn sm-btn-confirm" @click="ejecutarVaciarLote" :disabled="vaciandoLote">
+              <span v-if="vaciandoLote">⏳ Vaciando...</span>
+              <span v-else>✅ Confirmar vaciar {{ selectedIds.size }}</span>
+            </button>
+            <button v-if="confirmarVaciarLote" class="sm-btn sm-btn-cancel" @click="confirmarVaciarLote = false">❌ Cancelar</button>
+            <button v-else class="sm-btn sm-btn-vaciar" :disabled="selectedIds.size === 0" @click="confirmarVaciarLote = true">
+              🧹 Vaciar stock
+            </button>
             <button v-if="confirmarLote" class="sm-btn sm-btn-confirm" @click="ejecutarEliminarLote" :disabled="eliminandoLote">
               <span v-if="eliminandoLote">⏳ Eliminando...</span>
               <span v-else>✅ Confirmar eliminación de {{ selectedIds.size }}</span>
@@ -499,7 +527,7 @@ async function ejecutarEliminarLote() {
               </span>
             </div>
             <div v-if="expandedCats[entry.cat]" class="sm-cat-body">
-              <div v-for="(item, i) in entry.items" :key="item.idProducto || i" class="sm-item" :class="{ 'sm-item-pending': pendingDelete.has(item.idProducto!) }">
+              <div v-for="(item, i) in entry.items" :key="item.idProducto || i" class="sm-item" :class="{ 'sm-item-pending': pendingDelete.has(item.idProducto!), 'sm-item-vaciando': item.idProducto ? pendingVaciar.has(item.idProducto) : false }">
                 <input type="checkbox" class="sm-item-cb" :checked="item.idProducto ? selectedIds.has(item.idProducto) : false" @change="item.idProducto && toggleSelect(item.idProducto)">
                 <span class="sm-item-name" :title="item.nombre || 'Producto sin nombre'">{{ item.nombre || '(sin nombre)' }}</span>
                 <span class="sm-item-stock">{{ (item.stock ?? 0) }} {{ item.isGramaje ? 'kg' : 'uds' }}</span>
@@ -515,7 +543,13 @@ async function ejecutarEliminarLote() {
                   <button class="sm-item-confirm-yes" @click="ejecutarEliminar(item)" title="Sí, eliminar permanentemente">✅</button>
                   <button class="sm-item-confirm-no" @click="cancelDelete(item.idProducto!)" title="Cancelar">❌</button>
                 </template>
-                <button v-else class="sm-item-delete" @click="item.idProducto && iniciarEliminar(item.idProducto)" title="Eliminar este producto">🗑️</button>
+                <template v-else-if="item.idProducto && pendingVaciar.has(item.idProducto)">
+                  <span class="sm-item-confirm-msg">¿Vaciar stock?</span>
+                  <button class="sm-item-confirm-yes" @click="ejecutarVaciar(item)" title="Sí, poner stock en 0">🧹</button>
+                  <button class="sm-item-confirm-no" @click="cancelVaciar(item.idProducto!)" title="Cancelar">❌</button>
+                </template>
+                <button v-else class="sm-item-vaciar" @click="item.idProducto && iniciarVaciar(item.idProducto)" title="Poner stock en 0">🧹</button>
+                <button class="sm-item-delete" @click="item.idProducto && iniciarEliminar(item.idProducto)" title="Eliminar este producto">🗑️</button>
               </div>
             </div>
           </div>
@@ -654,6 +688,9 @@ async function ejecutarEliminarLote() {
 .sm-btn-confirm:disabled{opacity:.4;cursor:not-allowed}
 .sm-btn-cancel{background:color-mix(in srgb,var(--color-text-secondary) 15%,transparent);color:var(--color-text-secondary)}
 .sm-btn-cancel:hover{background:color-mix(in srgb,var(--color-text-secondary) 30%,transparent)}
+.sm-btn-vaciar{background:color-mix(in srgb,var(--color-info) 18%,transparent);color:var(--color-info)}
+.sm-btn-vaciar:hover:not(:disabled){background:color-mix(in srgb,var(--color-info) 32%,transparent)}
+.sm-btn-vaciar:disabled{opacity:.4;cursor:not-allowed}
 
 /* ---------- SIN MOVIMIENTO: WARNING ---------- */
 .sm-warning{padding:.35rem .5rem;background:color-mix(in srgb,var(--color-error) 12%,transparent);border:1px solid color-mix(in srgb,var(--color-error) 25%,transparent);border-radius:6px;font-size:.65rem;color:var(--color-error)}
@@ -680,6 +717,7 @@ async function ejecutarEliminarLote() {
 .sm-item:last-child{border-bottom:none}
 .sm-item:hover{background:color-mix(in srgb,var(--color-accent) 3%,transparent)}
 .sm-item-pending{background:color-mix(in srgb,var(--color-error) 10%,transparent)!important}
+.sm-item-vaciando{background:color-mix(in srgb,var(--color-info) 10%,transparent)!important}
 .sm-item-cb{cursor:pointer;flex-shrink:0}
 .sm-item-name{flex:1;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--color-text-primary)}
 .sm-item-stock{font-family:monospace;font-weight:600;text-align:right;width:55px;flex-shrink:0;color:var(--color-text-primary)}
@@ -694,6 +732,8 @@ async function ejecutarEliminarLote() {
 .sm-item-confirm-no:hover{background:color-mix(in srgb,var(--color-error) 20%,transparent)}
 .sm-item-delete{background:none;border:none;cursor:pointer;font-size:.75rem;padding:.1rem;opacity:.4;transition:all .15s;border-radius:3px;line-height:1}
 .sm-item-delete:hover{opacity:1;background:color-mix(in srgb,var(--color-error) 15%,transparent)}
+.sm-item-vaciar{background:none;border:none;cursor:pointer;font-size:.75rem;padding:.1rem;opacity:.4;transition:all .15s;border-radius:3px;line-height:1}
+.sm-item-vaciar:hover{opacity:1;background:color-mix(in srgb,var(--color-info) 15%,transparent)}
 
 /* ---------- RESPONSIVE: TABLET (1024px) ---------- */
 @media(max-width:1024px){
