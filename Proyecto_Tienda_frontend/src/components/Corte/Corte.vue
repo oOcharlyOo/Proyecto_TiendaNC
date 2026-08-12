@@ -51,7 +51,7 @@ import {
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
   selectedFiles, dragOver,
-  historialFiltrado, historialTotalFiltrado,
+  historialFiltrado, historialTotalFiltrado, historialGananciaFiltrada,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
   cortePieChartData, cortePieChartOptions,
@@ -114,7 +114,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
         @generar-corte="generarCorte"
         @abrir-modal-diario="modalDiarioAbierto = true"
         @abrir-modal-mensual="modalMensualAbierto = true"
-        @abrir-historial="abrirHistorialVentas"
+        @abrir-historial="() => { historialPagina = 0; abrirHistorialVentas() }"
         @abrir-modal-apartados="abrirModalApartados"
         @abrir-modal-anual="modalAnualAbierto = true"
       />
@@ -173,7 +173,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       @volver="mostrarReporte = false"
       @abrir-modal-diario="modalDiarioAbierto = true"
       @abrir-modal-mensual="modalMensualAbierto = true"
-      @abrir-historial="abrirHistorialVentas"
+      @abrir-historial="() => { historialPagina = 0; abrirHistorialVentas() }"
       @abrir-modal-anual="modalAnualAbierto = true"
     />
 
@@ -248,6 +248,7 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
       :cargando="cargandoHistorial"
       :historialData="historialFiltrado"
       :historialTotalFiltrado="historialTotalFiltrado"
+      :historialGananciaFiltrada="historialGananciaFiltrada"
       :filtroMesHistorial="filtroMesHistorial"
       :filtroAnioHistorial="filtroAnioHistorial"
       :filtroDiaHistorial="filtroDiaHistorial"

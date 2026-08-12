@@ -184,8 +184,9 @@ export function useUsuarios() {
     return response.json() as Promise<T>;
   }
 
-  function formatAvatarUrl(url: string): string {
-    if (!url || url.startsWith('data:')) return url;
+  function formatAvatarUrl(url: string | null): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('data:')) return url;
     if (url.startsWith('http')) {
       const urlObj = new URL(url);
       const path = urlObj.pathname;
@@ -204,7 +205,7 @@ export function useUsuarios() {
     try {
       const usuariosData = await fetchApi<{ codigo: number; datos: Usuario[] }>(`${API_BASE}/usuarios/listarUsuarios`);
       usuarios.value = Array.isArray(usuariosData?.datos)
-        ? usuariosData.datos.map(u => ({ ...u, avatar: u.avatar ? formatAvatarUrl(u.avatar) : null }))
+        ? usuariosData.datos.map(u => ({ ...u, avatar: u.avatar ? (formatAvatarUrl(u.avatar) ?? null) : null }))
         : [];
     } catch (error) {
       usuarios.value = [];
@@ -319,6 +320,34 @@ export function useUsuarios() {
     }
   }
 
+  async function eliminarTurno(idUsuario: number, fecha: string, nombre: string): Promise<boolean> {
+    const result = await Swal.fire({
+      title: '¿Eliminar turno?',
+      html: `Se eliminará la apertura y cierre de <strong>${nombre}</strong> del día <strong>${fecha}</strong>.<br/>Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: 'var(--error-color)',
+      cancelButtonColor: 'var(--accent-color)',
+      background: 'var(--bg-panel)',
+      color: 'var(--text-primary)',
+      customClass: { popup: 'swal2-popup-papyrus' }
+    });
+
+    if (!result.isConfirmed) return false;
+    try {
+      const res = await fetch(`${API_BASE}/asistencias/turno?idUsuario=${idUsuario}&fecha=${fecha}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.codigo === 200) return true;
+      console.error('Error al eliminar turno:', json.mensaje);
+      return false;
+    } catch (error) {
+      console.error('Error de red al eliminar turno:', error);
+      return false;
+    }
+  }
+
   function getTipoLabel(id: number): string {
     return id === 1 ? '🧙 Admin' : '⚔️ Vendedor';
   }
@@ -328,7 +357,7 @@ export function useUsuarios() {
     return meses[mes - 1] || '';
   }
 
-  function getIniciales(nombre: string, apellido_p: string): string {
+  function getIniciales(nombre: string, apellido_p?: string): string {
     return `${(nombre || '')[0] || ''}${(apellido_p || '')[0] || ''}`.toUpperCase();
   }
 
@@ -361,7 +390,7 @@ export function useUsuarios() {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
   }
 
-  function formatoFecha(fecha: string): string {
+  function formatoFecha(fecha?: string): string {
     if (!fecha) return '';
     const d = new Date(fecha);
     return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -404,6 +433,28 @@ export function useUsuarios() {
     }
   }
 
+  const guardandoHora = ref(false);
+
+  async function guardarHoraCaja(idUsuario: number, fecha: string, hora: string, tipo: 'apertura' | 'cierre'): Promise<boolean> {
+    guardandoHora.value = true;
+    try {
+      const res = await fetch(`${API_BASE}/asistencias/hora`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idUsuario, fecha, hora, tipo })
+      });
+      const json = await res.json();
+      if (json.codigo === 200) return true;
+      console.error('Error al guardar hora:', json.mensaje);
+      return false;
+    } catch (error) {
+      console.error('Error de red al guardar hora:', error);
+      return false;
+    } finally {
+      guardandoHora.value = false;
+    }
+  }
+
   function getHorasTotales(usuario: UsuarioDiasData): number {
     let total = 0;
     if (usuario.horasPorDia) {
@@ -423,7 +474,7 @@ export function useUsuarios() {
     return `${h}h ${m}m`;
   }
 
-  function formatoHora(hora: string): string {
+  function formatoHora(hora: string | null | undefined): string {
     if (!hora) return '—';
     const timePart = hora.includes('T') ? hora.split('T')[1] : hora;
     return timePart.slice(0, 5);
@@ -559,14 +610,17 @@ export function useUsuarios() {
     usuarios, cargando, modalAbierto, editando, modalSueldoAbierto,
     seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas,
     diasTrabajados, cargandoAsistencias,
+    guardandoHora,
     avatarPreview, dragando, form,
     tipoUsuarioActual, esAdmin, puedeEditar,
     esEdicionPerfilPropio, usuarioTop,
     cargarUsuarios, cargarVentasPorUsuario, cargarAsistencias,
+    guardarHoraCaja,
     cambiarSeccion, formatoMoneda, formatoFecha, formatoCantidad,
     abrirModalNuevo, abrirModalEditar, cerrarModal,
     handleDragOver, handleDragLeave, handleDrop, handleFileSelect,
     formatAvatarUrl, guardarUsuario, eliminarUsuario,
+    eliminarTurno,
     getTipoLabel, getNombreMes, getIniciales,
     getHorasTotales, getHorasFormateadas, formatoHora,
     getHorasDelDia, getDiasCalendario, semanasDelMes,

@@ -14,7 +14,7 @@ export type VentaDTO = {
   idVenta: number; idUsuario?: number; numeroTicket?: number;
   fechaVenta?: string; metodoPago?: string; montoTotal?: number;
   estatus?: string; usuario?: UsuarioDTO; nombreUsuario?: string;
-  tieneDiscrepancia?: boolean; detalles?: VentaDetalleDTO[];
+  tieneDiscrepancia?: boolean; detalles?: VentaDetalleDTO[]; ganancia?: number;
 };
 export type GananciasDTO = { cobroTotal?: number; gananciaTotal?: number; ventas?: VentaDTO[]; nombreUsuario?: string };
 export type ReporteDiarioCompletoDTO = {
@@ -360,6 +360,10 @@ const historialFiltrado = computed(() => {
 
 const historialTotalFiltrado = computed(() => {
   return historialFiltrado.value.reduce((sum, x) => sum + Number(x.venta.montoTotal || 0), 0);
+});
+
+const historialGananciaFiltrada = computed(() => {
+  return historialFiltrado.value.reduce((sum, x) => sum + Number(x.venta.ganancia || 0), 0);
 });
 
 // ===== FORMATTING =====
@@ -1135,7 +1139,6 @@ async function cerrarTurno() {
 
 async function abrirHistorialVentas() {
   modalHistorialAbierto.value = true;
-  historialPagina.value = 0;
   cargandoHistorial.value = true;
   try {
     const params = new URLSearchParams();
@@ -1154,7 +1157,7 @@ async function abrirHistorialVentas() {
         idVenta: item.idVenta, idUsuario: item.idUsuario, nombreUsuario: item.nombreUsuario,
         fechaVenta: item.fechaVenta, montoTotal: item.montoTotal, estatus: item.estatus,
         metodoPago: item.metodoPago, numeroTicket: item.numeroTicket,
-        tieneDiscrepancia: item.tieneDiscrepancia,
+        tieneDiscrepancia: item.tieneDiscrepancia, ganancia: item.ganancia,
       },
       detalles: item.detalles,
     }));
@@ -1588,7 +1591,7 @@ export {
   egresosDia, entradasDia, cargandoEntradas, cargandoEgresos,
   reporteAnualData, mostrarBackupManager, mostrarImportModal,
   dragOver,
-  historialFiltrado, historialTotalFiltrado,
+  historialFiltrado, historialTotalFiltrado, historialGananciaFiltrada,
   chartData, chartDataUnitarios, chartDataGranel, chartDataCombinado, chartOptionsCombinado,
   chartOptions, chartOptionsUnitarios, chartOptionsGranel,
   cortePieChartData, cortePieChartOptions,

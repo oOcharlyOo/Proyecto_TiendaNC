@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { DiasTrabajadosData, SemanaInfo, UsuarioDiasData } from '../logica/useUsuarios';
 
 const props = defineProps<{
   diasTrabajados: DiasTrabajadosData | null;
   cargandoAsistencias: boolean;
+  guardandoHora: boolean;
   filtroMesVentas: string;
   esAdmin: boolean;
   semanasDelMes: SemanaInfo[];
@@ -22,6 +23,68 @@ const props = defineProps<{
   formatoMoneda: (valor: number) => string;
 }>();
 
+type TrabajadorCal = { idUsuario: number; nombre: string; horas: number; apertura: string; cierre: string | null };
+type DiaCal = { numero: number; fecha: string; esHoy: boolean; trabajadores: TrabajadorCal[]; esVacio: boolean; horasTotales: number; esOverflow: boolean };
+
+const DURACION_TURNO_HORAS = 6.5;
+const UMBRAL_AUTO_CIERRE_HORAS = 10;
+
+const editModal = ref<{ fecha: string; idUsuario: number; nombre: string; turnoAbierto: boolean } | null>(null);
+const entradaInput = ref('');
+const salidaInput = ref('');
+
+function sumarHoras(hhmm: string, horas: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = h * 60 + m + Math.round(horas * 60);
+  const mins = ((total % 1440) + 1440) % 1440;
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}
+
+function horasTranscurridas(hhmm: string, fecha: string): number {
+  const apertura = new Date(`${fecha}T${hhmm}`);
+  if (isNaN(apertura.getTime())) return 0;
+  return Math.max(0, (new Date().getTime() - apertura.getTime()) / 3600000);
+}
+
+function abrirEdicionHora(t: TrabajadorCal, fecha: string) {
+  const turnoAbierto = !t.cierre;
+  editModal.value = { fecha, idUsuario: t.idUsuario, nombre: t.nombre, turnoAbierto };
+  entradaInput.value = t.apertura ? props.formatoHora(t.apertura) : '';
+  salidaInput.value = t.cierre
+    ? props.formatoHora(t.cierre)
+    : (t.apertura ? sumarHoras(props.formatoHora(t.apertura), DURACION_TURNO_HORAS) : '');
+}
+
+function cerrarEdicionHora() {
+  editModal.value = null;
+  entradaInput.value = '';
+  salidaInput.value = '';
+}
+
+function guardarEdicionHora() {
+  const mod = editModal.value;
+  if (!mod) return;
+  const entrada = entradaInput.value.trim();
+  const salida = salidaInput.value.trim();
+  if (!entrada && !salida) return;
+  const re = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (entrada && !re.test(entrada)) { alert('Hora de entrada inválida (use HH:MM)'); return; }
+  if (salida && !re.test(salida)) { alert('Hora de salida inválida (use HH:MM)'); return; }
+
+  if (!salida && mod.turnoAbierto && entrada) {
+    if (horasTranscurridas(entrada, mod.fecha) >= UMBRAL_AUTO_CIERRE_HORAS) {
+      emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: sumarHoras(entrada, DURACION_TURNO_HORAS), tipo: 'cierre' });
+    } else {
+      alert('El turno aún puede estar activo (lleva menos de 10h desde la entrada). Escribe la hora de salida para cerrarlo.');
+      return;
+    }
+  }
+
+  if (entrada) emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: entrada, tipo: 'apertura' });
+  if (salida) emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: salida, tipo: 'cierre' });
+  cerrarEdicionHora();
+}
+
 const usuariosConSueldo = computed(() => {
   if (!props.diasTrabajados?.usuarios) return [];
   return props.diasTrabajados.usuarios.filter(u => props.getSueldoHora(u.idUsuario) > 0);
@@ -30,14 +93,13 @@ const usuariosConSueldo = computed(() => {
 const calendarioDias = computed(() => {
   const dt = props.diasTrabajados;
   if (!dt) return [];
-  type DiaCal = { numero: number; esHoy: boolean; trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }>; esVacio: boolean; horasTotales: number; esOverflow: boolean };
   const dias: DiaCal[] = [];
   const rawDay = new Date(dt.anio, dt.mes - 1, 1).getDay();
   const firstDay = (rawDay + 6) % 7;
   const daysInMonth = new Date(dt.anio, dt.mes, 0).getDate();
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
   const hoy = new Date();
-  const empty: DiaCal = { numero: 0, esHoy: false, trabajadores: [], esVacio: true, horasTotales: 0, esOverflow: true };
+  const empty: DiaCal = { numero: 0, fecha: '', esHoy: false, trabajadores: [], esVacio: true, horasTotales: 0, esOverflow: true };
 
   const prevMonth = dt.mes === 1 ? 12 : dt.mes - 1;
   const prevYear = dt.mes === 1 ? dt.anio - 1 : dt.anio;
@@ -45,12 +107,13 @@ const calendarioDias = computed(() => {
   const nextMonth = dt.mes === 12 ? 1 : dt.mes + 1;
   const nextYear = dt.mes === 12 ? dt.anio + 1 : dt.anio;
 
-  function getOverflowWorkers(user: UsuarioDiasData, fechaStr: string): Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> {
-    const workers: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+  function getOverflowWorkers(user: UsuarioDiasData, fechaStr: string): TrabajadorCal[] {
+    const workers: TrabajadorCal[] = [];
     if (!user.overflow) return workers;
     const entry = user.overflow.find(o => o.fecha === fechaStr);
     if (entry && entry.horas > 0) {
       workers.push({
+        idUsuario: user.idUsuario,
         nombre: user.nombreUsuario,
         horas: entry.horas,
         apertura: entry.apertura || '',
@@ -63,7 +126,7 @@ const calendarioDias = computed(() => {
   for (let i = 0; i < firstDay; i++) {
     const dayNum = daysInPrevMonth - firstDay + 1 + i;
     const fechaStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    const trabajadores: TrabajadorCal[] = [];
     let horasTotales = 0;
     if (dt.usuarios) {
       for (const user of dt.usuarios) {
@@ -72,18 +135,20 @@ const calendarioDias = computed(() => {
         horasTotales += workers.reduce((s, w) => s + w.horas, 0);
       }
     }
-    dias.push({ numero: dayNum, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
+    dias.push({ numero: dayNum, fecha: fechaStr, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    const trabajadores: TrabajadorCal[] = [];
     let horasTotales = 0;
+    const fechaStr = `${dt.anio}-${String(dt.mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     if (dt.usuarios) {
       for (const user of dt.usuarios) {
         if (user.diasLaborados?.includes(d)) {
           const horas = props.getHorasDelDia(user, d);
           horasTotales += horas;
           trabajadores.push({
+            idUsuario: user.idUsuario,
             nombre: user.nombreUsuario,
             horas,
             apertura: user.aperturas?.[d] || '',
@@ -93,13 +158,13 @@ const calendarioDias = computed(() => {
       }
     }
     const esHoy = d === hoy.getDate() && dt.mes === hoy.getMonth() + 1 && dt.anio === hoy.getFullYear();
-    dias.push({ numero: d, esHoy, trabajadores, esVacio: false, horasTotales, esOverflow: false });
+    dias.push({ numero: d, fecha: fechaStr, esHoy, trabajadores, esVacio: false, horasTotales, esOverflow: false });
   }
 
   const remaining = totalCells - dias.length;
   for (let i = 1; i <= remaining; i++) {
     const fechaStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-    const trabajadores: Array<{ nombre: string; horas: number; apertura: string; cierre: string | null }> = [];
+    const trabajadores: TrabajadorCal[] = [];
     let horasTotales = 0;
     if (dt.usuarios) {
       for (const user of dt.usuarios) {
@@ -108,7 +173,7 @@ const calendarioDias = computed(() => {
         horasTotales += workers.reduce((s, w) => s + w.horas, 0);
       }
     }
-    dias.push({ numero: i, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
+    dias.push({ numero: i, fecha: fechaStr, esHoy: false, trabajadores, esVacio: false, horasTotales, esOverflow: true });
   }
 
   return dias;
@@ -131,6 +196,8 @@ const totalesPago = computed(() => {
 const emit = defineEmits<{
   'cargar-asistencias': [];
   'update:filtro-mes-ventas': [value: string];
+  'guardar-hora': [{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }];
+  'eliminar-turno': [{ idUsuario: number; fecha: string; nombre: string }];
 }>();
 </script>
 
@@ -198,6 +265,18 @@ const emit = defineEmits<{
                 <span class="trabajador-horas">{{ getHorasFormateadas(trabajador.horas) }}</span>
                 <span v-if="trabajador.apertura" class="trabajador-apertura">{{ formatoHora(trabajador.apertura) }}</span>
                 <span v-if="!trabajador.cierre" class="trabajando-badge" title="Turno abierto">🟢</span>
+                <button
+                  v-if="esAdmin"
+                  class="btn-edit-hora"
+                  title="Editar entrada/salida"
+                  @click.stop="abrirEdicionHora(trabajador, dia.fecha)"
+                >✏️</button>
+                <button
+                  v-if="esAdmin"
+                  class="btn-del-hora"
+                  title="Eliminar turno"
+                  @click.stop="emit('eliminar-turno', { idUsuario: trabajador.idUsuario, fecha: dia.fecha, nombre: trabajador.nombre })"
+                >🗑️</button>
               </div>
               <div v-if="dia.trabajadores.length > 3" class="trabajador-chip mas">
                 +{{ dia.trabajadores.length - 3 }}
@@ -257,6 +336,18 @@ const emit = defineEmits<{
                 <span v-if="usuario.aperturas?.[dia]" class="dia-apertura">{{ formatoHora(usuario.aperturas[dia]) }}</span>
                 <span class="dia-horas">{{ getHorasFormateadas(getHorasDelDia(usuario, dia)) }}</span>
                 <span v-if="!usuario.cierres?.[dia]" class="dia-trabajando-text">🔴</span>
+                <button
+                  v-if="esAdmin"
+                  class="btn-edit-hora"
+                  title="Editar entrada/salida"
+                  @click.stop="abrirEdicionHora({ idUsuario: usuario.idUsuario, nombre: usuario.nombreUsuario, horas: getHorasDelDia(usuario, dia), apertura: usuario.aperturas?.[dia] || '', cierre: usuario.cierres?.[dia] || null }, `${diasTrabajados?.anio}-${String(diasTrabajados?.mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`)"
+                >✏️</button>
+                <button
+                  v-if="esAdmin"
+                  class="btn-del-hora"
+                  title="Eliminar turno"
+                  @click.stop="emit('eliminar-turno', { idUsuario: usuario.idUsuario, fecha: `${diasTrabajados?.anio}-${String(diasTrabajados?.mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`, nombre: usuario.nombreUsuario })"
+                >🗑️</button>
               </div>
             </div>
           </div>
@@ -322,6 +413,41 @@ const emit = defineEmits<{
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="editModal" class="modal-edit-hora" @click.self="cerrarEdicionHora">
+      <div class="modal-edit-card">
+        <div class="modal-edit-header">
+          <h3>✏️ Editar Hora</h3>
+          <button class="modal-edit-close" @click="cerrarEdicionHora">✕</button>
+        </div>
+        <div class="modal-edit-body">
+          <div class="modal-edit-info">
+            <span><strong>{{ editModal.nombre }}</strong></span>
+            <span class="modal-edit-fecha">📅 {{ editModal.fecha }}</span>
+          </div>
+          <div v-if="editModal.turnoAbierto" class="modal-edit-alert">
+            🔴 Turno abierto sin cierre. Se cerrará solo si lleva más de 10h; si no, escribe la hora de salida.
+          </div>
+          <div class="modal-edit-fields">
+            <label>
+              <span>Entrada</span>
+              <input v-model="entradaInput" type="time" placeholder="HH:MM" />
+            </label>
+            <label>
+              <span>Salida</span>
+              <input v-model="salidaInput" type="time" placeholder="HH:MM" />
+            </label>
+          </div>
+          <p class="modal-edit-hint">Los tiempos se redondean a los 15 min más cercanos para el cálculo de nómina.</p>
+          <div class="modal-edit-actions">
+            <button class="btn-edit-cancel" @click="cerrarEdicionHora">Cancelar</button>
+            <button class="btn-edit-save" @click="guardarEdicionHora" :disabled="guardandoHora">
+              {{ guardandoHora ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

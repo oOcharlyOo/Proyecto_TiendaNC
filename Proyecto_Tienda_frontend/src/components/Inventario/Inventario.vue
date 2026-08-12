@@ -16,7 +16,7 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
     <InvHeader :total-items="totalItems" :cargando="cargando" :vista-lista="vistaLista"
       @update:vista-lista="vistaLista = $event" @recargar="cargar" />
 
-    <InvKpisBar :total-items="totalItems" :bajo-stock="bajoStock.length" :productos-agotados="productosAgotados.length"
+    <InvKpisBar :total-items="totalItems" :bajo-stock="bajoStock" :productos-agotados="productosAgotados"
       :costo-total="costoTotal" :ganancia-pot="gananciaPot" />
 
     <InvToolbar :filtro-busqueda="filtroBusqueda" :filtro-categoria="filtroCategoria" :ordenar-por="ordenarPor"

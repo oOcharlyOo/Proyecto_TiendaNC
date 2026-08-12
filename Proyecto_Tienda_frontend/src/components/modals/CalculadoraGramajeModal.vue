@@ -236,7 +236,7 @@ function confirmar() {
   background: rgba(0,0,0,.4);
   backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
-  z-index: 300;
+  z-index: 1100;
   animation: calcFadeIn .25s ease;
 }
 @keyframes calcFadeIn{from{opacity:0}to{opacity:1}}

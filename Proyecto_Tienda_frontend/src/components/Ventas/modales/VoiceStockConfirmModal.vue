@@ -216,7 +216,7 @@ watch(() => props.open, (val) => {
                 v-model="manualInput"
                 class="stock-text-input"
                 placeholder="Ej: actualiza el stock de cocacola a 15"
-                @keyup.enter="parsearComando"
+                @keyup.enter="parsearComando()"
                 :disabled="parseando || reconociendo"
               />
               <button
@@ -228,7 +228,7 @@ watch(() => props.open, (val) => {
               >
                 {{ reconociendo ? '⏹' : '🎤' }}
               </button>
-              <button class="stock-btn stock-btn-primary" @click="parsearComando" :disabled="parseando || !manualInput.trim()">
+              <button class="stock-btn stock-btn-primary" @click="parsearComando()" :disabled="parseando || !manualInput.trim()">
                 {{ parseando ? 'Procesando...' : 'Procesar' }}
               </button>
             </div>

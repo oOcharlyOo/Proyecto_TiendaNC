@@ -4,7 +4,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   tickets, ticketActualId, ticketActual, ticket, creandoTicket, ticketDelDia,
   totalVenta, ticketInfoText, nombreUsuario, mensaje, mensajeTipo,
-  obtenerIniciales, getJson, mostrarMensaje,
+  obtenerIniciales, getJson, mostrarMensaje, formatoMoneda,
   cargarSiguienteTicket, crearNuevoTicket, cargarTicketsDesdeBackend,
   seleccionarTicket, eliminarTicket, aumentarCantidad, disminuirCantidad,
   quitarItem, limpiarTicket, getFechaHoy

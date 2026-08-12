@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Bar, Pie, Line } from 'vue-chartjs';
 import * as r from './logica/useReporteVentas';
 import { useReporteVentas } from './logica/useReporteVentas';
@@ -8,6 +8,27 @@ useReporteVentas();
 const categoriasExpandidas = ref<Record<string, boolean>>({});
 function toggleCategoria(cat: string) {
   categoriasExpandidas.value[cat] = !categoriasExpandidas.value[cat];
+}
+
+const rentaEditable = ref<number>(r.rentaMensual.value);
+const guardandoRenta = ref(false);
+watch(() => r.rentaMensual.value, (v) => {
+  rentaEditable.value = v;
+});
+
+async function guardarRentaLocal() {
+  guardandoRenta.value = true;
+  const ok = await r.guardarRenta(Number(rentaEditable.value || 0));
+  guardandoRenta.value = false;
+  if (ok) rentaEditable.value = r.rentaMensual.value;
+}
+
+const limiteUnitarios = ref(10);
+const limiteGramaje = ref(10);
+function toggleLimite(tipo: 'unitarios' | 'gramaje') {
+  const total = tipo === 'unitarios' ? r.productosUnitarios.value.length : r.productosGramaje.value.length;
+  const limite = tipo === 'unitarios' ? limiteUnitarios : limiteGramaje;
+  limite.value = limite.value === 10 ? total : 10;
 }
 </script>
 
@@ -62,6 +83,17 @@ function toggleCategoria(cat: string) {
         </div>
       </div>
     </header>
+
+    <div v-if="r.esAdmin.value" class="card-section s-renta renta-admin">
+      <h3 class="section-title"><span class="section-icon">🏠</span> Renta del Local</h3>
+      <div class="renta-admin-controls">
+        <label class="renta-admin-label" for="renta-mensual">Monto mensual</label>
+        <input id="renta-mensual" v-model="rentaEditable" type="number" min="0" step="0.01" class="renta-admin-input" />
+        <button class="btn-cargar" @click="guardarRentaLocal" :disabled="guardandoRenta">
+          {{ guardandoRenta ? '...' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
 
     <div class="rango-actual">
       <span class="rango-label">📅 Rango consultado:</span>
@@ -124,15 +156,43 @@ function toggleCategoria(cat: string) {
             <div class="summary-card highlight ganancia">
               <span class="summary-icon">💵</span>
               <div class="summary-info">
-                <span class="summary-label">Ganancia Neta</span>
-                <span class="summary-value">{{ r.formatoMoneda(r.totalGanancia.value) }}</span>
+                <span class="summary-label">Ganancia Bruta</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.gananciaBruta.value) }}</span>
+              </div>
+            </div>
+            <div class="summary-card">
+              <span class="summary-icon">👥</span>
+              <div class="summary-info">
+                <span class="summary-label">Sueldos Pagados</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.totalSueldosPagados.value) }}</span>
+              </div>
+            </div>
+            <div class="summary-card">
+              <span class="summary-icon">🏠</span>
+              <div class="summary-info">
+                <span class="summary-label">Renta del Local</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.rentaPeriodo.value) }}</span>
               </div>
             </div>
             <div class="summary-card highlight ganancia">
               <span class="summary-icon">📊</span>
               <div class="summary-info">
-                <span class="summary-label">Ganancia Prom. por Día</span>
-                <span class="summary-value">{{ r.formatoMoneda(r.gananciaPromedioDia.value) }}</span>
+                <span class="summary-label">Ganancia Neta</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.gananciaNeta.value) }}</span>
+              </div>
+            </div>
+            <div class="summary-card highlight ganancia">
+              <span class="summary-icon">📅</span>
+              <div class="summary-info">
+                <span class="summary-label">Ganancia Bruta Prom. por Día</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.gananciaBrutaPromedioDia.value) }}</span>
+              </div>
+            </div>
+            <div class="summary-card highlight ganancia">
+              <span class="summary-icon">📈</span>
+              <div class="summary-info">
+                <span class="summary-label">Ganancia Neta Prom. por Día</span>
+                <span class="summary-value">{{ r.formatoMoneda(r.gananciaNetaPromedioDia.value) }}</span>
               </div>
             </div>
           </div>
@@ -223,7 +283,7 @@ function toggleCategoria(cat: string) {
             <div class="chart-card chart-wide chart-tall">
               <h3 class="chart-title">📈 Tendencia de Ventas</h3>
               <div class="chart-container">
-                <Line :data="r.chartTendencia.value" :options="r.chartOptionsTendencia" />
+                <Line :data="r.chartTendencia.value" :options="r.chartOptionsTendencia.value" />
               </div>
             </div>
             <div class="chart-card chart-wide chart-tall">
@@ -271,7 +331,7 @@ function toggleCategoria(cat: string) {
             <div class="chart-card">
               <h3 class="chart-title">💳 Ventas por Método de Pago</h3>
               <div class="chart-container chart-pie">
-                <Pie :data="r.chartMetodos.value" :options="r.chartPieOptions" />
+                <Pie :data="r.chartMetodos.value" :options="r.chartPieOptions.value" />
               </div>
             </div>
           </div>
@@ -283,18 +343,20 @@ function toggleCategoria(cat: string) {
             <div class="chart-card chart-wide">
               <h3 class="chart-title">🏷️ Ventas por Categoría (Monto)</h3>
               <div class="chart-container">
-                <Bar :data="r.chartVentasCategoria.value" :options="r.chartOptionsCategoria" />
+                <Bar v-if="!r.esMovil.value" :data="r.chartVentasCategoria.value" :options="r.chartOptionsCategoria" />
+                <Bar v-else :data="r.chartVentasCategoriaMovil.value" :options="r.chartOptionsCategoriaMovil.value" />
               </div>
             </div>
             <div class="chart-card chart-wide">
               <h3 class="chart-title">🏷️ Ganancia por Categoría</h3>
               <div class="chart-container">
-                <Bar :data="r.chartGananciaCategoria.value" :options="r.chartOptionsCategoria" />
+                <Bar v-if="!r.esMovil.value" :data="r.chartGananciaCategoria.value" :options="r.chartOptionsCategoria" />
+                <Bar v-else :data="r.chartGananciaCategoriaMovil.value" :options="r.chartOptionsCategoriaMovil.value" />
               </div>
             </div>
             <div class="chart-card chart-wide">
               <h3 class="chart-title">📊 Ventas vs Costo vs Ganancia por Categoría</h3>
-              <div class="tabla-container">
+              <div v-if="!r.esMovil.value" class="tabla-container">
                 <table class="tabla-productos">
                   <thead>
                     <tr>
@@ -337,6 +399,9 @@ function toggleCategoria(cat: string) {
                   </tbody>
                 </table>
               </div>
+              <div v-else class="chart-container" style="height: 360px;">
+                <Bar :data="r.chartCategoriaComparativa.value" :options="r.chartOptionsCategoriaComparativa" />
+              </div>
             </div>
           </div>
         </div>
@@ -370,7 +435,7 @@ function toggleCategoria(cat: string) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="p in r.productosUnitarios.value" :key="p.nombre">
+                    <tr v-for="p in r.productosUnitarios.value.slice(0, limiteUnitarios)" :key="p.nombre">
                       <td>{{ p.nombre }}</td>
                       <td class="text-right">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
                       <td class="text-right monto">{{ r.formatoMoneda(p.montoTotal) }}</td>
@@ -379,6 +444,9 @@ function toggleCategoria(cat: string) {
                     </tr>
                   </tbody>
                 </table>
+                <button v-if="r.productosUnitarios.value.length > 10" class="table-more-btn" @click="toggleLimite('unitarios')">
+                  {{ limiteUnitarios === 10 ? `Ver más (${r.productosUnitarios.value.length - 10} restantes)` : 'Ver menos' }}
+                </button>
               </div>
             </div>
             <div class="chart-card">
@@ -395,7 +463,7 @@ function toggleCategoria(cat: string) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="p in r.productosGramaje.value" :key="p.nombre">
+                    <tr v-for="p in r.productosGramaje.value.slice(0, limiteGramaje)" :key="p.nombre">
                       <td>{{ p.nombre }}</td>
                       <td class="text-right">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
                       <td class="text-right monto">{{ r.formatoMoneda(p.montoTotal) }}</td>
@@ -404,6 +472,9 @@ function toggleCategoria(cat: string) {
                     </tr>
                   </tbody>
                 </table>
+                <button v-if="r.productosGramaje.value.length > 10" class="table-more-btn" @click="toggleLimite('gramaje')">
+                  {{ limiteGramaje === 10 ? `Ver más (${r.productosGramaje.value.length - 10} restantes)` : 'Ver menos' }}
+                </button>
               </div>
             </div>
           </div>
@@ -519,8 +590,9 @@ function toggleCategoria(cat: string) {
 .reporte-ventas :deep(.rango-actual){display:flex;align-items:center;gap:.5rem;padding:.35rem .7rem;background:var(--color-bg-panel);border:none;border-radius:8px;font-size:.72rem;box-shadow:2px 2px 4px rgba(0,0,0,.06)}.reporte-ventas :deep(.rango-label){color:var(--color-text-secondary);font-weight:600}.reporte-ventas :deep(.rango-fechas){color:var(--color-accent);font-weight:700;font-family:'Courier New',monospace}.reporte-ventas :deep(.rango-detalle){color:var(--color-text-secondary);opacity:.7}
 .reporte-ventas :deep(.loading-state){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;padding:3rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.loading-spinner){width:40px;height:40px;border:3px solid var(--color-border);border-top-color:var(--color-accent);border-radius:50%;animation:repSpin .8s linear infinite}@keyframes repSpin{to{transform:rotate(360deg)}}
 .reporte-ventas :deep(.cards-sections){display:flex;flex-direction:column;gap:.75rem}.reporte-ventas :deep(.card-section){background:var(--color-bg-secondary);border:none;border-radius:12px;padding:.7rem .85rem;box-shadow:3px 3px 8px rgba(0,0,0,.08)}.reporte-ventas :deep(.card-section.s-ventas){border-left:4px solid var(--color-success)}.reporte-ventas :deep(.card-section.s-ganancias){border-left:4px solid #9b59b6}.reporte-ventas :deep(.card-section.s-pagos){border-left:4px solid #3498db}.reporte-ventas :deep(.card-section.s-flujo){border-left:4px solid #e67e22}.reporte-ventas :deep(.section-title){margin:0 0 .45rem;font-size:.82rem;color:var(--color-text-primary);font-weight:800;display:flex;align-items:center;gap:.35rem}.reporte-ventas :deep(.section-icon){font-size:1rem}.reporte-ventas :deep(.section-cards){display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.4rem}.reporte-ventas :deep(.summary-card){display:flex;align-items:center;gap:.6rem;padding:.7rem .85rem;background:var(--color-bg-primary);border:none;border-radius:10px;box-shadow:3px 3px 6px rgba(0,0,0,.08),-1px -1px 3px rgba(255,255,255,.02)}.reporte-ventas :deep(.summary-card.highlight){box-shadow:3px 3px 6px rgba(0,0,0,.08),0 0 8px color-mix(in srgb,var(--color-accent) 15%,transparent)}.reporte-ventas :deep(.summary-card.ganancia){box-shadow:3px 3px 6px rgba(0,0,0,.08),0 0 8px color-mix(in srgb,var(--color-success) 15%,transparent)}.reporte-ventas :deep(.summary-icon){font-size:1.5rem}.reporte-ventas :deep(.summary-info){display:flex;flex-direction:column;gap:.05rem}.reporte-ventas :deep(.summary-label){font-size:.6rem;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.03em}.reporte-ventas :deep(.summary-value){font-size:1rem;font-weight:800;color:var(--color-text-primary)}
+.reporte-ventas :deep(.card-section.s-renta){border-left:4px solid #e67e22}.reporte-ventas :deep(.renta-admin-controls){display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.reporte-ventas :deep(.renta-admin-label){font-size:.68rem;color:var(--color-text-secondary);font-weight:700}.reporte-ventas :deep(.renta-admin-input){width:140px;padding:.4rem .6rem;background:var(--color-bg-primary);border:none;border-radius:7px;color:var(--color-text-primary);font-size:.78rem;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08)}.reporte-ventas :deep(.renta-admin-input:focus){outline:none;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08),0 0 0 2px var(--color-accent)}
 .reporte-ventas :deep(.charts-sections){display:flex;flex-direction:column;gap:.75rem}.reporte-ventas :deep(.chart-section){background:var(--color-bg-secondary);border:none;border-radius:12px;padding:.7rem .85rem;box-shadow:3px 3px 8px rgba(0,0,0,.08)}.reporte-ventas :deep(.chart-section.s-tendencia){border-left:4px solid #1abc9c}.reporte-ventas :deep(.chart-section.s-top){border-left:4px solid #f39c12}.reporte-ventas :deep(.chart-section.s-pagos){border-left:4px solid #3498db}.reporte-ventas :deep(.chart-section.s-categorias){border-left:4px solid #9b59b6}.reporte-ventas :deep(.chart-section.s-detalle){border-left:4px solid var(--color-success)}.reporte-ventas :deep(.section-charts){display:grid;grid-template-columns:1fr;gap:.5rem}.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:repeat(2,1fr)}.reporte-ventas :deep(.chart-wide){grid-column:1 / -1}.reporte-ventas :deep(.chart-card){background:var(--color-bg-primary);border:none;border-radius:12px;padding:.75rem .85rem;box-shadow:3px 3px 8px rgba(0,0,0,.08)}.reporte-ventas :deep(.chart-title){margin:0 0 .4rem;font-size:.78rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.chart-container){position:relative;height:280px}.reporte-ventas :deep(.chart-container canvas){width:100%!important}.reporte-ventas :deep(.chart-container.chart-pie){height:240px}.reporte-ventas :deep(.chart-tall .chart-container){height:340px}
-.reporte-ventas :deep(.tabla-container){overflow-x:auto;max-height:400px;overflow-y:auto}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar){width:5px}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar-thumb){background:var(--color-border);border-radius:3px}.reporte-ventas :deep(.tabla-productos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-productos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.6rem;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg-secondary)}.reporte-ventas :deep(.tabla-productos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02);color:var(--color-text-primary)}.reporte-ventas :deep(.tabla-productos tr:hover td){background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.text-right){text-align:right}.reporte-ventas :deep(.monto){color:var(--color-success);font-weight:700}.reporte-ventas :deep(.costo){color:var(--color-accent)}.reporte-ventas :deep(.ganancia){color:var(--color-success);font-weight:700}
+.reporte-ventas :deep(.tabla-container){overflow-x:auto;max-height:400px;overflow-y:auto}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar){width:5px}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar-thumb){background:var(--color-border);border-radius:3px}.reporte-ventas :deep(.tabla-productos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-productos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.6rem;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg-secondary)}.reporte-ventas :deep(.tabla-productos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02);color:var(--color-text-primary)}.reporte-ventas :deep(.tabla-productos tr:hover td){background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.text-right){text-align:right}.reporte-ventas :deep(.monto){color:var(--color-success);font-weight:700}.reporte-ventas :deep(.costo){color:var(--color-accent)}.reporte-ventas :deep(.ganancia){color:var(--color-success);font-weight:700}.reporte-ventas :deep(.table-more-btn){display:block;margin:.5rem auto 0;padding:.35rem .8rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-accent);font-size:.7rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 5px rgba(0,0,0,.08)}.reporte-ventas :deep(.table-more-btn:hover){box-shadow:2px 2px 5px rgba(0,0,0,.08),0 0 6px color-mix(in srgb,var(--color-accent) 25%,transparent)}
 .reporte-ventas :deep(.modal-overlay-cat){position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}.reporte-ventas :deep(.modal-card-cat){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,700px);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}.reporte-ventas :deep(.modal-movimientos){max-width:600px}.reporte-ventas :deep(.modal-header-cat){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}.reporte-ventas :deep(.modal-header-cat h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.modal-close-cat){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}.reporte-ventas :deep(.modal-close-cat:hover){background:var(--color-error);color:#fff}.reporte-ventas :deep(.modal-body-cat){padding:1rem;overflow-y:auto;flex:1}.reporte-ventas :deep(.modal-empty){padding:2rem;text-align:center;color:var(--color-text-secondary)}.reporte-ventas :deep(.chart-container-modal){height:250px;margin-bottom:.75rem}
 .reporte-ventas :deep(.tabla-modal table){width:100%;border-collapse:collapse;font-size:.7rem}.reporte-ventas :deep(.tabla-modal th){padding:.35rem .5rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-modal td){padding:.3rem .5rem;border-bottom:1px solid rgba(255,255,255,.02)}
 .reporte-ventas :deep(.tabla-movimientos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-movimientos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-movimientos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02)}.reporte-ventas :deep(.tabla-movimientos tfoot td){font-weight:700;border-top:1px solid var(--color-border)}.reporte-ventas :deep(.fecha-col){white-space:nowrap;font-family:monospace;font-size:.68rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.desc-text){color:var(--color-text-primary)}.reporte-ventas :deep(.edit-desc-input){padding:.25rem .4rem;background:var(--color-bg-primary);border:none;border-radius:4px;color:var(--color-text-primary);font-size:.7rem;width:100%;box-shadow:inset 2px 2px 3px rgba(0,0,0,.1)}.reporte-ventas :deep(.edit-actions){display:inline-flex;gap:.2rem;margin-left:.3rem}.reporte-ventas :deep(.btn-edit-save){border:none;border-radius:3px;background:var(--color-success);color:#fff;font-size:.6rem;cursor:pointer;padding:.1rem .25rem}.reporte-ventas :deep(.btn-edit-cancel),.reporte-ventas :deep(.btn-edit-icon){border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;border-radius:3px;padding:0 .25rem;font-size:.65rem;box-shadow:1px 1px 2px rgba(0,0,0,.05)}.reporte-ventas :deep(.btn-edit-cancel:hover),.reporte-ventas :deep(.btn-edit-icon:hover){color:var(--color-accent)}

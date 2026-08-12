@@ -4,6 +4,7 @@ import type { VentaDTO, VentaDetalleDTO } from '../logica/useCorte';
 const props = defineProps<{
   abierto: boolean; cargando: boolean; historialData: { venta: VentaDTO; detalles: VentaDetalleDTO[] }[];
   historialTotalFiltrado: number;
+  historialGananciaFiltrada: number;
   filtroMesHistorial: string; filtroAnioHistorial: number; filtroDiaHistorial: number | null; filtroDiscrepanciaHistorial: boolean;
   historialPagina: number; historialTotalPaginas: number; historialTotalElementos: number;
   ventasHistorialSeleccionadas: Set<number>; corrigiendoHistorial: boolean; correccionHistorialMsg: string;
@@ -58,24 +59,37 @@ const nombreUsuario = computed(() => {
           <span>{{ ventasHistorialSeleccionadas.size }} seleccionadas</span>
           <button class="action-btn small" :disabled="corrigiendoHistorial" @click="$emit('corregir-seleccionadas')">{{ corrigiendoHistorial ? 'Corrigiendo...' : 'Corregir Discrepancias' }}</button>
         </div>
-        <div class="historial-total">Total filtrado: {{ formatoMoneda(historialTotalFiltrado) }}</div>
+        <div class="historial-total">Total filtrado: <span class="total-monto">{{ formatoMoneda(historialTotalFiltrado) }}</span> · Ganancia: <span class="total-ganancia">{{ formatoMoneda(Math.round(historialGananciaFiltrada)) }}</span></div>
         <div v-if="cargando" class="loading">Cargando historial...</div>
-        <div v-else class="historial-list">
-          <div v-for="item in historialData" :key="item.venta.idVenta" class="historial-item" :class="{ discrepancia: item.venta.tieneDiscrepancia }">
-            <div class="historial-main" @click="$emit('abrir-detalle', item.venta.idVenta)">
-              <div class="venta-info">
-                <span class="venta-id">#{{ item.venta.idVenta }}</span>
-                <span class="venta-fecha">{{ formatoFecha(item.venta.fechaVenta) }}</span>
-                <span class="venta-monto">{{ formatoMoneda(Number(item.venta.montoTotal)) }}</span>
-                <span class="metodo-badge" :class="getMetodoClase(item.venta.metodoPago)">{{ getMetodoIcono(item.venta.metodoPago) }} {{ item.venta.metodoPago || 'EFECTIVO' }}</span>
-              </div>
-              <div class="venta-usuario">{{ item.venta.nombreUsuario || item.venta.usuario?.nombre || nombreUsuario(item.venta.idUsuario) }}</div>
-            </div>
-            <label class="checkbox-label historial-check" @click.stop @change="$emit('toggle-seleccion', item.venta.idVenta)">
-              <input type="checkbox" :checked="ventasHistorialSeleccionadas.has(item.venta.idVenta)" />
-            </label>
-            <div v-if="item.venta.tieneDiscrepancia" class="discrepancia-badge">⚠️ Discrepancia</div>
-          </div>
+        <div v-else class="historial-table-wrap">
+          <table class="historial-table">
+            <thead>
+              <tr>
+                <th class="historial-check-th"></th>
+                <th>Ticket</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Ganancia</th>
+                <th>Pago</th>
+                <th>Cajero</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in historialData" :key="item.venta.idVenta" class="historial-row" :class="{ discrepancia: item.venta.tieneDiscrepancia }" @click="$emit('abrir-detalle', item.venta.idVenta)">
+                <td class="historial-check-cell" @click.stop>
+                  <label class="checkbox-label historial-check" @change="$emit('toggle-seleccion', item.venta.idVenta)">
+                    <input type="checkbox" :checked="ventasHistorialSeleccionadas.has(item.venta.idVenta)" />
+                  </label>
+                </td>
+                <td class="venta-id"><span v-if="item.venta.tieneDiscrepancia" class="discrepancia-badge">⚠️</span> #{{ item.venta.idVenta }}</td>
+                <td class="venta-fecha">{{ formatoFecha(item.venta.fechaVenta) }}</td>
+                <td class="venta-monto">{{ formatoMoneda(Number(item.venta.montoTotal)) }}</td>
+                <td class="venta-ganancia">{{ formatoMoneda(Math.round(Number(item.venta.ganancia ?? 0))) }}</td>
+                <td class="venta-pago"><span class="metodo-badge" :class="getMetodoClase(item.venta.metodoPago)">{{ getMetodoIcono(item.venta.metodoPago) }} {{ item.venta.metodoPago || 'EFECTIVO' }}</span></td>
+                <td class="venta-usuario">{{ item.venta.nombreUsuario || item.venta.usuario?.nombre || nombreUsuario(item.venta.idUsuario) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <div v-if="historialTotalPaginas > 1" class="pagination">
           <button class="pagination-btn" :disabled="historialPagina === 0" @click="$emit('cambiar-pagina', historialPagina - 1)">‹ Anterior</button>
@@ -160,24 +174,34 @@ const nombreUsuario = computed(() => {
 .correccion-msg { text-align: center; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 8px; background: color-mix(in srgb, var(--color-success) 10%, transparent); color: var(--color-success); font-weight: 500; }
 .batch-actions { display: flex; align-items: center; gap: 1rem; padding: 0.5rem; background: color-mix(in srgb, var(--color-accent) 10%, transparent); border-radius: 10px; margin-bottom: 0.5rem; }
 .historial-total { text-align: right; font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: 0.5rem; }
+.total-monto { font-weight: 700; color: var(--color-success); font-family: "Courier New", monospace; }
+.total-ganancia { font-weight: 700; color: var(--color-info); font-family: "Courier New", monospace; }
 
-/* Lista historial */
-.historial-list { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
-.historial-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.8rem; border-radius: 10px; background: rgba(255,255,255,.02); cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
-.historial-item:hover { background: rgba(255,255,255,.03); }
-.historial-item.discrepancia { border-color: color-mix(in srgb, var(--color-error) 30%, transparent); background: color-mix(in srgb, var(--color-error) 5%, transparent); }
-.historial-main { flex: 1; display: flex; justify-content: space-between; align-items: center; }
-.venta-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.venta-id { font-weight: 700; color: var(--color-accent); }
-.venta-fecha { font-size: 0.8rem; color: var(--color-text-secondary); }
-.venta-monto { font-weight: 600; }
-.metodo-badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; }
+/* Tabla historial */
+.historial-table-wrap { max-height: 60vh; overflow-y: auto; }
+.historial-table { width: 100%; border-collapse: collapse; }
+.historial-table thead { position: sticky; top: 0; z-index: 5; }
+.historial-table th { padding: 0.5rem 0.75rem; font-size: 0.65rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; background: var(--color-bg-panel); border-bottom: 2px solid var(--color-border); text-align: left; }
+.historial-table th:nth-child(4), .historial-table th:nth-child(5), .historial-table th:nth-child(6) { text-align: center; }
+.historial-check-th { width: 30px; }
+.historial-row { border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background 0.15s; }
+.historial-row:hover { background: rgba(255,255,255,.03); }
+.historial-row.discrepancia { border-left: 3px solid var(--color-error); background: color-mix(in srgb, var(--color-error) 5%, transparent); }
+.historial-row td { padding: 0.5rem 0.75rem; font-size: 0.82rem; vertical-align: middle; }
+.historial-check-cell { width: 30px; }
+.venta-id { font-weight: 700; color: var(--color-accent); font-family: "Courier New", monospace; white-space: nowrap; }
+.venta-id .discrepancia-badge { margin-right: 0.3rem; }
+.venta-fecha { font-size: 0.8rem; color: var(--color-text-secondary); white-space: nowrap; }
+.venta-monto { font-weight: 700; color: var(--color-success); font-family: "Courier New", monospace; text-align: center; }
+.venta-ganancia { font-weight: 700; color: var(--color-info); font-family: "Courier New", monospace; text-align: center; }
+.venta-pago { text-align: center; }
+.venta-usuario { font-size: 0.78rem; color: var(--color-text-secondary); white-space: nowrap; }
+.historial-check { margin: 0; padding: 0; display: inline-flex; }
+.metodo-badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; white-space: nowrap; }
 .metodo-badge.efectivo { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); }
 .metodo-badge.transfer { background: color-mix(in srgb, var(--color-info) 15%, transparent); color: var(--color-info); }
 .metodo-badge.tarjeta { background: color-mix(in srgb,var(--color-accent) 15%,transparent); color: var(--color-accent); }
-.venta-usuario { font-size: 0.75rem; color: var(--color-text-secondary); }
-.historial-check { margin: 0; padding: 0.3rem; }
-.discrepancia-badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px; background: color-mix(in srgb, var(--color-error) 15%, transparent); color: var(--color-error); white-space: nowrap; }
+.discrepancia-badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--color-error) 15%, transparent); color: var(--color-error); white-space: nowrap; }
 
 /* Detalle tabla */
 .venta-metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
@@ -210,5 +234,8 @@ const nombreUsuario = computed(() => {
   .modal-container { max-width: 95vw; padding: 1rem; }
   .filtros-historial { flex-direction: column; }
   .filtros-historial select, .filtros-historial .checkbox-label { width: 100%; }
+  .historial-table th:nth-child(3), .historial-table td:nth-child(3),
+  .historial-table th:nth-child(6), .historial-table td:nth-child(6),
+  .historial-table th:nth-child(7), .historial-table td:nth-child(7) { display: none; }
 }
 </style>

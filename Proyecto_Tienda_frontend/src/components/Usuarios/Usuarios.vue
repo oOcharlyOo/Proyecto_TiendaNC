@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useUsuarios } from './logica/useUsuarios';
-const { usuarios, cargando, modalAbierto, editando, modalSueldoAbierto, seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas, diasTrabajados, cargandoAsistencias, avatarPreview, dragando, form, tipoUsuarioActual, esAdmin, puedeEditar, esEdicionPerfilPropio, usuarioTop, cargarUsuarios, cargarVentasPorUsuario, cargarAsistencias, cambiarSeccion, formatoMoneda, formatoFecha, formatoCantidad, abrirModalNuevo, abrirModalEditar, cerrarModal, handleDragOver, handleDragLeave, handleDrop, handleFileSelect, formatAvatarUrl, guardarUsuario, eliminarUsuario, getTipoLabel, getNombreMes, getIniciales, getHorasTotales, getHorasFormateadas, formatoHora, getHorasDelDia, getDiasCalendario, semanasDelMes, getPagoSemanal, getPagoTotal, getSueldoHora, getHorasSemana } = useUsuarios();
+const { usuarios, cargando, modalAbierto, editando, modalSueldoAbierto, seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas, diasTrabajados, cargandoAsistencias, guardandoHora, avatarPreview, dragando, form, tipoUsuarioActual, esAdmin, puedeEditar, esEdicionPerfilPropio, usuarioTop, cargarUsuarios, cargarVentasPorUsuario, cargarAsistencias, guardarHoraCaja, eliminarTurno, cambiarSeccion, formatoMoneda, formatoFecha, formatoCantidad, abrirModalNuevo, abrirModalEditar, cerrarModal, handleDragOver, handleDragLeave, handleDrop, handleFileSelect, formatAvatarUrl, guardarUsuario, eliminarUsuario, getTipoLabel, getNombreMes, getIniciales, getHorasTotales, getHorasFormateadas, formatoHora, getHorasDelDia, getDiasCalendario, semanasDelMes, getPagoSemanal, getPagoTotal, getSueldoHora, getHorasSemana } = useUsuarios();
 
 const semanasDelMesArray = computed(() => {
   if (!diasTrabajados.value) return [];
   return semanasDelMes(diasTrabajados.value.mes, diasTrabajados.value.anio);
 });
+
+async function guardarHora(detalle: { idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }) {
+  const ok = await guardarHoraCaja(detalle.idUsuario, detalle.fecha, detalle.hora, detalle.tipo);
+  if (ok) {
+    const [y, m] = detalle.fecha.split('-');
+    cargarAsistencias(Number(m), Number(y));
+  }
+}
+
+async function eliminarTurnoHandler(detalle: { idUsuario: number; fecha: string; nombre: string }) {
+  const ok = await eliminarTurno(detalle.idUsuario, detalle.fecha, detalle.nombre);
+  if (ok) {
+    const [y, m] = detalle.fecha.split('-');
+    cargarAsistencias(Number(m), Number(y));
+  }
+}
 
 import UsuariosHeader from './secciones/UsuariosHeader.vue';
 import UsuariosTabs from './secciones/UsuariosTabs.vue';
@@ -71,6 +87,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
       v-if="seccionActiva === 'asistencias'"
       :dias-trabajados="diasTrabajados"
       :cargando-asistencias="cargandoAsistencias"
+      :guardando-hora="guardandoHora"
       :filtro-mes-ventas="filtroMesVentas"
       :es-admin="esAdmin"
       :semanas-del-mes="semanasDelMesArray"
@@ -88,6 +105,8 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
       :formato-moneda="formatoMoneda"
       @cargar-asistencias="() => { const [y, m] = (filtroMesVentas || '').split('-'); cargarAsistencias(Number(m), Number(y)); }"
       @update:filtro-mes-ventas="filtroMesVentas = $event"
+      @guardar-hora="guardarHora"
+      @eliminar-turno="eliminarTurnoHandler"
     />
 
     <UsuariosModal
@@ -245,6 +264,35 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.pago-usuario-nombre){display:flex;flex-direction:column}.usuarios-layout :deep(.pago-usuario-nombre span){font-weight:700;font-size:.8rem}.usuarios-layout :deep(.pago-usuario-nombre small){font-size:.58rem;color:var(--color-text-secondary)}.usuarios-layout :deep(.pago-usuario-nombre small.sin-sueldo){color:var(--color-error);font-style:italic}
 .usuarios-layout :deep(.pago-cell-content){display:flex;flex-direction:column;align-items:center;gap:1px}.usuarios-layout :deep(.pago-cell-horas){font-size:.65rem;color:var(--color-info);font-weight:600}.usuarios-layout :deep(.pago-cell-horas.total){font-weight:700}.usuarios-layout :deep(.pago-cell-monto){font-size:.75rem;color:var(--color-success);font-weight:700}.usuarios-layout :deep(.pago-cell-monto.total){font-weight:900}
 .usuarios-layout :deep(.pago-cell.total){background:color-mix(in srgb,var(--color-accent) 8%,transparent)}
+.usuarios-layout :deep(.btn-edit-hora){border:none;background:var(--color-bg-panel);color:var(--color-accent);cursor:pointer;border-radius:3px;padding:0 2px;font-size:.5rem;line-height:1;flex-shrink:0;box-shadow:1px 1px 2px rgba(0,0,0,.08);opacity:.65;transition:all .15s}
+.usuarios-layout :deep(.btn-edit-hora:hover){opacity:1;transform:scale(1.15)}
+.usuarios-layout :deep(.dia-chip .btn-edit-hora){font-size:.55rem;padding:0 3px}
+.usuarios-layout :deep(.btn-del-hora){border:none;background:var(--color-bg-panel);color:var(--color-error);cursor:pointer;border-radius:3px;padding:0 2px;font-size:.5rem;line-height:1;flex-shrink:0;box-shadow:1px 1px 2px rgba(0,0,0,.08);opacity:.65;transition:all .15s}
+.usuarios-layout :deep(.btn-del-hora:hover){opacity:1;transform:scale(1.15);background:var(--color-error);color:#fff}
+.usuarios-layout :deep(.dia-chip .btn-del-hora){font-size:.55rem;padding:0 3px}
+.usuarios-layout :deep(.modal-edit-hora){position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:1100;padding:1rem}
+.usuarios-layout :deep(.modal-edit-card){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,360px);overflow:hidden;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}
+.usuarios-layout :deep(.modal-edit-header){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}
+.usuarios-layout :deep(.modal-edit-header h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:800}
+.usuarios-layout :deep(.modal-edit-close){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}
+.usuarios-layout :deep(.modal-edit-close:hover){background:var(--color-error);color:#fff}
+.usuarios-layout :deep(.modal-edit-body){padding:1rem;display:flex;flex-direction:column;gap:.8rem}
+.usuarios-layout :deep(.modal-edit-info){display:flex;flex-direction:column;gap:.1rem}
+.usuarios-layout :deep(.modal-edit-info strong){font-size:.85rem;color:var(--color-text-primary)}
+.usuarios-layout :deep(.modal-edit-fecha){font-size:.68rem;color:var(--color-text-secondary)}
+.usuarios-layout :deep(.modal-edit-alert){background:color-mix(in srgb,var(--color-error) 12%,transparent);border:1px solid color-mix(in srgb,var(--color-error) 35%,transparent);color:var(--color-error);padding:.5rem .6rem;border-radius:8px;font-size:.62rem;font-weight:600;line-height:1.3}
+.usuarios-layout :deep(.modal-edit-fields){display:flex;gap:.6rem}
+.usuarios-layout :deep(.modal-edit-fields label){display:flex;flex-direction:column;gap:.25rem;flex:1}
+.usuarios-layout :deep(.modal-edit-fields label span){font-size:.62rem;color:var(--color-text-secondary);font-weight:700;text-transform:uppercase}
+.usuarios-layout :deep(.modal-edit-fields input){padding:.45rem .55rem;background:var(--color-bg-primary);border:none;border-radius:7px;color:var(--color-text-primary);font-size:.85rem;box-shadow:inset 2px 2px 4px rgba(0,0,0,.1)}
+.usuarios-layout :deep(.modal-edit-fields input:focus){outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,.1),0 0 0 2px var(--color-accent)}
+.usuarios-layout :deep(.modal-edit-hint){margin:0;font-size:.62rem;color:var(--color-text-secondary);font-style:italic}
+.usuarios-layout :deep(.modal-edit-actions){display:flex;justify-content:flex-end;gap:.4rem;margin-top:.2rem}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-cancel){border:none;padding:.45rem .8rem;border-radius:7px;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;font-size:.7rem;font-weight:700;box-shadow:2px 2px 4px rgba(0,0,0,.08)}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-cancel:hover){color:var(--color-text-primary)}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-save){border:none;padding:.45rem .9rem;border-radius:7px;background:var(--color-success);color:#fff;cursor:pointer;font-size:.7rem;font-weight:800;box-shadow:2px 2px 5px rgba(0,0,0,.12);transition:all .15s}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-save:hover:not(:disabled)){transform:translateY(-1px)}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-save:disabled){opacity:.5;cursor:not-allowed}
 @media(max-width:992px){.usuarios-layout :deep(.stats-section){grid-template-columns:repeat(3,1fr)}.usuarios-layout :deep(.usuarios-grid){grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}}
 @media(max-width:768px){
   .usuarios-layout{padding:.5rem}

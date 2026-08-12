@@ -95,6 +95,17 @@ export const entradasCaja = ref<MovimientoCaja[]>([]);
 export const salidasCaja = ref<MovimientoCaja[]>([]);
 export const montoInicialPeriodo = ref<number>(0);
 export const aperturasPorDia = ref<Map<string, number>>(new Map());
+export const sueldosPeriodo = ref<number>(0);
+export const rentaMensual = ref<number>(0);
+export const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
+export const esMovil = ref(typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(max-width: 768px)').matches
+  : false);
+export const rentaPeriodo = computed(() => {
+  if (periodo.value === 'mes') return rentaMensual.value;
+  if (periodo.value === 'anio') return Math.round(rentaMensual.value * 12 * 100) / 100;
+  return 0;
+});
 
 export function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -473,6 +484,15 @@ export const gananciaPromedioDia = computed(() => {
   return Math.round((totalGanancia.value / diasEnPeriodo.value) * 100) / 100;
 });
 
+export const gananciaBruta = computed(() => totalGanancia.value);
+export const totalSueldosPagados = computed(() => sueldosPeriodo.value);
+export const gananciaNeta = computed(() => Math.round((totalGanancia.value - totalSueldosPagados.value - rentaPeriodo.value) * 100) / 100);
+export const gananciaBrutaPromedioDia = computed(() => gananciaPromedioDia.value);
+export const gananciaNetaPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((gananciaNeta.value / diasEnPeriodo.value) * 100) / 100;
+});
+
 export const ventasPromedioDia = computed(() => {
   if (diasEnPeriodo.value === 0) return 0;
   return Math.round((totalMonto.value / diasEnPeriodo.value) * 100) / 100;
@@ -746,6 +766,92 @@ export const chartGananciaCategoria = computed(() => {
     datasets
   };
 });
+
+export const chartVentasCategoriaMovil = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [{
+      label: 'Ventas ($)',
+      data: cats.map(c => Math.round(c.totalMonto * 100) / 100),
+      backgroundColor: cats.map((_, i) => chartColors[i % chartColors.length]),
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+});
+
+export const chartGananciaCategoriaMovil = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [{
+      label: 'Ganancia ($)',
+      data: cats.map(c => Math.round(c.totalGanancia * 100) / 100),
+      backgroundColor: cats.map((_, i) => chartColors[i % chartColors.length] + '99'),
+      borderColor: cats.map((_, i) => chartColors[i % chartColors.length]),
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+});
+
+export function onCategoriaClickMovil(event: any, elements: any[]) {
+  if (elements.length > 0) {
+    const el = elements[0];
+    const catName = chartVentasCategoriaMovil.value.labels[el.index];
+    if (catName) {
+      categoriaSeleccionada.value = catName as string;
+      subCategoriaSeleccionada.value = '';
+      modalCategoriaOpen.value = true;
+    }
+  }
+}
+
+export const chartOptionsCategoriaMovil = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  onClick: onCategoriaClickMovil,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        title: (items: any[]) => {
+          if (!items.length) return '';
+          const catName = items[0].label;
+          const catData = categoriasJerarquicas.value.find(c => c.categoria === catName);
+          return `${catName} — Total: $${catData ? Math.round(catData.totalMonto * 100) / 100 : 0}`;
+        },
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX')}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#888', font: { size: 9 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      ticks: { color: '#f6f2de', font: { size: esMovil.value ? 9 : 11 } },
+      grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
+  }
+}));
 
 export const chartCategoriaComparativa = computed(() => {
   const cats = categoriasJerarquicas.value.slice(0, 10);
@@ -1030,60 +1136,63 @@ export const chartOptions = {
   }
 };
 
-export const chartOptionsTendencia = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 12 }, padding: 16 } },
-    tooltip: {
-      backgroundColor: '#1a1a2e',
-      titleColor: '#c99234',
-      bodyColor: '#f6f2de',
-      borderColor: '#c99234',
-      borderWidth: 1,
-      cornerRadius: 8,
-      mode: 'index' as const,
-      intersect: false,
-      callbacks: {
-        label: (ctx: any) => {
-          const val = ctx.parsed.y;
-          if (ctx.dataset.label.includes('$')) {
-            return ` ${ctx.dataset.label}: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const chartOptionsTendencia = computed(() => {
+  const movil = esMovil.value;
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: movil ? 10 : 12 }, padding: movil ? 8 : 16 } },
+      tooltip: {
+        backgroundColor: '#1a1a2e',
+        titleColor: '#c99234',
+        bodyColor: '#f6f2de',
+        borderColor: '#c99234',
+        borderWidth: 1,
+        cornerRadius: 8,
+        mode: 'index' as const,
+        intersect: false,
+        callbacks: {
+          label: (ctx: any) => {
+            const val = ctx.parsed.y;
+            if (ctx.dataset.label.includes('$')) {
+              return ` ${ctx.dataset.label}: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            return ` ${ctx.dataset.label}: ${val}`;
           }
-          return ` ${ctx.dataset.label}: ${val}`;
         }
       }
-    }
-  },
-  scales: {
-    x: {
-      ticks: { color: '#888', maxRotation: 45, font: { size: 11 } },
-      grid: { color: '#33333344' }
     },
-    y: {
-      type: 'linear' as const,
-      display: true,
-      position: 'left' as const,
-      ticks: { color: '#c99234', font: { size: 11 }, callback: (v: any) => `$${v}` },
-      grid: { color: '#33333344' },
-      beginAtZero: true,
-      title: { display: true, text: 'Monto / Ganancia ($)', color: '#c99234' }
+    scales: {
+      x: {
+        ticks: { color: '#888', maxRotation: movil ? 0 : 45, font: { size: movil ? 9 : 11 }, maxTicksLimit: movil ? 8 : undefined },
+        grid: { color: '#33333344' }
+      },
+      y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        ticks: { color: '#c99234', font: { size: movil ? 9 : 11 }, callback: (v: any) => `$${v}` },
+        grid: { color: '#33333344' },
+        beginAtZero: true,
+        title: { display: true, text: 'Monto / Ganancia ($)', color: '#c99234' }
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        ticks: { color: '#4a90d9', font: { size: movil ? 9 : 11 } },
+        grid: { drawOnChartArea: false },
+        beginAtZero: true,
+        title: { display: true, text: 'Cantidad', color: '#28a745' }
+      }
     },
-    y1: {
-      type: 'linear' as const,
-      display: true,
-      position: 'right' as const,
-      ticks: { color: '#4a90d9', font: { size: 11 } },
-      grid: { drawOnChartArea: false },
-      beginAtZero: true,
-      title: { display: true, text: 'Cantidad', color: '#28a745' }
+    interaction: {
+      mode: 'index' as const,
+      intersect: false
     }
-  },
-  interaction: {
-    mode: 'index' as const,
-    intersect: false
-  }
-};
+  };
+});
 
 export const chartOptionsBar = {
   responsive: true,
@@ -1313,11 +1422,14 @@ export const chartOptionsCategoria = {
   }
 };
 
-export const chartPieOptions = {
+export const chartPieOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'right' as const, labels: { color: '#f6f2de', font: { size: 12 }, padding: 12 } },
+    legend: {
+      position: esMovil.value ? ('bottom' as const) : ('right' as const),
+      labels: { color: '#f6f2de', font: { size: esMovil.value ? 10 : 12 }, padding: esMovil.value ? 6 : 12 }
+    },
     tooltip: {
       backgroundColor: '#1a1a2e',
       titleColor: '#c99234',
@@ -1330,7 +1442,7 @@ export const chartPieOptions = {
       }
     }
   }
-};
+}));
 
 export const chartOptionsFlujo = computed(() => ({
   responsive: true,
@@ -1439,6 +1551,102 @@ export function inicializarFecha() {
   }
 }
 
+async function cargarSueldosPeriodo(fechaInicio: string, fechaFin: string) {
+  try {
+    const resUsuarios = await fetch(`${API_BASE}/usuarios/listarUsuarios`);
+    const dataUsuarios = await resUsuarios.json();
+    const sueldoMap = new Map<number, number>();
+    if (dataUsuarios.codigo === 200 && Array.isArray(dataUsuarios.datos)) {
+      for (const u of dataUsuarios.datos) {
+        sueldoMap.set(Number(u.idUsuario), Number(u.sueldo_hora || 0));
+      }
+    }
+
+    const [inicioY, inicioM] = fechaInicio.split('-').map(Number);
+    const [finY, finM] = fechaFin.split('-').map(Number);
+    const inicio = parseLocalDate(fechaInicio);
+    const fin = parseLocalDate(fechaFin);
+
+    let total = 0;
+    let anio = inicioY;
+    let mes = inicioM;
+    while (anio < finY || (anio === finY && mes <= finM)) {
+      const res = await fetch(`${API_BASE}/asistencias/dias-trabajados?mes=${mes}&anio=${anio}`);
+      const data = await res.json();
+      if (data.codigo === 200 && data.datos?.usuarios) {
+        const firstDay = new Date(anio, mes - 1, 1);
+        const offset = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(anio, mes, 0).getDate();
+        const gridStart = new Date(anio, mes - 1, 1 - offset);
+        const gridEnd = new Date(anio, mes - 1, 1 - offset + Math.ceil((offset + daysInMonth) / 7) * 7 - 1);
+        const mesCubiertoCompleto = inicio <= new Date(anio, mes - 1, 1) && fin >= new Date(anio, mes - 1, daysInMonth);
+
+        for (const u of data.datos.usuarios) {
+          const sueldo = sueldoMap.get(Number(u.idUsuario)) || 0;
+          if (sueldo <= 0) continue;
+          let horas = 0;
+          if (u.horasPorDia) {
+            for (const [diaStr, h] of Object.entries(u.horasPorDia)) {
+              const dia = Number(diaStr);
+              const fechaDia = new Date(anio, mes - 1, dia);
+              if (fechaDia >= inicio && fechaDia <= fin) {
+                horas += Number(h);
+              }
+            }
+          }
+          if (mesCubiertoCompleto && Array.isArray(u.overflow)) {
+            for (const ov of u.overflow) {
+              if (!ov || !ov.fecha) continue;
+              const fechaOv = parseLocalDate(String(ov.fecha));
+              if (fechaOv >= gridStart && fechaOv <= gridEnd) {
+                horas += Number(ov.horas || 0);
+              }
+            }
+          }
+          total += horas * sueldo;
+        }
+      }
+      mes++;
+      if (mes > 12) { mes = 1; anio++; }
+    }
+    sueldosPeriodo.value = Math.round(total * 100) / 100;
+  } catch (e) {
+    console.error('Error al cargar sueldos del periodo:', e);
+    sueldosPeriodo.value = 0;
+  }
+}
+
+export async function cargarRenta() {
+  try {
+    const res = await fetch(`${API_BASE}/rentaLocal`);
+    const data = await res.json();
+    if (data.codigo === 200) {
+      rentaMensual.value = Number(data.datos || 0);
+    }
+  } catch (e) {
+    console.error('Error al cargar la renta del local:', e);
+    rentaMensual.value = 0;
+  }
+}
+
+export async function guardarRenta(monto: number) {
+  try {
+    const res = await fetch(`${API_BASE}/rentaLocal`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monto_mensual: monto })
+    });
+    const data = await res.json();
+    if (data.codigo === 200) {
+      rentaMensual.value = Number(data.datos || 0);
+    }
+    return data.codigo === 200;
+  } catch (e) {
+    console.error('Error al guardar la renta del local:', e);
+    return false;
+  }
+}
+
 export async function cargarDatos() {
   cargando.value = true;
   try {
@@ -1515,6 +1723,9 @@ export async function cargarDatos() {
       }
       aperturasPorDia.value = map;
     }
+
+    await cargarSueldosPeriodo(fechaInicio, fechaFin);
+    await cargarRenta();
   } catch (e) {
     console.error('Error al cargar reporte:', e);
   } finally {
@@ -1532,6 +1743,16 @@ export function useReporteVentas() {
     inicializarFecha();
     cargarDatos();
   });
+
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => { esMovil.value = e.matches; };
+    if (mq.addEventListener) {
+      mq.addEventListener('change', handler);
+    } else if ((mq as any).addListener) {
+      (mq as any).addListener(handler);
+    }
+  }
 }
 
 export function formatoMoneda(valor: number) {

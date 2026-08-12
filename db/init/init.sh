@@ -300,6 +300,16 @@ CREATE TABLE IF NOT EXISTS tiendadb.credito_abono (
         REFERENCES tiendadb.usuarios(id_usuario)
 );
 
+CREATE TABLE IF NOT EXISTS tiendadb.renta_local (
+    id_renta SERIAL PRIMARY KEY,
+    monto_mensual DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    actualizado_en TIMESTAMP DEFAULT NOW()
+);
+
+INSERT INTO tiendadb.renta_local (id_renta, monto_mensual)
+VALUES (1, 0)
+ON CONFLICT (id_renta) DO NOTHING;
+
 -- ========================================
 -- INDICES
 -- ========================================
@@ -676,6 +686,16 @@ CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.credito_abono (
     CONSTRAINT fk_ca_usuario FOREIGN KEY (id_usuario)
         REFERENCES tiendadb_abarrotera.usuarios(id_usuario)
 );
+
+CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.renta_local (
+    id_renta SERIAL PRIMARY KEY,
+    monto_mensual DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    actualizado_en TIMESTAMP DEFAULT NOW()
+);
+
+INSERT INTO tiendadb_abarrotera.renta_local (id_renta, monto_mensual)
+VALUES (1, 0)
+ON CONFLICT (id_renta) DO NOTHING;
 
 -- Indices
 CREATE INDEX IF NOT EXISTS idx_ganancias_fecha ON tiendadb_abarrotera.ganancias_acumuladas(fecha_movimiento DESC);

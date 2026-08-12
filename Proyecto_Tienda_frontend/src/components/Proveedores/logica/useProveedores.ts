@@ -63,7 +63,7 @@ const provisionSemanal = ref<ProvisionDia[]>([]);
 const productosDisponibles = ref<{ idProducto: number; nombre: string; precio_costo: number; codigoBarras?: string }[]>([]);
 const categorias = ref<{ idCategoria: number; nombre: string }[]>([]);
 
-const activeTab = ref<'proveedores' | 'pedidos' | 'provision' | 'sugerido' | 'sugeridoHoy' | 'asignar'>('proveedores');
+const activeTab = ref<'proveedores' | 'pedidos' | 'provision' | 'sugerido' | 'sugeridoHoy' | 'asignar' | 'inteligencia'>('proveedores');
 
 const showProveedorModal = ref(false);
 const editingProveedor = ref<Proveedor | null>(null);

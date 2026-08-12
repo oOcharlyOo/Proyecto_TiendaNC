@@ -120,7 +120,7 @@ async function corregir(ids: number[]) {
         <div class="hist-summary">
           <div class="hist-sum-item"><span class="hist-sum-label">Ventas</span><span class="hist-sum-val">{{ ventasFiltradas.length }}</span></div>
           <div class="hist-sum-item accent"><span class="hist-sum-label">Cobro Total</span><span class="hist-sum-val">{{ formatoMoneda(cobroTotalFiltrado) }}</span></div>
-          <div class="hist-sum-item profit"><span class="hist-sum-label">Ganancia</span><span class="hist-sum-val">{{ formatoMoneda(gananciaTotal) }}</span></div>
+          <div class="hist-sum-item profit"><span class="hist-sum-label">Ganancia</span><span class="hist-sum-val">{{ formatoMoneda(Math.round(Number(gananciaTotal ?? 0))) }}</span></div>
         </div>
       </header>
 
@@ -146,7 +146,7 @@ async function corregir(ids: number[]) {
           <div class="hist-vendedor-info"><span class="hist-vendedor-name">{{ v.nombre }}</span><span class="hist-vendedor-count">{{ v.totalVentas }} ventas</span></div>
           <div class="hist-vendedor-bars">
             <div class="hist-bar"><span class="hist-bar-label">Cobro</span><div class="hist-bar-track"><div class="hist-bar-fill cobro" :style="{ width: `${maxCobro > 0 ? (v.montoTotal / maxCobro) * 100 : 0}%` }"></div></div><span class="hist-bar-val">{{ formatoMoneda(v.montoTotal) }}</span></div>
-            <div class="hist-bar"><span class="hist-bar-label">Ganancia</span><div class="hist-bar-track"><div class="hist-bar-fill gain" :style="{ width: `${maxGanancia > 0 ? (v.gananciaTotal / maxGanancia) * 100 : 0}%` }"></div></div><span class="hist-bar-val">{{ formatoMoneda(v.gananciaTotal) }}</span></div>
+            <div class="hist-bar"><span class="hist-bar-label">Ganancia</span><div class="hist-bar-track"><div class="hist-bar-fill gain" :style="{ width: `${maxGanancia > 0 ? (v.gananciaTotal / maxGanancia) * 100 : 0}%` }"></div></div><span class="hist-bar-val">{{ formatoMoneda(Math.round(v.gananciaTotal)) }}</span></div>
           </div>
         </div>
       </div>
@@ -155,7 +155,7 @@ async function corregir(ids: number[]) {
         <p v-if="loading" class="hist-empty">📡 Cargando...</p>
         <p v-else-if="!ventasFiltradas.length" class="hist-empty">📭 No hay ventas hoy.</p>
         <table v-else class="hist-table">
-          <thead><tr><th>Ticket</th><th>Hora</th><th>Monto</th><th>Pago</th><th>Cajero</th><th></th></tr></thead>
+          <thead><tr><th>Ticket</th><th>Hora</th><th>Monto</th><th>Ganancia</th><th>Pago</th><th>Cajero</th><th></th></tr></thead>
           <tbody>
             <tr v-for="v in ventasFiltradas" :key="v.idVenta" class="hist-row" :class="{ 'row-disc': v.tieneDiscrepancia, 'row-sel': ventasSeleccionadas.has(v.idVenta) }" @click="emit('ver-detalle', v)">
               <td class="hist-td-ticket">
@@ -165,6 +165,7 @@ async function corregir(ids: number[]) {
               </td>
               <td class="hist-td-hora">{{ formatoHora(v.fechaVenta) }}</td>
               <td class="hist-td-monto">{{ formatoMoneda(Number(v.montoTotal ?? 0)) }}</td>
+              <td class="hist-td-ganancia">{{ formatoMoneda(Math.round(Number(v.ganancia ?? 0))) }}</td>
               <td class="hist-td-pago"><span class="hist-badge-pago" :class="getMetodoClase(v.metodoPago)">{{ getMetodoIcono(v.metodoPago) }} {{ getMetodoLabel(v.metodoPago) }}</span></td>
               <td class="hist-td-cajero">{{ v.nombreUsuario || 'Cajero' }}</td>
               <td class="hist-td-act" @click.stop>
@@ -197,7 +198,7 @@ async function corregir(ids: number[]) {
 .hist-sum-label { font-size: 0.65rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
 .hist-sum-val { font-size: 1.05rem; font-weight: 700; color: var(--color-text-primary); font-family: "Courier New", monospace; }
 .hist-sum-item.accent .hist-sum-val { color: var(--color-accent); }
-.hist-sum-item.profit .hist-sum-val { color: var(--color-success); }
+.hist-sum-item.profit .hist-sum-val { color: var(--color-info); }
 .hist-filters { display: flex; gap: 0.75rem; padding: 0.6rem 1.5rem; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; align-items: center; }
 .hist-filters select { padding: 0.35rem 0.5rem; border: none; border-radius: 6px; background: var(--color-bg-secondary); color: var(--color-text-primary); font-size: 0.8rem; }
 .hist-check { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--color-text-secondary); cursor: pointer; }
@@ -227,7 +228,7 @@ async function corregir(ids: number[]) {
 .hist-table { width: 100%; border-collapse: collapse; }
 .hist-table thead { position: sticky; top: 0; z-index: 5; }
 .hist-table th { padding: 0.5rem 0.75rem; font-size: 0.65rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; background: var(--color-bg-panel); border-bottom: 2px solid var(--color-border); text-align: left; }
-.hist-table th:nth-child(3), .hist-table th:nth-child(4) { text-align: center; }
+.hist-table th:nth-child(3), .hist-table th:nth-child(4), .hist-table th:nth-child(5) { text-align: center; }
 .hist-table th:last-child { width: 36px; text-align: center; }
 .hist-row { border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background 0.15s; }
 .hist-row:hover { background: var(--color-bg-secondary); }
@@ -241,6 +242,7 @@ async function corregir(ids: number[]) {
 .hist-ticket { font-weight: 700; color: var(--color-accent); font-family: "Courier New", monospace; }
 .hist-td-hora { font-family: "Courier New", monospace; color: var(--color-text-secondary); font-size: 0.78rem; }
 .hist-td-monto { font-weight: 700; color: var(--color-success); font-family: "Courier New", monospace; text-align: center; }
+.hist-td-ganancia { font-weight: 700; color: var(--color-info); font-family: "Courier New", monospace; text-align: center; }
 .hist-badge-pago { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; }
 .hist-badge-pago.efectivo { background: rgba(34,197,94,0.1); color: #166534; }
 .hist-badge-pago.transferencia { background: rgba(59,130,246,0.1); color: #1d4ed8; }
@@ -272,11 +274,11 @@ async function corregir(ids: number[]) {
   .hist-correccion-btns { flex-direction: column; }
   .hist-btn.corr { width: 100%; text-align: center; }
   .hist-table th, .hist-table td { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
-  .hist-td-cajero, .hist-table th:nth-child(5) { display: none; }
+  .hist-td-cajero, .hist-table th:nth-child(6) { display: none; }
   .hist-footer { padding: 0.5rem 1rem; }
 }
 @media (max-width: 480px) {
-  .hist-table th:nth-child(4), .hist-td-pago { display: none; }
+  .hist-table th:nth-child(5), .hist-td-pago { display: none; }
   .hist-summary { gap: 0.3rem; }
   .hist-sum-label { font-size: 0.6rem; }
   .hist-sum-val { font-size: 0.85rem; }
