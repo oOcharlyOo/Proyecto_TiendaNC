@@ -160,8 +160,8 @@ onUnmounted(() => {
             <span v-if="nombrePersona" class="banner-persona">{{ nombrePersona }}</span>
           </div>
 
-          <div class="total-parchment" :class="{ 'abono-mode': esAbono }">
-            <span class="parchment-label">{{ esAbono ? 'Monto a abonar' : 'Total a pagar' }}</span>
+          <div v-if="!esAbono" class="total-parchment">
+            <span class="parchment-label">Total a pagar</span>
             <span class="parchment-amount">{{ formatoMoneda(total) }}</span>
           </div>
 
@@ -289,7 +289,6 @@ onUnmounted(() => {
 .banner-persona { font-size: .8rem; color: var(--color-text-secondary); }
 
 .total-parchment { background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 60%, black)); border-radius: var(--radius-md); padding: 1rem; text-align: center; box-shadow: 4px 4px 12px rgba(0,0,0,0.2); }
-.total-parchment.abono-mode { background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover)); }
 .parchment-label { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.7); margin-bottom: .25rem; }
 .parchment-amount { display: block; font-family: Courier New, monospace; font-size: 1.8rem; font-weight: 700; color: #fff; }
 
