@@ -52,7 +52,7 @@ const ordenStock = ref<'mayor' | 'menor' | null>(null);
 const filtroTipo = ref<'unidad' | 'gramaje' | null>(null);
 const vistaLista = ref(true);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
-const tabActiva = ref<'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte'>('productos');
+const tabActiva = ref<'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio'>('productos');
 
 const modalFormOpen = ref(false);
 const modalScannerOpen = ref(false);

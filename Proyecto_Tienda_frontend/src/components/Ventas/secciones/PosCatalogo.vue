@@ -2,6 +2,7 @@
 
 import { formatoMoneda, obtenerIniciales } from '../logica/usePosTicket';
 import { esCategoriaGaming } from '../logica/usePosProductos';
+import { montoHoy } from '@/composables/useAjustePrecio';
 import CarruselPromociones from '../modales/CarruselPromociones.vue';
 import type { Producto } from '../logica/usePosTipos';
 
@@ -95,6 +96,10 @@ const emit = defineEmits<{
       <div v-if="provisionSemanalTotal > 0" class="provision-total-badge" :class="provisionStatusClass">
         <span class="provision-label">Total por apartar (7 días)</span>
         <span class="provision-amount">{{ formatoMoneda(provisionSemanalTotal) }}</span>
+      </div>
+      <div v-if="montoHoy > 0" class="ajuste-hoy-badge">
+        <span class="ajuste-hoy-label">Hoy aplica</span>
+        <span class="ajuste-hoy-amount">+{{ formatoMoneda(montoHoy) }}</span>
       </div>
     </header>
 
@@ -234,6 +239,31 @@ const emit = defineEmits<{
 }
 
 .pos-container .provision-amount {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pos-container .ajuste-hoy-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--warning-color, var(--warning-color));
+  background: color-mix(in srgb, var(--warning-color) 10%, transparent);
+  color: var(--warning-color, var(--warning-color));
+  min-width: 110px;
+  text-align: right;
+}
+
+.pos-container .ajuste-hoy-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.pos-container .ajuste-hoy-amount {
   font-size: 1rem;
   font-weight: 700;
 }

@@ -8,6 +8,7 @@ import Proveedores from '../Proveedores/Proveedores.vue';
 import ReporteVentas from '../ReporteVentas/ReporteVentas.vue';
 import ProductosToolbar from './secciones/ProductosToolbar.vue';
 import ProductosTabs from './secciones/ProductosTabs.vue';
+import AjustePrecioAdmin from './secciones/AjustePrecioAdmin.vue';
 
 import { useProductos } from './logica/useProductos';
 
@@ -49,7 +50,7 @@ const {
         @update:ordenStock="(v) => { ordenStock = v as 'mayor' | 'menor' | null }"
         @update:filtroTipo="(v) => { filtroTipo = v as 'unidad' | 'gramaje' | null }"
         @update:terminoBusqueda="(v) => { terminoBusqueda = v }"
-        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' }"
+        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio' }"
         @update:vistaLista="(v) => { vistaLista = v }"
         @exportar-csv="exportarCSV"
         @exportar-xlsx="exportarXLSX"
@@ -73,8 +74,7 @@ const {
         :esCategoriaGaming="esCategoriaGaming"
         :categoriaNombre="(id?: number) => obtenerNombreCategoria(id || 0)"
         :subcategoriaNombre="(id: number | null | undefined) => obtenerNombreSubcategoria(id || 0)"
-        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' }"
-        @toggle-seleccion="toggleSeleccionProducto"
+        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio' }"
         @toggle-seleccion-todos="toggleSeleccionTodos"
         @editar="abrirModalEditarProducto"
         @nuevo-producto="abrirModalNuevoProducto"
@@ -95,6 +95,9 @@ const {
       </div>
       <div v-else-if="tabActiva === 'reporte'" class="tab-content tab-reporte">
         <ReporteVentas />
+      </div>
+      <div v-else-if="tabActiva === 'ajustePrecio'" class="tab-content tab-ajuste">
+        <AjustePrecioAdmin />
       </div>
     </section>
 
@@ -166,6 +169,7 @@ const {
 .productos-layout .tab-content{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .productos-layout .tab-proveedores{overflow-y:auto}
 .productos-layout .tab-reporte{overflow-y:auto}
+.productos-layout .tab-ajuste{overflow-y:auto}
 .productos-layout .hidden-file-input{display:none}
 .productos-layout :deep(.table-container){flex:1;min-height:0;overflow:auto;padding:0}
 .productos-layout :deep(.estado-loading),.productos-layout :deep(.estado-empty){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:4rem 1rem;color:var(--color-text-secondary)}

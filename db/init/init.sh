@@ -310,6 +310,18 @@ INSERT INTO tiendadb.renta_local (id_renta, monto_mensual)
 VALUES (1, 0)
 ON CONFLICT (id_renta) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS tiendadb.ajuste_precio (
+    id_ajuste SERIAL PRIMARY KEY,
+    dia_semana INT NOT NULL UNIQUE,
+    monto DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+INSERT INTO tiendadb.ajuste_precio (dia_semana, monto, activo)
+SELECT d.dia, 0, FALSE
+FROM (VALUES (1), (2), (3), (4), (5), (6), (7)) AS d(dia)
+ON CONFLICT (dia_semana) DO NOTHING;
+
 -- ========================================
 -- INDICES
 -- ========================================
@@ -696,6 +708,18 @@ CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.renta_local (
 INSERT INTO tiendadb_abarrotera.renta_local (id_renta, monto_mensual)
 VALUES (1, 0)
 ON CONFLICT (id_renta) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.ajuste_precio (
+    id_ajuste SERIAL PRIMARY KEY,
+    dia_semana INT NOT NULL UNIQUE,
+    monto DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+INSERT INTO tiendadb_abarrotera.ajuste_precio (dia_semana, monto, activo)
+SELECT d.dia, 0, FALSE
+FROM (VALUES (1), (2), (3), (4), (5), (6), (7)) AS d(dia)
+ON CONFLICT (dia_semana) DO NOTHING;
 
 -- Indices
 CREATE INDEX IF NOT EXISTS idx_ganancias_fecha ON tiendadb_abarrotera.ganancias_acumuladas(fecha_movimiento DESC);

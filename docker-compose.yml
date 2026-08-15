@@ -54,6 +54,29 @@ services:
     container_name: Dulceria-DB
     ports:
       - "5432:5432" 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d dulcesnc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - tienda-red
+
+  db-init:
+    image: postgres:13
+    container_name: db-init
+    environment:
+      - PGHOST=database
+      - PGPASSWORD=password
+      - POSTGRES_USER=user
+      - POSTGRES_DB=dulcesnc
+    volumes:
+      - ./db/init:/init:ro
+    entrypoint: ["sh", "-c", "bash /init/init.sh"]
+    restart: "no"
+    depends_on:
+      database:
+        condition: service_healthy
     networks:
       - tienda-red
 

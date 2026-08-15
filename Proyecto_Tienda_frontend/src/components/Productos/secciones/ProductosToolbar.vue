@@ -66,5 +66,6 @@ defineEmits<{
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'subcategorias' }" @click="$emit('update:tabActiva', 'subcategorias')"><span class="tab-icon">📂</span><span class="tab-text">Subcategorías</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'proveedores' }" @click="$emit('update:tabActiva', 'proveedores')"><span class="tab-icon">🚚</span><span class="tab-text">Proveedores</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'reporte' }" @click="$emit('update:tabActiva', 'reporte')"><span class="tab-icon">📊</span><span class="tab-text">Reporte Ventas</span></button>
+    <button type="button" class="tab-btn" :class="{ active: tabActiva === 'ajustePrecio' }" @click="$emit('update:tabActiva', 'ajustePrecio')"><span class="tab-icon">📈</span><span class="tab-text">Precios por Día</span></button>
   </div>
 </template>

@@ -3,6 +3,7 @@ import type { ApiRespuesta, ProductoDTO, Producto, TicketItem } from './usePosTi
 import { getJson, mostrarMensaje, crearNuevoTicket, ticketActual, crearDetalleVenta } from './usePosTicket';
 import { playSound } from './usePosSonido';
 import { useProductosCache } from '@/composables/useProductCache';
+import { montoHoy, cargarAjustes } from '@/composables/useAjustePrecio';
 
 const terminoBusqueda = ref('');
 const categoriaFiltro = ref<number | null>(null);
@@ -40,7 +41,7 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
       const id = Number(item?.idProducto ?? 0);
       const nombre = String(item?.nombre ?? '').trim();
       const codigo = String(item?.codigoBarras ?? '').trim();
-      const precio = Number(item?.precio_venta ?? 0);
+      const precio = Number(item?.precio_venta ?? 0) + montoHoy.value;
       const precioMayoreo = item?.precio_mayoreo != null ? Number(item.precio_mayoreo) : null;
       return {
         id, nombre,
@@ -58,6 +59,7 @@ function normalizarProductos(data: ProductoDTO[] | null | undefined): Producto[]
 }
 
 async function cargarProductos() {
+  await cargarAjustes();
   const { getProductosCache, setProductosCache } = useProductosCache();
   const cached = getProductosCache<ProductoDTO[]>();
   if (cached) {
@@ -288,7 +290,7 @@ async function toggleMayoreo(item: TicketItem) {
   const nuevoMayoreo = !item.is_mayoreo;
   const precioAnterior = item.precio;
   item.is_mayoreo = nuevoMayoreo;
-  item.precio = nuevoMayoreo ? item.precio_mayoreo : (item.dto?.precio_venta ? Number(item.dto.precio_venta) : item.precio);
+  item.precio = nuevoMayoreo ? item.precio_mayoreo : (item.dto?.precio_venta ? Number(item.dto.precio_venta) + montoHoy.value : item.precio);
   if (item.idVentaDetalle && ticketActual.value) {
     try { await crearDetalleVenta(ticketActual.value.id, item); }
     catch (e) { item.is_mayoreo = !nuevoMayoreo; item.precio = precioAnterior; mostrarMensaje('Error al actualizar precio.', 'error'); }
