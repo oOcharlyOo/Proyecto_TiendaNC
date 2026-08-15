@@ -37,8 +37,14 @@ watch(
   }
 );
 
+const montoAbono = computed(() => {
+  const maximo = Number(props.saldoPendiente || props.total || 0);
+  const monto = Number(montoRecibido.value ?? 0);
+  if (monto <= 0) return maximo;
+  return Math.min(monto, maximo);
+});
+
 const cambio = computed(() => {
-  if (esAbono.value) return 0;
   const recibido = Number(montoRecibido.value ?? 0);
   const restante = recibido - Number(props.total ?? 0);
   return restante > 0 ? restante : 0;
@@ -47,8 +53,7 @@ const cambio = computed(() => {
 const montoValido = computed(() => {
   if (esAbono.value) {
     const monto = Number(montoRecibido.value ?? 0);
-    const maximo = props.saldoPendiente || props.total;
-    return monto > 0 && monto <= maximo;
+    return monto > 0;
   }
   return true;
 });
@@ -62,8 +67,7 @@ function formatoMoneda(valor: number) {
 
 function confirmarEfectivo() {
   if (esAbono.value) {
-    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
-    emit('confirmar-abono', { monto, metodoPago: 'EFECTIVO' });
+    emit('confirmar-abono', { monto: montoAbono.value, metodoPago: 'EFECTIVO' });
     return;
   }
   const recibido = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : props.total;
@@ -72,8 +76,7 @@ function confirmarEfectivo() {
 
 function confirmarTransferencia() {
   if (esAbono.value) {
-    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
-    emit('confirmar-abono', { monto, metodoPago: 'TRANSFERENCIA' });
+    emit('confirmar-abono', { monto: montoAbono.value, metodoPago: 'TRANSFERENCIA' });
     return;
   }
   emit('confirmar-transferencia');
@@ -81,8 +84,7 @@ function confirmarTransferencia() {
 
 function confirmarTarjeta() {
   if (esAbono.value) {
-    const monto = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : (props.saldoPendiente || props.total);
-    emit('confirmar-abono', { monto, metodoPago: 'TARJETA' });
+    emit('confirmar-abono', { monto: montoAbono.value, metodoPago: 'TARJETA' });
     return;
   }
   emit('confirmar-tarjeta');
@@ -164,7 +166,7 @@ onUnmounted(() => {
           </div>
 
           <div class="input-parchment">
-            <label>{{ esAbono ? 'Monto a abonar' : 'Monto recibido' }}</label>
+            <label>Monto recibido</label>
             <div class="input-container">
               <span class="coin-icon">🪙</span>
               <input 
@@ -173,18 +175,13 @@ onUnmounted(() => {
                 type="number" 
                 step="0.01" 
                 min="0" 
-                :max="esAbono ? (saldoPendiente || total) : undefined"
                 :placeholder="esAbono ? '0.00' : '0.00'"
                 @keydown.enter="manejarEnter"
-                :class="{ 'input-invalid': !montoValido && montoRecibido !== null && montoRecibido > 0 }"
               >
             </div>
-            <span v-if="!montoValido && montoRecibido !== null && montoRecibido > 0" class="input-error">
-              El monto no puede ser mayor al saldo pendiente
-            </span>
           </div>
 
-          <div v-if="!esAbono" class="cambio-parchment" :class="{ active: cambio > 0 }">
+          <div class="cambio-parchment" :class="{ active: cambio > 0 }">
             <span class="cambio-label">Cambio</span>
             <span class="cambio-amount">{{ formatoMoneda(cambio) }}</span>
           </div>
@@ -301,8 +298,6 @@ onUnmounted(() => {
 .input-container { display: flex; align-items: center; background: var(--color-bg-secondary); border-radius: var(--radius-sm); box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.02); }
 .coin-icon { padding: .65rem; font-size: 1.1rem; border-right: 1px solid var(--color-border); }
 .input-container input { flex: 1; background: transparent; border: none; padding: .65rem .75rem; color: var(--color-text-primary); font-size: 1rem; font-family: Courier New, monospace; outline: none; }
-.input-container input.input-invalid { color: var(--color-error); }
-.input-error { font-size: .7rem; color: var(--color-error); }
 
 .cambio-parchment { display: flex; justify-content: space-between; align-items: center; padding: .5rem .75rem; background: var(--color-bg-secondary); border-radius: var(--radius-sm); box-shadow: inset 2px 2px 4px rgba(0,0,0,0.1); }
 .cambio-parchment.active { background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-secondary)); }
