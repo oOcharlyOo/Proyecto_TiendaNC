@@ -89,7 +89,15 @@ export type MovimientoCaja = {
   descripcion: string;
   saldoResultante: number;
   montoInicial?: number;
+  usuario?: { idUsuario?: number; nombre?: string; apellido_p?: string; apellido_m?: string; usuario?: string };
 };
+
+export function nombreDeUsuario(m: MovimientoCaja): string {
+  const u = m.usuario;
+  if (!u) return '—';
+  const n = [u.nombre, u.apellido_p, u.apellido_m].filter(Boolean).join(' ').trim();
+  return n || u.usuario || '—';
+}
 
 export const entradasCaja = ref<MovimientoCaja[]>([]);
 export const salidasCaja = ref<MovimientoCaja[]>([]);
