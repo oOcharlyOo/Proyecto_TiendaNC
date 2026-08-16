@@ -93,6 +93,7 @@ export type MovimientoCaja = {
 
 export const entradasCaja = ref<MovimientoCaja[]>([]);
 export const salidasCaja = ref<MovimientoCaja[]>([]);
+export const proveedoresLista = ref<string[]>([]);
 export const montoInicialPeriodo = ref<number>(0);
 export const aperturasPorDia = ref<Map<string, number>>(new Map());
 export const sueldosPeriodo = ref<number>(0);
@@ -533,18 +534,32 @@ export const totalEnvases = computed(() => {
 
 export const modalMovimientosOpen = ref(false);
 export const movimientosTitulo = ref('');
-export const movimientosLista = ref<MovimientoCaja[]>([]);
+export const movimientosEsSalidas = ref(false);
+export const movimientosFiltro = ref<'todas' | 'proveedores' | 'otras'>('todas');
 export const editandoMovimientoId = ref<number | null>(null);
 export const editandoDescripcion = ref('');
 export const guardandoDescripcion = ref(false);
 
-export function abrirMovimientos(tipo: 'entradas' | 'salidas') {
-  editandoMovimientoId.value = null;
-  movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
-  const datos = tipo === 'entradas' ? entradasCaja.value : salidasCaja.value;
-  movimientosLista.value = [...datos].sort((a, b) =>
+export const movimientosVisibles = computed(() => {
+  const fuente = movimientosEsSalidas.value ? salidasCaja.value : entradasCaja.value;
+  let lista = [...fuente].sort((a, b) =>
     new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime()
   );
+  if (movimientosEsSalidas.value) {
+    if (movimientosFiltro.value === 'proveedores') {
+      lista = lista.filter(esSalidaProveedor);
+    } else if (movimientosFiltro.value === 'otras') {
+      lista = lista.filter(m => !esSalidaProveedor(m));
+    }
+  }
+  return lista;
+});
+
+export function abrirMovimientos(tipo: 'entradas' | 'salidas', filtro: 'todas' | 'proveedores' | 'otras' = 'todas') {
+  editandoMovimientoId.value = null;
+  movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
+  movimientosEsSalidas.value = tipo === 'salidas';
+  movimientosFiltro.value = filtro;
   modalMovimientosOpen.value = true;
 }
 
@@ -574,8 +589,9 @@ export async function guardarDescripcion(id: number) {
     });
     const json = await res.json();
     if (json.codigo === 200) {
-      const idx = movimientosLista.value.findIndex(m => m.idCaja === id);
-      if (idx !== -1) movimientosLista.value[idx].descripcion = editandoDescripcion.value;
+      const fuente = movimientosEsSalidas.value ? salidasCaja.value : entradasCaja.value;
+      const idx = fuente.findIndex(m => m.idCaja === id);
+      if (idx !== -1) fuente[idx].descripcion = editandoDescripcion.value;
       editandoMovimientoId.value = null;
     } else {
       alert('Error al guardar: ' + json.mensaje);
@@ -699,6 +715,42 @@ export const totalEntradas = computed(() => {
 
 export const totalSalidas = computed(() => {
   return salidasCaja.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+});
+
+export function normalizarTexto(texto?: string): string {
+  return (texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function esSalidaProveedor(m: MovimientoCaja): boolean {
+  const desc = normalizarTexto(m.descripcion);
+  if (!desc) return false;
+  for (const nombre of proveedoresLista.value) {
+    const prov = normalizarTexto(nombre);
+    if (prov.length < 3) continue;
+    if (desc.includes(prov)) return true;
+  }
+  return false;
+}
+
+export const salidasProveedores = computed(() => {
+  return salidasCaja.value.filter(esSalidaProveedor);
+});
+
+export const salidasOtras = computed(() => {
+  return salidasCaja.value.filter(m => !esSalidaProveedor(m));
+});
+
+export const totalSalidasProveedores = computed(() => {
+  return salidasProveedores.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+});
+
+export const totalSalidasOtras = computed(() => {
+  return salidasOtras.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
 });
 
 export const totalVentasPeriodo = computed(() => {
@@ -1616,6 +1668,20 @@ async function cargarSueldosPeriodo(fechaInicio: string, fechaFin: string) {
   }
 }
 
+export async function cargarProveedores() {
+  try {
+    const res = await fetch(`${API_BASE}/proveedores/listar`);
+    const data = await res.json();
+    if (data.codigo === 200 && Array.isArray(data.datos)) {
+      const nombres = data.datos.map((p: { nombre?: string }) => (p.nombre || '').trim()).filter(Boolean);
+      proveedoresLista.value = Array.from(new Set(nombres));
+    }
+  } catch (e) {
+    console.error('Error al cargar proveedores:', e);
+    proveedoresLista.value = [];
+  }
+}
+
 export async function cargarRenta() {
   try {
     const res = await fetch(`${API_BASE}/rentaLocal`);
@@ -1726,6 +1792,7 @@ export async function cargarDatos() {
 
     await cargarSueldosPeriodo(fechaInicio, fechaFin);
     await cargarRenta();
+    await cargarProveedores();
   } catch (e) {
     console.error('Error al cargar reporte:', e);
   } finally {
