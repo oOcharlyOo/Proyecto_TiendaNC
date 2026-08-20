@@ -1462,11 +1462,17 @@ async function descargarBackups() {
     if (!resp.ok) throw new Error('Error al listar backups');
     let data = await resp.json();
     if (data?.datos?.length) {
+      const combinedFiles = data.datos.filter((f: string) => f.startsWith('backup-'));
       const dumpFiles = data.datos.filter((f: string) => f.startsWith('dump-'));
       const minioFiles = data.datos.filter((f: string) => f.startsWith('minio-'));
-      if (dumpFiles.length) { descargarArchivo(dumpFiles[0]); await new Promise(r => setTimeout(r, 300)); }
-      if (minioFiles.length) descargarArchivo(minioFiles[0]);
-      mostrarMensaje(dumpFiles.length ? `Backup descargado: ${dumpFiles[0]}${minioFiles.length ? ' + MinIO' : ''}` : 'Backup MinIO descargado', 'ok');
+      if (combinedFiles.length) {
+        descargarArchivo(combinedFiles[0]);
+        mostrarMensaje(`Backup descargado: ${combinedFiles[0]}`, 'ok');
+      } else if (dumpFiles.length) {
+        for (const f of dumpFiles) { descargarArchivo(f); await new Promise(r => setTimeout(r, 300)); }
+        if (minioFiles.length) { await new Promise(r => setTimeout(r, 300)); descargarArchivo(minioFiles[0]); }
+        mostrarMensaje(`Backups descargados: ${dumpFiles.length} base(s) de datos${minioFiles.length ? ' + MinIO' : ''}`, 'ok');
+      }
       return;
     }
     cargandoBackup.value = true;
@@ -1489,7 +1495,7 @@ async function descargarBackups() {
 const MAX_BACKUP_SIZE = 500 * 1024 * 1024; // 500 MB
 
 function validarExtensionBackup(file: File): boolean {
-  return file.name.endsWith('.sql') || file.name.endsWith('.dump') || file.name.endsWith('.bak') || file.name.endsWith('.tar.gz') || file.name.endsWith('.tgz');
+  return file.name.endsWith('.sql') || file.name.endsWith('.dump') || file.name.endsWith('.bak') || file.name.endsWith('.tar.gz') || file.name.endsWith('.tgz') || file.name.endsWith('.gz');
 }
 
 function handleFileSelect(event: Event) {

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useLogin } from './logica/useLogin';
-const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme } = useLogin();
+const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin } = useLogin();
 import type { Sucursal } from '@/composables/useSucursal';
 import type { Theme } from '@/composables/useTheme';
 import MontoInicialModal from '../modals/MontoInicialModal.vue';
 import LoginAmbiente from './secciones/LoginAmbiente.vue';
 import LoginSucursalSelector from './secciones/LoginSucursalSelector.vue';
 import LoginForm from './secciones/LoginForm.vue';
+import FirstAdminForm from './secciones/FirstAdminForm.vue';
 import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
 
 </script>
@@ -29,9 +30,26 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
       <h2 class="classic-title">La Leyenda Del Dulce</h2>
       <p class="classic-subtitle">Pulsa Start para entrar al reino</p>
 
-      <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" @seleccionar="(v: string) => seleccionarSucursal(v as Sucursal)" />
+      <template v-if="existeUsuarios === null">
+        <div class="loading-check">
+          <div class="loading-spinner"></div>
+          <span>Verificando reino...</span>
+        </div>
+      </template>
 
-      <LoginForm :name="name" :pass="pass" @update:name="name = $event" @update:pass="pass = $event" @submit="iniciarSesion" />
+      <template v-else-if="existeUsuarios === false">
+        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" @seleccionar="(v: string) => seleccionarSucursal(v as Sucursal)" />
+
+        <FirstAdminForm @submit="(d) => crearPrimerAdmin(d)" />
+
+        <p v-if="creandoPrimerAdmin" class="creating-text">Forjando al guardián...</p>
+      </template>
+
+      <template v-else>
+        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" @seleccionar="(v: string) => seleccionarSucursal(v as Sucursal)" />
+
+        <LoginForm :name="name" :pass="pass" @update:name="name = $event" @update:pass="pass = $event" @submit="iniciarSesion" />
+      </template>
 
       <LoginThemeSelector :current-theme="currentTheme" @select-theme="(v: string) => setTheme(v as Theme)" />
 
@@ -379,6 +397,28 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
 }
 
 .toast-container { position: fixed; right: 1rem; bottom: 1rem; display: grid; gap: 0.5rem; z-index: 40; }
+
+.loading-check {
+  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+  padding: 1.5rem 0; color: var(--text-primary);
+  font-family: "Courier New", monospace; font-size: 0.8rem;
+  text-transform: uppercase; letter-spacing: 0.08em; animation: fadeSlideIn 500ms ease-out;
+}
+
+.loading-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border-color); border-top-color: var(--accent-color);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.creating-text {
+  text-align: center; margin-top: 0.75rem;
+  color: var(--accent-color); font-family: "Courier New", monospace;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+  animation: fadeSlideIn 500ms ease-out;
+}
 
 :deep(.toast-message) {
   padding: 0.65rem 0.85rem; border-radius: 0; border: 2px solid #000;

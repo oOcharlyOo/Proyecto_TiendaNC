@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTheme } from '@/composables/useTheme';
 import { useSucursal, type Sucursal } from '@/composables/useSucursal';
@@ -14,10 +14,52 @@ const toastContainer = ref<HTMLElement | null>(null);
 const modalMontoInicialAbierto = ref(false);
 const idUsuarioActual = ref<number | null>(null);
 
+const existeUsuarios = ref<boolean | null>(null);
+const creandoPrimerAdmin = ref(false);
+
 export function useLogin() {
   const router = useRouter();
   const { currentTheme, setTheme } = useTheme();
   const { setSucursal, getHeader } = useSucursal();
+
+  onMounted(() => {
+    verificarExisteUsuarios();
+  });
+
+  async function verificarExisteUsuarios() {
+    try {
+      const res = await fetch(`${API_BASE}/usuarios/existeUsuarios`, { headers: getHeader() });
+      const data = await res.json();
+      existeUsuarios.value = data.codigo === 200 ? data.datos : true;
+    } catch {
+      existeUsuarios.value = true;
+    }
+  }
+
+  async function crearPrimerAdmin(datos: { nombre: string; apellido_p: string; apellido_m: string; usuario: string; password_hash: string }) {
+    creandoPrimerAdmin.value = true;
+    try {
+      const res = await fetch(`${API_BASE}/usuarios/agregarUsuario`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getHeader() },
+        body: JSON.stringify({ ...datos, id_tipo_usuario: 1 })
+      });
+      const data = await res.json();
+      if (data.codigo === 200) {
+        mostrarToast('Guardián creado. Iniciando sesión...', 'success');
+        name.value = datos.usuario;
+        pass.value = datos.password_hash;
+        existeUsuarios.value = true;
+        await iniciarSesion();
+      } else {
+        mostrarToast(data.mensaje || 'Error al crear el usuario', 'error');
+        creandoPrimerAdmin.value = false;
+      }
+    } catch {
+      mostrarToast('Error de conexión.', 'error');
+      creandoPrimerAdmin.value = false;
+    }
+  }
 
   function seleccionarSucursal(sucursal: Sucursal) {
     sucursalSeleccionada.value = sucursal;
@@ -141,8 +183,10 @@ export function useLogin() {
   return {
     name, pass, sucursalSeleccionada, toastContainer,
     modalMontoInicialAbierto, idUsuarioActual,
+    existeUsuarios, creandoPrimerAdmin,
     currentTheme, setTheme,
     seleccionarSucursal, iniciarSesion, verificarCajaActiva,
-    registrarMontoInicial, cerrarModalMontoInicial, mostrarToast
+    registrarMontoInicial, cerrarModalMontoInicial, mostrarToast,
+    crearPrimerAdmin
   };
 }
