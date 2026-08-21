@@ -543,10 +543,22 @@ export const totalEnvases = computed(() => {
 export const modalMovimientosOpen = ref(false);
 export const movimientosTitulo = ref('');
 export const movimientosEsSalidas = ref(false);
-export const movimientosFiltro = ref<'todas' | 'proveedores' | 'otras'>('todas');
+export const movimientosFiltro = ref<'todas' | 'proveedores' | 'envases' | 'otras'>('todas');
+export const busquedaMovimiento = ref('');
 export const editandoMovimientoId = ref<number | null>(null);
 export const editandoDescripcion = ref('');
 export const guardandoDescripcion = ref(false);
+
+function coincideBusquedaMovimiento(m: MovimientoCaja): boolean {
+  const q = normalizarTexto(busquedaMovimiento.value.trim());
+  if (!q) return true;
+  const campos = [m.descripcion || '', nombreDeUsuario(m)];
+  if (movimientosEsSalidas.value) {
+    const c = clasificarSalida(m);
+    if (c) campos.push(c.proveedor);
+  }
+  return campos.some(v => normalizarTexto(v).includes(q));
+}
 
 export const movimientosVisibles = computed(() => {
   const fuente = movimientosEsSalidas.value ? salidasCaja.value : entradasCaja.value;
@@ -556,15 +568,21 @@ export const movimientosVisibles = computed(() => {
   if (movimientosEsSalidas.value) {
     if (movimientosFiltro.value === 'proveedores') {
       lista = lista.filter(esSalidaProveedor);
+    } else if (movimientosFiltro.value === 'envases') {
+      lista = lista.filter(esSalidaEnvase);
     } else if (movimientosFiltro.value === 'otras') {
-      lista = lista.filter(m => !esSalidaProveedor(m));
+      lista = lista.filter(m => !esSalidaProveedor(m) && !esSalidaEnvase(m));
     }
+  }
+  if (busquedaMovimiento.value.trim()) {
+    lista = lista.filter(coincideBusquedaMovimiento);
   }
   return lista;
 });
 
-export function abrirMovimientos(tipo: 'entradas' | 'salidas', filtro: 'todas' | 'proveedores' | 'otras' = 'todas') {
+export function abrirMovimientos(tipo: 'entradas' | 'salidas', filtro: 'todas' | 'proveedores' | 'envases' | 'otras' = 'todas') {
   editandoMovimientoId.value = null;
+  busquedaMovimiento.value = '';
   movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
   movimientosEsSalidas.value = tipo === 'salidas';
   movimientosFiltro.value = filtro;
@@ -745,16 +763,14 @@ export interface AsignacionPP {
 export interface ClasificacionSalida {
   esProveedor: boolean;
   proveedor: string;
-  criterio: 'directo' | 'producto' | 'categoria';
+  criterio: 'directo' | 'producto' | 'envase';
   precio: number | null;
 }
 
 export const proveedoresDetalle = ref<{ idProveedor: number; nombre: string }[]>([]);
 const mapaProductoProveedor = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
-const mapaCategoriaProveedor = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
 const mapaTokensProveedor = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
 const mapaTokensProducto = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
-const mapaTokensCategoria = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
 const cacheClasificacion = new Map<string, ClasificacionSalida | null>();
 
 const STOPWORDS_SALIDAS = new Set([
@@ -763,11 +779,26 @@ const STOPWORDS_SALIDAS = new Set([
   'y', 'o', 'u', 'su', 'sus', 'un', 'una', 'con', 'por', 'al', 'que', 'se'
 ]);
 
+function formaCanonica(palabra: string): string {
+  if (palabra.length > 3 && palabra.endsWith('es')) return palabra.slice(0, -2);
+  if (palabra.length > 2 && palabra.endsWith('s')) return palabra.slice(0, -1);
+  return palabra;
+}
+
+function variantesNombre(nombre: string): string[] {
+  const base = normalizarTexto(nombre);
+  const variantes = new Set([base]);
+  if (base.length > 3 && base.endsWith('es')) variantes.add(base.slice(0, -2));
+  if (base.length > 2 && base.endsWith('s')) variantes.add(base.slice(0, -1));
+  return [...variantes].filter(v => v.length >= 3);
+}
+
 function tokensSignificativos(texto: string): string[] {
   return texto
     .split(' ')
     .map(t => t.trim())
-    .filter(t => t.length >= 3 && !STOPWORDS_SALIDAS.has(t) && !/^\d+[.,]?\d*$/.test(t));
+    .filter(t => t.length >= 3 && !STOPWORDS_SALIDAS.has(t) && !/^\d+[.,]?\d*$/.test(t))
+    .map(formaCanonica);
 }
 
 export function clasificarSalida(m: MovimientoCaja): ClasificacionSalida | null {
@@ -778,30 +809,29 @@ export function clasificarSalida(m: MovimientoCaja): ClasificacionSalida | null 
 
   let resultado: ClasificacionSalida | null = null;
 
+  if (desc.split(' ')[0] === 'importe') {
+    resultado = { esProveedor: true, proveedor: 'Envases', criterio: 'envase', precio: null };
+    cacheClasificacion.set(desc, resultado);
+    return resultado;
+  }
+
   for (const p of proveedoresDetalle.value) {
-    const norm = normalizarTexto(p.nombre);
-    if (norm.length < 3) continue;
-    if (desc.includes(norm)) {
-      resultado = { esProveedor: true, proveedor: p.nombre, criterio: 'directo', precio: null };
-      break;
+    for (const variante of variantesNombre(p.nombre)) {
+      if (desc.includes(variante)) {
+        resultado = { esProveedor: true, proveedor: p.nombre, criterio: 'directo', precio: null };
+        break;
+      }
     }
+    if (resultado) break;
   }
 
   if (!resultado) {
     let mejor: { clave: string; r: ClasificacionSalida } | null = null;
     for (const [nombre, info] of mapaProductoProveedor.value) {
-      if (desc.includes(nombre) && (!mejor || nombre.length > mejor.clave.length)) {
-        mejor = { clave: nombre, r: { esProveedor: true, proveedor: info.proveedor, criterio: 'producto', precio: info.precio } };
-      }
-    }
-    if (mejor) resultado = mejor.r;
-  }
-
-  if (!resultado) {
-    let mejor: { clave: string; r: ClasificacionSalida } | null = null;
-    for (const [nombre, info] of mapaCategoriaProveedor.value) {
-      if (desc.includes(nombre) && (!mejor || nombre.length > mejor.clave.length)) {
-        mejor = { clave: nombre, r: { esProveedor: true, proveedor: info.proveedor, criterio: 'categoria', precio: info.precio } };
+      for (const variante of variantesNombre(nombre)) {
+        if (desc.includes(variante) && (!mejor || variante.length > mejor.clave.length)) {
+          mejor = { clave: variante, r: { esProveedor: true, proveedor: info.proveedor, criterio: 'producto', precio: info.precio } };
+        }
       }
     }
     if (mejor) resultado = mejor.r;
@@ -827,29 +857,24 @@ export function clasificarSalida(m: MovimientoCaja): ClasificacionSalida | null 
     }
   }
 
-  if (!resultado) {
-    for (const t of tokensSignificativos(desc)) {
-      const info = mapaTokensCategoria.value.get(t);
-      if (info) {
-        resultado = { esProveedor: true, proveedor: info.proveedor, criterio: 'categoria', precio: info.precio };
-        break;
-      }
-    }
-  }
-
   cacheClasificacion.set(desc, resultado);
   return resultado;
 }
 
 export function esSalidaProveedor(m: MovimientoCaja): boolean {
-  return clasificarSalida(m) !== null;
+  const c = clasificarSalida(m);
+  return c !== null && c.criterio !== 'envase';
+}
+
+export function esSalidaEnvase(m: MovimientoCaja): boolean {
+  return clasificarSalida(m)?.criterio === 'envase';
 }
 
 export function proveedorDeSalida(m: MovimientoCaja): string {
   return clasificarSalida(m)?.proveedor || '';
 }
 
-export function criterioDeSalida(m: MovimientoCaja): 'directo' | 'producto' | 'categoria' | '' {
+export function criterioDeSalida(m: MovimientoCaja): 'directo' | 'producto' | 'envase' | '' {
   return clasificarSalida(m)?.criterio || '';
 }
 
@@ -858,19 +883,18 @@ export function precioSugeridoDeSalida(m: MovimientoCaja): number | null {
 }
 
 export function iconoCriterio(criterio: string): string {
-  if (criterio === 'directo') return '🚚';
   if (criterio === 'producto') return '📦';
-  return '🏷️';
+  if (criterio === 'envase') return '🍾';
+  return '🚚';
 }
 
 export function tooltipClasificacion(m: MovimientoCaja): string {
   const c = clasificarSalida(m);
   if (!c) return '';
+  if (c.criterio === 'envase') return 'Envases (devolución de envases)';
   const criterioTxt = c.criterio === 'directo'
     ? 'coincide con el nombre del proveedor'
-    : c.criterio === 'producto'
-      ? 'detectado por producto'
-      : 'detectado por categoría';
+    : 'detectado por producto asignado';
   const precioTxt = c.precio != null ? ` · precio más bajo: ${formatoMoneda(c.precio)}` : '';
   return `${c.proveedor} (${criterioTxt}${precioTxt})`;
 }
@@ -880,7 +904,11 @@ export const salidasProveedores = computed(() => {
 });
 
 export const salidasOtras = computed(() => {
-  return salidasCaja.value.filter(m => !esSalidaProveedor(m));
+  return salidasCaja.value.filter(m => !esSalidaProveedor(m) && !esSalidaEnvase(m));
+});
+
+export const salidasEnvases = computed(() => {
+  return salidasCaja.value.filter(esSalidaEnvase);
 });
 
 export const totalSalidasProveedores = computed(() => {
@@ -894,9 +922,9 @@ export const totalSalidasOtras = computed(() => {
 export const salidasPorProveedor = computed(() => {
   const grupos = new Map<string, MovimientoCaja[]>();
   for (const m of salidasProveedores.value) {
-    const prov = proveedorDeSalida(m) || 'Sin identificar';
-    if (!grupos.has(prov)) grupos.set(prov, []);
-    grupos.get(prov)!.push(m);
+    const clave = clasificarSalida(m)?.proveedor || 'Sin identificar';
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave)!.push(m);
   }
   return [...grupos.entries()]
     .map(([proveedor, movimientos]) => ({
@@ -907,6 +935,16 @@ export const salidasPorProveedor = computed(() => {
       total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0)
     }))
     .sort((a, b) => b.total - a.total);
+});
+
+export const salidasPorProveedorFiltradas = computed(() => {
+  if (!busquedaMovimiento.value.trim()) return salidasPorProveedor.value;
+  return salidasPorProveedor.value
+    .map(g => {
+      const movimientos = g.movimientos.filter(coincideBusquedaMovimiento);
+      return { ...g, movimientos, total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0) };
+    })
+    .filter(g => g.movimientos.length > 0);
 });
 
 export const totalVentasPeriodo = computed(() => {
@@ -1876,46 +1914,28 @@ function acumularCandidato(mapa: Map<string, Map<string, { precio: number | null
   }
 }
 
+async function obtenerJsonSeguro(url: string): Promise<any | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
 async function cargarMapaProductosProveedor() {
   try {
-    const [resAsig, resProd, resCat] = await Promise.all([
-      fetch(`${API_BASE}/producto-proveedor/listar`),
-      fetch(`${API_BASE}/productos/listarProductos`),
-      fetch(`${API_BASE}/categorias/listarCategorias`)
-    ]);
-    const [dataAsig, dataProd, dataCat] = await Promise.all([
-      resAsig.json(),
-      resProd.json(),
-      resCat.json()
-    ]);
+    const dataAsig = await obtenerJsonSeguro(`${API_BASE}/producto-proveedor/listar`);
 
-    const asignaciones: AsignacionPP[] = dataAsig.codigo === 200 && Array.isArray(dataAsig.datos) ? dataAsig.datos : [];
-    const productos: { idProducto?: number; nombre?: string; idCategoria?: number }[] = dataProd.codigo === 200 && Array.isArray(dataProd.datos) ? dataProd.datos : [];
-    const categorias: { idCategoria?: number; nombre?: string }[] = dataCat.codigo === 200 && Array.isArray(dataCat.datos) ? dataCat.datos : [];
+    const asignaciones: AsignacionPP[] = dataAsig?.codigo === 200 && Array.isArray(dataAsig.datos) ? dataAsig.datos : [];
 
     const porProducto = new Map<string, Map<string, { precio: number | null; veces: number }>>();
     for (const a of asignaciones) {
       acumularCandidato(porProducto, normalizarTexto(a.nombreProducto), (a.nombreProveedor || '').trim(), a.precioAcordado);
     }
 
-    const nombreCatPorId = new Map<number, string>();
-    for (const c of categorias) {
-      if (c.idCategoria != null) nombreCatPorId.set(Number(c.idCategoria), normalizarTexto(c.nombre));
-    }
-    const catPorProducto = new Map<number, string>();
-    for (const p of productos) {
-      const cat = p.idCategoria != null ? nombreCatPorId.get(Number(p.idCategoria)) : undefined;
-      if (p.idProducto != null && cat) catPorProducto.set(Number(p.idProducto), cat);
-    }
-
-    const porCategoria = new Map<string, Map<string, { precio: number | null; veces: number }>>();
-    for (const a of asignaciones) {
-      const cat = catPorProducto.get(Number(a.idProducto));
-      if (cat) acumularCandidato(porCategoria, cat, (a.nombreProveedor || '').trim(), a.precioAcordado);
-    }
-
     mapaProductoProveedor.value = new Map([...porProducto.entries()].map(([k, v]) => [k, elegirMejorProveedor(v)]));
-    mapaCategoriaProveedor.value = new Map([...porCategoria.entries()].map(([k, v]) => [k, elegirMejorProveedor(v)]));
 
     const tokProv = new Map<string, { proveedor: string; precio: number | null }>();
     for (const p of proveedoresDetalle.value) {
@@ -1932,14 +1952,6 @@ async function cargarMapaProductosProveedor() {
       }
     }
     mapaTokensProducto.value = tokProd;
-
-    const tokCat = new Map<string, { proveedor: string; precio: number | null }>();
-    for (const [nombre, mejor] of mapaCategoriaProveedor.value) {
-      for (const t of tokensSignificativos(nombre)) {
-        if (!tokCat.has(t)) tokCat.set(t, mejor);
-      }
-    }
-    mapaTokensCategoria.value = tokCat;
 
     cacheClasificacion.clear();
   } catch (e) {

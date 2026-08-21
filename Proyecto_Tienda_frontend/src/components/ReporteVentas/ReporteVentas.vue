@@ -547,6 +547,16 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
           <button class="modal-close-cat" @click="r.modalMovimientosOpen.value = false">✕</button>
         </div>
         <div class="modal-body-cat">
+          <div class="mov-search">
+            <span class="mov-search-icon">🔍</span>
+            <input
+              v-model="r.busquedaMovimiento.value"
+              type="text"
+              class="mov-search-input"
+              placeholder="Buscar por descripción, usuario o proveedor…"
+            />
+            <button v-if="r.busquedaMovimiento.value" class="mov-search-clear" @click="r.busquedaMovimiento.value = ''" title="Limpiar búsqueda">✕</button>
+          </div>
           <div v-if="r.movimientosEsSalidas.value" class="mov-tabs">
             <button :class="['mov-tab', { active: r.movimientosFiltro.value === 'todas' }]" @click="r.movimientosFiltro.value = 'todas'">
               Todas ({{ r.salidasCaja.value.length }})
@@ -554,12 +564,15 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
             <button :class="['mov-tab', { active: r.movimientosFiltro.value === 'proveedores' }]" @click="r.movimientosFiltro.value = 'proveedores'">
               🚚 Proveedores ({{ r.salidasProveedores.value.length }})
             </button>
+            <button :class="['mov-tab', { active: r.movimientosFiltro.value === 'envases' }]" @click="r.movimientosFiltro.value = 'envases'">
+              🍾 Envases ({{ r.salidasEnvases.value.length }})
+            </button>
             <button :class="['mov-tab', { active: r.movimientosFiltro.value === 'otras' }]" @click="r.movimientosFiltro.value = 'otras'">
               Otras ({{ r.salidasOtras.value.length }})
             </button>
           </div>
           <div v-if="r.movimientosVisibles.value.length === 0" class="modal-empty">
-            No hay {{ r.movimientosTitulo.value.toLowerCase() }} en este período.
+            {{ r.busquedaMovimiento.value ? 'Sin resultados para la búsqueda.' : `No hay ${r.movimientosTitulo.value.toLowerCase()} en este período.` }}
           </div>
           <table v-else class="tabla-movimientos">
             <thead>
@@ -569,13 +582,12 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                 <th>Descripción</th>
                 <th v-if="r.movimientosEsSalidas.value">Proveedor</th>
                 <th class="text-right">Monto</th>
-                <th class="text-center">Acción</th>
               </tr>
             </thead>
             <tbody v-if="r.movimientosEsSalidas.value && r.movimientosFiltro.value === 'proveedores'">
-              <template v-for="g in r.salidasPorProveedor.value" :key="'g-' + g.proveedor">
+              <template v-for="g in r.salidasPorProveedorFiltradas.value" :key="'g-' + g.proveedor">
                 <tr class="prov-group-row">
-                  <td colspan="6">
+                  <td colspan="5">
                     <span class="prov-group-icon">🚚</span>
                     <span class="prov-group-name">{{ g.proveedor }}</span>
                     <span class="prov-group-count">{{ g.movimientos.length }} movimiento{{ g.movimientos.length === 1 ? '' : 's' }}</span>
@@ -583,9 +595,9 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                   </td>
                 </tr>
                 <tr v-for="m in g.movimientos" :key="m.idCaja">
-                  <td class="fecha-col">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
-                  <td class="user-col">{{ r.nombreDeUsuario(m) }}</td>
-                  <td>
+                  <td class="fecha-col" data-label="Fecha">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
+                  <td class="user-col" data-label="Usuario">{{ r.nombreDeUsuario(m) }}</td>
+                  <td data-label="Descripción">
                     <template v-if="r.editandoMovimientoId.value === m.idCaja">
                       <input v-model="r.editandoDescripcion.value" class="edit-desc-input" type="text" @keyup.enter="r.guardarDescripcion(m.idCaja)" @keyup.escape="r.cancelarEdicionDescripcion" />
                       <span class="edit-actions">
@@ -598,22 +610,21 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                       <button class="btn-edit-icon" @click="r.iniciarEdicionDescripcion(m)" title="Editar descripción">✎</button>
                     </template>
                   </td>
-                  <td class="prov-col">
-                    <span v-if="r.proveedorDeSalida(m)" class="prov-badge" :class="'crit-' + r.criterioDeSalida(m)" :title="r.tooltipClasificacion(m)">
-                      {{ r.iconoCriterio(r.criterioDeSalida(m)) }} {{ r.proveedorDeSalida(m) }}
-                    </span>
-                    <span v-else class="prov-badge none">—</span>
-                  </td>
-                  <td class="text-right costo">{{ r.formatoMoneda(m.monto) }}</td>
-                  <td class="text-center"></td>
+                  <td class="prov-col" data-label="Proveedor">
+                  <span v-if="r.proveedorDeSalida(m)" class="prov-badge" :class="'crit-' + r.criterioDeSalida(m)" :title="r.tooltipClasificacion(m)">
+                    {{ r.iconoCriterio(r.criterioDeSalida(m)) }} {{ r.proveedorDeSalida(m) }}
+                  </span>
+                  <span v-else class="prov-badge none">—</span>
+                </td>
+                  <td class="text-right costo" data-label="Monto">{{ r.formatoMoneda(m.monto) }}</td>
                 </tr>
               </template>
             </tbody>
             <tbody v-else>
               <tr v-for="m in r.movimientosVisibles.value" :key="m.idCaja">
-                <td class="fecha-col">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
-                <td class="user-col">{{ r.nombreDeUsuario(m) }}</td>
-                <td>
+                <td class="fecha-col" data-label="Fecha">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
+                <td class="user-col" data-label="Usuario">{{ r.nombreDeUsuario(m) }}</td>
+                <td data-label="Descripción">
                   <template v-if="r.editandoMovimientoId.value === m.idCaja">
                     <input v-model="r.editandoDescripcion.value" class="edit-desc-input" type="text" @keyup.enter="r.guardarDescripcion(m.idCaja)" @keyup.escape="r.cancelarEdicionDescripcion" />
                     <span class="edit-actions">
@@ -626,23 +637,21 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                     <button class="btn-edit-icon" @click="r.iniciarEdicionDescripcion(m)" title="Editar descripción">✎</button>
                   </template>
                 </td>
-                <td v-if="r.movimientosEsSalidas.value" class="prov-col">
+                <td v-if="r.movimientosEsSalidas.value" class="prov-col" data-label="Proveedor">
                   <span v-if="r.proveedorDeSalida(m)" class="prov-badge" :class="'crit-' + r.criterioDeSalida(m)" :title="r.tooltipClasificacion(m)">
                     {{ r.iconoCriterio(r.criterioDeSalida(m)) }} {{ r.proveedorDeSalida(m) }}
                   </span>
                   <span v-else class="prov-badge none">—</span>
                 </td>
-                <td class="text-right" :class="r.movimientosTitulo.value.startsWith('Entradas') ? 'monto' : 'costo'">
+                <td class="text-right" :class="r.movimientosTitulo.value.startsWith('Entradas') ? 'monto' : 'costo'" data-label="Monto">
                   {{ r.formatoMoneda(m.monto) }}
                 </td>
-                <td class="text-center"></td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <td :colspan="r.movimientosEsSalidas.value ? 4 : 3"><strong>Total</strong></td>
+                <td :colspan="r.movimientosEsSalidas.value ? 3 : 2"><strong>Total</strong></td>
                 <td class="text-right"><strong>{{ r.formatoMoneda(r.movimientosVisibles.value.reduce((s, m) => s + Number(m.monto || 0), 0)) }}</strong></td>
-                <td></td>
               </tr>
             </tfoot>
           </table>
@@ -664,12 +673,34 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
 .reporte-ventas :deep(.card-section.s-renta){border-left:4px solid #e67e22}.reporte-ventas :deep(.renta-admin-controls){display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.reporte-ventas :deep(.renta-admin-label){font-size:.68rem;color:var(--color-text-secondary);font-weight:700}.reporte-ventas :deep(.renta-admin-input){width:140px;padding:.4rem .6rem;background:var(--color-bg-primary);border:none;border-radius:7px;color:var(--color-text-primary);font-size:.78rem;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08)}.reporte-ventas :deep(.renta-admin-input:focus){outline:none;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08),0 0 0 2px var(--color-accent)}
 .reporte-ventas :deep(.charts-sections){display:flex;flex-direction:column;gap:.75rem}.reporte-ventas :deep(.chart-section){background:var(--color-bg-secondary);border:none;border-radius:12px;padding:.7rem .85rem;box-shadow:3px 3px 8px rgba(0,0,0,.08)}.reporte-ventas :deep(.chart-section.s-tendencia){border-left:4px solid #1abc9c}.reporte-ventas :deep(.chart-section.s-top){border-left:4px solid #f39c12}.reporte-ventas :deep(.chart-section.s-pagos){border-left:4px solid #3498db}.reporte-ventas :deep(.chart-section.s-categorias){border-left:4px solid #9b59b6}.reporte-ventas :deep(.chart-section.s-detalle){border-left:4px solid var(--color-success)}.reporte-ventas :deep(.section-charts){display:grid;grid-template-columns:1fr;gap:.5rem}.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:repeat(2,1fr)}.reporte-ventas :deep(.chart-wide){grid-column:1 / -1}.reporte-ventas :deep(.chart-card){background:var(--color-bg-primary);border:none;border-radius:12px;padding:.75rem .85rem;box-shadow:3px 3px 8px rgba(0,0,0,.08)}.reporte-ventas :deep(.chart-title){margin:0 0 .4rem;font-size:.78rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.chart-container){position:relative;height:280px}.reporte-ventas :deep(.chart-container canvas){width:100%!important}.reporte-ventas :deep(.chart-container.chart-pie){height:240px}.reporte-ventas :deep(.chart-tall .chart-container){height:340px}
 .reporte-ventas :deep(.tabla-container){overflow-x:auto;max-height:400px;overflow-y:auto}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar){width:5px}.reporte-ventas :deep(.tabla-container::-webkit-scrollbar-thumb){background:var(--color-border);border-radius:3px}.reporte-ventas :deep(.tabla-productos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-productos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.6rem;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg-secondary)}.reporte-ventas :deep(.tabla-productos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02);color:var(--color-text-primary)}.reporte-ventas :deep(.tabla-productos tr:hover td){background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.text-right){text-align:right}.reporte-ventas :deep(.monto){color:var(--color-success);font-weight:700}.reporte-ventas :deep(.costo){color:var(--color-accent)}.reporte-ventas :deep(.ganancia){color:var(--color-success);font-weight:700}.reporte-ventas :deep(.table-more-btn){display:block;margin:.5rem auto 0;padding:.35rem .8rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-accent);font-size:.7rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 5px rgba(0,0,0,.08)}.reporte-ventas :deep(.table-more-btn:hover){box-shadow:2px 2px 5px rgba(0,0,0,.08),0 0 6px color-mix(in srgb,var(--color-accent) 25%,transparent)}
-.reporte-ventas :deep(.modal-overlay-cat){position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}.reporte-ventas :deep(.modal-card-cat){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,700px);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}.reporte-ventas :deep(.modal-movimientos){max-width:600px}.reporte-ventas :deep(.mov-tabs){display:flex;gap:.3rem;margin-bottom:.6rem;flex-wrap:wrap}.reporte-ventas :deep(.mov-tab){padding:.3rem .7rem;border:none;border-radius:7px;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.65rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 4px rgba(0,0,0,.08);transition:all .15s}.reporte-ventas :deep(.mov-tab:hover){color:var(--color-text-primary)}.reporte-ventas :deep(.mov-tab.active){background:var(--color-accent);color:var(--color-on-brand)}.reporte-ventas :deep(.modal-header-cat){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}.reporte-ventas :deep(.modal-header-cat h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.modal-close-cat){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}.reporte-ventas :deep(.modal-close-cat:hover){background:var(--color-error);color:#fff}.reporte-ventas :deep(.modal-body-cat){padding:1rem;overflow-y:auto;flex:1}.reporte-ventas :deep(.modal-empty){padding:2rem;text-align:center;color:var(--color-text-secondary)}.reporte-ventas :deep(.chart-container-modal){height:250px;margin-bottom:.75rem}
+.reporte-ventas :deep(.modal-overlay-cat){position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}.reporte-ventas :deep(.modal-card-cat){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,700px);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}.reporte-ventas :deep(.modal-movimientos){max-width:780px}.reporte-ventas :deep(.mov-tabs){display:flex;gap:.3rem;margin-bottom:.6rem;flex-wrap:wrap}.reporte-ventas :deep(.mov-tab){padding:.3rem .7rem;border:none;border-radius:7px;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.65rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 4px rgba(0,0,0,.08);transition:all .15s}.reporte-ventas :deep(.mov-tab:hover){color:var(--color-text-primary)}.reporte-ventas :deep(.mov-tab.active){background:var(--color-accent);color:var(--color-on-brand)}.reporte-ventas :deep(.modal-header-cat){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}.reporte-ventas :deep(.modal-header-cat h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:700}.reporte-ventas :deep(.modal-close-cat){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}.reporte-ventas :deep(.modal-close-cat:hover){background:var(--color-error);color:#fff}.reporte-ventas :deep(.modal-body-cat){padding:1rem;overflow-y:auto;flex:1}.reporte-ventas :deep(.modal-empty){padding:2rem;text-align:center;color:var(--color-text-secondary)}.reporte-ventas :deep(.chart-container-modal){height:250px;margin-bottom:.75rem}
 .reporte-ventas :deep(.tabla-modal table){width:100%;border-collapse:collapse;font-size:.7rem}.reporte-ventas :deep(.tabla-modal th){padding:.35rem .5rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-modal td){padding:.3rem .5rem;border-bottom:1px solid rgba(255,255,255,.02)}
 .reporte-ventas :deep(.tabla-movimientos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-movimientos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-movimientos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02)}.reporte-ventas :deep(.tabla-movimientos tfoot td){font-weight:700;border-top:1px solid var(--color-border)}.reporte-ventas :deep(.fecha-col){white-space:nowrap;font-family:monospace;font-size:.68rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.user-col){white-space:nowrap;font-size:.7rem;color:var(--color-accent);font-weight:600}.reporte-ventas :deep(.desc-text){color:var(--color-text-primary)}.reporte-ventas :deep(.edit-desc-input){padding:.25rem .4rem;background:var(--color-bg-primary);border:none;border-radius:4px;color:var(--color-text-primary);font-size:.7rem;width:100%;box-shadow:inset 2px 2px 3px rgba(0,0,0,.1)}.reporte-ventas :deep(.edit-actions){display:inline-flex;gap:.2rem;margin-left:.3rem}.reporte-ventas :deep(.btn-edit-save){border:none;border-radius:3px;background:var(--color-success);color:#fff;font-size:.6rem;cursor:pointer;padding:.1rem .25rem}.reporte-ventas :deep(.btn-edit-cancel),.reporte-ventas :deep(.btn-edit-icon){border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;border-radius:3px;padding:0 .25rem;font-size:.65rem;box-shadow:1px 1px 2px rgba(0,0,0,.05)}.reporte-ventas :deep(.btn-edit-cancel:hover),.reporte-ventas :deep(.btn-edit-icon:hover){color:var(--color-accent)}
-.reporte-ventas :deep(.prov-col){white-space:nowrap}.reporte-ventas :deep(.prov-badge){display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .45rem;border-radius:20px;font-size:.62rem;font-weight:700;background:var(--color-bg-primary);box-shadow:1px 1px 3px rgba(0,0,0,.08);max-width:150px;overflow:hidden;text-overflow:ellipsis}.reporte-ventas :deep(.prov-badge.crit-directo){background:color-mix(in srgb,var(--color-success) 14%,transparent);color:var(--color-success)}.reporte-ventas :deep(.prov-badge.crit-producto){background:color-mix(in srgb,#3498db 14%,transparent);color:#3498db}.reporte-ventas :deep(.prov-badge.crit-categoria){background:color-mix(in srgb,#9b59b6 14%,transparent);color:#9b59b6}.reporte-ventas :deep(.prov-badge.none){background:transparent;box-shadow:none;color:var(--color-text-secondary);opacity:.5}
+.reporte-ventas :deep(.prov-col){white-space:nowrap}.reporte-ventas :deep(.prov-badge){display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .45rem;border-radius:20px;font-size:.62rem;font-weight:700;background:var(--color-bg-primary);box-shadow:1px 1px 3px rgba(0,0,0,.08);max-width:150px;overflow:hidden;text-overflow:ellipsis}.reporte-ventas :deep(.prov-badge.crit-directo){background:color-mix(in srgb,var(--color-success) 14%,transparent);color:var(--color-success)}.reporte-ventas :deep(.prov-badge.crit-producto){background:color-mix(in srgb,#3498db 14%,transparent);color:#3498db}.reporte-ventas :deep(.prov-badge.crit-envase){background:color-mix(in srgb,#e67e22 14%,transparent);color:#e67e22}.reporte-ventas :deep(.prov-badge.none){background:transparent;box-shadow:none;color:var(--color-text-secondary);opacity:.5}
 .reporte-ventas :deep(.prov-group-row td){background:color-mix(in srgb,var(--color-accent) 8%,transparent);border-bottom:2px solid color-mix(in srgb,var(--color-accent) 25%,transparent);padding:.4rem .6rem!important;display:flex;align-items:center;width:100%}.reporte-ventas :deep(.prov-group-icon){margin-right:.35rem}.reporte-ventas :deep(.prov-group-name){font-weight:800;color:var(--color-accent);font-size:.75rem;margin-right:.5rem}.reporte-ventas :deep(.prov-group-count){font-size:.6rem;color:var(--color-text-secondary);margin-right:auto}.reporte-ventas :deep(.prov-group-total){margin-left:auto;font-size:.72rem;color:var(--color-text-primary)}
 .reporte-ventas :deep(.cat-total-row td){border-bottom:2px solid var(--color-border);background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.cat-total-row){cursor:pointer}.reporte-ventas :deep(.cat-total-row:hover td){background:color-mix(in srgb,var(--color-accent) 10%,transparent)!important}.reporte-ventas :deep(.sub-row td){padding-left:1.5rem!important;font-size:.68rem}.reporte-ventas :deep(.sub-indent){color:var(--color-text-secondary);opacity:.5;margin-right:2px}.reporte-ventas :deep(.expand-icon){display:inline-block;width:12px;margin-right:4px;font-size:.6rem;color:var(--color-accent)}.reporte-ventas :deep(.modal-icon){margin-left:6px;font-size:.7rem;cursor:pointer;opacity:0;transition:opacity .15s}.reporte-ventas :deep(tr:hover .modal-icon){opacity:1}.reporte-ventas :deep(.sub-name){color:var(--color-text-primary)}
+.reporte-ventas :deep(.mov-search){position:relative;display:flex;align-items:center;margin-bottom:.55rem}.reporte-ventas :deep(.mov-search-icon){position:absolute;left:.55rem;font-size:.7rem;opacity:.6;pointer-events:none}.reporte-ventas :deep(.mov-search-input){width:100%;padding:.45rem 1.9rem .45rem 1.8rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.72rem;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08)}.reporte-ventas :deep(.mov-search-input:focus){outline:none;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08),0 0 0 2px var(--color-accent)}.reporte-ventas :deep(.mov-search-clear){position:absolute;right:.4rem;border:none;background:var(--color-bg-panel,var(--color-bg-secondary));border-radius:50%;width:18px;height:18px;font-size:.55rem;color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center}.reporte-ventas :deep(.mov-search-clear:hover){background:var(--color-error);color:#fff}
+.reporte-ventas :deep(.tabla-movimientos th){position:sticky;top:0;background:var(--color-bg-secondary);z-index:2;box-shadow:0 1px 0 var(--color-border)}.reporte-ventas :deep(.tabla-movimientos tfoot td){position:sticky;bottom:0;background:var(--color-bg-secondary)}
+
+@media(max-width:640px){
+.reporte-ventas :deep(.modal-overlay-cat){padding:.5rem}
+.reporte-ventas :deep(.modal-movimientos){width:100%;max-height:94dvh;border-radius:12px}
+.reporte-ventas :deep(.modal-movimientos .modal-body-cat){padding:.6rem}
+.reporte-ventas :deep(.mov-tab){padding:.35rem .55rem;font-size:.6rem}
+.reporte-ventas :deep(.tabla-movimientos){font-size:.68rem}
+.reporte-ventas :deep(.tabla-movimientos thead){display:none}
+.reporte-ventas :deep(.tabla-movimientos tbody){display:block}
+.reporte-ventas :deep(.tabla-movimientos tbody tr){display:block;background:var(--color-bg-primary);border-radius:10px;margin-bottom:.45rem;padding:.4rem .55rem;box-shadow:2px 2px 5px rgba(0,0,0,.08)}
+.reporte-ventas :deep(.tabla-movimientos tbody td){display:flex;justify-content:space-between;align-items:center;gap:.7rem;border-bottom:none;padding:.16rem .05rem;text-align:right}
+.reporte-ventas :deep(.tabla-movimientos tbody td::before){content:attr(data-label);font-size:.55rem;font-weight:800;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.03em;text-align:left;flex-shrink:0}
+.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row){background:color-mix(in srgb,var(--color-accent) 10%,transparent);margin-top:.55rem}
+.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row td){display:flex;flex-wrap:wrap;align-items:center;text-align:left;padding:.25rem .3rem}
+.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row td::before){content:none}
+.reporte-ventas :deep(.tabla-movimientos tfoot){display:block}
+.reporte-ventas :deep(.tabla-movimientos tfoot tr){display:flex;justify-content:space-between;align-items:center;background:var(--color-bg-secondary);border-radius:8px;padding:.35rem .6rem;margin-top:.3rem;box-shadow:0 -2px 8px rgba(0,0,0,.15)}
+.reporte-ventas :deep(.tabla-movimientos tfoot td){display:block;padding:0;border-top:none}
+.reporte-ventas :deep(.edit-desc-input){flex:1;min-width:0}
+}
 
 @media(max-width:1024px){.reporte-ventas :deep(.chart-tall .chart-container){height:300px}}
 @media(max-width:768px){.reporte-ventas :deep(.section-cards){grid-template-columns:repeat(2,1fr)}.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:1fr}.reporte-ventas :deep(.chart-tall .chart-container){height:280px}}
