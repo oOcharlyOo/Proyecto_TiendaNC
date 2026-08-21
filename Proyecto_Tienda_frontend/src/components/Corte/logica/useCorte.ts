@@ -1447,13 +1447,28 @@ function getRankClass(index: number): string {
 
 // ===== BACKUP =====
 
-function descargarArchivo(file: string) {
+async function descargarArchivo(file: string) {
+  const resp = await fetch(`${API_BASE}/backup/descargar?file=${encodeURIComponent(file)}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = `${API_BASE}/backup/descargar?file=${encodeURIComponent(file)}`;
+  link.href = url;
   link.download = file;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function ultimosPorGrupo(files: string[]): string[] {
+  const grupos = new Map<string, string>();
+  for (const f of files) {
+    const m = f.match(/^(.+)-\d{8}_\d{6}/);
+    const key = m ? m[1] : f.replace(/\.[^.]+$/, '');
+    if (!grupos.has(key)) grupos.set(key, f);
+  }
+  return [...grupos.values()];
 }
 
 async function descargarBackups() {
@@ -1466,12 +1481,20 @@ async function descargarBackups() {
       const dumpFiles = data.datos.filter((f: string) => f.startsWith('dump-'));
       const minioFiles = data.datos.filter((f: string) => f.startsWith('minio-'));
       if (combinedFiles.length) {
-        descargarArchivo(combinedFiles[0]);
-        mostrarMensaje(`Backup descargado: ${combinedFiles[0]}`, 'ok');
+        await descargarArchivo(combinedFiles[0]);
+        mostrarMensaje(`Backup combinado descargado: ${combinedFiles[0]} (incluye bases de datos + MinIO)`, 'ok');
       } else if (dumpFiles.length) {
-        for (const f of dumpFiles) { descargarArchivo(f); await new Promise(r => setTimeout(r, 300)); }
-        if (minioFiles.length) { await new Promise(r => setTimeout(r, 300)); descargarArchivo(minioFiles[0]); }
-        mostrarMensaje(`Backups descargados: ${dumpFiles.length} base(s) de datos${minioFiles.length ? ' + MinIO' : ''}`, 'ok');
+        const recientes = ultimosPorGrupo(dumpFiles);
+        for (const f of recientes) { await descargarArchivo(f); await new Promise(r => setTimeout(r, 300)); }
+        const conMinio = minioFiles.length > 0;
+        if (conMinio) { await new Promise(r => setTimeout(r, 300)); await descargarArchivo(minioFiles[0]); }
+        mostrarMensaje(
+          `Backups descargados: ${recientes.length} base(s) de datos${conMinio ? ' + MinIO' : ' (sin backup de MinIO en el servidor)'}`,
+          conMinio ? 'ok' : 'info'
+        );
+      } else if (minioFiles.length) {
+        await descargarArchivo(minioFiles[0]);
+        mostrarMensaje(`Backup de MinIO descargado: ${minioFiles[0]}`, 'ok');
       }
       return;
     }
@@ -1486,7 +1509,7 @@ async function descargarBackups() {
       resp = await fetch(`${API_BASE}/backup/listar`);
       if (resp.ok) { data = await resp.json(); if (data?.datos?.length) backupFile = data.datos[0]; }
     }
-    if (backupFile) { descargarArchivo(backupFile); mostrarMensaje(`Backup generado y descargado: ${backupFile}`, 'ok'); }
+    if (backupFile) { await descargarArchivo(backupFile); mostrarMensaje(`Backup generado y descargado: ${backupFile}`, 'ok'); }
     else mostrarMensaje('El backup está en proceso. Intenta descargar en unos minutos.', 'info');
   } catch (e) { mostrarMensaje(`Error: ${e instanceof Error ? e.message : 'Error'}`, 'error'); }
   finally { cargandoBackup.value = false; }
