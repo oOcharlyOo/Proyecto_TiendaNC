@@ -174,6 +174,7 @@ async function cargarTicketsDesdeBackend() {
       const ventasPendientes = response.datos;
       if (ventasPendientes.length > 0) {
         tickets.value = [];
+        ticketActualId.value = null;
         for (const venta of ventasPendientes) {
           const nuevoTicket: Ticket = {
             id: venta.idVenta,
@@ -234,6 +235,8 @@ async function cargarTicketsDesdeBackend() {
         }
         return;
       }
+      tickets.value = [];
+      ticketActualId.value = null;
     }
     if (tickets.value.length === 0) await crearVentaPendienteEnBackend();
   } catch (_error) {
