@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { ProductoDTO } from '../logica/useProductos';
-defineProps<{
-  tabActiva: string; cargando: boolean; productosFiltrados: ProductoDTO[]; vistaLista: boolean;
+defineProps<{  tabActiva: string; cargando: boolean; productosFiltrados: ProductoDTO[]; vistaLista: boolean;
   terminoBusqueda: string; categoriaFiltro: number | null;
   selectedProductos: Set<number>; escaneando: boolean; escanerActivo: boolean;
   formatMoneda: (v: number) => string; obtenerEmojiDulce: (id?: number) => string;
   esCategoriaGaming: (id?: number) => boolean;
   categoriaNombre: (id?: number) => string;
   subcategoriaNombre: (id: number | null | undefined) => string;
+  esAdmin?: boolean;
 }>();
 defineEmits<{
   'update:tabActiva': [v: string];
@@ -15,7 +15,13 @@ defineEmits<{
   'editar': [p: ProductoDTO]; 'eliminar': [p?: ProductoDTO];
   'nuevo-producto': []; 'abrir-modal-categoria': [];
   'iniciar-escaneo': []; 'detener-escaneo': [];
+  'editar-cajas': [p: ProductoDTO];
 }>();
+
+function cajasDe(producto: ProductoDTO): number[] {
+  if (!producto.presentacion_caja) return [];
+  return producto.presentacion_caja.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+}
 </script>
 <template>
   <div v-if="tabActiva === 'productos'" class="tab-content">
@@ -40,6 +46,7 @@ defineEmits<{
           <th class="col-precio text-right">Precio Venta</th>
           <th class="col-stock text-center">Stock</th>
           <th class="col-tipo text-center">Tipo</th>
+          <th class="col-caja text-center">Caja</th>
           <th class="col-envase text-center">Envase</th>
           <th class="col-acciones text-center">Acciones</th>
         </tr></thead>
@@ -57,10 +64,20 @@ defineEmits<{
               <template v-else><span class="stock-badge" :class="{ 'low': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out': Number(producto.stock || 0) === 0 }">{{ producto.stock }}</span></template>
             </td>
             <td class="col-tipo text-center">{{ producto.is_gramaje ? '⚖️ Gramaje' : '📦 Unidad' }}</td>
+            <td class="col-caja text-center">
+              <button v-if="esAdmin && !producto.is_gramaje && cajasDe(producto).length > 0" type="button" class="cajas-btn" @click="$emit('editar-cajas', producto)" title="Editar compra por caja">
+                <span v-for="pz in cajasDe(producto)" :key="pz" class="cajas-badge">📦 {{ pz }} pzs</span>
+              </button>
+              <div v-else-if="cajasDe(producto).length > 0" class="cajas-view">
+                <span v-for="pz in cajasDe(producto)" :key="pz" class="cajas-badge">📦 {{ pz }} pzs</span>
+              </div>
+              <span v-else class="sin-caja">—</span>
+            </td>
             <td class="col-envase text-center">{{ producto.requiere_envase ? `Sí ($${Number(producto.precio_envase || 0).toFixed(2)})` : '—' }}</td>
             <td class="col-acciones text-center">
               <div class="acciones-cell">
                 <button type="button" class="btn-action btn-edit" @click="$emit('editar', producto)" title="Editar"><svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                <button v-if="esAdmin && !producto.is_gramaje" type="button" class="btn-action btn-cajas" @click="$emit('editar-cajas', producto)" title="Editar compra por caja">📦</button>
                 <button type="button" class="btn-action btn-delete" @click="$emit('eliminar', producto)" title="Eliminar"><svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
               </div>
             </td>
@@ -81,10 +98,12 @@ defineEmits<{
           <div class="pc-stats">
             <div class="pc-stat"><span class="stat-label">Precio</span><span class="stat-value stat-price">{{ formatMoneda(producto.precio_venta) }}</span></div>
             <div class="pc-stat"><span class="stat-label">Stock</span><span class="stat-value" :class="{ 'stat-low': Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'stat-out': Number(producto.stock || 0) === 0 }">{{ producto.stock }}</span></div>
+            <div class="pc-stat" v-if="cajasDe(producto).length > 0"><span class="stat-label">Caja</span><span class="stat-value stat-caja">📦 {{ cajasDe(producto).join(' · ') }} pzs</span></div>
             <div class="pc-stat" v-if="producto.precio_mayoreo"><span class="stat-label">Mayoreo</span><span class="stat-value stat-price">{{ formatMoneda(producto.precio_mayoreo) }}</span></div>
           </div>
           <div class="pc-actions">
             <button class="pc-btn pc-btn-edit" @click="$emit('editar', producto)" title="Editar">✏️</button>
+            <button v-if="esAdmin && !producto.is_gramaje" class="pc-btn pc-btn-cajas" @click="$emit('editar-cajas', producto)" title="Editar compra por caja">📦</button>
             <button class="pc-btn pc-btn-del" @click="$emit('eliminar', producto)" title="Eliminar">🗑️</button>
           </div>
         </div>

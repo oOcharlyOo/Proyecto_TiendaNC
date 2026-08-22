@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
 import ProductoScannerModal from '../modals/Productos/ProductoScannerModal.vue';
+import EditarCajasProductoModal from '../modals/Productos/EditarCajasProductoModal.vue';
 import Categorias from '../Categorias/Categorias.vue';
 import Subcategorias from '../Subcategorias/Subcategorias.vue';
 import Proveedores from '../Proveedores/Proveedores.vue';
@@ -11,6 +12,7 @@ import ProductosTabs from './secciones/ProductosTabs.vue';
 import AjustePrecioAdmin from './secciones/AjustePrecioAdmin.vue';
 
 import { useProductos } from './logica/useProductos';
+import type { ProductoDTO } from './logica/useProductos';
 
 const {
   productos, categorias, subcategorias, cargando, guardando,
@@ -28,6 +30,20 @@ const {
   toggleSeleccionProducto, toggleSeleccionTodos,
   abrirModalCategoria, aplicarCambioCategoria
 } = useProductos();
+
+const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
+const productoEditandoCajas = ref<ProductoDTO | null>(null);
+
+function abrirEditarCajas(producto: ProductoDTO) {
+  productoEditandoCajas.value = producto;
+}
+
+async function onCajasGuardadas(cajas: number[]) {
+  const prod = productoEditandoCajas.value;
+  if (prod) prod.presentacion_caja = cajas.join(',');
+  productoEditandoCajas.value = null;
+  await cargarProductos();
+}
 </script>
 
 <template>
@@ -74,6 +90,7 @@ const {
         :esCategoriaGaming="esCategoriaGaming"
         :categoriaNombre="(id?: number) => obtenerNombreCategoria(id || 0)"
         :subcategoriaNombre="(id: number | null | undefined) => obtenerNombreSubcategoria(id || 0)"
+        :esAdmin="esAdmin"
         @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio' }"
         @toggle-seleccion-todos="toggleSeleccionTodos"
         @editar="abrirModalEditarProducto"
@@ -82,6 +99,7 @@ const {
         @eliminar="handleDeleteProducto"
         @iniciar-escaneo="() => {}"
         @detener-escaneo="() => {}"
+        @editar-cajas="abrirEditarCajas"
       />
 
       <div v-if="tabActiva === 'categorias'" class="tab-content">
@@ -118,6 +136,16 @@ const {
       :open="modalScannerOpen"
       @apply="handleScannerApply"
       @close="modalScannerOpen = false"
+    />
+
+    <EditarCajasProductoModal
+      :open="!!productoEditandoCajas"
+      :id-producto="productoEditandoCajas?.idProducto"
+      :nombre-producto="productoEditandoCajas?.nombre"
+      :precio-costo="productoEditandoCajas?.precio_costo"
+      :presentacion-caja="productoEditandoCajas?.presentacion_caja"
+      @close="productoEditandoCajas = null"
+      @saved="onCajasGuardadas"
     />
 
     <div v-if="modalCategoriaOpen" class="modal-overlay" @click.self="modalCategoriaOpen = false">
@@ -296,6 +324,8 @@ const {
 .productos-layout :deep(.btn-edit:hover){background:var(--color-accent);color:var(--color-on-brand);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .productos-layout :deep(.btn-delete){color:var(--color-error)}
 .productos-layout :deep(.btn-delete:hover){background:var(--color-error);color:#fff;transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
+.productos-layout :deep(.btn-cajas){font-size:.95rem;color:var(--color-warning)}
+.productos-layout :deep(.btn-cajas:hover){background:var(--color-warning);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .productos-layout :deep(.productos-grid){display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;padding:.5rem 0}
 .productos-layout :deep(.producto-card){position:relative;background:var(--color-bg-primary);border:none;border-radius:12px;padding:.75rem;display:flex;flex-direction:column;align-items:center;gap:.35rem;transition:all .2s;box-shadow:4px 4px 8px rgba(0,0,0,.12),-2px -2px 5px rgba(255,255,255,.02);text-align:center}
 .productos-layout :deep(.producto-card:hover){transform:translateY(-3px);box-shadow:6px 6px 14px rgba(0,0,0,.18),-3px -3px 8px rgba(255,255,255,.03)}
@@ -320,6 +350,13 @@ const {
 .productos-layout :deep(.pc-btn:hover){transform:scale(1.05);box-shadow:3px 3px 6px rgba(0,0,0,.12)}
 .productos-layout :deep(.pc-btn-edit:hover){color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,var(--color-bg-secondary))}
 .productos-layout :deep(.pc-btn-del:hover){color:var(--color-error);background:color-mix(in srgb,var(--color-error) 10%,var(--color-bg-secondary))}
+.productos-layout :deep(.pc-btn-cajas:hover){color:var(--color-warning);background:color-mix(in srgb,var(--color-warning) 10%,var(--color-bg-secondary))}
+.productos-layout :deep(.cajas-btn){border:none;background:none;cursor:pointer;display:flex;flex-wrap:wrap;gap:.2rem;justify-content:center;align-items:center;padding:.15rem .25rem;border-radius:5px;transition:all .15s;font-family:var(--font-body)}
+.productos-layout :deep(.cajas-btn:hover){background:color-mix(in srgb,var(--color-info) 12%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--color-info) 35%,transparent);transform:translateY(-1px)}
+.productos-layout :deep(.cajas-view){display:flex;flex-wrap:wrap;gap:.2rem;justify-content:center;align-items:center}
+.productos-layout :deep(.cajas-badge){display:inline-flex;align-items:center;padding:.15rem .4rem;border-radius:4px;font-size:.62rem;font-weight:700;font-family:'Courier New',monospace;color:var(--color-info);background:color-mix(in srgb,var(--color-info) 12%,transparent);white-space:nowrap}
+.productos-layout :deep(.sin-caja){color:var(--color-text-secondary);opacity:.4}
+.productos-layout :deep(.stat-value.stat-caja){color:var(--color-info)}
 .productos-layout .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
 .productos-layout .modal-dialog{background:var(--color-bg-panel);border:none;border-radius:14px;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03);width:100%;max-width:500px;overflow:hidden}
 .productos-layout .modal-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}
@@ -334,7 +371,7 @@ const {
 .productos-layout .form-label{display:block;font-size:.8rem;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
 .productos-layout .form-select{width:100%;padding:.6rem .75rem;border:none;border-radius:8px;background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.9rem;transition:all .15s;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12)}
 .productos-layout .form-select:focus{outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12),0 0 0 2px var(--color-accent)}
-@media(max-width:1024px){.productos-layout :deep(.col-categoria),.productos-layout :deep(.col-subcategoria),.productos-layout :deep(.col-codigo),.productos-layout :deep(.col-tipo){display:none}.productos-layout :deep(.tabs-bar){overflow-x:auto;scrollbar-width:none}.productos-layout :deep(.tabs-bar::-webkit-scrollbar){display:none}.productos-layout :deep(.tab-btn){padding:.75rem 1rem;white-space:nowrap}}
+@media(max-width:1024px){.productos-layout :deep(.col-categoria),.productos-layout :deep(.col-subcategoria),.productos-layout :deep(.col-codigo),.productos-layout :deep(.col-tipo),.productos-layout :deep(.col-caja){display:none}.productos-layout :deep(.tabs-bar){overflow-x:auto;scrollbar-width:none}.productos-layout :deep(.tabs-bar::-webkit-scrollbar){display:none}.productos-layout :deep(.tab-btn){padding:.75rem 1rem;white-space:nowrap}}
 @media(max-width:768px){.productos-layout{padding:.5rem}.productos-layout :deep(.toolbar){flex-direction:column;align-items:stretch;padding:.875rem 1rem}.productos-layout :deep(.toolbar-left){text-align:center}.productos-layout :deep(.toolbar-title){justify-content:center}.productos-layout :deep(.toolbar-right){justify-content:center;flex-wrap:wrap;gap:.5rem}.productos-layout :deep(.view-toggles){order:-1;width:100%;max-width:120px;margin:0 auto}.productos-layout :deep(.import-export-group){width:100%;justify-content:center}.productos-layout :deep(.category-filter){width:100%;min-width:unset}.productos-layout :deep(.search-input){width:100%}.productos-layout :deep(.col-precio),.productos-layout :deep(.col-stock){display:none}.productos-layout :deep(.col-codigo){display:none}.productos-layout :deep(.col-envase){display:none}.productos-layout :deep(.col-subcategoria){display:none}.productos-layout :deep(.bulk-action-bar){flex-direction:column;align-items:stretch}.productos-layout :deep(.bulk-info){justify-content:center}.productos-layout :deep(.btn-bulk-action){justify-content:center}.productos-layout :deep(.tabla-productos th),.productos-layout :deep(.tabla-productos td){padding:.6rem .75rem}.productos-layout :deep(.tabs-bar){padding:0 1rem}.productos-layout :deep(.tab-btn){padding:.65rem .85rem;font-size:.8rem}.productos-layout :deep(.tab-icon){font-size:1rem}.productos-layout :deep(.icon-cell){width:36px;height:36px;font-size:1.1rem}.productos-layout :deep(.nombre-text){font-size:.85rem}.productos-layout :deep(.nombre-id){font-size:.65rem}.productos-layout :deep(.btn-action){width:32px;height:32px}.productos-layout :deep(.btn-action .action-icon){width:16px;height:16px}.productos-layout :deep(.acciones-cell){gap:.35rem}.productos-layout .toast-container{bottom:1rem;right:1rem;left:1rem}.productos-layout .toast-notification{min-width:unset;max-width:unset;width:100%}.productos-layout :deep(.toolbar-right){flex-direction:column;align-items:stretch}.productos-layout :deep(.toolbar-right .category-filter),.productos-layout :deep(.toolbar-right .search-wrapper),.productos-layout :deep(.toolbar-right .import-export-group){width:100%}.productos-layout :deep(.productos-grid){grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem}.productos-layout :deep(.view-btn){width:34px;height:34px;font-size:.95rem}}
 @media(max-width:480px){.productos-layout :deep(.toolbar-left){display:none}.productos-layout :deep(.toolbar){padding:.4rem .45rem;gap:.2rem}.productos-layout :deep(.toolbar-right){gap:.2rem}.productos-layout :deep(.category-filter){padding:.3rem .2rem;font-size:.6rem;min-width:0;width:100%}.productos-layout :deep(.search-input){padding:.3rem 1.5rem .3rem 1.5rem;font-size:.65rem;width:100%}.productos-layout :deep(.search-wrapper){width:100%}.productos-layout :deep(.search-icon){left:.3rem;font-size:.65rem}.productos-layout :deep(.import-export-group .btn-text){display:none}.productos-layout :deep(.import-export-group .btn-secondary){padding:.3rem .35rem;min-width:28px;justify-content:center;font-size:.6rem}.productos-layout :deep(.import-export-group .btn-icon){font-size:.85rem;margin:0}.productos-layout :deep(.btn-danger.btn-sm){padding:.3rem .35rem;font-size:.6rem}.productos-layout :deep(.btn-primary .btn-text){display:none}.productos-layout :deep(.btn-primary){padding:.35rem .55rem;font-size:.65rem}.productos-layout :deep(.tab-text){display:none}.productos-layout :deep(.tab-btn){padding:.45rem .35rem;justify-content:center;font-size:.65rem}.productos-layout :deep(.tab-icon){font-size:1rem;margin:0}.productos-layout :deep(.tabs-bar){justify-content:space-around;padding:0 .2rem}.productos-layout :deep(.view-toggles){max-width:70px}.productos-layout :deep(.view-btn){width:26px;height:26px;font-size:.75rem}.productos-layout :deep(.tabla-productos){font-size:.8rem}.productos-layout :deep(.tabla-productos th),.productos-layout :deep(.tabla-productos td){padding:.5rem .5rem}.productos-layout :deep(.icon-cell){width:32px;height:32px;font-size:1rem}.productos-layout :deep(.nombre-text){font-size:.8rem}.productos-layout :deep(.nombre-id){font-size:.6rem}.productos-layout :deep(.btn-action){width:30px;height:30px}.productos-layout :deep(.btn-action .action-icon){width:14px;height:14px}.productos-layout :deep(.acciones-cell){gap:.25rem}.productos-layout :deep(.stock-badge){padding:.25rem .4rem;font-size:.8rem}.productos-layout :deep(.stock-icon){font-size:.85rem}.productos-layout .toast-container{bottom:.5rem;right:.5rem;left:.5rem}.productos-layout .toast-notification{padding:.75rem .85rem}.productos-layout .toast-icon{font-size:1rem}.productos-layout .toast-message{font-size:.8rem}.productos-layout :deep(.estado-loading),.productos-layout :deep(.estado-empty){padding:2.5rem .5rem}.productos-layout :deep(.empty-icon){font-size:2.5rem}.productos-layout :deep(.empty-text){font-size:.9rem}.productos-layout :deep(.loading-spinner){width:36px;height:36px;border-width:3px}.productos-layout :deep(.category-filter),.productos-layout :deep(.search-input){font-size:.8rem;padding:.5rem 2rem .5rem .7rem}.productos-layout :deep(.btn-secondary){padding:.5rem .7rem;font-size:.7rem}.productos-layout :deep(.categoria-badge){font-size:.65rem;padding:.15rem .4rem}.productos-layout :deep(.table-footer){padding:.6rem 1rem}.productos-layout :deep(.footer-count){font-size:.7rem}.productos-layout :deep(.bulk-action-bar){padding:.6rem .75rem}.productos-layout :deep(.bulk-count){font-size:.8rem}.productos-layout :deep(.btn-bulk-action){padding:.45rem .75rem;font-size:.75rem}.productos-layout :deep(.productos-grid){grid-template-columns:repeat(2,1fr);gap:.5rem}.productos-layout :deep(.producto-card){padding:.6rem}.productos-layout :deep(.pc-ico){width:36px;height:36px;font-size:1rem}.productos-layout :deep(.pc-name){font-size:.7rem}.productos-layout :deep(.pc-stat-l){font-size:.5rem}.productos-layout :deep(.pc-stat-v){font-size:.6rem}.productos-layout :deep(.pc-btn){height:28px;font-size:.8rem}.productos-layout :deep(.view-toggles){border-radius:6px}.productos-layout :deep(.view-btn){width:32px;height:32px;font-size:.9rem}}
 @media(max-width:360px){.productos-layout :deep(.toolbar){padding:.3rem .25rem;gap:.15rem}.productos-layout :deep(.toolbar-right){gap:.15rem}.productos-layout :deep(.category-filter){padding:.25rem .15rem;font-size:.55rem}.productos-layout :deep(.search-input){padding:.25rem 1.2rem .25rem 1.2rem;font-size:.6rem}.productos-layout :deep(.search-icon){font-size:.6rem}.productos-layout :deep(.import-export-group){gap:.15rem}.productos-layout :deep(.import-export-group .btn-text){display:none}.productos-layout :deep(.import-export-group .btn-secondary){padding:.25rem .3rem;min-width:24px;justify-content:center;font-size:.55rem}.productos-layout :deep(.import-export-group .btn-icon){font-size:.75rem;margin:0}.productos-layout :deep(.btn-danger.btn-sm){padding:.25rem .3rem;font-size:.55rem}.productos-layout :deep(.btn-primary .btn-text){display:none}.productos-layout :deep(.btn-primary){padding:.3rem .45rem;font-size:.6rem}.productos-layout :deep(.btn-icon){font-size:.75rem}.productos-layout :deep(.btn-text){font-size:.55rem}.productos-layout :deep(.tab-btn){padding:.4rem .25rem;font-size:.6rem}.productos-layout :deep(.tab-icon){font-size:.85rem}.productos-layout :deep(.tabs-bar){padding:0 .15rem;gap:0}.productos-layout :deep(.view-btn){width:24px;height:24px;font-size:.7rem}.productos-layout :deep(.view-toggles){max-width:60px}.productos-layout :deep(.tabla-productos th),.productos-layout :deep(.tabla-productos td){padding:.4rem .35rem}.productos-layout :deep(.col-check){width:30px}.productos-layout :deep(.row-checkbox){width:14px;height:14px}.productos-layout :deep(.col-icon){width:30px}.productos-layout :deep(.icon-cell){width:28px;height:28px;font-size:.85rem}.productos-layout :deep(.nombre-text){font-size:.7rem}.productos-layout :deep(.nombre-id){font-size:.55rem}.productos-layout :deep(.categoria-badge){font-size:.6rem;padding:.1rem .3rem}.productos-layout :deep(.btn-action){width:26px;height:26px}.productos-layout :deep(.btn-action .action-icon){width:12px;height:12px}.productos-layout :deep(.stock-value){font-size:.7rem}.productos-layout :deep(.stock-icon){font-size:.75rem}.productos-layout :deep(.tipo-badge){font-size:.6rem;padding:.1rem .3rem}.productos-layout :deep(.envase-badge){font-size:.6rem}.productos-layout :deep(.productos-grid){gap:.35rem;padding:.3rem 0}.productos-layout :deep(.producto-card){padding:.45rem;gap:.25rem;border-radius:8px}.productos-layout :deep(.pc-top){margin-bottom:.1rem}.productos-layout :deep(.pc-id){font-size:.5rem}.productos-layout :deep(.pc-dot){width:6px;height:6px}.productos-layout :deep(.pc-ico){width:28px;height:28px;font-size:.8rem}.productos-layout :deep(.pc-name){font-size:.6rem;min-height:1.2em;-webkit-line-clamp:1}.productos-layout :deep(.pc-badges){gap:.2rem}.productos-layout :deep(.pc-badge){font-size:.45rem;padding:.05rem .25rem;border-radius:4px}.productos-layout :deep(.pc-stats){gap:.15rem}.productos-layout :deep(.pc-stat){padding:.12rem .2rem;border-radius:4px}.productos-layout :deep(.pc-stat-l){font-size:.4rem}.productos-layout :deep(.pc-stat-v){font-size:.5rem}.productos-layout :deep(.pc-actions){gap:.15rem;margin-top:.05rem}.productos-layout :deep(.pc-btn){height:24px;font-size:.7rem;border-radius:4px}.productos-layout .toast-container{bottom:.3rem;right:.3rem;left:.3rem}.productos-layout .toast-notification{padding:.6rem .7rem;font-size:.75rem}.productos-layout .toast-icon{font-size:.9rem}.productos-layout .toast-message{font-size:.7rem}.productos-layout :deep(.estado-loading),.productos-layout :deep(.estado-empty){padding:2rem .3rem}.productos-layout :deep(.empty-icon){font-size:2rem}.productos-layout :deep(.empty-text){font-size:.8rem}.productos-layout :deep(.loading-spinner){width:30px;height:30px;border-width:2px}.productos-layout :deep(.bulk-action-bar){padding:.5rem .6rem;gap:.4rem}.productos-layout :deep(.bulk-count){font-size:.7rem}.productos-layout :deep(.btn-clear-selection){font-size:.65rem;padding:.15rem .35rem}.productos-layout :deep(.btn-bulk-action){padding:.4rem .6rem;font-size:.7rem}.productos-layout :deep(.btn-icon){font-size:.85rem}.productos-layout :deep(.btn-text){font-size:.65rem}.productos-layout :deep(.productos-grid){grid-template-columns:repeat(2,1fr);gap:.4rem}.productos-layout :deep(.producto-card){padding:.5rem;gap:.3rem}.productos-layout :deep(.pc-ico){width:32px;height:32px;font-size:.9rem}.productos-layout :deep(.pc-name){font-size:.65rem;-webkit-line-clamp:1}.productos-layout :deep(.pc-badge){font-size:.5rem;padding:.05rem .3rem}.productos-layout :deep(.pc-stat){padding:.15rem .25rem}.productos-layout :deep(.pc-stat-l){font-size:.45rem}.productos-layout :deep(.pc-stat-v){font-size:.55rem}.productos-layout :deep(.pc-actions){gap:.2rem}.productos-layout :deep(.pc-btn){height:26px;font-size:.75rem}.productos-layout :deep(.view-btn){width:30px;height:30px;font-size:.85rem}}

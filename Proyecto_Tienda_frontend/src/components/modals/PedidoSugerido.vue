@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import EditarCajasProductoModal from './Productos/EditarCajasProductoModal.vue';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
@@ -57,6 +58,8 @@ const cargando = ref(false);
 const buscarProducto = ref('');
 const vistaAgrupada = ref(true);
 const provExpandidos = ref<Set<number>>(new Set());
+const esAdmin = Number(localStorage.getItem('tipoUsuario') || 2) === 1;
+const productoEditandoCajas = ref<Sugerencia | null>(null);
 const emit = defineEmits(['pedido-creado']);
 
 type GrupoDepartamento = {
@@ -238,6 +241,25 @@ function getUrgencyClass(s: Sugerencia) {
   if (s.diasInventarioRestante <= 3) return 'urgency-high';
   if (s.diasInventarioRestante <= 7) return 'urgency-medium';
   return 'urgency-low';
+}
+
+function abrirEditarCajas(s: Sugerencia) {
+  productoEditandoCajas.value = s;
+}
+
+async function onCajasGuardadas(cajas: number[]) {
+  const prod = productoEditandoCajas.value;
+  if (prod) {
+    prod.presentacionCaja = cajas.join(',');
+    prod.cajasDisponibles = cajas.map(piezas => ({
+      piezas,
+      precioCaja: prod.precioCosto * piezas,
+      costoPorPieza: prod.precioCosto,
+      ahorroVsIndividual: 0
+    }));
+  }
+  productoEditandoCajas.value = null;
+  await cargar();
 }
 
 async function crearPedidoPorProveedor(idProveedor: number, nombreProveedor: string) {
@@ -530,6 +552,12 @@ defineExpose({ cargar });
                       <button v-for="caja in s.cajasDisponibles" :key="caja.piezas" class="caja-option-btn" :class="{ recommended: caja.piezas === s.cajaSugerida }" @click.stop>
                         📦 {{ caja.piezas }}pzs - {{ formatoMoneda(caja.precioCaja) }}
                       </button>
+                      <span v-if="!s.cajasDisponibles.some(c => c.piezas === s.cajaSugerida)" class="caja-options-label">📦 Caja de {{ s.cajaSugerida }} pzs (no configurada)</span>
+                    </div>
+                    <div v-if="esAdmin && !s.isGramaje" class="ps-caja-admin-row">
+                      <button class="btn-editar-cajas" @click.stop="abrirEditarCajas(s)" :title="s.cajasDisponibles && s.cajasDisponibles.length > 0 ? 'Editar compra por caja' : 'Configurar compra por caja'">
+                        📦✏️ {{ s.cajasDisponibles && s.cajasDisponibles.length > 0 ? 'Editar cajas' : 'Configurar cajas' }}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -636,6 +664,12 @@ defineExpose({ cargar });
               <button v-for="caja in s.cajasDisponibles" :key="caja.piezas" class="caja-option-btn" :class="{ recommended: caja.piezas === s.cajaSugerida }" @click.stop>
                 📦 {{ caja.piezas }}pzs - {{ formatoMoneda(caja.precioCaja) }}
               </button>
+              <span v-if="!s.cajasDisponibles.some(c => c.piezas === s.cajaSugerida)" class="caja-options-label">📦 Caja de {{ s.cajaSugerida }} pzs (no configurada)</span>
+            </div>
+            <div v-if="esAdmin && !s.isGramaje" class="ps-caja-admin-row">
+              <button class="btn-editar-cajas" @click.stop="abrirEditarCajas(s)" :title="s.cajasDisponibles && s.cajasDisponibles.length > 0 ? 'Editar compra por caja' : 'Configurar compra por caja'">
+                📦✏️ {{ s.cajasDisponibles && s.cajasDisponibles.length > 0 ? 'Editar cajas' : 'Configurar cajas' }}
+              </button>
             </div>
           </div>
         </div>
@@ -644,6 +678,16 @@ defineExpose({ cargar });
         </div>
       </div>
     </template>
+
+    <EditarCajasProductoModal
+      :open="!!productoEditandoCajas"
+      :id-producto="productoEditandoCajas?.idProducto"
+      :nombre-producto="productoEditandoCajas?.nombreProducto"
+      :precio-costo="productoEditandoCajas?.precioCosto"
+      :presentacion-caja="productoEditandoCajas?.presentacionCaja"
+      @close="productoEditandoCajas = null"
+      @saved="onCajasGuardadas"
+    />
   </div>
 </template>
 
@@ -1348,6 +1392,31 @@ defineExpose({ cargar });
   border-color: rgba(82, 196, 26, 0.6);
   background: rgba(82, 196, 26, 0.08);
   color: #a0d911;
+}
+
+.ps-caja-admin-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.btn-editar-cajas {
+  border: none;
+  padding: 0.25rem 0.55rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning);
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.btn-editar-cajas:hover {
+  background: var(--color-warning);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .badge-prov {

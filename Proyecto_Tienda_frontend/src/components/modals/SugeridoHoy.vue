@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import EditarCajasProductoModal from './Productos/EditarCajasProductoModal.vue';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
@@ -63,6 +64,8 @@ const seleccionados = ref<Set<number>>(new Set());
 const cargando = ref(false);
 const buscarProducto = ref('');
 const expandedGroups = ref<Set<number>>(new Set());
+const esAdmin = Number(localStorage.getItem('tipoUsuario') || 2) === 1;
+const productoEditandoCajas = ref<Sugerencia | null>(null);
 const emit = defineEmits(['pedido-creado']);
 
 async function cargar() {
@@ -189,6 +192,25 @@ function getUrgencyClass(s: Sugerencia) {
 
 function getTipoBadge(tipo: string) {
   return tipo === 'PREVENTA' ? '📋 Preventa' : '🚚 Directa';
+}
+
+function abrirEditarCajas(p: Sugerencia) {
+  productoEditandoCajas.value = p;
+}
+
+async function onCajasGuardadas(cajas: number[]) {
+  const prod = productoEditandoCajas.value;
+  if (prod) {
+    prod.presentacionCaja = cajas.join(',');
+    prod.cajasDisponibles = cajas.map(piezas => ({
+      piezas,
+      precioCaja: prod.precioCosto * piezas,
+      costoPorPieza: prod.precioCosto,
+      ahorroVsIndividual: 0
+    }));
+  }
+  productoEditandoCajas.value = null;
+  await cargar();
 }
 
 async function crearPedidoPorGrupo(grupo: SugeridoHoy) {
@@ -400,6 +422,12 @@ defineExpose({ cargar });
                     📦 {{ caja.piezas }}pzs - {{ formatoMoneda(caja.precioCaja) }}
                     <span v-if="caja.ahorroVsIndividual > 0" class="caja-option-ahorro">(-{{ formatoMoneda(caja.ahorroVsIndividual) }}/pza)</span>
                   </button>
+                  <span v-if="!p.cajasDisponibles.some(c => c.piezas === p.cajaSugerida)" class="caja-options-label">📦 Caja de {{ p.cajaSugerida }} pzs (no configurada)</span>
+                </div>
+                <div v-if="esAdmin && !p.isGramaje" class="sh-caja-admin-row">
+                  <button class="btn-editar-cajas" @click.stop="abrirEditarCajas(p)" :title="p.cajasDisponibles && p.cajasDisponibles.length > 0 ? 'Editar compra por caja' : 'Configurar compra por caja'">
+                    📦✏️ {{ p.cajasDisponibles && p.cajasDisponibles.length > 0 ? 'Editar cajas' : 'Configurar cajas' }}
+                  </button>
                 </div>
               </div>
               <div class="sh-prod-suggestion">
@@ -415,6 +443,16 @@ defineExpose({ cargar });
         </div>
       </div>
     </template>
+
+    <EditarCajasProductoModal
+      :open="!!productoEditandoCajas"
+      :id-producto="productoEditandoCajas?.idProducto"
+      :nombre-producto="productoEditandoCajas?.nombreProducto"
+      :precio-costo="productoEditandoCajas?.precioCosto"
+      :presentacion-caja="productoEditandoCajas?.presentacionCaja"
+      @close="productoEditandoCajas = null"
+      @saved="onCajasGuardadas"
+    />
   </div>
 </template>
 
@@ -435,6 +473,7 @@ defineExpose({ cargar });
 .sh-productos{display:flex;flex-direction:column;gap:.25rem;padding:.25rem .75rem .6rem}.sh-producto{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:var(--color-bg-primary);border:none;border-radius:8px;cursor:pointer;transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,.05)}.sh-producto:hover{transform:translateY(-1px);box-shadow:4px 4px 8px rgba(0,0,0,.1)}.sh-producto.selected{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 2px var(--color-accent)}.sh-producto.urgencia-alta{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-error) 30%,transparent)}.sh-producto.urgencia-media{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-warning) 30%,transparent)}.sh-producto.urgencia-baja{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-success) 20%,transparent)}.sh-prod-check{width:20px;height:20px;border:none;border-radius:4px;background:var(--color-bg-secondary);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 1px 1px 2px rgba(0,0,0,.1)}.check-mark{font-size:.7rem;color:var(--color-accent);font-weight:900}.sh-prod-info{flex:1;min-width:0}.sh-prod-name{font-size:.75rem;font-weight:700;color:var(--color-text-primary)}.sh-prod-stats{display:flex;gap:.6rem;margin-top:.15rem;font-size:.6rem;color:var(--color-text-secondary)}.sh-prod-stats strong{color:var(--color-text-primary)}.margin-stat strong.margin-val{color:var(--color-accent)}.sh-prod-suggestion{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;flex-shrink:0}.sug-cantidad{font-size:.75rem;font-weight:800;color:var(--color-accent)}.sug-costo{font-size:.65rem;color:var(--color-warning);font-weight:600}.sug-ganancia{font-size:.62rem;color:var(--color-success);font-weight:600}
 
 .sh-caja-badge{display:flex;align-items:center;gap:.3rem;margin-top:.25rem;padding:.15rem .4rem;background:color-mix(in srgb,var(--color-info) 10%,transparent);border-radius:4px;font-size:.55rem;color:var(--color-info)}.caja-icon{font-size:.7rem}.caja-dias{margin-left:auto;font-size:.5rem;opacity:.7}.sh-caja-options{display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.2rem}.caja-options-label{font-size:.5rem;color:var(--color-text-secondary)}.caja-option-btn{border:none;padding:.15rem .35rem;border-radius:3px;background:var(--color-bg-secondary);color:var(--color-text-secondary);font-size:.52rem;cursor:pointer;box-shadow:1px 1px 2px rgba(0,0,0,.04)}.caja-option-btn:hover{color:var(--color-text-primary)}.caja-option-btn.recommended{background:color-mix(in srgb,var(--color-accent) 15%,transparent);color:var(--color-accent);box-shadow:0 0 4px color-mix(in srgb,var(--color-accent) 20%,transparent)}.caja-option-ahorro{font-size:.45rem;color:var(--color-success)}.caja-ahorro{font-size:.52rem;color:var(--color-success);font-weight:600}.sh-no-results{padding:1rem;text-align:center;font-size:.7rem;color:var(--color-text-secondary)}
+.sh-caja-admin-row{display:flex;justify-content:flex-end;margin-top:.2rem}.btn-editar-cajas{border:none;padding:.18rem .45rem;border-radius:4px;background:color-mix(in srgb,var(--color-warning) 12%,transparent);color:var(--color-warning);font-size:.55rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}.btn-editar-cajas:hover{background:var(--color-warning);color:#fff;transform:translateY(-1px)}
 
 @media(max-width:768px){.sh-grupo-header{flex-direction:column;align-items:stretch;gap:.4rem}.sh-grupo-totals{justify-content:space-between}.sh-producto{flex-wrap:wrap}}
 </style>
