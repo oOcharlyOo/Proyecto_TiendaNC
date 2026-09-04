@@ -13,6 +13,7 @@ const sucursalSeleccionada = ref<Sucursal>('dulceria');
 const toastContainer = ref<HTMLElement | null>(null);
 const modalMontoInicialAbierto = ref(false);
 const idUsuarioActual = ref<number | null>(null);
+const modoAmbulante = ref<boolean>(false);
 
 const existeUsuarios = ref<boolean | null>(null);
 const creandoPrimerAdmin = ref(false);
@@ -20,7 +21,7 @@ const creandoPrimerAdmin = ref(false);
 export function useLogin() {
   const router = useRouter();
   const { currentTheme, setTheme } = useTheme();
-  const { setSucursal, getHeader } = useSucursal();
+  const { setSucursal, getHeader, clearSucursal } = useSucursal();
 
   onMounted(() => {
     verificarExisteUsuarios();
@@ -63,14 +64,21 @@ export function useLogin() {
 
   function seleccionarSucursal(sucursal: Sucursal) {
     sucursalSeleccionada.value = sucursal;
+    modoAmbulante.value = sucursal.startsWith('ambulante');
   }
 
   async function iniciarSesion() {
     const usuarioDTO = { usuario: name.value, password_hash: pass.value };
     try {
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      headers = { ...headers, ...getHeader() };
+      if (modoAmbulante.value) {
+        headers['X-Ambulante'] = 'true';
+        headers['X-Sucursal-Origen'] = sucursalSeleccionada.value === 'ambulante_dulceria' ? 'dulceria' : 'abarrotera';
+      }
       const resLogin = await fetch(`${API_BASE}/usuarios/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getHeader() },
+        headers: headers as Record<string, string>,
         body: JSON.stringify(usuarioDTO)
       });
       const usuario = await resLogin.json();
@@ -187,6 +195,6 @@ export function useLogin() {
     currentTheme, setTheme,
     seleccionarSucursal, iniciarSesion, verificarCajaActiva,
     registrarMontoInicial, cerrarModalMontoInicial, mostrarToast,
-    crearPrimerAdmin
+    crearPrimerAdmin, modoAmbulante
   };
 }

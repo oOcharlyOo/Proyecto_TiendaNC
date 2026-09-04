@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useLogin } from './logica/useLogin';
-const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin } = useLogin();
+const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin, modoAmbulante } = useLogin();
 import type { Sucursal } from '@/composables/useSucursal';
 import type { Theme } from '@/composables/useTheme';
 import MontoInicialModal from '../modals/MontoInicialModal.vue';

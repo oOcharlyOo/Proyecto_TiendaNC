@@ -1,4 +1,4 @@
-export type Sucursal = 'dulceria' | 'abarrotera';
+export type Sucursal = 'dulceria' | 'abarrotera' | 'ambulante_dulceria' | 'ambulante_abarrotera';
 
 const SUCURSAL_KEY = 'sucursalActiva';
 
