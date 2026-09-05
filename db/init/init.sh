@@ -398,6 +398,37 @@ INSERT INTO tiendadb.categorias (nombre, descripcion, estatus)
 VALUES ('Sin asignar', 'Categoria por defecto', 'A')
 ON CONFLICT (nombre) DO NOTHING;
 
+-- ========================================
+-- SISTEMA AMBULANTE (Migraciones 015 y 016)
+-- ========================================
+CREATE TABLE IF NOT EXISTS tiendadb.ambulante_inventario (
+    id BIGSERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_producto INT,
+    nombre_producto VARCHAR(255) NOT NULL,
+    id_sucursal_origen VARCHAR(20) NOT NULL,
+    cantidad INT NOT NULL,
+    gramos_por_pieza INT,
+    unidad VARCHAR(10) NOT NULL DEFAULT 'PIEZA',
+    precio_costo DECIMAL(12, 4) NOT NULL,
+    estatus VARCHAR(20) NOT NULL DEFAULT 'CARGADO',
+    fecha_carga TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_venta TIMESTAMP,
+    id_venta INT,
+    CONSTRAINT fk_amb_usuario FOREIGN KEY (id_usuario)
+        REFERENCES tiendadb.usuarios(id_usuario)
+);
+
+CREATE INDEX IF NOT EXISTS idx_amb_inventario_usuario ON tiendadb.ambulante_inventario(id_usuario, estatus);
+CREATE INDEX IF NOT EXISTS idx_amb_inventario_venta ON tiendadb.ambulante_inventario(id_venta);
+
+ALTER TABLE tiendadb.ventas
+    ADD COLUMN IF NOT EXISTS es_ambulante BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS id_sucursal_origen VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS precio_costo_total DECIMAL(12, 2) NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_ventas_ambulante ON tiendadb.ventas(es_ambulante, fecha_venta);
+
 EOSQL
 
 echo "OK - Esquema tiendadb listo"
@@ -790,6 +821,37 @@ ON CONFLICT (nombre) DO NOTHING;
 INSERT INTO tiendadb_abarrotera.categorias (nombre, descripcion, estatus)
 VALUES ('Sin asignar', 'Categoria por defecto', 'A')
 ON CONFLICT (nombre) DO NOTHING;
+
+-- ========================================
+-- SISTEMA AMBULANTE (Migraciones 015 y 016)
+-- ========================================
+CREATE TABLE IF NOT EXISTS tiendadb_abarrotera.ambulante_inventario (
+    id BIGSERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_producto INT,
+    nombre_producto VARCHAR(255) NOT NULL,
+    id_sucursal_origen VARCHAR(20) NOT NULL,
+    cantidad INT NOT NULL,
+    gramos_por_pieza INT,
+    unidad VARCHAR(10) NOT NULL DEFAULT 'PIEZA',
+    precio_costo DECIMAL(12, 4) NOT NULL,
+    estatus VARCHAR(20) NOT NULL DEFAULT 'CARGADO',
+    fecha_carga TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_venta TIMESTAMP,
+    id_venta INT,
+    CONSTRAINT fk_amb_usuario FOREIGN KEY (id_usuario)
+        REFERENCES tiendadb_abarrotera.usuarios(id_usuario)
+);
+
+CREATE INDEX IF NOT EXISTS idx_amb_inventario_usuario ON tiendadb_abarrotera.ambulante_inventario(id_usuario, estatus);
+CREATE INDEX IF NOT EXISTS idx_amb_inventario_venta ON tiendadb_abarrotera.ambulante_inventario(id_venta);
+
+ALTER TABLE tiendadb_abarrotera.ventas
+    ADD COLUMN IF NOT EXISTS es_ambulante BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS id_sucursal_origen VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS precio_costo_total DECIMAL(12, 2) NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_ventas_ambulante ON tiendadb_abarrotera.ventas(es_ambulante, fecha_venta);
 
 EOSQL
 

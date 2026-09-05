@@ -105,23 +105,36 @@ window.fetch = async function (url: RequestInfo | URL, init?: RequestInit): Prom
   let urlStr = typeof url === 'string' ? url : url.toString();
   urlStr = urlStr.replace(LOCAL_BASE, base).replace(REMOTE_BASE, base);
 
-  // Para FormData, no tocar headers (el navegador debe auto-generar Content-Type con boundary)
-  // Pasar sucursal como query param en su lugar
-  if (init?.body instanceof FormData && sucursal) {
+  const esAmbulante = sucursal === 'ambulante_dulceria' || sucursal === 'ambulante_abarrotera';
+  const origenAmbulante = sucursal === 'ambulante_abarrotera' ? 'abarrotera' : 'dulceria';
+
+  const buildHeaders = (existing?: HeadersInit): Headers => {
+    const headers = new Headers(existing || {});
+    if (sucursal) headers.set('X-Sucursal', sucursal);
+    if (esAmbulante) {
+      headers.set('X-Ambulante', 'true');
+      headers.set('X-Sucursal-Origen', origenAmbulante);
+    }
+    return headers;
+  };
+
+  // Para FormData, el navegador auto-genera Content-Type con boundary; pasamos sucursal y ambulante como query param
+  if (init?.body instanceof FormData) {
     const separator = urlStr.includes('?') ? '&' : '?';
-    urlStr += `${separator}sucursal=${encodeURIComponent(sucursal)}`;
+    urlStr += `${separator}sucursal=${encodeURIComponent(sucursal || '')}`;
+    if (esAmbulante) {
+      urlStr += `&ambulante=${encodeURIComponent(origenAmbulante)}`;
+    }
+    const headers = buildHeaders();
     try {
-      return await originalFetch.call(window, urlStr, init);
+      return await originalFetch.call(window, urlStr, { ...init, headers });
     } catch (e) {
-      if (base === LOCAL_BASE) return fallbackRemoto(urlStr.replace(LOCAL_BASE, REMOTE_BASE), init);
+      if (base === LOCAL_BASE) return fallbackRemoto(urlStr.replace(LOCAL_BASE, REMOTE_BASE), { ...init, headers });
       throw e;
     }
   }
 
-  const headers = new Headers(init?.headers || {});
-  if (sucursal) {
-    headers.set('X-Sucursal', sucursal);
-  }
+  const headers = buildHeaders(init?.headers);
 
   try {
     return await originalFetch.call(window, urlStr, { ...init, headers });

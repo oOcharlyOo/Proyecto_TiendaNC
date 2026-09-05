@@ -15,22 +15,45 @@ export function useSucursal() {
     localStorage.removeItem(SUCURSAL_KEY);
   }
 
+  function isAmbulante(): boolean {
+    const s = getSucursal();
+    return s === 'ambulante_dulceria' || s === 'ambulante_abarrotera';
+  }
+
+  function getOrigen(): string {
+    return getSucursal() === 'ambulante_abarrotera' ? 'abarrotera' : 'dulceria';
+  }
+
   function getHeader(): Record<string, string> {
-    return { 'X-Sucursal': getSucursal() };
+    const header: Record<string, string> = { 'X-Sucursal': getSucursal() };
+    if (isAmbulante()) {
+      header['X-Ambulante'] = 'true';
+      header['X-Sucursal-Origen'] = getOrigen();
+    }
+    return header;
   }
 
   function getLabel(): string {
-    return getSucursal() === 'abarrotera' ? 'Abarrotera' : 'Dulcería';
+    const s = getSucursal();
+    if (s === 'abarrotera') return 'Abarrotera';
+    if (s === 'ambulante_dulceria') return 'Ambulante (Dulcería)';
+    if (s === 'ambulante_abarrotera') return 'Ambulante (Abarrotera)';
+    return 'Dulcería';
   }
 
   function getIcon(): string {
-    return getSucursal() === 'abarrotera' ? '🏪' : '🍬';
+    const s = getSucursal();
+    if (s === 'abarrotera') return '🏪';
+    if (s === 'ambulante_dulceria' || s === 'ambulante_abarrotera') return '🛺';
+    return '🍬';
   }
 
   return {
     getSucursal,
     setSucursal,
     clearSucursal,
+    isAmbulante,
+    getOrigen,
     getHeader,
     getLabel,
     getIcon

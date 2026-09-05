@@ -8,6 +8,7 @@ import Corte from "@/components/Corte/Corte.vue";
 import Finanzas from "@/components/Finanzas/Finanzas.vue";
 import Rental from "@/components/Rental/Rental.vue";
 import Usuarios from "@/components/Usuarios/Usuarios.vue";
+import Ambulante from "@/components/Ambulante/Ambulante.vue";
 
 const AUTH_KEY = 'isAuth';
 
@@ -57,6 +58,12 @@ const routes = [
     path: '/rental',
     name: 'Rental',
     component: Rental,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/ambulante',
+    name: 'Ambulante',
+    component: Ambulante,
     meta: { requiresAuth: true },
   }
 ];
