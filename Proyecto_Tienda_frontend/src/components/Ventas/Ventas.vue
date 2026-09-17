@@ -89,6 +89,7 @@ import {
   eliminarDetalleVenta, eliminarTodosLosDetalles, cerrarDetalleVenta
 } from './logica/usePosEdicionDetalle';
 
+import { playSound } from './logica/usePosSonido';
 import PosSidebar from './secciones/PosSidebar.vue';
 import PosCatalogo from './secciones/PosCatalogo.vue';
 import PosPanelTicket from './secciones/PosPanelTicket.vue';
@@ -124,6 +125,41 @@ const stockData = ref<any>(null);
 const modalOpcionesVozAbierto = ref(false);
 const voiceOpcionesVenta = ref<any>(null);
 const vpVistaLista = ref(true);
+
+const confirmarCobroMixto = (splits: Array<{ metodo: string; monto: number }>) => {
+  if (!ticketActual.value || ticketActual.value.items.length === 0) { mostrarMensaje('No hay productos en el ticket.', 'error'); return; }
+  const montoTotal = totalVenta.value;
+  const ventaId = ticketActual.value.id;
+  const numeroTicket = ticketActual.value.numero;
+  
+  // Validar que la suma de los splits iguale el total
+  const sumaSplits = splits.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+  if (Math.round(sumaSplits * 100) / 100 !== Math.round(montoTotal * 100) / 100) {
+    mostrarMensaje('La suma de los montos debe ser igual al total (' + formatoMoneda(montoTotal) + ')', 'error');
+    return;
+  }
+  
+  // Crear descripción con el desglose de pagos mixtos
+  const partes = splits.map((sp, i) => `${sp.metodo === 'EFECTIVO' ? 'Efectivo' : sp.metodo === 'TRANSFERENCIA' ? 'Transferencia' : sp.metodo === 'TARJETA' ? 'Tarjeta' : sp.metodo} $${Number(sp.monto).toFixed(2)}`).join(' + ');
+  const descripcion = `Pago Mixto: ${partes} = $${Number(montoTotal).toFixed(2)}`;
+  
+  // Marcar la venta como pendiente con la descripción
+  getJson<any>(`/ventas/marcarPendiente/${ventaId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ montoTotal, estatus: 'P', descripcion })
+  })
+    .then(() => {
+      mostrarMensaje('Venta guardada como pendiente con pago mixto', 'ok');
+      playSound('cash');
+      window.dispatchEvent(new CustomEvent('venta-completada', { detail: { ventaId, montoTotal } }));
+      cargarTicketsDesdeBackend();
+      cargarSiguienteTicket();
+    })
+    .catch((e) => {
+      console.error('Error al guardar venta pendiente:', e);
+      mostrarMensaje('Error al guardar la venta', 'error');
+    });
+};
 
 const recognition = ref<any>(null);
 
@@ -650,6 +686,7 @@ onUnmounted(() => {
       @confirmar-tarjeta="confirmarCobroTarjeta"
       @confirmar-pendiente="confirmarCobroPendiente"
       @confirmar-credito="confirmarCobroCredito"
+      @confirmar-mixto="confirmarCobroMixto"
     />
 
     <CreditosPersonasModal
@@ -668,6 +705,7 @@ onUnmounted(() => {
       @confirmar-transferencia="confirmarCobroPendienteTransferencia"
       @confirmar-tarjeta="confirmarCobroPendienteTarjeta"
       @confirmar-credito="confirmarCobroPendienteCredito"
+      @confirmar-mixto="confirmarCobroMixto"
     />
 
     <CrudPromociones :open="modalPromocionesAbierto" @close="modalPromocionesAbierto = false; cargarPromocionesActivas()" @updated="cargarPromocionesActivas" />

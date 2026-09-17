@@ -9,21 +9,15 @@ const props = defineProps<{
   nombrePersona?: string;
 }>();
 
-const emit = defineEmits<{
-  (event: 'close'): void;
-  (event: 'confirmar-efectivo', payload: { montoRecibido: number }): void;
-  (event: 'confirmar-transferencia'): void;
-  (event: 'confirmar-tarjeta'): void;
-  (event: 'confirmar-pendiente'): void;
-  (event: 'confirmar-credito'): void;
-  (event: 'confirmar-abono', payload: { monto: number; metodoPago: string }): void;
-}>();
+const emit = defineEmits(['close', 'confirmar-efectivo', 'confirmar-transferencia', 'confirmar-tarjeta', 'confirmar-pendiente', 'confirmar-credito', 'confirmar-abono', 'confirmar-mixto']);
 
 const montoRecibido = ref<number | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
-
 const modoActual = computed(() => props.modo || 'venta');
 const esAbono = computed(() => modoActual.value === 'abono');
+
+const mixtoAbierto = ref(false);
+const mixtoSplits = ref<Array<{ metodo: string; monto: number }>>([]);
 
 watch(
   () => props.open,
@@ -33,6 +27,8 @@ watch(
       nextTick(() => {
         inputRef.value?.focus();
       });
+      mixtoAbierto.value = false;
+      mixtoSplits.value = [];
     }
   }
 );
@@ -58,6 +54,21 @@ const montoValido = computed(() => {
   return true;
 });
 
+const sumaMixto = computed(() => mixtoSplits.value.reduce((sum, sp) => sum + Number(sp.monto || 0), 0));
+
+const faltaMixto = computed(() => Math.max(0, Number(props.total) - sumaMixto.value));
+
+const mixtoValido = computed(() => {
+  if (mixtoSplits.value.length === 0) return false;
+  if (mixtoSplits.value.some(sp => Number(sp.monto || 0) <= 0)) return false;
+  return Math.round(sumaMixto.value * 100) / 100 === Math.round(Number(props.total) * 100) / 100;
+});
+
+function agregarSplit() {
+  if (mixtoSplits.value.length >= 4) { alert('Máximo 4 métodos de pago por venta'); return; }
+  mixtoSplits.value.push({ metodo: 'EFECTIVO', monto: Number(faltaMixto.value) });
+}
+
 function formatoMoneda(valor: number) {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -72,6 +83,18 @@ function confirmarEfectivo() {
   }
   const recibido = montoRecibido.value && montoRecibido.value > 0 ? montoRecibido.value : props.total;
   emit('confirmar-efectivo', { montoRecibido: recibido });
+}
+
+function confirmarMixto() {
+  if (!mixtoValido.value) {
+    if (mixtoSplits.value.length === 0) { alert('Agrega al menos un método de pago'); return; }
+    if (mixtoSplits.value.some(sp => Number(sp.monto || 0) <= 0)) { alert('Todos los montos deben ser mayores a 0'); return; }
+    alert(`La suma de los montos debe ser igual al total (${formatoMoneda(total)})`);
+    return;
+  }
+  emit('confirmar-mixto', { splits: mixtoSplits.value });
+  mixtoAbierto.value = false;
+  mixtoSplits.value = [];
 }
 
 function confirmarTransferencia() {
@@ -109,12 +132,18 @@ function manejarTeclado(e: KeyboardEvent) {
   } else if (e.key === 'F4') {
     e.preventDefault();
     confirmarTarjeta();
+  } else if (e.key === 'F7' && !esAbono.value) {
+    e.preventDefault();
+    mixtoAbierto.value = !mixtoAbierto.value;
+    if (mixtoAbierto.value && mixtoSplits.value.length === 0) mixtoSplits.value.push({ metodo: 'EFECTIVO', monto: Number(faltaMixto.value) });
   } else if (e.key === 'F5' && !esAbono.value) {
     e.preventDefault();
     emit('confirmar-pendiente');
   } else if (e.key === 'F6' && !esAbono.value) {
     e.preventDefault();
     emit('confirmar-credito');
+  } else if (e.key === 'Escape') {
+    if (mixtoAbierto.value) mixtoAbierto.value = false;
   }
 }
 
@@ -153,7 +182,7 @@ onUnmounted(() => {
             <div class="header-line"></div>
           </header>
 
-        <div class="modal-body">
+<div class="modal-body">
           <div v-if="esAbono" class="saldo-pendiente-banner">
             <span class="banner-label">Saldo pendiente</span>
             <span class="banner-amount">{{ formatoMoneda(saldoPendiente || total) }}</span>
@@ -185,6 +214,55 @@ onUnmounted(() => {
             <span class="cambio-label">Cambio</span>
             <span class="cambio-amount">{{ formatoMoneda(cambio) }}</span>
           </div>
+
+          <!-- Mixed payment dialog (conditional) -->
+          <div v-if="!esAbono && mixtoAbierto" class="mixto-dialog" @click.self="mixtoAbierto = false">
+            <div class="mixto-panel">
+              <button class="mixto-close" @click="mixtoAbierto = false" title="Cerrar">✕</button>
+              <header class="mixto-header">
+                <h3>💱 Pago Mixto</h3>
+                <p>Divide el total en varios métodos de pago:</p>
+              </header>
+
+              <div class="mixto-total">
+                <span class="mixto-total-label">Total a pagar</span>
+                <span class="mixto-total-amount">{{ formatoMoneda(total) }}</span>
+              </div>
+
+              <div class="mixto-splits">
+                <div v-for="(split, index) in mixtoSplits" :key="index" class="split-row">
+                  <select v-model="split.metodo" class="split-select">
+                    <option value="EFECTIVO">💵 Efectivo</option>
+                    <option value="TRANSFERENCIA">📱 Transferencia</option>
+                    <option value="TARJETA">💳 Tarjeta</option>
+                    <option value="CREDITO">💰 Crédito</option>
+                  </select>
+                  <input v-model.number="split.monto" type="number" step="0.01" min="0" class="split-input" placeholder="0.00">
+                  <button class="btn-delete" @click="mixtoSplits.splice(index, 1)" title="Eliminar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <button v-if="mixtoSplits.length < 4" class="mixto-add" @click="agregarSplit">＋ Agregar método de pago</button>
+                <div v-if="mixtoSplits.length === 0" class="empty-split">Aún no hay métodos de pago</div>
+              </div>
+
+              <div class="mixto-resumen">
+                <div class="resumen-row">
+                  <span>Suma de splits</span>
+                  <strong>{{ formatoMoneda(sumaMixto) }}</strong>
+                </div>
+                <div class="resumen-row" :class="{ ok: faltaMixto <= 0 }">
+                  <span>{{ faltaMixto > 0 ? 'Falta por pagar' : 'Cubierto' }}</span>
+                  <strong>{{ formatoMoneda(faltaMixto) }}</strong>
+                </div>
+              </div>
+
+              <div class="mixto-footer">
+                <button class="cancel-btn" @click="mixtoAbierto = false">Cancelar</button>
+                <button class="confirm-btn" @click="confirmarMixto" :disabled="!mixtoValido">Confirmar Pago Mixto</button>
+              </div>
+            </div>
+          </div>
         </div>
 
           <footer class="modal-footer">
@@ -200,6 +278,13 @@ onUnmounted(() => {
                 <span class="btn-rune">◈</span>
                 <span class="btn-label">Transferencia</span>
                 <span class="btn-shortcut">F3</span>
+                <span class="btn-rune">◈</span>
+              </button>
+              
+              <button class="pay-btn mixto" @click="mixtoAbierto = true" :disabled="!montoValido && montoRecibido !== null && montoRecibido > 0">
+                <span class="btn-rune">◈</span>
+                <span class="btn-label">Mixto</span>
+                <span class="btn-shortcut">F7</span>
                 <span class="btn-rune">◈</span>
               </button>
               
@@ -318,6 +403,7 @@ onUnmounted(() => {
 .pay-btn.tarjeta { background: linear-gradient(135deg, var(--color-info), color-mix(in srgb, var(--color-info) 50%, black)); }
 .pay-btn.pendiente { background: linear-gradient(135deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 50%, black)); }
 .pay-btn.credito { background: linear-gradient(135deg, #8e44ad, #6c3483); }
+.pay-btn.mixto { background: linear-gradient(135deg, #0ea5e9, #0369a1); color: #fff; }
 
 .btn-rune { font-size: .55rem; opacity: .5; flex-shrink: 0; }
 .btn-label { flex: 1; text-align: center; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
@@ -331,6 +417,37 @@ onUnmounted(() => {
 .cancel-btn { width: 100%; padding: .55rem; border: none; border-radius: var(--radius-sm); background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; box-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
 .cancel-btn:hover { color: var(--color-accent); box-shadow: 4px 4px 8px rgba(0,0,0,0.15); }
 .cancel-btn:active { transform: scale(.98); }
+
+.mixto-dialog { position: fixed; inset: 0; z-index: 230; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.mixto-panel { width: min(100%, 420px); max-height: 92vh; overflow-y: auto; background: var(--color-bg-panel); border-radius: var(--radius-lg); box-shadow: 8px 8px 24px rgba(0,0,0,0.45), -4px -4px 16px rgba(255,255,255,0.03); padding: 1.25rem; position: relative; animation: mixtoPop .18s ease; }
+@keyframes mixtoPop { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.mixto-close { position: absolute; top: .6rem; right: .6rem; width: 28px; height: 28px; border: none; border-radius: 50%; background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: .95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.mixto-close:hover { background: var(--color-error); color: #fff; }
+.mixto-header { text-align: center; margin-bottom: .35rem; }
+.mixto-header h3 { margin: 0 0 .25rem; font-size: 1.15rem; color: var(--color-accent); }
+.mixto-header p { margin: 0; font-size: .8rem; color: var(--color-text-secondary); }
+.mixto-total { display: flex; justify-content: space-between; align-items: center; padding: .6rem .8rem; background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover)); color: var(--color-on-brand); border-radius: var(--radius-sm); margin: .9rem 0; box-shadow: 3px 3px 8px rgba(0,0,0,0.15); }
+.mixto-total-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; opacity: .85; font-weight: 600; }
+.mixto-total-amount { font-size: 1.25rem; font-weight: 800; font-family: Courier New, monospace; }
+.mixto-splits { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .9rem; }
+.split-row { display: grid; grid-template-columns: 1.4fr 1fr 32px; gap: .4rem; align-items: center; }
+.split-select, .split-input { padding: .5rem .55rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-secondary); color: var(--color-text-primary); font-size: .9rem; outline: none; transition: border-color .15s, box-shadow .15s; }
+.split-select:focus, .split-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.split-input { font-family: Courier New, monospace; text-align: right; }
+.btn-delete { width: 32px; height: 32px; border: none; border-radius: var(--radius-sm); background: rgba(239,68,68,0.12); color: #dc2626; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; }
+.btn-delete:hover { background: #ef4444; color: #fff; }
+.mixto-add { width: 100%; padding: .5rem; border: 1.5px dashed color-mix(in srgb, var(--color-accent) 60%, transparent); border-radius: var(--radius-sm); background: transparent; color: var(--color-accent); font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.mixto-add:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.empty-split { text-align: center; padding: .5rem; font-size: .8rem; color: var(--color-text-secondary); border: 1.5px dashed var(--color-border); border-radius: var(--radius-sm); }
+.mixto-resumen { display: flex; flex-direction: column; gap: .35rem; padding: .6rem .8rem; background: var(--color-bg-secondary); border-radius: var(--radius-sm); margin-bottom: 1rem; }
+.resumen-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; color: var(--color-text-secondary); }
+.resumen-row strong { font-family: Courier New, monospace; color: var(--color-text-primary); font-size: .95rem; }
+.resumen-row.ok span, .resumen-row.ok strong { color: var(--color-success); font-weight: 700; }
+.mixto-footer { display: grid; grid-template-columns: 1fr 1.6fr; gap: .5rem; }
+.mixto-footer .cancel-btn { width: 100%; }
+.confirm-btn { padding: .6rem; border: none; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 60%, black)); color: #fff; font-size: .85rem; font-weight: 700; cursor: pointer; transition: all .15s; box-shadow: 3px 3px 6px rgba(0,0,0,0.15); }
+.confirm-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 5px 5px 10px rgba(0,0,0,0.2); }
+.confirm-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity .2s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
