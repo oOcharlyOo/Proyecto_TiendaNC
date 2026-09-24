@@ -5,14 +5,13 @@ import { nextTick } from 'vue';
 const scannerActivo = ref(false);
 let scannerProcessing = false;
 
-function handleScannerDetection(data: any) {
+async function handleScannerDetection(data: any) {
   if (scannerProcessing) return;
   const code = data.codeResult.code;
   if (code) {
     scannerProcessing = true;
     stopScanner();
-    const { buscarYAgregarProducto } = require('./usePosProductos');
-    buscarYAgregarProducto(code);
+    window.dispatchEvent(new CustomEvent('pos-scanner-detected', { detail: code }));
   }
 }
 

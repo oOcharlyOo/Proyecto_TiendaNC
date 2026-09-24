@@ -12,11 +12,11 @@
               <span class="disc-icon">⚠</span>
               <span class="disc-text">{{ formatoMonedaRedondeada(Math.abs(historialDiscrepanciaMonto)) }}</span>
             </button>
-            <button v-if="esAdmin && !modoEdicionDetalle" class="btn-edit" @click="emit('iniciar-edicion-detalle')">
+            <button v-if="(esAdmin || (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F')) && !modoEdicionDetalle" class="btn-edit" @click="emit('iniciar-edicion-detalle')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               Editar
             </button>
-            <template v-if="modoEdicionDetalle">
+            <template v-if="modoEdicionDetalle && (esAdmin || (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F'))">
               <button class="btn-save" @click="emit('guardar-cambios-detalle')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
                 Guardar
@@ -46,8 +46,45 @@
               </div>
               <div class="summary-item">
                 <span class="summary-label">Método</span>
-                <span class="method-badge" :class="getMetodoClase(historialVentaSeleccionada?.metodoPago)">
-                  {{ historialVentaSeleccionada?.metodoPago }}
+                <template v-if="!modoEdicionDetalle">
+                  <span class="method-badge" :class="metodoClase(historialVentaSeleccionada?.metodoPago)">
+                    {{ formatearMetodoPago(historialVentaSeleccionada?.metodoPago) }}
+                  </span>
+                </template>
+                <template v-else>
+                  <select v-if="!detalleCreditoInfo" :value="metodoPagoEditado" class="metodo-select" @change="emit('update:metodoPagoEditado', ($event.target as HTMLSelectElement).value)">
+                    <option value="EFECTIVO">💵 Efectivo</option>
+                    <option value="TRANSFERENCIA">📱 Transferencia</option>
+                    <option value="TARJETA">💳 Tarjeta</option>
+                    <option value="CREDITO">💰 Crédito</option>
+                    <option value="PENDIENTE">⏳ Pendiente</option>
+                    <option value="MIXTO">💱 Mixto</option>
+                  </select>
+                  <div v-else class="credito-bloqueado" title="Las ventas de crédito no permiten cambiar el método de pago">
+                    <span class="method-badge credito">{{ formatearMetodoPago(historialVentaSeleccionada?.metodoPago) }}</span>
+                    <small>🔒 No editable</small>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div v-if="modoEdicionDetalle && metodoPagoEditado === 'MIXTO' && !detalleCreditoInfo" class="mixto-edicion">
+              <div class="mixto-edicion-header">Configuración del pago mixto</div>
+              <div v-for="(split, index) in mixtoSplitsEdicion" :key="index" class="split-row-edicion">
+                <select class="split-select-edicion" :value="split.metodo" @change="split.metodo = ($event.target as HTMLSelectElement).value">
+                  <option value="EFECTIVO">💵 Efectivo</option>
+                  <option value="TRANSFERENCIA">📱 Transferencia</option>
+                  <option value="TARJETA">💳 Tarjeta</option>
+                  <option value="CREDITO">💰 Crédito</option>
+                </select>
+                <input type="number" step="0.01" min="0" class="split-input-edicion" :value="split.monto" @input="split.monto = Number(($event.target as HTMLInputElement).value)" placeholder="0.00" />
+                <button class="split-del-edicion" @click="emit('eliminar-split-mixto', index)" title="Eliminar método">✕</button>
+              </div>
+              <button class="split-add-edicion" @click="emit('agregar-split-mixto')">＋ Agregar método</button>
+              <div class="mixto-totales-edicion">
+                <span>Suma: <strong>{{ formatoMoneda(mixtoSuma) }}</strong></span>
+                <span :class="mixtoFalta <= 0 ? 'ok' : 'bad'">
+                  {{ mixtoFalta <= 0 ? `✓ Cubierto` : `Falta ${formatoMoneda(mixtoFalta)}` }}
                 </span>
               </div>
             </div>
@@ -154,7 +191,7 @@
             <div class="productos-header">
               <span class="prod-title">Productos</span>
               <span class="prod-count">{{ historialVentaDetalle.length }}</span>
-              <button v-if="esAdmin && modoEdicionDetalle && historialVentaDetalle.length > 0" class="btn-clear-all" @click="emit('eliminar-todos-detalles')" title="Eliminar todos">
+              <button v-if="esAdmin && modoEdicionDetalle && (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F')" class="btn-clear-all" @click="emit('eliminar-todos-detalles')" title="Eliminar todos">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Eliminar todo
               </button>
@@ -202,7 +239,7 @@
                   </template>
                   <template v-else>
                     <div class="prod-meta">
-                      <span class="prod-qty" :class="{ editable: esAdmin && modoEdicionDetalle }" @click="esAdmin && modoEdicionDetalle ? emit('iniciar-editar-item', i) : null">
+                      <span class="prod-qty" :class="{ editable: modoEdicionDetalle && (esAdmin || (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F')) }" @click="modoEdicionDetalle && (esAdmin || (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F')) ? emit('iniciar-editar-item', i) : null">
                         {{ d.cantidad }} {{ (d.producto || d.Producto)?.is_gramaje ? 'g' : 'pza' }}
                       </span>
                       <span class="prod-subtotal">{{ formatoMonedaRedondeada(d.tipoPrecioAplicado === 'VENTA_GRAMAJE' ? Number(d.precioUnitarioVenta || 0) : Math.round((Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0)) * 100) / 100) }}</span>
@@ -211,7 +248,7 @@
                       <span class="envase-label">🧴 {{ (d as any).cantidadEnvase || d.cantidad }} env.</span>
                       <span class="envase-price-line">{{ formatoMonedaRedondeada(Number((d as any).cobroEnvaseTotal ?? (d as any).cobro_envase_total ?? 0)) }}</span>
                     </div>
-                    <div v-if="esAdmin && modoEdicionDetalle" class="prod-actions">
+                    <div v-if="modoEdicionDetalle && (esAdmin || (historialVentaSeleccionada?.estatus === undefined || historialVentaSeleccionada?.estatus !== 'F'))" class="prod-actions">
                       <button class="btn-action btn-action-edit" @click="emit('iniciar-editar-item', i)" title="Editar cantidad y precio">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         <span>Editar</span>
@@ -232,7 +269,8 @@
 </template>
 
 <script setup lang="ts">
-import { formatoMoneda, formatoMonedaRedondeada, getMetodoClase, formatearFecha, formatearFechaHora } from '../logica/usePosTicket';
+import { computed } from 'vue';
+import { formatoMoneda, formatoMonedaRedondeada, formatearFecha, formatearFechaHora } from '../logica/usePosTicket';
 import { calcularSubtotalVenta } from '../logica/usePosEdicionDetalle';
 import type { Producto } from '../logica/usePosTipos';
 
@@ -256,6 +294,9 @@ interface Props {
   esAdmin: boolean
   montoTotalInput: number
   totalManualEditado: boolean
+  estatusVenta?: string
+  metodoPagoEditado: string
+  mixtoSplitsEdicion: Array<{ metodo: string; monto: number }>
 }
 
 const props = defineProps<Props>()
@@ -279,7 +320,33 @@ const emit = defineEmits<{
   'clear-busqueda-editar': []
   'update:cantidadTemporal': [value: number]
   'update:precioTemporal': [value: number]
+  'update:metodoPagoEditado': [value: string]
+  'agregar-split-mixto': []
+  'eliminar-split-mixto': [value: number]
 }>()
+
+const mixtoSuma = computed(() => props.mixtoSplitsEdicion.reduce((s, x) => s + Number(x.monto || 0), 0));
+const mixtoFalta = computed(() => Math.max(0, Number(props.historialVentaSeleccionada?.montoTotal ?? 0) - mixtoSuma.value));
+const mixtoOKEdicion = computed(() => {
+  const total = Number(props.historialVentaSeleccionada?.montoTotal ?? 0);
+  return props.mixtoSplitsEdicion.length > 0 && Math.round(mixtoSuma.value * 100) / 100 === Math.round(total * 100) / 100;
+});
+
+function formatearMetodoPago(m?: string) {
+  if (!m) return 'N/D';
+  const u = m.toUpperCase();
+  if (u === 'MIXTO' || u.startsWith('MIXTO:')) return 'MIXTO';
+  if (u.startsWith('ABONO/')) return m;
+  return u === 'EFECTIVO' ? 'Efectivo' : u === 'TRANSFERENCIA' ? 'Transferencia' : u === 'TARJETA' ? 'Tarjeta' : u === 'CREDITO' ? 'Crédito' : u === 'PENDIENTE' ? 'Pendiente' : m;
+}
+
+function metodoClase(m?: string) {
+  if (!m) return 'efectivo';
+  const u = m.toUpperCase();
+  if (u === 'MIXTO' || u.startsWith('MIXTO:')) return 'mixto';
+  if (u.startsWith('ABONO/')) return 'abono-credito';
+  return u === 'TRANSFERENCIA' ? 'transferencia' : u === 'TARJETA' ? 'tarjeta' : u === 'CREDITO' ? 'credito' : u === 'PENDIENTE' ? 'pendiente' : 'efectivo';
+}
 </script>
 
 <style scoped>
@@ -311,6 +378,23 @@ const emit = defineEmits<{
 .method-badge.tarjeta{background:color-mix(in srgb,var(--color-info) 15%,transparent);color:var(--color-info)}
 .method-badge.pendiente{background:color-mix(in srgb,var(--color-warning) 15%,transparent);color:var(--color-warning)}
 .method-badge.credito,.method-badge.abono-credito{background:color-mix(in srgb,#8e44ad 15%,transparent);color:#8e44ad}
+.method-badge.mixto{background:color-mix(in srgb,#0ea5e9 15%,transparent);color:#0284c7}
+.metodo-select{width:100%;padding:.3rem .4rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.75rem;font-weight:600;box-shadow:inset 2px 2px 4px rgba(0,0,0,0.1);outline:none}
+.credito-bloqueado{display:flex;flex-direction:column;gap:.2rem}
+.credito-bloqueado small{font-size:.6rem;color:var(--color-text-secondary)}
+.mixto-edicion{margin-top:.5rem;padding:.6rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);box-shadow:2px 2px 4px rgba(0,0,0,0.1)}
+.mixto-edicion-header{font-size:.7rem;font-weight:700;color:var(--color-accent);text-transform:uppercase;margin-bottom:.4rem}
+.split-row-edicion{display:grid;grid-template-columns:1.3fr 1fr 30px;gap:.35rem;align-items:center;margin-bottom:.35rem}
+.split-select-edicion,.split-input-edicion{padding:.35rem .45rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.75rem;box-shadow:inset 2px 2px 4px rgba(0,0,0,0.1);outline:none}
+.split-input-edicion{text-align:right;font-family:Courier New,monospace}
+.split-del-edicion{width:30px;height:30px;border:none;border-radius:var(--radius-sm);background:rgba(239,68,68,0.12);color:#dc2626;cursor:pointer;font-size:.9rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.split-del-edicion:hover{background:var(--color-error);color:#fff}
+.split-add-edicion{width:100%;padding:.35rem;border:1.5px dashed color-mix(in srgb,var(--color-accent) 55%,transparent);border-radius:var(--radius-sm);background:transparent;color:var(--color-accent);font-size:.7rem;font-weight:700;cursor:pointer;transition:all .15s}
+.split-add-edicion:hover{background:color-mix(in srgb,var(--color-accent) 10%,transparent)}
+.mixto-totales-edicion{display:flex;justify-content:space-between;align-items:center;margin-top:.4rem;font-size:.72rem;color:var(--color-text-secondary);padding-top:.35rem;border-top:1px solid var(--color-border)}
+.mixto-totales-edicion strong{font-family:Courier New,monospace}
+.mixto-totales-edicion .ok{color:var(--color-success);font-weight:700}
+.mixto-totales-edicion .bad{color:var(--color-error);font-weight:700}
 .total-section{background:linear-gradient(135deg,var(--color-success),color-mix(in srgb,var(--color-success) 60%,black));padding:.85rem;border-radius:var(--radius-md);text-align:center;box-shadow:4px 4px 12px rgba(0,0,0,0.2)}
 .total-amount{font-size:1.6rem;font-weight:700;font-family:Courier New,monospace;color:#fff}
 .profit-text{font-size:.75rem;font-weight:600;color:rgba(255,255,255,.7);margin-top:.2rem}

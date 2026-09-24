@@ -37,13 +37,19 @@ RUN echo 'server { \
     open_file_cache_min_uses 2; \
     open_file_cache_errors on; \
     \
+    location ~ ^/(sw\.js|registerSW\.js|workbox-[A-Za-z0-9_-]+\.js|manifest\.webmanifest)$ { \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+        expires -1; \
+        try_files $uri =404; \
+    } \
+    \
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|otf)$ { \
         expires 30d; \
         add_header Cache-Control "public, immutable"; \
         access_log off; \
     } \
     \
-    location ~ ^/(backup|caja|ventas|ventasDetalle|boveda|ganancias|gananciasAcumuladas|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito|asistencias|rentaLocal|ajustePrecio|voice)(/|$) { \
+    location ~ ^/(backup|caja|ventas|ventasDetalle|boveda|ganancias|gananciasAcumuladas|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito|asistencias|rentaLocal|ajustePrecio|voice)/.+$ { \
         proxy_pass http://backend:8080; \
         proxy_http_version 1.1; \
         proxy_set_header Host $host; \
@@ -56,10 +62,19 @@ RUN echo 'server { \
         proxy_buffering off; \
     } \
     \
+    location = /apartado { \
+        proxy_pass http://backend:8080; \
+        proxy_http_version 1.1; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
+    } \
+    \
     location / { \
         try_files $uri $uri/ /index.html; \
-        expires 7d; \
-        add_header Cache-Control "public, immutable"; \
+        expires -1; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 

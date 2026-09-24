@@ -89,7 +89,7 @@ function confirmarMixto() {
   if (!mixtoValido.value) {
     if (mixtoSplits.value.length === 0) { alert('Agrega al menos un método de pago'); return; }
     if (mixtoSplits.value.some(sp => Number(sp.monto || 0) <= 0)) { alert('Todos los montos deben ser mayores a 0'); return; }
-    alert(`La suma de los montos debe ser igual al total (${formatoMoneda(total)})`);
+    alert(`La suma de los montos debe ser igual al total (${formatoMoneda(props.total)})`);
     return;
   }
   emit('confirmar-mixto', { splits: mixtoSplits.value });

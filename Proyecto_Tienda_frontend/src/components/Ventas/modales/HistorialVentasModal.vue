@@ -30,6 +30,7 @@ const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'ver-detalle', venta: VentaResumen): void;
   (event: 'cancelar', venta: VentaResumen): void;
+  (event: 'editar', venta: VentaResumen): void;
   (event: 'ventas-corregidas'): void;
 }>();
 
@@ -159,9 +160,11 @@ async function corregir(ids: number[]) {
           <tbody>
             <tr v-for="v in ventasFiltradas" :key="v.idVenta" class="hist-row" :class="{ 'row-disc': v.tieneDiscrepancia, 'row-sel': ventasSeleccionadas.has(v.idVenta) }" @click="emit('ver-detalle', v)">
               <td class="hist-td-ticket">
-                <span v-if="v.tieneDiscrepancia" class="hist-disc" title="Venta con envase">🧴</span>
-                <input v-if="esAdmin && v.tieneDiscrepancia" type="checkbox" class="hist-cb" :checked="ventasSeleccionadas.has(v.idVenta)" @click.stop @change="toggleSeleccion(v.idVenta)">
-                <span class="hist-ticket">#{{ v.numeroTicket ?? v.idVenta }}</span>
+                <div class="hist-ticket-cell">
+                  <span v-if="v.tieneDiscrepancia" class="hist-disc" title="Venta con envase">🧴</span>
+                  <input v-if="esAdmin && v.tieneDiscrepancia" type="checkbox" class="hist-cb" :checked="ventasSeleccionadas.has(v.idVenta)" @click.stop @change="toggleSeleccion(v.idVenta)">
+                  <span class="hist-ticket">#{{ v.numeroTicket ?? v.idVenta }}</span>
+                </div>
               </td>
               <td class="hist-td-hora">{{ formatoHora(v.fechaVenta) }}</td>
               <td class="hist-td-monto">{{ formatoMoneda(Number(v.montoTotal ?? 0)) }}</td>
@@ -170,6 +173,9 @@ async function corregir(ids: number[]) {
               <td class="hist-td-cajero">{{ v.nombreUsuario || 'Cajero' }}</td>
               <td class="hist-td-act" @click.stop>
                 <button v-if="v.estatus === 'C'" class="hist-btn-icon cancel" @click="emit('cancelar', v)">✕</button>
+                <button v-if="v.estatus !== 'F' || (v.estatus === 'F' && esAdmin)" class="hist-btn-icon edit" @click="emit('editar', v)" title="Editar venta">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
                 <button v-else class="hist-btn-icon view" @click="emit('ver-detalle', v)">→</button>
               </td>
             </tr>
@@ -229,14 +235,15 @@ async function corregir(ids: number[]) {
 .hist-table thead { position: sticky; top: 0; z-index: 5; }
 .hist-table th { padding: 0.5rem 0.75rem; font-size: 0.65rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; background: var(--color-bg-panel); border-bottom: 2px solid var(--color-border); text-align: left; }
 .hist-table th:nth-child(3), .hist-table th:nth-child(4), .hist-table th:nth-child(5) { text-align: center; }
-.hist-table th:last-child { width: 36px; text-align: center; }
+.hist-table th:last-child { width: 1%; text-align: center; white-space: nowrap; }
 .hist-row { border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background 0.15s; }
 .hist-row:hover { background: var(--color-bg-secondary); }
 .hist-row.row-disc { border-left: 3px solid #eab308; background: rgba(234,179,8,0.03); }
 .hist-row.row-disc:hover { background: rgba(234,179,8,0.08); }
 .hist-row.row-sel { background: rgba(59,130,246,0.1); }
 .hist-row td { padding: 0.5rem 0.75rem; font-size: 0.82rem; vertical-align: middle; }
-.hist-td-ticket { display: flex; align-items: center; gap: 0.35rem; }
+.hist-td-ticket { white-space: nowrap; }
+.hist-ticket-cell { display: inline-flex; align-items: center; gap: 0.35rem; }
 .hist-disc { width: 15px; height: 15px; border-radius: 50%; background: #eab308; color: white; font-size: 0.6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .hist-cb { width: 13px; height: 13px; accent-color: var(--color-accent); cursor: pointer; flex-shrink: 0; }
 .hist-ticket { font-weight: 700; color: var(--color-accent); font-family: "Courier New", monospace; }
@@ -248,13 +255,17 @@ async function corregir(ids: number[]) {
 .hist-badge-pago.transferencia { background: rgba(59,130,246,0.1); color: #1d4ed8; }
 .hist-badge-pago.tarjeta { background: rgba(236,72,153,0.1); color: #be185d; }
 .hist-badge-pago.abono-credito { background: rgba(139,92,246,0.15); color: #7c3aed; font-weight: 700; }
+.hist-td-pago { text-align: center; }
 .hist-td-cajero { color: var(--color-text-secondary); font-size: 0.78rem; }
-.hist-td-act { text-align: center; }
+.hist-td-act { text-align: center; white-space: nowrap; }
+.hist-td-act .hist-btn-icon + .hist-btn-icon { margin-left: 0.3rem; }
 .hist-btn-icon { width: 26px; height: 26px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .hist-btn-icon.cancel { background: #ef4444; color: white; }
 .hist-btn-icon.cancel:hover { background: #dc2626; transform: scale(1.1); }
 .hist-btn-icon.view { background: var(--color-accent); color: var(--color-bg-panel); }
 .hist-btn-icon.view:hover { filter: brightness(1.15); transform: scale(1.1); }
+.hist-btn-icon.edit { width: 26px; height: 26px; background: rgba(59,130,246,0.1); color: #2563eb; }
+.hist-btn-icon.edit:hover { background: rgba(59,130,246,0.22); transform: scale(1.1); }
 .hist-footer { padding: 0.6rem 1.5rem; border-top: 1px solid var(--color-border); display: flex; justify-content: center; }
 .hist-btn-close { padding: 0.5rem 1.5rem; border: none; border-radius: 8px; background: var(--color-accent); color: var(--color-bg-panel); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 .hist-btn-close:hover { filter: brightness(1.1); }

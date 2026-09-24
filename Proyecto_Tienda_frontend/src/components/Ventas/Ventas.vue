@@ -83,10 +83,12 @@ import {
   modoEdicionDetalle, montoTotalEditado, detalleEditandoIndex,
   cantidadTemporal, precioTemporal, totalManualEditado, montoTotalInput,
   busquedaEditar, resultadosEditar, cargandoBusquedaEditar,
+  metodoPagoEditado, mixtoSplitsEdicion,
   iniciarEdicionDetalle, iniciarEditarItem, confirmarEdicionItem,
   cancelarEdicionItem, onTotalManualChange, guardarCambiosDetalle,
   cancelarEdicionDetalle, buscarProductoEditar, agregarProductoADetalle,
-  eliminarDetalleVenta, eliminarTodosLosDetalles, cerrarDetalleVenta
+  eliminarDetalleVenta, eliminarTodosLosDetalles, cerrarDetalleVenta,
+  agregarSplitMixtoEdicion, eliminarSplitMixtoEdicion
 } from './logica/usePosEdicionDetalle';
 
 import { playSound } from './logica/usePosSonido';
@@ -292,6 +294,11 @@ async function procesarEscaneo(codigo: string) {
   } else {
     mostrarMensaje(`Producto no encontrado: ${codigoLimpio}`, 'error');
   }
+}
+
+function manejarScannerCamara(e: Event) {
+  const codigo = (e as CustomEvent).detail;
+  if (codigo) void procesarEscaneo(String(codigo));
 }
 
 // --- Voice ---
@@ -519,6 +526,7 @@ onMounted(async () => {
   });
   window.addEventListener('focusout', () => { isKeyboardVisible.value = false; });
   window.addEventListener('keydown', manejarAtajosTeclado);
+  window.addEventListener('pos-scanner-detected', manejarScannerCamara);
   document.addEventListener('click', handleClickOutsideDropdown);
 
   await cargarProductos();
@@ -537,6 +545,7 @@ onUnmounted(() => {
   document.removeEventListener('touchmove', doResize);
   document.removeEventListener('touchend', stopResize);
   window.removeEventListener('keydown', manejarAtajosTeclado);
+  window.removeEventListener('pos-scanner-detected', manejarScannerCamara);
 });
 </script>
 
@@ -650,6 +659,8 @@ onUnmounted(() => {
       :es-admin="esAdmin"
       :monto-total-input="montoTotalInput"
       :total-manual-editado="totalManualEditado"
+      :metodo-pago-editado="metodoPagoEditado"
+      :mixto-splits-edicion="mixtoSplitsEdicion"
       @cerrar-detalle-venta="cerrarDetalleVenta"
       @iniciar-edicion-detalle="iniciarEdicionDetalle"
       @cancelar-edicion-detalle="cancelarEdicionDetalle"
@@ -664,6 +675,9 @@ onUnmounted(() => {
       @eliminar-detalle-venta="eliminarDetalleVenta"
       @update:monto-total-input="montoTotalInput = $event"
       @total-manual-change="onTotalManualChange"
+      @update:metodo-pago-editado="metodoPagoEditado = $event"
+      @agregar-split-mixto="agregarSplitMixtoEdicion"
+      @eliminar-split-mixto="eliminarSplitMixtoEdicion"
       @clear-busqueda-editar="busquedaEditar = ''; resultadosEditar = []"
     />
 
