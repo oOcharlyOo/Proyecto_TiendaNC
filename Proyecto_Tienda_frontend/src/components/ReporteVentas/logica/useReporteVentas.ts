@@ -548,6 +548,18 @@ export const busquedaMovimiento = ref('');
 export const editandoMovimientoId = ref<number | null>(null);
 export const editandoDescripcion = ref('');
 export const guardandoDescripcion = ref(false);
+export const gruposMovColapsados = ref<Set<string>>(new Set());
+
+export function isGrupoMovExpandido(nombre: string): boolean {
+  return !gruposMovColapsados.value.has(nombre);
+}
+
+export function toggleGrupoMov(nombre: string) {
+  const nuevo = new Set(gruposMovColapsados.value);
+  if (nuevo.has(nombre)) nuevo.delete(nombre);
+  else nuevo.add(nombre);
+  gruposMovColapsados.value = nuevo;
+}
 
 function coincideBusquedaMovimiento(m: MovimientoCaja): boolean {
   const q = normalizarTexto(busquedaMovimiento.value.trim());
@@ -583,6 +595,7 @@ export const movimientosVisibles = computed(() => {
 export function abrirMovimientos(tipo: 'entradas' | 'salidas', filtro: 'todas' | 'proveedores' | 'envases' | 'otras' = 'todas') {
   editandoMovimientoId.value = null;
   busquedaMovimiento.value = '';
+  gruposMovColapsados.value = new Set();
   movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
   movimientosEsSalidas.value = tipo === 'salidas';
   movimientosFiltro.value = filtro;
@@ -593,6 +606,29 @@ export function formatearFechaHora(fecha?: string) {
   if (!fecha) return 'N/A';
   const d = new Date(fecha);
   return d.toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+export function formatearFechaCorta(fecha?: string) {
+  if (!fecha) return 'N/A';
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+export function formatearHoraCorta(fecha?: string) {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function inicialesDeUsuario(m: MovimientoCaja): string {
+  const nombre = nombreDeUsuario(m);
+  if (!nombre || nombre === '—') return '?';
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
 export function iniciarEdicionDescripcion(m: MovimientoCaja) {
@@ -945,6 +981,32 @@ export const salidasPorProveedorFiltradas = computed(() => {
       return { ...g, movimientos, total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0) };
     })
     .filter(g => g.movimientos.length > 0);
+});
+
+export type GrupoSalidas = { proveedor: string; icono: string; movimientos: MovimientoCaja[]; total: number };
+
+function grupoSalidasFiltrado(lista: MovimientoCaja[], nombre: string, icono: string): GrupoSalidas | null {
+  const movimientos = busquedaMovimiento.value.trim() ? lista.filter(coincideBusquedaMovimiento) : [...lista];
+  if (movimientos.length === 0) return null;
+  movimientos.sort((a, b) => new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime());
+  return { proveedor: nombre, icono, movimientos, total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0) };
+}
+
+export const gruposAcordeon = computed<GrupoSalidas[]>(() => {
+  if (!movimientosEsSalidas.value) return [];
+  if (movimientosFiltro.value === 'proveedores' || movimientosFiltro.value === 'todas') {
+    const grupos: GrupoSalidas[] = salidasPorProveedorFiltradas.value.map(g => ({
+      proveedor: g.proveedor, icono: '🚚', movimientos: g.movimientos, total: g.total
+    }));
+    if (movimientosFiltro.value === 'todas') {
+      const envases = grupoSalidasFiltrado(salidasEnvases.value, 'Envases', '🍾');
+      if (envases) grupos.push(envases);
+      const otras = grupoSalidasFiltrado(salidasOtras.value, 'Otras salidas', '📤');
+      if (otras) grupos.push(otras);
+    }
+    return grupos;
+  }
+  return [];
 });
 
 export const totalVentasPeriodo = computed(() => {
@@ -1924,15 +1986,48 @@ async function obtenerJsonSeguro(url: string): Promise<any | null> {
   }
 }
 
+function resolverProveedorActivo(
+  idProveedor: number,
+  nombreProveedor: string,
+  activosPorId: Map<number, string>,
+  nombresActivos: Map<string, string>
+): string | null {
+  const porId = activosPorId.get(Number(idProveedor));
+  if (porId) return porId;
+  const norm = normalizarTexto(nombreProveedor);
+  if (!norm || norm.length < 3) return null;
+  const exacto = nombresActivos.get(norm);
+  if (exacto) return exacto;
+  let mejor: string | null = null;
+  let mejorLen = 0;
+  for (const [normActivo, nombreActivo] of nombresActivos) {
+    if (normActivo.length < 3) continue;
+    if (norm.includes(normActivo) || normActivo.includes(norm)) {
+      if (normActivo.length > mejorLen) { mejor = nombreActivo; mejorLen = normActivo.length; }
+    }
+  }
+  return mejor;
+}
+
 async function cargarMapaProductosProveedor() {
   try {
     const dataAsig = await obtenerJsonSeguro(`${API_BASE}/producto-proveedor/listar`);
 
     const asignaciones: AsignacionPP[] = dataAsig?.codigo === 200 && Array.isArray(dataAsig.datos) ? dataAsig.datos : [];
 
+    const activosPorId = new Map<number, string>();
+    const nombresActivos = new Map<string, string>();
+    for (const p of proveedoresDetalle.value) {
+      if (p.idProveedor) activosPorId.set(p.idProveedor, p.nombre);
+      const norm = normalizarTexto(p.nombre);
+      if (norm) nombresActivos.set(norm, p.nombre);
+    }
+
     const porProducto = new Map<string, Map<string, { precio: number | null; veces: number }>>();
     for (const a of asignaciones) {
-      acumularCandidato(porProducto, normalizarTexto(a.nombreProducto), (a.nombreProveedor || '').trim(), a.precioAcordado);
+      const proveedorActivo = resolverProveedorActivo(a.idProveedor, a.nombreProveedor, activosPorId, nombresActivos);
+      if (!proveedorActivo) continue;
+      acumularCandidato(porProducto, normalizarTexto(a.nombreProducto), proveedorActivo, a.precioAcordado);
     }
 
     mapaProductoProveedor.value = new Map([...porProducto.entries()].map(([k, v]) => [k, elegirMejorProveedor(v)]));

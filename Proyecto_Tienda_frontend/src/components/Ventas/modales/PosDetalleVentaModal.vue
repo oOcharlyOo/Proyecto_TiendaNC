@@ -204,11 +204,11 @@
                 <button v-if="busquedaEditar" class="agregar-clear" @click="emit('clear-busqueda-editar')">✕</button>
               </div>
               <div v-if="resultadosEditar.length > 0" class="agregar-resultados">
-                <div v-for="p in resultadosEditar" :key="p.idProducto" class="agregar-resultado" @click="emit('agregar-producto-detalle', p)">
+                <div v-for="p in resultadosEditar" :key="p.idProducto ?? p.id" class="agregar-resultado" @click="emit('agregar-producto-detalle', p)">
                   <span class="agregar-prod-name">{{ p.nombre }}</span>
                   <span class="agregar-prod-info">
                     <span v-if="p.is_gramaje" class="agregar-badge-gramaje">Gramaje</span>
-                    <span class="agregar-prod-price">{{ formatoMonedaRedondeada(p.precio_venta || 0) }}</span>
+                    <span class="agregar-prod-price">{{ formatoMonedaRedondeada(Number(p.precio ?? p.precio_venta ?? 0)) }}</span>
                   </span>
                 </div>
               </div>

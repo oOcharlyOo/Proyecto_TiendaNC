@@ -541,7 +541,7 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
 
     <!-- MODAL MOVIMIENTOS CAJA -->
     <div v-if="r.modalMovimientosOpen.value" class="modal-overlay-cat" @click.self="r.modalMovimientosOpen.value = false">
-      <div class="modal-card-cat modal-movimientos">
+      <div class="modal-card-cat modal-movimientos" :class="r.movimientosEsSalidas.value ? 'modal-salidas' : 'modal-entradas'">
         <div class="modal-header-cat">
           <h3>{{ r.movimientosTitulo.value }}</h3>
           <button class="modal-close-cat" @click="r.modalMovimientosOpen.value = false">✕</button>
@@ -574,7 +574,56 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
           <div v-if="r.movimientosVisibles.value.length === 0" class="modal-empty">
             {{ r.busquedaMovimiento.value ? 'Sin resultados para la búsqueda.' : `No hay ${r.movimientosTitulo.value.toLowerCase()} en este período.` }}
           </div>
-          <table v-else class="tabla-movimientos">
+          <!-- VISTA ACORDEÓN AGRUPADA POR PROVEEDOR (SALIDAS) -->
+          <div v-else-if="r.movimientosEsSalidas.value && r.gruposAcordeon.value.length > 0" class="mov-acc-list">
+            <div v-for="g in r.gruposAcordeon.value" :key="'g-' + g.proveedor" class="mov-acc-card">
+              <div class="mov-acc-header" role="button" :title="r.isGrupoMovExpandido(g.proveedor) ? 'Colapsar grupo' : 'Expandir grupo'" @click="r.toggleGrupoMov(g.proveedor)">
+                <span class="mov-acc-icon">{{ g.icono }}</span>
+                <div class="mov-acc-info">
+                  <div class="mov-acc-title-row">
+                    <span class="mov-acc-name">{{ g.proveedor }}</span>
+                    <span class="mov-acc-count">{{ g.movimientos.length }} movimiento{{ g.movimientos.length === 1 ? '' : 's' }}</span>
+                  </div>
+                  <span class="mov-acc-total-label">Total entregado</span>
+                </div>
+                <strong class="mov-acc-total">−{{ r.formatoMoneda(g.total) }}</strong>
+                <span class="mov-acc-chevron" :class="{ expanded: r.isGrupoMovExpandido(g.proveedor) }">▼</span>
+              </div>
+              <div v-show="r.isGrupoMovExpandido(g.proveedor)" class="mov-acc-body">
+                <div v-for="m in g.movimientos" :key="m.idCaja" class="mov-row">
+                  <div class="mov-cell c-fecha">
+                    <span class="mov-linea-1">{{ r.formatearFechaCorta(m.fechaMovimiento) }}</span>
+                    <span class="mov-linea-2">{{ r.formatearHoraCorta(m.fechaMovimiento) }}</span>
+                  </div>
+                  <div class="mov-cell c-user">
+                    <span class="mov-avatar">{{ r.inicialesDeUsuario(m) }}</span>
+                    <span class="mov-user-name" :title="r.nombreDeUsuario(m)">{{ r.nombreDeUsuario(m) }}</span>
+                  </div>
+                  <div class="mov-cell c-desc">
+                    <template v-if="r.editandoMovimientoId.value === m.idCaja">
+                      <input v-model="r.editandoDescripcion.value" class="edit-desc-input" type="text" @keyup.enter="r.guardarDescripcion(m.idCaja)" @keyup.escape="r.cancelarEdicionDescripcion" />
+                      <span class="edit-actions">
+                        <button class="btn-edit-save" @click="r.guardarDescripcion(m.idCaja)" :disabled="r.guardandoDescripcion.value" title="Guardar">✓</button>
+                        <button class="btn-edit-cancel" @click="r.cancelarEdicionDescripcion" title="Cancelar">✕</button>
+                      </span>
+                    </template>
+                    <template v-else>
+                      <span class="desc-text" :title="m.descripcion">{{ m.descripcion }}</span>
+                      <button class="btn-edit-icon" @click="r.iniciarEdicionDescripcion(m)" title="Editar descripción">✎</button>
+                    </template>
+                  </div>
+                  <div class="mov-cell c-monto">−{{ r.formatoMoneda(m.monto) }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="mov-acc-grandtotal">
+              <span>Total</span>
+              <strong>−{{ r.formatoMoneda(r.movimientosVisibles.value.reduce((s, m) => s + Number(m.monto || 0), 0)) }}</strong>
+            </div>
+          </div>
+
+          <!-- TABLA CRONOLÓGICA (TODAS / ENVASES / OTRAS / ENTRADAS) -->
+          <table v-else class="tabla-movimientos" :class="{ 'tabla-salidas': r.movimientosEsSalidas.value }">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -584,46 +633,20 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                 <th class="text-right">Monto</th>
               </tr>
             </thead>
-            <tbody v-if="r.movimientosEsSalidas.value && r.movimientosFiltro.value === 'proveedores'">
-              <template v-for="g in r.salidasPorProveedorFiltradas.value" :key="'g-' + g.proveedor">
-                <tr class="prov-group-row">
-                  <td colspan="5">
-                    <span class="prov-group-icon">🚚</span>
-                    <span class="prov-group-name">{{ g.proveedor }}</span>
-                    <span class="prov-group-count">{{ g.movimientos.length }} movimiento{{ g.movimientos.length === 1 ? '' : 's' }}</span>
-                    <strong class="prov-group-total">{{ r.formatoMoneda(g.total) }}</strong>
-                  </td>
-                </tr>
-                <tr v-for="m in g.movimientos" :key="m.idCaja">
-                  <td class="fecha-col" data-label="Fecha">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
-                  <td class="user-col" data-label="Usuario">{{ r.nombreDeUsuario(m) }}</td>
-                  <td data-label="Descripción">
-                    <template v-if="r.editandoMovimientoId.value === m.idCaja">
-                      <input v-model="r.editandoDescripcion.value" class="edit-desc-input" type="text" @keyup.enter="r.guardarDescripcion(m.idCaja)" @keyup.escape="r.cancelarEdicionDescripcion" />
-                      <span class="edit-actions">
-                        <button class="btn-edit-save" @click="r.guardarDescripcion(m.idCaja)" :disabled="r.guardandoDescripcion.value" title="Guardar">✓</button>
-                        <button class="btn-edit-cancel" @click="r.cancelarEdicionDescripcion" title="Cancelar">✕</button>
-                      </span>
-                    </template>
-                    <template v-else>
-                      <span class="desc-text">{{ m.descripcion }}</span>
-                      <button class="btn-edit-icon" @click="r.iniciarEdicionDescripcion(m)" title="Editar descripción">✎</button>
-                    </template>
-                  </td>
-                  <td class="prov-col" data-label="Proveedor">
-                  <span v-if="r.proveedorDeSalida(m)" class="prov-badge" :class="'crit-' + r.criterioDeSalida(m)" :title="r.tooltipClasificacion(m)">
-                    {{ r.iconoCriterio(r.criterioDeSalida(m)) }} {{ r.proveedorDeSalida(m) }}
-                  </span>
-                  <span v-else class="prov-badge none">—</span>
-                </td>
-                  <td class="text-right costo" data-label="Monto">{{ r.formatoMoneda(m.monto) }}</td>
-                </tr>
-              </template>
-            </tbody>
-            <tbody v-else>
+            <tbody>
               <tr v-for="m in r.movimientosVisibles.value" :key="m.idCaja">
-                <td class="fecha-col" data-label="Fecha">{{ r.formatearFechaHora(m.fechaMovimiento) }}</td>
-                <td class="user-col" data-label="Usuario">{{ r.nombreDeUsuario(m) }}</td>
+                <td class="fecha-col" data-label="Fecha">
+                  <span class="mov-doble-linea">
+                    <span class="mov-linea-1">{{ r.formatearFechaCorta(m.fechaMovimiento) }}</span>
+                    <span class="mov-linea-2">{{ r.formatearHoraCorta(m.fechaMovimiento) }}</span>
+                  </span>
+                </td>
+                <td class="user-col" data-label="Usuario">
+                  <span class="mov-user-chip">
+                    <span class="mov-avatar">{{ r.inicialesDeUsuario(m) }}</span>
+                    <span class="mov-user-name" :title="r.nombreDeUsuario(m)">{{ r.nombreDeUsuario(m) }}</span>
+                  </span>
+                </td>
                 <td data-label="Descripción">
                   <template v-if="r.editandoMovimientoId.value === m.idCaja">
                     <input v-model="r.editandoDescripcion.value" class="edit-desc-input" type="text" @keyup.enter="r.guardarDescripcion(m.idCaja)" @keyup.escape="r.cancelarEdicionDescripcion" />
@@ -643,15 +666,17 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                   </span>
                   <span v-else class="prov-badge none">—</span>
                 </td>
-                <td class="text-right" :class="r.movimientosTitulo.value.startsWith('Entradas') ? 'monto' : 'costo'" data-label="Monto">
-                  {{ r.formatoMoneda(m.monto) }}
+                <td class="text-right" :class="r.movimientosEsSalidas.value ? 'costo' : 'monto'" data-label="Monto">
+                  {{ r.movimientosEsSalidas.value ? '−' : '+' }}{{ r.formatoMoneda(m.monto) }}
                 </td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <td :colspan="r.movimientosEsSalidas.value ? 3 : 2"><strong>Total</strong></td>
-                <td class="text-right"><strong>{{ r.formatoMoneda(r.movimientosVisibles.value.reduce((s, m) => s + Number(m.monto || 0), 0)) }}</strong></td>
+                <td :colspan="r.movimientosEsSalidas.value ? 4 : 3"><strong>Total</strong></td>
+                <td class="text-right" :class="r.movimientosEsSalidas.value ? 'costo' : 'monto'">
+                  <strong>{{ r.movimientosEsSalidas.value ? '−' : '+' }}{{ r.formatoMoneda(r.movimientosVisibles.value.reduce((s, m) => s + Number(m.monto || 0), 0)) }}</strong>
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -677,7 +702,14 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
 .reporte-ventas :deep(.tabla-modal table){width:100%;border-collapse:collapse;font-size:.7rem}.reporte-ventas :deep(.tabla-modal th){padding:.35rem .5rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-modal td){padding:.3rem .5rem;border-bottom:1px solid rgba(255,255,255,.02)}
 .reporte-ventas :deep(.tabla-movimientos){width:100%;border-collapse:collapse;font-size:.72rem}.reporte-ventas :deep(.tabla-movimientos th){padding:.4rem .6rem;text-align:left;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;font-size:.58rem;border-bottom:1px solid var(--color-border)}.reporte-ventas :deep(.tabla-movimientos td){padding:.35rem .6rem;border-bottom:1px solid rgba(255,255,255,.02)}.reporte-ventas :deep(.tabla-movimientos tfoot td){font-weight:700;border-top:1px solid var(--color-border)}.reporte-ventas :deep(.fecha-col){white-space:nowrap;font-family:monospace;font-size:.68rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.user-col){white-space:nowrap;font-size:.7rem;color:var(--color-accent);font-weight:600}.reporte-ventas :deep(.desc-text){color:var(--color-text-primary)}.reporte-ventas :deep(.edit-desc-input){padding:.25rem .4rem;background:var(--color-bg-primary);border:none;border-radius:4px;color:var(--color-text-primary);font-size:.7rem;width:100%;box-shadow:inset 2px 2px 3px rgba(0,0,0,.1)}.reporte-ventas :deep(.edit-actions){display:inline-flex;gap:.2rem;margin-left:.3rem}.reporte-ventas :deep(.btn-edit-save){border:none;border-radius:3px;background:var(--color-success);color:#fff;font-size:.6rem;cursor:pointer;padding:.1rem .25rem}.reporte-ventas :deep(.btn-edit-cancel),.reporte-ventas :deep(.btn-edit-icon){border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;border-radius:3px;padding:0 .25rem;font-size:.65rem;box-shadow:1px 1px 2px rgba(0,0,0,.05)}.reporte-ventas :deep(.btn-edit-cancel:hover),.reporte-ventas :deep(.btn-edit-icon:hover){color:var(--color-accent)}
 .reporte-ventas :deep(.prov-col){white-space:nowrap}.reporte-ventas :deep(.prov-badge){display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .45rem;border-radius:20px;font-size:.62rem;font-weight:700;background:var(--color-bg-primary);box-shadow:1px 1px 3px rgba(0,0,0,.08);max-width:150px;overflow:hidden;text-overflow:ellipsis}.reporte-ventas :deep(.prov-badge.crit-directo){background:color-mix(in srgb,var(--color-success) 14%,transparent);color:var(--color-success)}.reporte-ventas :deep(.prov-badge.crit-producto){background:color-mix(in srgb,#3498db 14%,transparent);color:#3498db}.reporte-ventas :deep(.prov-badge.crit-envase){background:color-mix(in srgb,#e67e22 14%,transparent);color:#e67e22}.reporte-ventas :deep(.prov-badge.none){background:transparent;box-shadow:none;color:var(--color-text-secondary);opacity:.5}
-.reporte-ventas :deep(.prov-group-row td){background:color-mix(in srgb,var(--color-accent) 8%,transparent);border-bottom:2px solid color-mix(in srgb,var(--color-accent) 25%,transparent);padding:.4rem .6rem!important;display:flex;align-items:center;width:100%}.reporte-ventas :deep(.prov-group-icon){margin-right:.35rem}.reporte-ventas :deep(.prov-group-name){font-weight:800;color:var(--color-accent);font-size:.75rem;margin-right:.5rem}.reporte-ventas :deep(.prov-group-count){font-size:.6rem;color:var(--color-text-secondary);margin-right:auto}.reporte-ventas :deep(.prov-group-total){margin-left:auto;font-size:.72rem;color:var(--color-text-primary)}
+.reporte-ventas :deep(.mov-acc-list){display:flex;flex-direction:column;gap:.55rem}.reporte-ventas :deep(.mov-acc-card){background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:12px;overflow:hidden;box-shadow:3px 3px 8px rgba(0,0,0,.10)}.reporte-ventas :deep(.mov-acc-header){display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;cursor:pointer;user-select:none;transition:background .15s}.reporte-ventas :deep(.mov-acc-header:hover){background:color-mix(in srgb,var(--color-error) 6%,transparent)}.reporte-ventas :deep(.mov-acc-icon){width:38px;height:38px;border-radius:12px;background:var(--color-bg-secondary);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0;box-shadow:2px 2px 5px rgba(0,0,0,.15)}.reporte-ventas :deep(.mov-acc-info){display:flex;flex-direction:column;gap:.15rem;min-width:0;flex:1}.reporte-ventas :deep(.mov-acc-title-row){display:flex;align-items:center;gap:.45rem;min-width:0}.reporte-ventas :deep(.mov-acc-name){font-weight:800;font-size:.85rem;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reporte-ventas :deep(.mov-acc-count){font-size:.56rem;font-weight:800;color:var(--color-text-secondary);background:var(--color-bg-secondary);padding:.14rem .5rem;border-radius:20px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}.reporte-ventas :deep(.mov-acc-total-label){font-size:.52rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-secondary);opacity:.8}.reporte-ventas :deep(.mov-acc-total){font-size:1.05rem;font-weight:800;font-family:'Courier New',monospace;color:var(--color-error);white-space:nowrap}.reporte-ventas :deep(.mov-acc-chevron){width:26px;height:26px;border-radius:8px;background:var(--color-bg-secondary);display:flex;align-items:center;justify-content:center;color:var(--color-text-secondary);font-size:.55rem;transition:transform .2s;flex-shrink:0}.reporte-ventas :deep(.mov-acc-chevron.expanded){transform:rotate(180deg)}
+.reporte-ventas :deep(.mov-acc-body){border-top:1px solid var(--color-border);background:var(--color-bg-secondary)}.reporte-ventas :deep(.mov-row){display:grid;grid-template-columns:86px minmax(110px,1.1fr) minmax(0,2fr) 92px;gap:.5rem;align-items:center;padding:.45rem .75rem;border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s}.reporte-ventas :deep(.mov-row:last-child){border-bottom:none}.reporte-ventas :deep(.mov-row:hover){background:color-mix(in srgb,var(--color-error) 5%,transparent)}.reporte-ventas :deep(.mov-cell.c-fecha){display:flex;flex-direction:column;gap:.1rem}.reporte-ventas :deep(.mov-linea-1){font-size:.68rem;font-weight:700;color:var(--color-text-primary);font-family:'Courier New',monospace}.reporte-ventas :deep(.mov-linea-2){font-size:.58rem;color:var(--color-text-secondary)}.reporte-ventas :deep(.mov-cell.c-user){display:flex;align-items:center;gap:.4rem;min-width:0}.reporte-ventas :deep(.mov-avatar){width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--color-accent) 16%,var(--color-bg-primary));color:var(--color-accent);font-size:.55rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}.reporte-ventas :deep(.mov-user-name){font-size:.68rem;font-weight:600;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reporte-ventas :deep(.mov-cell.c-desc){display:flex;align-items:center;gap:.3rem;min-width:0}.reporte-ventas :deep(.mov-cell.c-desc .desc-text){font-size:.7rem;color:var(--color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reporte-ventas :deep(.mov-cell.c-desc .edit-desc-input){flex:1;min-width:0}.reporte-ventas :deep(.mov-cell.c-monto){text-align:right;font-weight:800;font-family:'Courier New',monospace;font-size:.8rem;color:var(--color-error);white-space:nowrap}
+.reporte-ventas :deep(.mov-acc-grandtotal){position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;background:var(--color-bg-secondary);border-radius:10px;padding:.5rem .75rem;font-weight:800;font-size:.7rem;color:var(--color-text-primary);box-shadow:0 -2px 8px rgba(0,0,0,.18);text-transform:uppercase;letter-spacing:.04em}.reporte-ventas :deep(.mov-acc-grandtotal strong){color:var(--color-error);font-family:'Courier New',monospace;font-size:.95rem}
+.reporte-ventas :deep(.tabla-movimientos .mov-doble-linea){display:inline-flex;flex-direction:column;gap:.05rem;line-height:1.3}.reporte-ventas :deep(.tabla-movimientos .mov-user-chip){display:inline-flex;align-items:center;gap:.4rem;max-width:100%}.reporte-ventas :deep(.tabla-movimientos .user-col){max-width:170px}.reporte-ventas :deep(.tabla-movimientos .user-col .mov-user-name){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reporte-ventas :deep(.modal-entradas .modal-header-cat){border-bottom-color:color-mix(in srgb,var(--color-success) 35%,transparent)}.reporte-ventas :deep(.modal-entradas .modal-header-cat h3){color:var(--color-success)}
+.reporte-ventas :deep(.tabla-movimientos td.costo){color:var(--color-error);font-weight:700;font-family:'Courier New',monospace;white-space:nowrap}.reporte-ventas :deep(.tabla-movimientos td.monto){font-family:'Courier New',monospace;white-space:nowrap}.reporte-ventas :deep(.tabla-movimientos tfoot td strong){font-family:'Courier New',monospace}
+.reporte-ventas :deep(.tabla-salidas tbody tr:not(.prov-group-row) td:first-child){border-left:3px solid color-mix(in srgb,var(--color-error) 45%,transparent)}.reporte-ventas :deep(.tabla-salidas tbody tr:not(.prov-group-row):hover td){background:color-mix(in srgb,var(--color-error) 5%,transparent)}
+.reporte-ventas :deep(.modal-salidas .modal-header-cat){border-bottom-color:color-mix(in srgb,var(--color-error) 35%,transparent)}.reporte-ventas :deep(.modal-salidas .modal-header-cat h3){color:var(--color-error)}
 .reporte-ventas :deep(.cat-total-row td){border-bottom:2px solid var(--color-border);background:color-mix(in srgb,var(--color-accent) 4%,transparent)}.reporte-ventas :deep(.cat-total-row){cursor:pointer}.reporte-ventas :deep(.cat-total-row:hover td){background:color-mix(in srgb,var(--color-accent) 10%,transparent)!important}.reporte-ventas :deep(.sub-row td){padding-left:1.5rem!important;font-size:.68rem}.reporte-ventas :deep(.sub-indent){color:var(--color-text-secondary);opacity:.5;margin-right:2px}.reporte-ventas :deep(.expand-icon){display:inline-block;width:12px;margin-right:4px;font-size:.6rem;color:var(--color-accent)}.reporte-ventas :deep(.modal-icon){margin-left:6px;font-size:.7rem;cursor:pointer;opacity:0;transition:opacity .15s}.reporte-ventas :deep(tr:hover .modal-icon){opacity:1}.reporte-ventas :deep(.sub-name){color:var(--color-text-primary)}
 .reporte-ventas :deep(.mov-search){position:relative;display:flex;align-items:center;margin-bottom:.55rem}.reporte-ventas :deep(.mov-search-icon){position:absolute;left:.55rem;font-size:.7rem;opacity:.6;pointer-events:none}.reporte-ventas :deep(.mov-search-input){width:100%;padding:.45rem 1.9rem .45rem 1.8rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.72rem;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08)}.reporte-ventas :deep(.mov-search-input:focus){outline:none;box-shadow:inset 2px 2px 3px rgba(0,0,0,.08),0 0 0 2px var(--color-accent)}.reporte-ventas :deep(.mov-search-clear){position:absolute;right:.4rem;border:none;background:var(--color-bg-panel,var(--color-bg-secondary));border-radius:50%;width:18px;height:18px;font-size:.55rem;color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center}.reporte-ventas :deep(.mov-search-clear:hover){background:var(--color-error);color:#fff}
 .reporte-ventas :deep(.tabla-movimientos th){position:sticky;top:0;background:var(--color-bg-secondary);z-index:2;box-shadow:0 1px 0 var(--color-border)}.reporte-ventas :deep(.tabla-movimientos tfoot td){position:sticky;bottom:0;background:var(--color-bg-secondary)}
@@ -693,12 +725,20 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
 .reporte-ventas :deep(.tabla-movimientos tbody tr){display:block;background:var(--color-bg-primary);border-radius:10px;margin-bottom:.45rem;padding:.4rem .55rem;box-shadow:2px 2px 5px rgba(0,0,0,.08)}
 .reporte-ventas :deep(.tabla-movimientos tbody td){display:flex;justify-content:space-between;align-items:center;gap:.7rem;border-bottom:none;padding:.16rem .05rem;text-align:right}
 .reporte-ventas :deep(.tabla-movimientos tbody td::before){content:attr(data-label);font-size:.55rem;font-weight:800;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.03em;text-align:left;flex-shrink:0}
-.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row){background:color-mix(in srgb,var(--color-accent) 10%,transparent);margin-top:.55rem}
-.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row td){display:flex;flex-wrap:wrap;align-items:center;text-align:left;padding:.25rem .3rem}
-.reporte-ventas :deep(.tabla-movimientos tbody tr.prov-group-row td::before){content:none}
+.reporte-ventas :deep(.mov-acc-header){padding:.55rem .65rem}
+.reporte-ventas :deep(.mov-acc-total){font-size:.92rem}
+.reporte-ventas :deep(.mov-row){grid-template-columns:1fr auto;grid-template-areas:"fecha monto" "user user" "desc desc";gap:.3rem .5rem;padding:.5rem .65rem}
+.reporte-ventas :deep(.mov-row .c-fecha){grid-area:fecha}
+.reporte-ventas :deep(.mov-row .c-monto){grid-area:monto}
+.reporte-ventas :deep(.mov-row .c-user){grid-area:user}
+.reporte-ventas :deep(.mov-row .c-desc){grid-area:desc}
+.reporte-ventas :deep(.tabla-movimientos tbody td .mov-doble-linea){align-items:flex-end}
+.reporte-ventas :deep(.tabla-movimientos tbody td .mov-user-chip){flex-direction:row-reverse}
 .reporte-ventas :deep(.tabla-movimientos tfoot){display:block}
 .reporte-ventas :deep(.tabla-movimientos tfoot tr){display:flex;justify-content:space-between;align-items:center;background:var(--color-bg-secondary);border-radius:8px;padding:.35rem .6rem;margin-top:.3rem;box-shadow:0 -2px 8px rgba(0,0,0,.15)}
 .reporte-ventas :deep(.tabla-movimientos tfoot td){display:block;padding:0;border-top:none}
+.reporte-ventas :deep(.tabla-salidas tbody tr:not(.prov-group-row)){border-left:3px solid color-mix(in srgb,var(--color-error) 55%,transparent)}
+.reporte-ventas :deep(.tabla-salidas tbody tr:not(.prov-group-row) td:first-child){border-left:none}
 .reporte-ventas :deep(.edit-desc-input){flex:1;min-width:0}
 }
 

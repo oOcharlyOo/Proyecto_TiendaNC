@@ -175,35 +175,61 @@ function cancelarEdicionDetalle() {
   mixtoSplitsEdicion.value = [];
 }
 
-async function buscarProductoEditar() {
+let busquedaEditarTimer: ReturnType<typeof setTimeout> | null = null;
+let busquedaEditarSec = 0;
+
+function normalizarBusqueda(s: string): string {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[-\s]/g, '');
+}
+
+function buscarProductoEditar(valor?: string) {
+  if (valor !== undefined) busquedaEditar.value = valor;
   const termino = busquedaEditar.value.trim();
-  if (!termino) { resultadosEditar.value = []; return; }
+  if (busquedaEditarTimer) clearTimeout(busquedaEditarTimer);
+  if (!termino) { busquedaEditarSec++; resultadosEditar.value = []; cargandoBusquedaEditar.value = false; return; }
   cargandoBusquedaEditar.value = true;
+  busquedaEditarTimer = setTimeout(() => void ejecutarBusquedaEditar(termino), 250);
+}
+
+async function ejecutarBusquedaEditar(termino: string) {
+  const sec = ++busquedaEditarSec;
   try {
-    const { buscarProductoPorCodigoBarras, buscarProducto } = await import('./usePosProductos');
-    const producto = await buscarProductoPorCodigoBarras(termino);
-    if (producto) resultadosEditar.value = [producto];
-    else { const resultado = await buscarProducto(termino); resultadosEditar.value = resultado ? [resultado] : []; }
-  } catch (e) { resultadosEditar.value = []; }
-  finally { cargandoBusquedaEditar.value = false; }
+    const { buscarProductoPorCodigoBarras, buscarProducto, productos } = await import('./usePosProductos');
+    const q = normalizarBusqueda(termino);
+    const locales = productos.value
+      .filter(p => normalizarBusqueda(p.nombre).includes(q) || normalizarBusqueda(p.codigo_barras || '').includes(q))
+      .slice(0, 20);
+    if (sec !== busquedaEditarSec) return;
+    if (locales.length > 0) { resultadosEditar.value = locales; return; }
+    const porCodigo = await buscarProductoPorCodigoBarras(termino);
+    if (sec !== busquedaEditarSec) return;
+    if (porCodigo) { resultadosEditar.value = [porCodigo]; return; }
+    const resultado = await buscarProducto(termino);
+    if (sec !== busquedaEditarSec) return;
+    resultadosEditar.value = resultado ? [resultado] : [];
+  } catch (e) { if (sec === busquedaEditarSec) resultadosEditar.value = []; }
+  finally { if (sec === busquedaEditarSec) cargandoBusquedaEditar.value = false; }
 }
 
 async function agregarProductoADetalle(producto: Producto) {
   if (!historialVentaSeleccionada.value) return;
   try {
     const { verDetalleVenta } = await import('./usePosCobro');
-    const precioUnitario = producto.precio_venta || 0;
-    await getJson<ApiRespuesta<unknown>>('/ventasDetalle/agregarVentaDetalle', {
+    const idProducto = producto.idProducto ?? producto.id;
+    const precioUnitario = Number(producto.precio ?? producto.precio_venta ?? 0);
+    if (!idProducto) { mostrarMensaje('Producto inválido', 'error'); return; }
+    const respuesta = await getJson<ApiRespuesta<unknown>>('/ventasDetalle/agregarVentaDetalle', {
       method: 'POST',
       body: JSON.stringify({
         Venta: { idVenta: historialVentaSeleccionada.value.idVenta },
-        Producto: { idProducto: producto.idProducto },
+        Producto: { idProducto },
         cantidad: 1, precioUnitarioVenta: precioUnitario,
         tipoPrecioAplicado: producto.is_gramaje ? 'VENTA_GRAMAJE' : 'VENTA',
         cobroEnvase: Boolean(producto.requiere_envase),
         cantidadEnvase: producto.requiere_envase ? 1 : 0
       })
     });
+    if (respuesta?.codigo !== 200) { mostrarMensaje(respuesta?.mensaje || 'Error al agregar producto', 'error'); return; }
     if (producto.is_gramaje) {
       modalProductoGramaje.value = producto;
       gramajeEditandoDesdeHistorial.value = true;
@@ -223,7 +249,8 @@ async function agregarProductoADetalle(producto: Producto) {
 
 async function eliminarDetalleVenta(index: number) {
   const detalle = historialVentaDetalle.value[index];
-  if (!detalle?.idVentaDetalle) return;
+  if (!detalle) { mostrarMensaje('No se encontró el producto en la venta', 'error'); return; }
+  if (!detalle.idVentaDetalle) { mostrarMensaje('El producto aún no está guardado en el servidor', 'error'); return; }
   if (!confirm(`¿Eliminar "${(detalle.producto || detalle.Producto)?.nombre}" de esta venta?`)) return;
   try {
     const response = await getJson<ApiRespuesta<unknown>>(`/ventasDetalle/eliminarVentaDetalle/${detalle.idVentaDetalle}`, { method: 'DELETE' });
