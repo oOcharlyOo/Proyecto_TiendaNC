@@ -12,6 +12,7 @@ const filtroBusqueda = ref('');
 const filtroCategoria = ref<number | null>(null);
 const ordenarPor = ref('nombre');
 const verSoloProblemas = ref(false);
+const verInactivos = ref(false);
 const modalFormOpen = ref(false);
 const modalProductoEditando = ref<ProductoDTO | undefined>(undefined);
 const guardando = ref(false);
@@ -29,6 +30,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 function paramsParaFiltros(pag: number): URLSearchParams {
   const p = new URLSearchParams({ page: String(pag), size: '50', ordenarPor: ordenarPor.value });
+  p.set('estatus', verInactivos.value ? 'I' : 'A');
   if (filtroBusqueda.value.trim()) p.set('q', filtroBusqueda.value.trim());
   if (filtroCategoria.value !== null) p.set('idCategoria', String(filtroCategoria.value));
   return p;
@@ -88,6 +90,7 @@ watch(filtroBusqueda, () => {
 });
 watch(filtroCategoria, () => cargarPrimeraPagina());
 watch(ordenarPor, () => cargarPrimeraPagina());
+watch(verInactivos, () => { verSoloProblemas.value = false; cargarPrimeraPagina(); });
 
 async function guardar(payload: ProductoDTO) {
   if (!payload.nombre.trim()) { mensaje.value = 'Nombre obligatorio.'; return; }
@@ -104,6 +107,16 @@ async function guardar(payload: ProductoDTO) {
 }
 
 function editar(p: ProductoDTO) { modalProductoEditando.value = { ...p }; modalFormOpen.value = true; }
+
+/** Reactiva un producto inactivo (estatus 'I' -> 'A') y recarga la lista actual. */
+async function restaurar(p: ProductoDTO) {
+  if (!p.idProducto) return;
+  try {
+    const d = await api<any>(`${API_BASE}/productos/restaurarProducto/${p.idProducto}`, { method: 'PUT' });
+    if (d?.codigo !== 200) throw new Error(d?.mensaje || 'No se pudo restaurar');
+    await Promise.all([cargarPrimeraPagina(), cargarResumen()]);
+  } catch (e) { mensaje.value = `Error: ${e instanceof Error ? e.message : 'Desconocido'}`; }
+}
 
 const gamingCategoryId = computed(() => categorias.value.find(c => c.nombre.toLowerCase() === 'gaming')?.idCategoria ?? null);
 
@@ -182,9 +195,9 @@ export function useInventario() {
 
   return {
     cargando, cargandoMas, mensaje, productos, categorias, filtroBusqueda, filtroCategoria,
-    ordenarPor, verSoloProblemas, modalFormOpen, modalProductoEditando, guardando, vistaLista,
+    ordenarPor, verSoloProblemas, verInactivos, modalFormOpen, modalProductoEditando, guardando, vistaLista,
     pagina, totalPaginas, resumen,
-    cargarMas, cargar, guardar, editar, esGaming, stockClass, stockLabel,
+    cargarMas, cargar, guardar, editar, restaurar, esGaming, stockClass, stockLabel,
     productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems,
     catsConTodas, catNombre, moneda, numero, gamingCategoryId
   };

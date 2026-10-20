@@ -36,11 +36,17 @@ export type ProductoDTO = {
   precio_envase?: number;
   presentacion_caja?: string;
   cajas?: { piezas: number }[];
+  /** 'A' = activo, 'I' = inactivo (borrado lógico). */
+  estatus?: string;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
 const productos = shallowRef<ProductoDTO[]>([]);
+const productosInactivos = shallowRef<ProductoDTO[]>([]);
+const cargandoInactivos = ref(false);
+/** id del producto inactivo que apareció por escaneo de código de barras (resaltado con contorno morado). */
+const escaneoInactivoId = ref<number | null>(null);
 const categorias = shallowRef<CategoriaDTO[]>([]);
 const subcategorias = shallowRef<SubcategoriaDTO[]>([]);
 const cargando = ref(false);
@@ -52,7 +58,7 @@ const ordenStock = ref<'mayor' | 'menor' | null>(null);
 const filtroTipo = ref<'unidad' | 'gramaje' | null>(null);
 const vistaLista = ref(true);
 const toasts = ref<{ id: number; mensaje: string; tipo: 'ok' | 'error' | 'info' }[]>([]);
-const tabActiva = ref<'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio'>('productos');
+const tabActiva = ref<'productos' | 'inactivos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio'>('productos');
 
 const modalFormOpen = ref(false);
 const modalScannerOpen = ref(false);
@@ -161,6 +167,10 @@ export function useProductos() {
       subcategoriaFiltro.value = null;
     });
 
+    watch(tabActiva, (v) => {
+      if (v === 'inactivos') cargarInactivos();
+    });
+
     onMounted(() => {
       cargarProductos();
       cargarCategorias();
@@ -233,6 +243,36 @@ export function useProductos() {
       mostrarToast(`Error al cargar productos: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
     } finally {
       cargando.value = false;
+    }
+  }
+
+  async function cargarInactivos() {
+    cargandoInactivos.value = true;
+    try {
+      const data = await fetchApi<ApiRespuesta<ProductoDTO[]>>(`${API_BASE}/productos/listarProductos?estatus=I`);
+      productosInactivos.value = Array.isArray(data?.datos)
+        ? [...data.datos].sort((a, b) => Number(a.idProducto || 0) - Number(b.idProducto || 0))
+        : [];
+    } catch {
+      productosInactivos.value = [];
+    } finally {
+      cargandoInactivos.value = false;
+    }
+  }
+
+  /** Reactiva un producto inactivo (estatus 'I' -> 'A') y recarga ambos listados. */
+  async function restaurarProducto(producto: ProductoDTO) {
+    if (!producto.idProducto) return;
+    const confirmacion = window.confirm(`¿Restaurar el producto "${producto.nombre}"? Volverá a estar activo en el catálogo.`);
+    if (!confirmacion) return;
+    try {
+      const data = await fetchApi<ApiRespuesta<ProductoDTO>>(`${API_BASE}/productos/restaurarProducto/${producto.idProducto}`, { method: 'PUT' });
+      if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo restaurar.');
+      mostrarToast('Producto restaurado correctamente.', 'ok');
+      if (escaneoInactivoId.value === producto.idProducto) escaneoInactivoId.value = null;
+      await Promise.all([cargarProductos(), cargarInactivos()]);
+    } catch (error) {
+      mostrarToast(`Error al restaurar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
     }
   }
 
@@ -333,7 +373,7 @@ export function useProductos() {
       if (data?.codigo !== 200) throw new Error(data?.mensaje || 'No se pudo eliminar.');
       mostrarToast('Producto eliminado correctamente.', 'ok');
       modalFormOpen.value = false;
-      await cargarProductos();
+      await Promise.all([cargarProductos(), cargarInactivos()]);
     } catch (error) {
       mostrarToast(`Error al eliminar: ${error instanceof Error ? error.message : 'Error inesperado.'}`, 'error');
     }
@@ -450,7 +490,31 @@ export function useProductos() {
       terminoBusqueda.value = productoEncontrado.codigoBarras || productoEncontrado.nombre;
     } else {
       terminoBusqueda.value = codigoLimpio;
+      // El código no está en la lista de activos: puede ser un producto inactivo → consulta al backend.
+      buscarInactivoPorCodigo(codigoLimpio);
     }
+  }
+
+  /**
+   * Si el código no está en la lista activa, consulta /productos/buscarPorCodigoBarras (no filtra estatus)
+   * e inyecta el producto encontrado en la lista visible; los inactivos se resaltan con contorno morado.
+   */
+  async function buscarInactivoPorCodigo(codigoLimpio: string) {
+    try {
+      const data = await fetchApi<ApiRespuesta<ProductoDTO>>(`${API_BASE}/productos/buscarPorCodigoBarras/${encodeURIComponent(codigoLimpio)}`);
+      const p = data?.datos;
+      if (data?.codigo !== 200 || !p?.idProducto) return;
+
+      if (!productos.value.some(x => x.idProducto === p.idProducto)) {
+        productos.value = [...productos.value, p];
+      }
+      terminoBusqueda.value = p.codigoBarras || p.nombre;
+
+      if (p.estatus === 'I') {
+        escaneoInactivoId.value = p.idProducto;
+        mostrarToast(`"${p.nombre}" es un producto INACTIVO. Puedes restaurarlo desde la pestaña 🗑️ Inactivos.`, 'info');
+      }
+    } catch { /* no encontrado: se queda el término escaneado en el buscador */ }
   }
 
   async function exportarCSV() {
@@ -608,6 +672,9 @@ export function useProductos() {
   return {
     API_BASE,
     productos,
+    productosInactivos,
+    cargandoInactivos,
+    escaneoInactivoId,
     categorias,
     subcategorias,
     cargando,
@@ -650,6 +717,8 @@ export function useProductos() {
     mostrarToast,
     fetchApi,
     cargarProductos,
+    cargarInactivos,
+    restaurarProducto,
     cargarCategorias,
     cargarSubcategorias,
     abrirModalNuevoProducto,

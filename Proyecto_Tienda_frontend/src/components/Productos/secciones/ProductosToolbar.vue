@@ -62,6 +62,7 @@ defineEmits<{
   </header>
   <div class="tabs-bar">
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'productos' }" @click="$emit('update:tabActiva', 'productos')"><span class="tab-icon">📦</span><span class="tab-text">Productos</span></button>
+    <button type="button" class="tab-btn tab-btn--inactivos" :class="{ active: tabActiva === 'inactivos' }" title="Productos eliminados (inactivos)" @click="$emit('update:tabActiva', 'inactivos')"><span class="tab-icon">🗑️</span><span class="tab-text">Inactivos</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'categorias' }" @click="$emit('update:tabActiva', 'categorias')"><span class="tab-icon">🏷️</span><span class="tab-text">Categorías</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'subcategorias' }" @click="$emit('update:tabActiva', 'subcategorias')"><span class="tab-icon">📂</span><span class="tab-text">Subcategorías</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'proveedores' }" @click="$emit('update:tabActiva', 'proveedores')"><span class="tab-icon">🚚</span><span class="tab-text">Proveedores</span></button>

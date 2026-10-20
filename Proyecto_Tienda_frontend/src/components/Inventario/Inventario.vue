@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useInventario } from './logica/useInventario';
-const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
+const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, verInactivos, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, restaurar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
 
 import InvHeader from './secciones/InvHeader.vue';
 import InvKpisBar from './secciones/InvKpisBar.vue';
@@ -20,19 +20,20 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
       :costo-total="costoTotal" :ganancia-pot="gananciaPot" />
 
     <InvToolbar :filtro-busqueda="filtroBusqueda" :filtro-categoria="filtroCategoria" :ordenar-por="ordenarPor"
-      :ver-solo-problemas="verSoloProblemas" :cats-con-todas="catsConTodas"
+      :ver-solo-problemas="verSoloProblemas" :ver-inactivos="verInactivos" :cats-con-todas="catsConTodas"
       @update:filtro-busqueda="filtroBusqueda = $event"
       @update:filtro-categoria="filtroCategoria = $event"
       @update:ordenar-por="ordenarPor = $event"
-      @update:ver-solo-problemas="verSoloProblemas = $event" />
+      @update:ver-solo-problemas="verSoloProblemas = $event"
+      @update:ver-inactivos="verInactivos = $event" />
 
     <div class="inv__body">
       <div v-if="cargando" class="inv__wait"><div class="inv__spin"></div><p>Cargando inventario...</p></div>
       <p v-else-if="mensaje" class="inv__err">⚠️ {{ mensaje }}</p>
-      <p v-else-if="productosFiltrados.length === 0" class="inv__nil">📭 {{ verSoloProblemas ? 'Sin alertas' : 'Sin resultados' }}</p>
+      <p v-else-if="productosFiltrados.length === 0" class="inv__nil">📭 {{ verInactivos ? 'No hay productos inactivos' : verSoloProblemas ? 'Sin alertas' : 'Sin resultados' }}</p>
 
-      <InvTabla v-else-if="vistaLista" :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @cargar-mas="cargarMas" />
-      <InvGrilla v-else :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @cargar-mas="cargarMas" />
+      <InvTabla v-else-if="vistaLista" :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @restaurar="restaurar" @cargar-mas="cargarMas" />
+      <InvGrilla v-else :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @restaurar="restaurar" @cargar-mas="cargarMas" />
     </div>
 
     <ProductoFormModal :open="modalFormOpen" :data="modalProductoEditando" :loading="guardando"
@@ -84,6 +85,22 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
 .inv__cd-stats{display:flex;flex-direction:column;gap:.25rem}.inv__cs{display:flex;align-items:center;gap:.35rem;padding:.2rem .35rem;background:var(--color-bg-secondary);border-radius:6px;box-shadow:inset 1px 1px 2px rgba(0,0,0,.04)}.inv__cs:hover{background:var(--color-bg-primary)}.inv__cs-ico{font-size:.8rem;flex-shrink:0;width:16px;text-align:center}.inv__cs-body{display:flex;justify-content:space-between;align-items:center;flex:1;min-width:0}.inv__cs-l{font-size:.5rem;color:var(--color-text-secondary)}.inv__cs-v{font-size:.6rem;font-family:'Courier New',monospace;font-weight:600;white-space:nowrap}.inv__cs-v small{font-size:.48rem;font-weight:400;color:var(--color-text-secondary);margin-left:.05rem}.v-venta{color:var(--color-success)}.v-gain{color:var(--color-accent)}.v-agotado{color:var(--color-error)}.v-bajo{color:var(--color-warning)}.v-ok,.v-normal{color:var(--color-success)}
 .inv__cd-bar-wrap{display:flex;align-items:center;gap:.35rem;margin-top:.05rem}.inv__cd-bar-bg{flex:1;height:4px;background:var(--color-bg-secondary);border-radius:2px;overflow:hidden;box-shadow:inset 1px 1px 2px rgba(0,0,0,.06)}.inv__cd-bar-fill{height:100%;border-radius:2px;transition:width .4s ease}.bf-ok,.bf-normal{background:var(--color-success)}.bf-bajo{background:var(--color-warning)}.bf-agotado{background:var(--color-error)}.inv__cd-bar-pct{font-size:.5rem;color:var(--color-text-secondary);font-family:'Courier New',monospace;min-width:24px;text-align:right}
 .inv__cd-ed{position:absolute;top:.35rem;right:.35rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;background:var(--color-bg-secondary);cursor:pointer;border-radius:4px;opacity:0;transition:all .15s;font-size:.65rem;box-shadow:2px 2px 4px rgba(0,0,0,.08)}.inv__cd:hover .inv__cd-ed{opacity:1}.inv__cd-ed:hover{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,.15)}
+
+/* Productos inactivos (estatus 'I') — morado #a855f7 */
+.inv__tog--purp input:checked+.inv__tog-t{background:#a855f7;box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
+.inv__tog--purp input:checked+.inv__tog-t .inv__tog-d{left:16px;background:#fff}
+.inv__row.r-inactivo{border-left:2px solid #a855f7;opacity:.85}
+.inv__tag.t-inactivo{background:color-mix(in srgb,#a855f7 15%,transparent);color:#a855f7}
+.inv__cd.c-inactivo{box-shadow:4px 4px 8px rgba(0,0,0,.1),0 0 0 1px color-mix(in srgb,#a855f7 45%,transparent);opacity:.9}
+.d-inactivo{background:#a855f7;box-shadow:0 0 5px color-mix(in srgb,#a855f7 50%,transparent)}
+.v-inactivo{color:#a855f7;opacity:.8}
+.bf-inactivo{background:#a855f7;opacity:.6}
+.inv__rb{opacity:1;color:#a855f7}
+.inv__row:hover .inv__rb{opacity:1}
+.inv__rb:hover{background:#a855f7;color:#fff;box-shadow:3px 3px 6px rgba(0,0,0,.15)}
+.inv__cd-rb{opacity:1;background:color-mix(in srgb,#a855f7 15%,var(--color-bg-secondary));color:#a855f7}
+.inv__cd:hover .inv__cd-rb{opacity:1}
+.inv__cd-rb:hover{background:#a855f7;color:#fff;box-shadow:3px 3px 6px rgba(0,0,0,.15)}
 
 @media(max-width:1200px){.inv__kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:768px){

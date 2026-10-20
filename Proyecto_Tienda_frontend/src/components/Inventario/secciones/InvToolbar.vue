@@ -6,6 +6,7 @@ defineProps<{
   filtroCategoria: number | null;
   ordenarPor: string;
   verSoloProblemas: boolean;
+  verInactivos: boolean;
   catsConTodas: { idCategoria: number | null; nombre: string }[];
 }>();
 defineEmits<{
@@ -13,6 +14,7 @@ defineEmits<{
   'update:filtro-categoria': [value: number | null];
   'update:ordenar-por': [value: string];
   'update:ver-solo-problemas': [value: boolean];
+  'update:ver-inactivos': [value: boolean];
 }>();
 </script>
 
@@ -39,6 +41,11 @@ defineEmits<{
         <input type="checkbox" :checked="verSoloProblemas" @change="$emit('update:ver-solo-problemas', ($event.target as HTMLInputElement).checked)" />
         <span class="inv__tog-t"><span class="inv__tog-d"></span></span>
         <span>Alertas</span>
+      </label>
+      <label class="inv__tog inv__tog--purp" title="Ver productos inactivos (borrados lógicamente)">
+        <input type="checkbox" :checked="verInactivos" @change="$emit('update:ver-inactivos', ($event.target as HTMLInputElement).checked)" />
+        <span class="inv__tog-t"><span class="inv__tog-d"></span></span>
+        <span>🗑️ Inactivos</span>
       </label>
     </div>
   </div>

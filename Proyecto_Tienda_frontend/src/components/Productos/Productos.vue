@@ -15,7 +15,8 @@ import { useProductos } from './logica/useProductos';
 import type { ProductoDTO } from './logica/useProductos';
 
 const {
-  productos, categorias, subcategorias, cargando, guardando,
+  productos, productosInactivos, cargandoInactivos, escaneoInactivoId,
+  categorias, subcategorias, cargando, guardando,
   terminoBusqueda, categoriaFiltro, subcategoriaFiltro, ordenStock, filtroTipo,
   vistaLista, toasts, tabActiva, modalFormOpen, modalScannerOpen, selectedProduct,
   scannerCode, selectedProductos, modalCategoriaOpen, nuevaCategoria, nuevaSubcategoria,
@@ -24,12 +25,14 @@ const {
   exportarCSV, exportarXLSX, triggerImport, handleImport, vaciarInventario,
   obtenerNombreCategoria, obtenerNombreSubcategoria, formatoMoneda,
   esCategoriaGaming, obtenerEmojiDulce,
-  cargarProductos, cargarCategorias,
+  cargarProductos, cargarCategorias, restaurarProducto,
   abrirModalNuevoProducto, abrirModalEditarProducto,
   handleSubmitProducto, handleDeleteProducto, handleScannerApply,
   toggleSeleccionProducto, toggleSeleccionTodos,
   abrirModalCategoria, aplicarCambioCategoria
 } = useProductos();
+
+type TabActiva = 'productos' | 'inactivos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio';
 
 const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
 const productoEditandoCajas = ref<ProductoDTO | null>(null);
@@ -66,7 +69,7 @@ async function onCajasGuardadas(cajas: number[]) {
         @update:ordenStock="(v) => { ordenStock = v as 'mayor' | 'menor' | null }"
         @update:filtroTipo="(v) => { filtroTipo = v as 'unidad' | 'gramaje' | null }"
         @update:terminoBusqueda="(v) => { terminoBusqueda = v }"
-        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio' }"
+        @update:tabActiva="(v) => { tabActiva = v as TabActiva }"
         @update:vistaLista="(v) => { vistaLista = v }"
         @exportar-csv="exportarCSV"
         @exportar-xlsx="exportarXLSX"
@@ -79,6 +82,9 @@ async function onCajasGuardadas(cajas: number[]) {
         :tabActiva="tabActiva"
         :cargando="cargando"
         :productosFiltrados="productosFiltrados"
+        :productosInactivos="productosInactivos"
+        :cargandoInactivos="cargandoInactivos"
+        :escaneoInactivoId="escaneoInactivoId"
         :vistaLista="vistaLista"
         :terminoBusqueda="terminoBusqueda"
         :categoriaFiltro="categoriaFiltro"
@@ -91,12 +97,13 @@ async function onCajasGuardadas(cajas: number[]) {
         :categoriaNombre="(id?: number) => obtenerNombreCategoria(id || 0)"
         :subcategoriaNombre="(id: number | null | undefined) => obtenerNombreSubcategoria(id || 0)"
         :esAdmin="esAdmin"
-        @update:tabActiva="(v) => { tabActiva = v as 'productos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio' }"
+        @update:tabActiva="(v) => { tabActiva = v as TabActiva }"
         @toggle-seleccion-todos="toggleSeleccionTodos"
         @editar="abrirModalEditarProducto"
         @nuevo-producto="abrirModalNuevoProducto"
         @abrir-modal-categoria="modalCategoriaOpen = true"
         @eliminar="handleDeleteProducto"
+        @restaurar="restaurarProducto"
         @iniciar-escaneo="() => {}"
         @detener-escaneo="() => {}"
         @editar-cajas="abrirEditarCajas"
@@ -371,6 +378,20 @@ async function onCajasGuardadas(cajas: number[]) {
 .productos-layout .form-label{display:block;font-size:.8rem;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
 .productos-layout .form-select{width:100%;padding:.6rem .75rem;border:none;border-radius:8px;background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.9rem;transition:all .15s;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12)}
 .productos-layout .form-select:focus{outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12),0 0 0 2px var(--color-accent)}
+
+/* Productos inactivos (estatus 'I') — morado #a855f7 */
+.productos-layout :deep(.tab-btn--inactivos.active){color:#a855f7;border-bottom-color:#a855f7;background:color-mix(in srgb,#a855f7 10%,transparent)}
+.productos-layout :deep(.producto-row.inactivo-row){border-left:4px solid #a855f7;background:color-mix(in srgb,#a855f7 7%,transparent)}
+.productos-layout :deep(.producto-row.inactivo-scan){border-left:4px solid #a855f7;background:color-mix(in srgb,#a855f7 14%,transparent);box-shadow:0 0 0 1px #a855f7,0 0 12px color-mix(in srgb,#a855f7 55%,transparent)}
+.productos-layout :deep(.producto-row.inactivo-glow){animation:psInactivoGlow 1.6s ease-in-out infinite}
+@keyframes psInactivoGlow{0%,100%{box-shadow:0 0 0 1px #a855f7,0 0 8px color-mix(in srgb,#a855f7 35%,transparent)}50%{box-shadow:0 0 0 1px #a855f7,0 0 20px color-mix(in srgb,#a855f7 75%,transparent)}}
+.productos-layout :deep(.badge-inactivo){display:inline-block;margin-left:.5rem;padding:.2rem .5rem;background:color-mix(in srgb,#a855f7 18%,transparent);color:#a855f7;border:none;border-radius:6px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;vertical-align:middle;box-shadow:2px 2px 4px rgba(0,0,0,.06)}
+.productos-layout :deep(.btn-restore){color:#a855f7;font-size:1rem}
+.productos-layout :deep(.btn-restore:hover){background:#a855f7;color:#fff;transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
+.productos-layout :deep(.producto-card.inactivo-scan){box-shadow:4px 4px 8px rgba(0,0,0,.12),-2px -2px 5px rgba(255,255,255,.02),inset 0 0 0 2px color-mix(in srgb,#a855f7 55%,transparent)}
+.productos-layout :deep(.pc-btn-restore:hover){color:#a855f7;background:color-mix(in srgb,#a855f7 10%,var(--color-bg-secondary))}
+.productos-layout :deep(.stock-badge.muted){color:var(--color-text-secondary);background:var(--color-bg-secondary)}
+.productos-layout :deep(.stat-value.stat-inactivo){color:#a855f7;opacity:.8}
 @media(max-width:1024px){.productos-layout :deep(.col-categoria),.productos-layout :deep(.col-subcategoria),.productos-layout :deep(.col-codigo),.productos-layout :deep(.col-tipo),.productos-layout :deep(.col-caja){display:none}.productos-layout :deep(.tabs-bar){overflow-x:auto;scrollbar-width:none}.productos-layout :deep(.tabs-bar::-webkit-scrollbar){display:none}.productos-layout :deep(.tab-btn){padding:.75rem 1rem;white-space:nowrap}}
 @media(max-width:768px){.productos-layout{padding:.5rem}.productos-layout :deep(.toolbar){flex-direction:column;align-items:stretch;padding:.875rem 1rem}.productos-layout :deep(.toolbar-left){text-align:center}.productos-layout :deep(.toolbar-title){justify-content:center}.productos-layout :deep(.toolbar-right){justify-content:center;flex-wrap:wrap;gap:.5rem}.productos-layout :deep(.view-toggles){order:-1;width:100%;max-width:120px;margin:0 auto}.productos-layout :deep(.import-export-group){width:100%;justify-content:center}.productos-layout :deep(.category-filter){width:100%;min-width:unset}.productos-layout :deep(.search-input){width:100%}.productos-layout :deep(.col-precio),.productos-layout :deep(.col-stock){display:none}.productos-layout :deep(.col-codigo){display:none}.productos-layout :deep(.col-envase){display:none}.productos-layout :deep(.col-subcategoria){display:none}.productos-layout :deep(.bulk-action-bar){flex-direction:column;align-items:stretch}.productos-layout :deep(.bulk-info){justify-content:center}.productos-layout :deep(.btn-bulk-action){justify-content:center}.productos-layout :deep(.tabla-productos th),.productos-layout :deep(.tabla-productos td){padding:.6rem .75rem}.productos-layout :deep(.tabs-bar){padding:0 1rem}.productos-layout :deep(.tab-btn){padding:.65rem .85rem;font-size:.8rem}.productos-layout :deep(.tab-icon){font-size:1rem}.productos-layout :deep(.icon-cell){width:36px;height:36px;font-size:1.1rem}.productos-layout :deep(.nombre-text){font-size:.85rem}.productos-layout :deep(.nombre-id){font-size:.65rem}.productos-layout :deep(.btn-action){width:32px;height:32px}.productos-layout :deep(.btn-action .action-icon){width:16px;height:16px}.productos-layout :deep(.acciones-cell){gap:.35rem}.productos-layout .toast-container{bottom:1rem;right:1rem;left:1rem}.productos-layout .toast-notification{min-width:unset;max-width:unset;width:100%}.productos-layout :deep(.toolbar-right){flex-direction:column;align-items:stretch}.productos-layout :deep(.toolbar-right .category-filter),.productos-layout :deep(.toolbar-right .search-wrapper),.productos-layout :deep(.toolbar-right .import-export-group){width:100%}.productos-layout :deep(.productos-grid){grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem}.productos-layout :deep(.view-btn){width:34px;height:34px;font-size:.95rem}}
 @media(max-width:480px){.productos-layout :deep(.toolbar-left){display:none}.productos-layout :deep(.toolbar){padding:.4rem .45rem;gap:.2rem}.productos-layout :deep(.toolbar-right){gap:.2rem}.productos-layout :deep(.category-filter){padding:.3rem .2rem;font-size:.6rem;min-width:0;width:100%}.productos-layout :deep(.search-input){padding:.3rem 1.5rem .3rem 1.5rem;font-size:.65rem;width:100%}.productos-layout :deep(.search-wrapper){width:100%}.productos-layout :deep(.search-icon){left:.3rem;font-size:.65rem}.productos-layout :deep(.import-export-group .btn-text){display:none}.productos-layout :deep(.import-export-group .btn-secondary){padding:.3rem .35rem;min-width:28px;justify-content:center;font-size:.6rem}.productos-layout :deep(.import-export-group .btn-icon){font-size:.85rem;margin:0}.productos-layout :deep(.btn-danger.btn-sm){padding:.3rem .35rem;font-size:.6rem}.productos-layout :deep(.btn-primary .btn-text){display:none}.productos-layout :deep(.btn-primary){padding:.35rem .55rem;font-size:.65rem}.productos-layout :deep(.tab-text){display:none}.productos-layout :deep(.tab-btn){padding:.45rem .35rem;justify-content:center;font-size:.65rem}.productos-layout :deep(.tab-icon){font-size:1rem;margin:0}.productos-layout :deep(.tabs-bar){justify-content:space-around;padding:0 .2rem}.productos-layout :deep(.view-toggles){max-width:70px}.productos-layout :deep(.view-btn){width:26px;height:26px;font-size:.75rem}.productos-layout :deep(.tabla-productos){font-size:.8rem}.productos-layout :deep(.tabla-productos th),.productos-layout :deep(.tabla-productos td){padding:.5rem .5rem}.productos-layout :deep(.icon-cell){width:32px;height:32px;font-size:1rem}.productos-layout :deep(.nombre-text){font-size:.8rem}.productos-layout :deep(.nombre-id){font-size:.6rem}.productos-layout :deep(.btn-action){width:30px;height:30px}.productos-layout :deep(.btn-action .action-icon){width:14px;height:14px}.productos-layout :deep(.acciones-cell){gap:.25rem}.productos-layout :deep(.stock-badge){padding:.25rem .4rem;font-size:.8rem}.productos-layout :deep(.stock-icon){font-size:.85rem}.productos-layout .toast-container{bottom:.5rem;right:.5rem;left:.5rem}.productos-layout .toast-notification{padding:.75rem .85rem}.productos-layout .toast-icon{font-size:1rem}.productos-layout .toast-message{font-size:.8rem}.productos-layout :deep(.estado-loading),.productos-layout :deep(.estado-empty){padding:2.5rem .5rem}.productos-layout :deep(.empty-icon){font-size:2.5rem}.productos-layout :deep(.empty-text){font-size:.9rem}.productos-layout :deep(.loading-spinner){width:36px;height:36px;border-width:3px}.productos-layout :deep(.category-filter),.productos-layout :deep(.search-input){font-size:.8rem;padding:.5rem 2rem .5rem .7rem}.productos-layout :deep(.btn-secondary){padding:.5rem .7rem;font-size:.7rem}.productos-layout :deep(.categoria-badge){font-size:.65rem;padding:.15rem .4rem}.productos-layout :deep(.table-footer){padding:.6rem 1rem}.productos-layout :deep(.footer-count){font-size:.7rem}.productos-layout :deep(.bulk-action-bar){padding:.6rem .75rem}.productos-layout :deep(.bulk-count){font-size:.8rem}.productos-layout :deep(.btn-bulk-action){padding:.45rem .75rem;font-size:.75rem}.productos-layout :deep(.productos-grid){grid-template-columns:repeat(2,1fr);gap:.5rem}.productos-layout :deep(.producto-card){padding:.6rem}.productos-layout :deep(.pc-ico){width:36px;height:36px;font-size:1rem}.productos-layout :deep(.pc-name){font-size:.7rem}.productos-layout :deep(.pc-stat-l){font-size:.5rem}.productos-layout :deep(.pc-stat-v){font-size:.6rem}.productos-layout :deep(.pc-btn){height:28px;font-size:.8rem}.productos-layout :deep(.view-toggles){border-radius:6px}.productos-layout :deep(.view-btn){width:32px;height:32px;font-size:.9rem}}
