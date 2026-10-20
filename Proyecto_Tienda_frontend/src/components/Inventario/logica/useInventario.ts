@@ -125,6 +125,39 @@ export function stockLabel(p: ProductoDTO) {
   return '';
 }
 
+/** Días desde la última venta o entrada de mercancía. null = nunca hubo movimiento. undefined = backend sin el dato. */
+export function diasSinMov(p: ProductoDTO): number | null | undefined {
+  return p.dias_sin_movimiento;
+}
+
+/** Clase visual para la etiqueta de días sin movimiento. */
+export function diasMovClase(d: number | null | undefined): string {
+  if (d === undefined) return 'dm-unknown';
+  if (d === null) return 'dm-none';
+  if (d >= 90) return 'dm-critico';
+  if (d >= 60) return 'dm-alto';
+  if (d >= 30) return 'dm-medio';
+  return 'dm-ok';
+}
+
+/** Texto de la etiqueta de días sin movimiento. */
+export function diasMovLabel(d: number | null | undefined): string {
+  if (d === undefined) return 'Sin dato';
+  if (d === null) return 'Nunca';
+  if (d === 0) return 'Hoy';
+  return `${numero(d)} d`;
+}
+
+/** Tooltip con la fecha exacta del último movimiento. */
+export function diasMovTitulo(p: ProductoDTO): string {
+  if (p.fecha_ultimo_movimiento) {
+    const f = new Date(p.fecha_ultimo_movimiento);
+    if (!isNaN(f.getTime())) return `Último movimiento: ${f.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+  }
+  if (p.dias_sin_movimiento === null) return 'Sin ventas ni entradas de mercancía registradas';
+  return 'El backend aún no devuelve este dato';
+}
+
 const productosFiltrados = computed(() => {
   let r = productos.value;
   if (verSoloProblemas.value) r = r.filter(p => Number(p.stock) < Number(p.cantidad_min));

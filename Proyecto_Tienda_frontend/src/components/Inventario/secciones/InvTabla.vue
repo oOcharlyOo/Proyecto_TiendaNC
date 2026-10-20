@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductoDTO } from '../logica/useInvTipos';
-import { moneda, numero, stockClass, stockLabel, esGaming, catNombre } from '../logica/useInventario';
+import { moneda, numero, stockClass, stockLabel, esGaming, catNombre, diasSinMov, diasMovClase, diasMovLabel, diasMovTitulo } from '../logica/useInventario';
 
 defineProps<{ productos: ProductoDTO[]; cargandoMas: boolean; hayMas: boolean }>();
 defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
@@ -14,6 +14,7 @@ defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
         <th>Categoría</th>
         <th class="tc">Stock</th>
         <th class="tc">Estado</th>
+        <th class="tc" title="Días desde la última venta o entrada de mercancía">Sin movimiento</th>
         <th class="tr">Costo</th>
         <th class="tr">Venta</th>
         <th class="tr">Ganancia/u</th>
@@ -32,6 +33,9 @@ defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
             <span v-if="esGaming(p.idCategoria)" class="inv__tag t-gaming">Rentable</span>
             <span v-else-if="stockLabel(p)" :class="['inv__tag', `t-${stockClass(p)}`]">{{ stockLabel(p) }}</span>
             <span v-else class="inv__tag t-ok">OK</span>
+          </td>
+          <td class="inv__cell tc">
+            <span :class="['inv__dm', diasMovClase(diasSinMov(p))]" :title="diasMovTitulo(p)">{{ diasMovLabel(diasSinMov(p)) }}</span>
           </td>
           <td class="inv__cell tr costo">{{ moneda(p.precio_costo) }}</td>
           <td class="inv__cell tr venta">{{ moneda(p.precio_venta) }}</td>

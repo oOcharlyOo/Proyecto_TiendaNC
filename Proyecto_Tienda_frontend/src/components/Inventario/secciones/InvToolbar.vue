@@ -33,6 +33,7 @@ defineEmits<{
         <option value="stock">Stock ↑</option>
         <option value="stock-desc">Stock ↓</option>
         <option value="precio">Precio</option>
+        <option value="sin-venta">Sin venta (más antiguos)</option>
       </select>
       <label class="inv__tog">
         <input type="checkbox" :checked="verSoloProblemas" @change="$emit('update:ver-solo-problemas', ($event.target as HTMLInputElement).checked)" />

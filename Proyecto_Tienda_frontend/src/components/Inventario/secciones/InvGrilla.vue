@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductoDTO } from '../logica/useInvTipos';
-import { moneda, numero, stockClass, stockLabel, esGaming, catNombre } from '../logica/useInventario';
+import { moneda, numero, stockClass, stockLabel, esGaming, catNombre, diasSinMov, diasMovClase, diasMovLabel, diasMovTitulo } from '../logica/useInventario';
 
 defineProps<{ productos: ProductoDTO[]; cargandoMas: boolean; hayMas: boolean }>();
 defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
@@ -38,6 +38,13 @@ defineEmits<{ editar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
           <div class="inv__cs-body">
             <span class="inv__cs-l">Ganancia</span>
             <span class="inv__cs-v v-gain">{{ moneda(Number(p.precio_venta) - Number(p.precio_costo)) }}</span>
+          </div>
+        </div>
+        <div class="inv__cs">
+          <span class="inv__cs-ico">🕰️</span>
+          <div class="inv__cs-body">
+            <span class="inv__cs-l">Sin movimiento</span>
+            <span :class="['inv__cs-v', diasMovClase(diasSinMov(p))]" :title="diasMovTitulo(p)">{{ diasMovLabel(diasSinMov(p)) }}</span>
           </div>
         </div>
       </div>

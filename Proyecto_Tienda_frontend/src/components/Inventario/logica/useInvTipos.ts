@@ -4,6 +4,10 @@ type ProductoDTO = {
   idProducto?: number; nombre: string; stock: number; codigoBarras: string | null;
   precio_costo: number; precio_venta: number; cantidad_min: number; cantidad_max: number;
   precio_mayoreo: number | null; is_gramaje: boolean; idCategoria?: number;
+  /** ISO datetime del último movimiento (venta o pedido recibido). null = nunca. undefined = backend sin este dato. */
+  fecha_ultimo_movimiento?: string | null;
+  /** Días desde el último movimiento. null = nunca. undefined = backend sin este dato. */
+  dias_sin_movimiento?: number | null;
 };
 type ResumenInventarioDTO = {
   totalItems: number; bajoStock: number; productosAgotados: number;
