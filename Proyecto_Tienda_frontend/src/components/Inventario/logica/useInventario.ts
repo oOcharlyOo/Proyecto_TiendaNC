@@ -13,6 +13,7 @@ const filtroCategoria = ref<number | null>(null);
 const ordenarPor = ref('nombre');
 const verSoloProblemas = ref(false);
 const verInactivos = ref(false);
+const verPorValidar = ref(false);
 const modalFormOpen = ref(false);
 const modalProductoEditando = ref<ProductoDTO | undefined>(undefined);
 const guardando = ref(false);
@@ -90,7 +91,8 @@ watch(filtroBusqueda, () => {
 });
 watch(filtroCategoria, () => cargarPrimeraPagina());
 watch(ordenarPor, () => cargarPrimeraPagina());
-watch(verInactivos, () => { verSoloProblemas.value = false; cargarPrimeraPagina(); });
+watch(verInactivos, () => { verSoloProblemas.value = false; verPorValidar.value = false; cargarPrimeraPagina(); });
+watch(verPorValidar, () => { verSoloProblemas.value = false; verInactivos.value = false; cargarPrimeraPagina(); });
 
 async function guardar(payload: ProductoDTO) {
   if (!payload.nombre.trim()) { mensaje.value = 'Nombre obligatorio.'; return; }
@@ -171,9 +173,18 @@ export function diasMovTitulo(p: ProductoDTO): string {
   return 'El backend aún no devuelve este dato';
 }
 
+/** true si lleva más de 30 días sin movimiento (o nunca se movió) pero sigue con stock: hay que validar si el stock es real. */
+export function requiereValidarStock(p: ProductoDTO): boolean {
+  if (p.requiere_validacion !== undefined) return !!p.requiere_validacion;
+  const d = p.dias_sin_movimiento;
+  const sinMov = d === null || (typeof d === 'number' && d > 30);
+  return sinMov && Number(p.stock) > 0;
+}
+
 const productosFiltrados = computed(() => {
   let r = productos.value;
   if (verSoloProblemas.value) r = r.filter(p => Number(p.stock) < Number(p.cantidad_min));
+  if (verPorValidar.value) r = r.filter(requiereValidarStock);
   return r;
 });
 
@@ -195,9 +206,9 @@ export function useInventario() {
 
   return {
     cargando, cargandoMas, mensaje, productos, categorias, filtroBusqueda, filtroCategoria,
-    ordenarPor, verSoloProblemas, verInactivos, modalFormOpen, modalProductoEditando, guardando, vistaLista,
+    ordenarPor, verSoloProblemas, verInactivos, verPorValidar, modalFormOpen, modalProductoEditando, guardando, vistaLista,
     pagina, totalPaginas, resumen,
-    cargarMas, cargar, guardar, editar, restaurar, esGaming, stockClass, stockLabel,
+    cargarMas, cargar, guardar, editar, restaurar, esGaming, stockClass, stockLabel, requiereValidarStock,
     productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems,
     catsConTodas, catNombre, moneda, numero, gamingCategoryId
   };

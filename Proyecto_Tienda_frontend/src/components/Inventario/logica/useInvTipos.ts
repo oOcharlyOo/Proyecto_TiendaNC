@@ -10,6 +10,8 @@ type ProductoDTO = {
   fecha_ultimo_movimiento?: string | null;
   /** Días desde el último movimiento. null = nunca. undefined = backend sin este dato. */
   dias_sin_movimiento?: number | null;
+  /** true = >30 días sin movimiento (o nunca movido) pero con stock: validar si el stock es real. */
+  requiere_validacion?: boolean;
 };
 type ResumenInventarioDTO = {
   totalItems: number; bajoStock: number; productosAgotados: number;

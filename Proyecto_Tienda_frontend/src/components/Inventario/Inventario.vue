@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useInventario } from './logica/useInventario';
-const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, verInactivos, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, restaurar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
+const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, verInactivos, verPorValidar, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, restaurar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
 
 import InvHeader from './secciones/InvHeader.vue';
 import InvKpisBar from './secciones/InvKpisBar.vue';
@@ -20,17 +20,18 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
       :costo-total="costoTotal" :ganancia-pot="gananciaPot" />
 
     <InvToolbar :filtro-busqueda="filtroBusqueda" :filtro-categoria="filtroCategoria" :ordenar-por="ordenarPor"
-      :ver-solo-problemas="verSoloProblemas" :ver-inactivos="verInactivos" :cats-con-todas="catsConTodas"
+      :ver-solo-problemas="verSoloProblemas" :ver-inactivos="verInactivos" :ver-por-validar="verPorValidar" :cats-con-todas="catsConTodas"
       @update:filtro-busqueda="filtroBusqueda = $event"
       @update:filtro-categoria="filtroCategoria = $event"
       @update:ordenar-por="ordenarPor = $event"
       @update:ver-solo-problemas="verSoloProblemas = $event"
-      @update:ver-inactivos="verInactivos = $event" />
+      @update:ver-inactivos="verInactivos = $event"
+      @update:ver-por-validar="verPorValidar = $event" />
 
     <div class="inv__body">
       <div v-if="cargando" class="inv__wait"><div class="inv__spin"></div><p>Cargando inventario...</p></div>
       <p v-else-if="mensaje" class="inv__err">⚠️ {{ mensaje }}</p>
-      <p v-else-if="productosFiltrados.length === 0" class="inv__nil">📭 {{ verInactivos ? 'No hay productos inactivos' : verSoloProblemas ? 'Sin alertas' : 'Sin resultados' }}</p>
+      <p v-else-if="productosFiltrados.length === 0" class="inv__nil">📭 {{ verInactivos ? 'No hay productos inactivos' : verPorValidar ? 'Nada por validar 🎉' : verSoloProblemas ? 'Sin alertas' : 'Sin resultados' }}</p>
 
       <InvTabla v-else-if="vistaLista" :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @restaurar="restaurar" @cargar-mas="cargarMas" />
       <InvGrilla v-else :productos="productosFiltrados" :cargando-mas="cargandoMas" :hay-mas="pagina < totalPaginas - 1" @editar="editar" @restaurar="restaurar" @cargar-mas="cargarMas" />
@@ -101,6 +102,11 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
 .inv__cd-rb{opacity:1;background:color-mix(in srgb,#a855f7 15%,var(--color-bg-secondary));color:#a855f7}
 .inv__cd:hover .inv__cd-rb{opacity:1}
 .inv__cd-rb:hover{background:#a855f7;color:#fff;box-shadow:3px 3px 6px rgba(0,0,0,.15)}
+
+/* Productos por validar stock (>30 días sin movimiento con stock) — ámbar/naranja #f59e0b */
+.inv__tog--val input:checked+.inv__tog-t{background:#f59e0b;box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
+.inv__tog--val input:checked+.inv__tog-t .inv__tog-d{left:16px;background:#fff}
+.inv__tag.t-validar{background:color-mix(in srgb,#f59e0b 18%,transparent);color:#f59e0b;text-transform:none}
 
 @media(max-width:1200px){.inv__kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:768px){

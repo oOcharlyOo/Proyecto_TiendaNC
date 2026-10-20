@@ -29,6 +29,7 @@ const topVentasUnitarios = ref<ProductoRank[]>([]);
 const bajaRotacion = ref<ProductoRank[]>([]);
 const mayorUtilidad = ref<ProductoRank[]>([]);
 const sinMovimiento = ref<ProductoRank[]>([]);
+const porValidarStock = ref<ProductoRank[]>([]);
 const alertas = ref<{ tipo: string; mensaje: string; severidad: 'alta' | 'media' | 'baja' }[]>([]);
 const resumenInventario = ref<any>(null);
 const ultimaActualizacion = ref('');
@@ -293,6 +294,26 @@ async function cargarAnalytics() {
     sinMovimiento.value = noMovValidos.slice(0, 50);
     valorRetenidoSinMov.value = noMovValidos.reduce((s, i) => s + (i.stock || 0) * (i.precioCosto || 0), 0);
 
+    // --- Productos por validar stock: >30 días sin movimiento (o nunca movidos) y con stock ---
+    const validarStock = datosProductos.filter((p: any) => {
+      const stock = Number(p.stock || 0);
+      if (stock <= 0) return false;
+      const dias = p.dias_sin_movimiento;
+      return dias === null || (typeof dias === 'number' && dias > 30);
+    });
+    porValidarStock.value = validarStock.map((p: any) => ({
+      idProducto: Number(p.idProducto),
+      nombre: p.nombre,
+      cantidadVendida: 0,
+      totalVendido: 0,
+      isGramaje: p.is_gramaje || false,
+      stock: Number(p.stock || 0),
+      diasSinVenta: p.dias_sin_movimiento ?? 999,
+      categoria: categoriaMap.get(Number(p.idCategoria)) || '',
+      precioCosto: Number(p.precio_costo || 0),
+      precioVenta: Number(p.precio_venta || 0),
+    }));
+
     // --- Alertas ---
     const alerts: typeof alertas.value = [];
     if (datosResumen) {
@@ -302,6 +323,7 @@ async function cargarAnalytics() {
         alerts.push({ tipo: 'agotado', mensaje: count + ' producto(s) agotados — considera reordenar urgente', severidad: 'alta' });
       }
     }
+    if (porValidarStock.value.length > 0) alerts.push({ tipo: 'validar-stock', mensaje: porValidarStock.value.length + ' producto(s) con más de 30 días sin movimiento pero con stock — valida si el stock es real', severidad: 'media' });
     if (sinMovimiento.value.length > 0) alerts.push({ tipo: 'sin-movimiento', mensaje: sinMovimiento.value.length + ' producto(s) sin ventas en más de 30 días — revisa si deben permanecer en catálogo', severidad: 'media' });
     if (slow.length > 0) alerts.push({ tipo: 'baja-rotacion', mensaje: slow.length + ' producto(s) con más de 60 días de inventario — reduce pedidos futuros', severidad: 'media' });
 
@@ -334,6 +356,7 @@ export function useProveedoresInteligencia() {
     bajaRotacion,
     mayorUtilidad,
     sinMovimiento,
+    porValidarStock,
     alertas,
     resumenInventario,
     ultimaActualizacion,

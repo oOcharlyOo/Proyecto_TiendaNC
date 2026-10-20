@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProductoDTO } from '../logica/useInvTipos';
-import { moneda, numero, stockClass, stockLabel, esGaming, catNombre, diasSinMov, diasMovClase, diasMovLabel, diasMovTitulo } from '../logica/useInventario';
+import { moneda, numero, stockClass, stockLabel, esGaming, catNombre, diasSinMov, diasMovClase, diasMovLabel, diasMovTitulo, requiereValidarStock } from '../logica/useInventario';
 
 defineProps<{ productos: ProductoDTO[]; cargandoMas: boolean; hayMas: boolean }>();
 defineEmits<{ editar: [producto: ProductoDTO]; restaurar: [producto: ProductoDTO]; 'cargar-mas': [] }>();
@@ -32,6 +32,7 @@ defineEmits<{ editar: [producto: ProductoDTO]; restaurar: [producto: ProductoDTO
           <td class="inv__cell tc">
             <span v-if="p.estatus === 'I'" class="inv__tag t-inactivo">Inactivo</span>
             <span v-else-if="esGaming(p.idCategoria)" class="inv__tag t-gaming">Rentable</span>
+            <span v-else-if="requiereValidarStock(p)" class="inv__tag t-validar" title="Más de 30 días sin movimiento con stock: valida si el stock es real">Validar stock</span>
             <span v-else-if="stockLabel(p)" :class="['inv__tag', `t-${stockClass(p)}`]">{{ stockLabel(p) }}</span>
             <span v-else class="inv__tag t-ok">OK</span>
           </td>

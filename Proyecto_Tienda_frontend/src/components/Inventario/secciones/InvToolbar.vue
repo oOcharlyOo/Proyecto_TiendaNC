@@ -7,6 +7,7 @@ defineProps<{
   ordenarPor: string;
   verSoloProblemas: boolean;
   verInactivos: boolean;
+  verPorValidar: boolean;
   catsConTodas: { idCategoria: number | null; nombre: string }[];
 }>();
 defineEmits<{
@@ -15,6 +16,7 @@ defineEmits<{
   'update:ordenar-por': [value: string];
   'update:ver-solo-problemas': [value: boolean];
   'update:ver-inactivos': [value: boolean];
+  'update:ver-por-validar': [value: boolean];
 }>();
 </script>
 
@@ -46,6 +48,11 @@ defineEmits<{
         <input type="checkbox" :checked="verInactivos" @change="$emit('update:ver-inactivos', ($event.target as HTMLInputElement).checked)" />
         <span class="inv__tog-t"><span class="inv__tog-d"></span></span>
         <span>🗑️ Inactivos</span>
+      </label>
+      <label class="inv__tog inv__tog--val" title="Productos con más de 30 días sin movimiento que aún tienen stock — valida si el stock es real">
+        <input type="checkbox" :checked="verPorValidar" @change="$emit('update:ver-por-validar', ($event.target as HTMLInputElement).checked)" />
+        <span class="inv__tog-t"><span class="inv__tog-d"></span></span>
+        <span>🔎 Por validar</span>
       </label>
     </div>
   </div>
