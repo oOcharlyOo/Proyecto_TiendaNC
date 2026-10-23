@@ -2,6 +2,8 @@ import { ref, computed } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
+export type ClasificacionRotacion = 'RAPIDO' | 'MEDIO' | 'LENTO' | 'ATORADO';
+
 export type ProductoRank = {
   idProducto?: number;
   nombre: string;
@@ -20,6 +22,29 @@ export type ProductoRank = {
   precioCosto?: number;
   precioVenta?: number;
   diasInventario?: number;
+  clasificacion?: ClasificacionRotacion | null;
+  diasCobertura?: number;
+  valorInmovilizado?: number;
+  motivo?: string;
+};
+
+export type RotacionProducto = {
+  idProducto: number;
+  nombre: string;
+  categoria?: string;
+  stock: number;
+  isGramaje: boolean;
+  precioCosto?: number;
+  clasificacion?: ClasificacionRotacion | null;
+  consumoDiario: number;
+  diasCobertura: number;
+  diasSinMovimiento: number;
+  valorInmovilizado: number;
+  coeficienteVariacion: number;
+  estable: boolean;
+  sinMovimiento: boolean;
+  usaFallback: boolean;
+  diasHistorial: number;
 };
 
 const cargando = ref(false);
@@ -36,6 +61,12 @@ const ultimaActualizacion = ref('');
 const totalVentasGranel = ref(0);
 const totalVentasUnitario = ref(0);
 const valorRetenidoSinMov = ref(0);
+const rotacionProductos = ref<RotacionProducto[]>([]);
+const rotacionMeta = ref<{ usaFallback: boolean; diasHistorial: number; diasMinimos: number }>({
+  usaFallback: true,
+  diasHistorial: 0,
+  diasMinimos: 14,
+});
 
 const kpiValorInventario = computed(() => {
   return resumenInventario.value?.costoTotal ?? 0;
@@ -44,6 +75,39 @@ const kpiValorInventario = computed(() => {
 const kpiValorVentaPotencial = computed(() => {
   return resumenInventario.value?.gananciaPot ?? 0;
 });
+
+/* ---------- rotación (motor con bitácora) ---------- */
+
+const hayDatosRotacion = computed(() =>
+  !rotacionMeta.value.usaFallback && rotacionProductos.value.length > 0
+);
+
+const rotacionPorClase = computed(() => {
+  const grupos: Record<ClasificacionRotacion, RotacionProducto[]> = {
+    RAPIDO: [], MEDIO: [], LENTO: [], ATORADO: [],
+  };
+  for (const p of rotacionProductos.value) {
+    const c = p.clasificacion;
+    if (c && grupos[c]) grupos[c].push(p);
+  }
+  return grupos;
+});
+
+const kpiProductosAtorados = computed(() => rotacionPorClase.value.ATORADO.length);
+
+const valorInmovilizadoAtorado = computed(() =>
+  rotacionPorClase.value.ATORADO.reduce((s, p) => s + (p.valorInmovilizado || 0), 0)
+);
+
+const valorInmovilizadoLento = computed(() =>
+  rotacionPorClase.value.LENTO.reduce((s, p) => s + (p.valorInmovilizado || 0), 0)
+);
+
+const topVelocidadVenta = computed(() =>
+  [...rotacionPorClase.value.RAPIDO, ...rotacionPorClase.value.MEDIO]
+    .sort((a, b) => (b.consumoDiario || 0) - (a.consumoDiario || 0))
+    .slice(0, 10)
+);
 
 function formatoMoneda(v: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
@@ -133,11 +197,30 @@ async function cargarAnalytics() {
       cacheSugerido = { ts: now, data: sugerencias };
     }
 
-    const [resumen, productos, categoriasResp] = await Promise.all([
+    const [resumen, productos, categoriasResp, rotacionResp] = await Promise.all([
       fetch(API_BASE + '/productos/resumen').then(r => r.json()).catch(() => ({ datos: null })),
       fetch(API_BASE + '/productos/listarProductos').then(r => r.json()).catch(() => ({ datos: [] })),
-      fetch(API_BASE + '/categorias/listarCategorias').then(r => r.json()).catch(() => ({ datos: [] }))
+      fetch(API_BASE + '/categorias/listarCategorias').then(r => r.json()).catch(() => ({ datos: [] })),
+      fetch(API_BASE + '/inteligencia/rotacion').then(r => r.json()).catch(() => ({ datos: null }))
     ]);
+
+    // --- Motor de rotación (puede no estar disponible si el backend aún no se despliega) ---
+    const datosRotacion = rotacionResp?.datos ?? null;
+    if (datosRotacion && Array.isArray(datosRotacion.productos) && datosRotacion.productos.length > 0) {
+      rotacionProductos.value = datosRotacion.productos as RotacionProducto[];
+      rotacionMeta.value = {
+        usaFallback: !!datosRotacion.usaFallback,
+        diasHistorial: Number(datosRotacion.diasHistorial || 0),
+        diasMinimos: Number(datosRotacion.diasMinimos || 14),
+      };
+    } else {
+      rotacionProductos.value = [];
+      rotacionMeta.value = { usaFallback: true, diasHistorial: 0, diasMinimos: 14 };
+    }
+    const rotacionMap = new Map<number, RotacionProducto>();
+    for (const r of rotacionProductos.value) {
+      if (r && r.idProducto) rotacionMap.set(Number(r.idProducto), r);
+    }
 
     const datosAnual = reporteAnual.datos ?? reporteAnual;
     const datosResumen = resumen.datos ?? resumen;
@@ -218,6 +301,7 @@ async function cargarAnalytics() {
       const diasRestante = s.diasInventarioRestante;
       const ventaDiaria = s.ventasDiariasPromedio || 0;
       const stock = s.stockActual || 0;
+      const rot = rotacionMap.get(sid);
 
       if ((diasRestante === -1 || diasRestante == null) && stock > 0 && sid > 0) {
         noMov.push({
@@ -233,6 +317,10 @@ async function cargarAnalytics() {
           ventaDiaria: 0,
           precioCosto: s.precioCosto || 0,
           precioVenta: s.precioVenta || 0,
+          clasificacion: rot?.clasificacion ?? null,
+          diasCobertura: rot?.diasCobertura,
+          valorInmovilizado: rot?.valorInmovilizado,
+          motivo: s.motivo,
         });
         idProductosVistos.add(sid);
       }
@@ -246,10 +334,14 @@ async function cargarAnalytics() {
           isGramaje: s.isGramaje || false,
           stock,
           ventaDiaria,
-          rotacion: Math.round(stock / ventaDiaria),
+          rotacion: rot?.diasCobertura && rot.diasCobertura >= 0 ? rot.diasCobertura : Math.round(stock / ventaDiaria),
           categoria: s.categoria,
           proveedor: s.nombreProveedor,
           precioCosto: s.precioCosto || 0,
+          clasificacion: rot?.clasificacion ?? null,
+          diasCobertura: rot?.diasCobertura,
+          valorInmovilizado: rot?.valorInmovilizado,
+          motivo: s.motivo,
         });
       }
     }
@@ -268,6 +360,7 @@ async function cargarAnalytics() {
 
         const precioCosto = Number(p.precio_costo || 0);
         const precioVenta = Number(p.precio_venta || 0);
+        const rot = rotacionMap.get(id);
 
         const item: ProductoRank = {
           idProducto: id,
@@ -275,11 +368,14 @@ async function cargarAnalytics() {
           cantidadVendida: 0,
           totalVendido: 0,
           isGramaje: p.is_gramaje || false,
-          diasSinVenta: 999,
+          diasSinVenta: rot?.diasSinMovimiento != null && rot.diasSinMovimiento >= 0 ? rot.diasSinMovimiento : 999,
           stock,
           categoria: categoriaNombre,
           precioCosto: precioCosto,
           precioVenta: precioVenta,
+          clasificacion: rot?.clasificacion ?? null,
+          diasCobertura: rot?.diasCobertura,
+          valorInmovilizado: rot?.valorInmovilizado,
         };
         noMov.push(item);
         idProductosVistos.add(id);
@@ -292,7 +388,10 @@ async function cargarAnalytics() {
     slow.sort((a, b) => (b.rotacion || 0) - (a.rotacion || 0));
     bajaRotacion.value = slow.slice(0, 10);
     sinMovimiento.value = noMovValidos.slice(0, 50);
-    valorRetenidoSinMov.value = noMovValidos.reduce((s, i) => s + (i.stock || 0) * (i.precioCosto || 0), 0);
+    valorRetenidoSinMov.value = noMovValidos.reduce(
+      (s, i) => s + (i.valorInmovilizado ?? (i.stock || 0) * (i.precioCosto || 0)),
+      0
+    );
 
     // --- Productos por validar stock: >30 días sin movimiento (o nunca movidos) y con stock ---
     const validarStock = datosProductos.filter((p: any) => {
@@ -326,6 +425,32 @@ async function cargarAnalytics() {
     if (porValidarStock.value.length > 0) alerts.push({ tipo: 'validar-stock', mensaje: porValidarStock.value.length + ' producto(s) con más de 30 días sin movimiento pero con stock — valida si el stock es real', severidad: 'media' });
     if (sinMovimiento.value.length > 0) alerts.push({ tipo: 'sin-movimiento', mensaje: sinMovimiento.value.length + ' producto(s) sin ventas en más de 30 días — revisa si deben permanecer en catálogo', severidad: 'media' });
     if (slow.length > 0) alerts.push({ tipo: 'baja-rotacion', mensaje: slow.length + ' producto(s) con más de 60 días de inventario — reduce pedidos futuros', severidad: 'media' });
+
+    // Alertas del motor de rotación
+    if (rotacionMeta.value.usaFallback) {
+      alerts.push({
+        tipo: 'motor-aprendiendo',
+        mensaje: 'Motor de rotación en aprendizaje (' + rotacionMeta.value.diasHistorial + '/' + rotacionMeta.value.diasMinimos + ' días de historial) — se usa el cálculo anterior',
+        severidad: 'baja',
+      });
+    } else {
+      const atorados = kpiProductosAtorados.value;
+      if (atorados > 0) {
+        alerts.push({
+          tipo: 'atorados',
+          mensaje: atorados + ' producto(s) atorados con ' + formatoMoneda(valorInmovilizadoAtorado.value) + ' inmovilizado — el pedido sugerido ya no los incluye',
+          severidad: 'media',
+        });
+      }
+      const rapidos = rotacionPorClase.value.RAPIDO.length;
+      if (rapidos > 0) {
+        alerts.push({
+          tipo: 'rotacion-rapida',
+          mensaje: rapidos + ' producto(s) de rotación rápida — asegura su reabasto',
+          severidad: 'baja',
+        });
+      }
+    }
 
     try {
       const prov = await fetch(API_BASE + '/pedidos-proveedor/provision-semanal').then(r => r.json());
@@ -369,5 +494,13 @@ export function useProveedoresInteligencia() {
     kpiValorInventario,
     kpiValorVentaPotencial,
     valorRetenidoSinMov,
+    rotacionProductos,
+    rotacionMeta,
+    hayDatosRotacion,
+    rotacionPorClase,
+    topVelocidadVenta,
+    kpiProductosAtorados,
+    valorInmovilizadoAtorado,
+    valorInmovilizadoLento,
   };
 }

@@ -232,6 +232,10 @@ function formatoVentaDia(s: Sugerencia) {
 
 function getMotivoIcon(motivo: string) {
   if (motivo.includes('Sin stock')) return '💀';
+  if (motivo.includes('Rápido')) return '⚡';
+  if (motivo.includes('Medio')) return '🟡';
+  if (motivo.includes('Lento')) return '🐢';
+  if (motivo.includes('Atorado')) return '🧊';
   if (motivo.includes('mínimo')) return '⚠️';
   return '⏳';
 }

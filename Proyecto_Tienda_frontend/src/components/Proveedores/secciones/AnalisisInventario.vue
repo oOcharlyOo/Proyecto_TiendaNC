@@ -10,7 +10,9 @@ const {
   bajaRotacion, mayorUtilidad, sinMovimiento,
   alertas, resumenInventario, ultimaActualizacion,
   cargarAnalytics, eliminarProducto, eliminarProductosLote, vaciarStock, vaciarStocksLote, formatoMoneda,
-  kpiValorInventario, valorRetenidoSinMov
+  kpiValorInventario, valorRetenidoSinMov,
+  rotacionMeta, hayDatosRotacion, rotacionPorClase, topVelocidadVenta,
+  kpiProductosAtorados, valorInmovilizadoAtorado, valorInmovilizadoLento
 } = useProveedoresInteligencia();
 
 onMounted(() => cargarAnalytics());
@@ -41,6 +43,38 @@ function categoriaItem(item: ProductoRank) {
   const cat = item.categoria;
   if (cat && cat !== '0' && cat !== '' && cat !== 'Sin categoría') return cat;
   return 'Sin categoría';
+}
+
+/* ---------- rotación: helpers de presentación ---------- */
+function rotClass(c?: string | null) {
+  switch (c) {
+    case 'RAPIDO': return 'rot-rapido';
+    case 'MEDIO': return 'rot-medio';
+    case 'LENTO': return 'rot-lento';
+    case 'ATORADO': return 'rot-atorado';
+    default: return '';
+  }
+}
+
+function rotLabel(c?: string | null) {
+  switch (c) {
+    case 'RAPIDO': return '⚡ Rápido';
+    case 'MEDIO': return '🟡 Medio';
+    case 'LENTO': return '🐢 Lento';
+    case 'ATORADO': return '🧊 Atorado';
+    default: return '';
+  }
+}
+
+function coberturaTexto(dias: number) {
+  if (dias == null || dias < 0) return '—';
+  if (dias > 365) return '365+ d';
+  return '~' + dias + ' d';
+}
+
+function diasSinVentaTexto(dias: number) {
+  if (dias == null || dias < 0) return 'Nunca';
+  return dias + ' d';
 }
 
 /* ---------- sin movimiento state ---------- */
@@ -313,6 +347,33 @@ async function ejecutarVaciarLote() {
           </div>
           <span class="info-tip" data-tip="Productos con stock que no se han vendido en más de 30 días. Tienen su valor atorado sin generar ganancia.">?</span>
         </div>
+        <div class="kpi-card" :class="kpiProductosAtorados > 0 ? 'kpi-danger' : ''">
+          <span class="kpi-icon">🧊</span>
+          <div class="kpi-body">
+            <span class="kpi-label">Atorados</span>
+            <span class="kpi-value">{{ hayDatosRotacion ? kpiProductosAtorados : '—' }}</span>
+            <span class="kpi-sub">El sugerido no los pide</span>
+          </div>
+          <span class="info-tip" data-tip="Productos sin ventas en la ventana de rotación (o 30+ días sin salir). El motor de pedidos ya no los sugiere hasta que vuelvan a moverse.">?</span>
+        </div>
+        <div class="kpi-card" :class="valorInmovilizadoAtorado + valorInmovilizadoLento > 0 ? 'kpi-warn' : ''">
+          <span class="kpi-icon">🔒</span>
+          <div class="kpi-body">
+            <span class="kpi-label">Valor inmovilizado</span>
+            <span class="kpi-value">{{ formatoMoneda(valorInmovilizadoAtorado + valorInmovilizadoLento) }}</span>
+            <span class="kpi-sub">Atorados + lentos</span>
+          </div>
+          <span class="info-tip" data-tip="Costo del stock que rota lento o está atorado (stock × precio de costo). Es dinero parado que puedes liberar con promociones o dejando de pedirlo.">?</span>
+        </div>
+      </div>
+
+      <!-- AVISO: motor de rotación en aprendizaje -->
+      <div v-if="rotacionMeta.usaFallback" class="ia-rot-fallback">
+        <span class="ia-rot-fallback-icon">🧪</span>
+        <span>
+          Motor de rotación en aprendizaje: {{ rotacionMeta.diasHistorial }}/{{ rotacionMeta.diasMinimos }} días de historial.
+          Mientras tanto, el pedido sugerido usa el cálculo anterior.
+        </span>
       </div>
 
       <!-- ALERTS -->
@@ -425,7 +486,10 @@ async function ejecutarVaciarLote() {
               <tbody>
                 <tr v-for="(item, i) in bajaRotacion" :key="i">
                   <td class="ia-rank">{{ i + 1 }}</td>
-                  <td class="ia-name">{{ item.nombre }}</td>
+                  <td class="ia-name">
+                    {{ item.nombre }}
+                    <span v-if="item.clasificacion" class="rot-badge" :class="rotClass(item.clasificacion)">{{ rotLabel(item.clasificacion) }}</span>
+                  </td>
                   <td class="ia-num">{{ item.stock }} {{ item.isGramaje ? 'kg' : 'uds' }}</td>
                   <td class="ia-num">{{ (item.ventaDiaria || 0).toFixed(2) }}</td>
                   <td class="ia-num ia-warn">~{{ item.rotacion }} días</td>
@@ -435,6 +499,53 @@ async function ejecutarVaciarLote() {
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- VELOCIDAD DE VENTA (MOTOR DE ROTACIÓN) -->
+      <div class="ia-section" v-if="hayDatosRotacion">
+        <div class="ia-section-header">
+          <h4 class="ia-section-title">⚡ Velocidad de Venta</h4>
+          <span class="info-tip" data-tip="Clasificación calculada a partir del historial real de inventario: cuánto se vende por día (ponderando lo reciente), días de cobertura del stock y días sin vender. Rápido se pide amplio y temprano; medio con cobertura moderada; lento solo si baja del mínimo; atorado no se pide.">?</span>
+        </div>
+        <p class="ia-section-desc">
+          Motor de rotación con {{ rotacionMeta.diasHistorial }} días de historial
+          <span class="rot-legend">
+            <span class="rot-badge rot-rapido">⚡ {{ rotacionPorClase.RAPIDO.length }}</span>
+            <span class="rot-badge rot-medio">🟡 {{ rotacionPorClase.MEDIO.length }}</span>
+            <span class="rot-badge rot-lento">🐢 {{ rotacionPorClase.LENTO.length }}</span>
+            <span class="rot-badge rot-atorado">🧊 {{ rotacionPorClase.ATORADO.length }}</span>
+          </span>
+        </p>
+        <div v-if="topVelocidadVenta.length === 0" class="ia-empty">Sin productos con venta registrada en la ventana</div>
+        <div v-else class="ia-table-wrap">
+          <table class="ia-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th title="Clasificación del motor de rotación">Rotación</th>
+                <th>Venta/día</th>
+                <th title="Días que durará el stock al ritmo actual">Cobertura</th>
+                <th title="Días desde la última venta">Sin venta</th>
+                <th title="Costo del stock actual (stock × precio costo)">Inmovilizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, i) in topVelocidadVenta" :key="item.idProducto">
+                <td class="ia-rank">{{ i + 1 }}</td>
+                <td class="ia-name">{{ item.nombre }}</td>
+                <td><span class="rot-badge" :class="rotClass(item.clasificacion)">{{ rotLabel(item.clasificacion) }}</span></td>
+                <td class="ia-num">{{ (item.consumoDiario || 0).toFixed(2) }} {{ item.isGramaje ? 'kg' : 'uds' }}</td>
+                <td class="ia-num" :class="item.diasCobertura >= 0 && item.diasCobertura <= 7 ? 'ia-warn' : ''">{{ coberturaTexto(item.diasCobertura) }}</td>
+                <td class="ia-num">{{ diasSinVentaTexto(item.diasSinMovimiento) }}</td>
+                <td class="ia-monto">{{ formatoMoneda(item.valorInmovilizado || 0) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ia-section-foot">
+          ⚡ Rápido: pide amplio y temprano · 🟡 Medio: cobertura moderada · 🐢 Lento: solo si baja del mínimo · 🧊 Atorado: no se pide
+        </p>
       </div>
 
       <!-- SIN MOVIMIENTO (FULL WIDTH) -->
@@ -530,6 +641,9 @@ async function ejecutarVaciarLote() {
               <div v-for="(item, i) in entry.items" :key="item.idProducto || i" class="sm-item" :class="{ 'sm-item-pending': pendingDelete.has(item.idProducto!), 'sm-item-vaciando': item.idProducto ? pendingVaciar.has(item.idProducto) : false }">
                 <input type="checkbox" class="sm-item-cb" :checked="item.idProducto ? selectedIds.has(item.idProducto) : false" @change="item.idProducto && toggleSelect(item.idProducto)">
                 <span class="sm-item-name" :title="item.nombre || 'Producto sin nombre'">{{ item.nombre || '(sin nombre)' }}</span>
+                <span v-if="item.clasificacion" class="sm-item-rot">
+                  <span class="rot-badge rot-badge-sm" :class="rotClass(item.clasificacion)">{{ rotLabel(item.clasificacion) }}</span>
+                </span>
                 <span class="sm-item-stock">{{ (item.stock ?? 0) }} {{ item.isGramaje ? 'kg' : 'uds' }}</span>
                 <span class="sm-item-costo">{{ formatoMoneda(item.precioCosto || 0) }}</span>
                 <span class="sm-item-valor sm-item-valor-warn">{{ formatoMoneda(valorItem(item)) }}</span>
@@ -592,7 +706,7 @@ async function ejecutarVaciarLote() {
 .ia-error button{padding:.3rem .6rem;border:none;border-radius:4px;background:var(--color-error);color:#fff;cursor:pointer;font-size:.7rem;font-weight:600;margin-left:auto}
 
 /* ---------- KPI CARDS ---------- */
-.ia-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem}
+.ia-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
 .kpi-card{display:flex;align-items:center;gap:.5rem;padding:.6rem .65rem;background:var(--color-bg-secondary);border:none;border-radius:10px;box-shadow:2px 2px 5px rgba(0,0,0,.06);position:relative}
 .kpi-icon{font-size:1.1rem;flex-shrink:0}
 .kpi-body{display:flex;flex-direction:column;gap:.05rem;flex:1;min-width:0}
@@ -657,6 +771,19 @@ async function ejecutarVaciarLote() {
 .margen-badge.margen-alta{background:rgba(16,185,129,.15);color:#34d399}
 .margen-badge.margen-media{background:rgba(251,191,36,.15);color:#fbbf24}
 .margen-badge.margen-baja{background:rgba(239,68,68,.15);color:#ef4444}
+
+/* ---------- ROTACIÓN: BADGES ---------- */
+.rot-badge{display:inline-block;padding:.05rem .32rem;border-radius:4px;font-weight:700;font-size:.55rem;white-space:nowrap;line-height:1.35}
+.rot-badge.rot-rapido{background:rgba(16,185,129,.16);color:#34d399}
+.rot-badge.rot-medio{background:rgba(251,191,36,.16);color:#fbbf24}
+.rot-badge.rot-lento{background:rgba(249,115,22,.16);color:#fb923c}
+.rot-badge.rot-atorado{background:rgba(239,68,68,.16);color:#ef4444}
+.rot-badge-sm{font-size:.5rem;padding:.02rem .25rem}
+.rot-legend{display:inline-flex;gap:.25rem;margin-left:.4rem;flex-wrap:wrap}
+.ia-section-foot{margin:.35rem 0 0;font-size:.55rem;color:var(--color-text-secondary);line-height:1.5}
+.ia-rot-fallback{display:flex;align-items:center;gap:.45rem;padding:.4rem .6rem;background:color-mix(in srgb,var(--color-info) 10%,transparent);border:1px solid color-mix(in srgb,var(--color-info) 25%,transparent);border-radius:8px;font-size:.62rem;color:var(--color-text-primary)}
+.ia-rot-fallback-icon{font-size:.85rem;flex-shrink:0}
+.sm-item-rot{width:66px;flex-shrink:0;display:flex;justify-content:center}
 
 /* ---------- SIN MOVIMIENTO: TABS ---------- */
 .sm-tabs{display:flex;gap:.25rem;flex-wrap:wrap}
@@ -750,6 +877,7 @@ async function ejecutarVaciarLote() {
   .ia-title{font-size:.85rem}
   .ia-desc{font-size:.58rem;max-width:100%}
   .ia-kpis{grid-template-columns:repeat(2,1fr);gap:.35rem}
+  .sm-item-rot{display:none}
   .kpi-card{padding:.4rem .5rem;gap:.35rem}
   .kpi-icon{font-size:.95rem}
   .kpi-value{font-size:.78rem}
