@@ -1,5 +1,6 @@
 -- Migración 018: el stock de un producto no puede ser negativo
 -- Fecha: 2026-10-23
+-- @idempotente
 -- Descripción:
 --   El stock se descontaba en ventas, ajustes y salidas de ambulante sin tope,
 --   por lo que podía quedar en negativo. La aplicación ahora se detiene en 0 y

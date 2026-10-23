@@ -1,5 +1,6 @@
 -- Migración 017: Bitácora de inventario
 -- Fecha: 2026-10-22
+-- @idempotente
 -- Descripción:
 --   Tabla de auditoría que registra CADA cambio de stock de un producto, con el
 --   tipo de evento (venta, entrada de pedido, ajuste manual, vaciado, voz,

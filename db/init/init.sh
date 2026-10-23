@@ -867,4 +867,14 @@ else
     echo "AVISO: no se encontro /migrations/apply.sh; se omiten las migraciones"
 fi
 
+# Las migraciones marcadas como @idempotente se re-verifican en cada arranque:
+# restaurar un respaldo desde la interfaz reemplaza tablas y puede dejar la base
+# sin columnas o restricciones que las migraciones ya habian agregado.
+if [ -f /migrations/reparar.sh ]; then
+    echo "=== Verificando invariantes de esquema ==="
+    bash /migrations/reparar.sh
+else
+    echo "AVISO: no se encontro /migrations/reparar.sh; se omiten las verificaciones"
+fi
+
 echo "=== Inicializacion completada exitosamente ==="
