@@ -855,4 +855,16 @@ CREATE INDEX IF NOT EXISTS idx_ventas_ambulante ON tiendadb_abarrotera.ventas(es
 
 EOSQL
 
+# ========================================
+# MIGRACIONES (db/migrations)
+# ========================================
+# Se aplican aqui para que un "docker compose up" deje la base al dia,
+# tanto en una instalacion nueva como en una actualizacion con datos.
+if [ -f /migrations/apply.sh ]; then
+    echo "=== Aplicando migraciones de db/migrations ==="
+    bash /migrations/apply.sh
+else
+    echo "AVISO: no se encontro /migrations/apply.sh; se omiten las migraciones"
+fi
+
 echo "=== Inicializacion completada exitosamente ==="

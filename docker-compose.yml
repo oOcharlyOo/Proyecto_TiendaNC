@@ -22,8 +22,12 @@ services:
       - backup-trigger:/trigger
       - ./db/backups:/deployments/db/backups
     depends_on:
-      - database 
-      - minio
+      database:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      minio:
+        condition: service_started
     networks:
       - tienda-red
 
@@ -51,6 +55,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
+      - ./db/migrations:/migrations:ro
     container_name: Dulceria-DB
     ports:
       - "5432:5432" 
@@ -72,6 +77,7 @@ services:
       - POSTGRES_DB=dulcesnc
     volumes:
       - ./db/init:/init:ro
+      - ./db/migrations:/migrations:ro
     entrypoint: ["sh", "-c", "bash /init/init.sh"]
     restart: "no"
     depends_on:
