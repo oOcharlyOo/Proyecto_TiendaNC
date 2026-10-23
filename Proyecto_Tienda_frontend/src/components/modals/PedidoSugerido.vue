@@ -357,7 +357,7 @@ defineExpose({ cargar });
         </template>
         <template v-else>
           <div class="custom-budget">
-            <span class="currency-symbol">$</span>
+            <span class="s-currency-symbol">$</span>
             <input
               v-model="montoCustom"
               @keyup.enter="cargar"
@@ -378,7 +378,7 @@ defineExpose({ cargar });
 
     <!-- SEARCH -->
     <div class="s-search-box">
-      <span class="search-icon">🔍</span>
+      <span class="s-search-icon">🔍</span>
       <input v-model="buscarProducto" placeholder="Buscar producto por nombre..." class="s-search-input">
       <button v-if="buscarProducto" class="s-clear-btn" @click="buscarProducto = ''">✕</button>
     </div>
@@ -391,8 +391,8 @@ defineExpose({ cargar });
 
     <!-- EMPTY -->
     <div v-else-if="sugerencias.length === 0" class="sugerido-empty">
-      <div class="empty-icon">✨</div>
-      <p class="empty-title">Todo en orden</p>
+      <div class="s-empty-icon">✨</div>
+      <p class="s-empty-title">Todo en orden</p>
       <p class="empty-sub">No hay productos que necesiten reabastecimiento</p>
     </div>
 
@@ -430,8 +430,8 @@ defineExpose({ cargar });
       <!-- TOOLBAR: cambio de vista + selección -->
       <div class="sugerido-toolbar">
         <div class="s-view-toggle">
-          <button :class="['view-btn', { active: !vistaAgrupada }]" @click="vistaAgrupada = false">📋 Lista</button>
-          <button :class="['view-btn', { active: vistaAgrupada }]" @click="vistaAgrupada = true">🗂️ Por Proveedor</button>
+          <button :class="['s-view-btn', { active: !vistaAgrupada }]" @click="vistaAgrupada = false">📋 Lista</button>
+          <button :class="['s-view-btn', { active: vistaAgrupada }]" @click="vistaAgrupada = true">🗂️ Por Proveedor</button>
         </div>
         <span class="sel-count">{{ seleccionadas.size }}/{{ sugerenciasFiltradas.length }} seleccionados</span>
         <div class="toolbar-actions">
@@ -811,7 +811,7 @@ defineExpose({ cargar });
   gap: 0.2rem;
 }
 
-.currency-symbol {
+.s-currency-symbol {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-accent);
@@ -893,7 +893,7 @@ defineExpose({ cargar });
   border-radius: 10px;
 }
 
-.search-icon {
+.s-search-icon {
   font-size: 0.85rem;
   opacity: 0.5;
 }
@@ -952,11 +952,11 @@ defineExpose({ cargar });
   gap: 0.5rem;
 }
 
-.empty-icon {
+.s-empty-icon {
   font-size: 2.5rem;
 }
 
-.empty-title {
+.s-empty-title {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
@@ -1452,7 +1452,7 @@ defineExpose({ cargar });
   max-width: 100%;
 }
 
-.view-btn {
+.s-view-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1472,11 +1472,11 @@ defineExpose({ cargar });
   min-width: 0;
 }
 
-.view-btn:hover {
+.s-view-btn:hover {
   color: var(--color-text-primary);
 }
 
-.view-btn.active {
+.s-view-btn.active {
   background: var(--color-accent);
   color: var(--color-on-brand);
 }
@@ -1934,7 +1934,7 @@ defineExpose({ cargar });
     display: flex;
   }
 
-  .view-btn {
+  .s-view-btn {
     flex: 1 1 0;
     justify-content: center;
     font-size: 0.7rem;
