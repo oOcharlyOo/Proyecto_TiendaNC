@@ -1043,6 +1043,13 @@ defineExpose({ cargar });
   padding-right: 0.25rem;
 }
 
+/* La lista es un flex column con altura acotada: sin flex-shrink:0 las
+   tarjetas se encogen para caber todas en el alto disponible y quedan
+   aplastadas (solo se ve la franja del borde) en vez de scrollear. */
+.sugerido-cards > * {
+  flex: 0 0 auto;
+}
+
 .s-card {
   background: var(--color-bg-panel);
   border: 2px solid var(--color-border);
