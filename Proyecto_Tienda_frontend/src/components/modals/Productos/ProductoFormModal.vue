@@ -127,7 +127,7 @@ function setFormFromData() {
   form.value = {
     idProducto: source.idProducto,
     nombre: source.nombre,
-    stock: Number(source.stock || 0),
+    stock: Math.max(0, Number(source.stock || 0)),
     codigoBarras: (source.codigoBarras ?? props.prefillCode?.trim()) || '',
     precio_costo: precioCosto,
     precio_venta: Number(source.precio_venta || 0),
@@ -155,6 +155,10 @@ function setFormFromData() {
 }
 
 function handleSubmit() {
+  // El stock nunca puede ser negativo (el backend también lo rechaza).
+  if (Number(form.value.stock) < 0) {
+    form.value.stock = 0;
+  }
   const presentacionCaja = cajasSeleccionadas.value.join(',');
   const cajas = cajasSeleccionadas.value.map(s => ({
     piezas: s

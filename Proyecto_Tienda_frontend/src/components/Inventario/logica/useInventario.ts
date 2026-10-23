@@ -96,6 +96,7 @@ watch(verPorValidar, () => { verSoloProblemas.value = false; verInactivos.value 
 
 async function guardar(payload: ProductoDTO) {
   if (!payload.nombre.trim()) { mensaje.value = 'Nombre obligatorio.'; return; }
+  if (Number(payload.stock) < 0) { mensaje.value = 'El stock no puede ser negativo.'; return; }
   guardando.value = true;
   try {
     if (payload.idProducto) {
