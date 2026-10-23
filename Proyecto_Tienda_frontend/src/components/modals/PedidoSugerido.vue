@@ -427,17 +427,13 @@ defineExpose({ cargar });
         </div>
       </div>
 
-      <!-- VIEW TOGGLE -->
-      <div class="s-view-toggle">
-        <button :class="['view-btn', { active: !vistaAgrupada }]" @click="vistaAgrupada = false">📋 Lista</button>
-        <button :class="['view-btn', { active: vistaAgrupada }]" @click="vistaAgrupada = true">🗂️ Por Proveedor</button>
-      </div>
-
-      <!-- TOOLBAR -->
+      <!-- TOOLBAR: cambio de vista + selección -->
       <div class="sugerido-toolbar">
-        <div class="toolbar-info">
-          <span class="sel-count">{{ seleccionadas.size }}/{{ sugerenciasFiltradas.length }} seleccionados</span>
+        <div class="s-view-toggle">
+          <button :class="['view-btn', { active: !vistaAgrupada }]" @click="vistaAgrupada = false">📋 Lista</button>
+          <button :class="['view-btn', { active: vistaAgrupada }]" @click="vistaAgrupada = true">🗂️ Por Proveedor</button>
         </div>
+        <span class="sel-count">{{ seleccionadas.size }}/{{ sugerenciasFiltradas.length }} seleccionados</span>
         <div class="toolbar-actions">
           <button class="btn-tool" @click="seleccionarTodas">☑ Todos</button>
           <button class="btn-tool" @click="deseleccionarTodas">☐ Ninguno</button>
@@ -976,24 +972,27 @@ defineExpose({ cargar });
 /* TOOLBAR */
 .sugerido-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.6rem;
   background: var(--color-bg-panel);
   border-radius: 8px;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.5rem 0.75rem;
 }
 
 .sel-count {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 
 .toolbar-actions {
   display: flex;
   gap: 0.4rem;
   align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .btn-tool {
@@ -1440,28 +1439,37 @@ defineExpose({ cargar });
 }
 
 /* VIEW TOGGLE */
+/* TOGGLE DE VISTA */
 .s-view-toggle {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   gap: 0.2rem;
-  background: var(--color-bg-panel);
+  background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.2rem;
-  align-self: flex-start;
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .view-btn {
-  padding: 0.3rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  font-family: inherit;
+  line-height: 1.1;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
-  overflow: hidden;
+  min-width: 0;
 }
 
 .view-btn:hover {
@@ -1470,11 +1478,11 @@ defineExpose({ cargar });
 
 .view-btn.active {
   background: var(--color-accent);
-  color: var(--color-text-primary);
+  color: var(--color-on-brand);
 }
 
 /* GROUPED VIEW */
-.ps-grupos{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto;flex:1;min-height:0;max-height:calc(100vh - 420px);padding-right:.25rem}
+.ps-grupos{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto;flex:1;min-height:0;max-height:100%;padding-right:.25rem}
 .ps-grupo-prov{background:var(--color-bg-panel);border:none;border-radius:10px;overflow:hidden;box-shadow:2px 2px 5px rgba(0,0,0,.06);flex-shrink:0}
 
 .ps-prov-header {
@@ -1639,26 +1647,25 @@ defineExpose({ cargar });
 
   .header-right {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 0.4rem;
   }
 
   .btn-refresh {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     font-size: 0.8rem;
   }
 
   .budget-mode-toggle {
-    order: -2;
-    width: 100%;
-    justify-content: center;
+    order: 0;
+    flex: 0 1 auto;
   }
 
   .custom-budget {
-    flex: 1;
-    min-width: 100px;
+    flex: 1 1 120px;
+    min-width: 0;
   }
 
   .monto-input {
@@ -1666,8 +1673,8 @@ defineExpose({ cargar });
   }
 
   .budget-selector {
-    order: -1;
-    width: 100%;
+    order: 0;
+    flex: 1 1 100%;
     justify-content: center;
   }
 
@@ -1691,15 +1698,11 @@ defineExpose({ cargar });
   }
 
   .sugerido-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     padding: 0.4rem 0.6rem;
   }
 
   .toolbar-actions {
-    width: 100%;
-    justify-content: flex-end;
-    flex-wrap: wrap;
     gap: 0.3rem;
   }
 
@@ -1784,16 +1787,17 @@ defineExpose({ cargar });
   }
 
   .sugerido-toolbar {
-    padding: 0.3rem 0.5rem;
+    padding: 0.35rem 0.5rem;
+    gap: 0.4rem;
   }
 
   .toolbar-actions {
-    width: 100%;
-    justify-content: space-between;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 
   .btn-create {
-    flex: 1;
+    flex: 0 1 auto;
     text-align: center;
   }
 
@@ -1927,13 +1931,14 @@ defineExpose({ cargar });
 
   .s-view-toggle {
     width: 100%;
+    display: flex;
   }
 
   .view-btn {
-    flex: 1;
-    text-align: center;
-    font-size: 0.65rem;
-    padding: 0.25rem 0.4rem;
+    flex: 1 1 0;
+    justify-content: center;
+    font-size: 0.7rem;
+    padding: 0.45rem 0.5rem;
   }
 }
 
