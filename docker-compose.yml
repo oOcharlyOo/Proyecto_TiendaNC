@@ -60,10 +60,13 @@ services:
     ports:
       - "5432:5432" 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d dulcesnc"]
+      # -h 127.0.0.1 obliga a probar TCP: durante la inicializacion el servidor
+      # temporal solo escucha el socket y el healthcheck pasaria antes de tiempo.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U user -d dulcesnc"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 60s
     networks:
       - tienda-red
 
