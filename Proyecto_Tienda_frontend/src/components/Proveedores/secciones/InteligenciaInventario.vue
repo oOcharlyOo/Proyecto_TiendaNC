@@ -18,6 +18,7 @@ const {
   calidad,
   movimientos,
   recomendaciones,
+  salidasEfectivo,
   revisionConStock,
   revisionSinStock,
   revisionInactivos,
@@ -29,6 +30,7 @@ const {
   formatoPorcentaje,
   formatoCantidad,
   formatoPrecioUnitario,
+  formatoDia,
   formatoFecha,
 } = useInteligenciaInventario();
 
@@ -52,6 +54,11 @@ const detalleAbierto = ref<number | null>(null);
 const revisionTab = ref<RevisionTab>('CON_STOCK');
 const guardandoRevision = ref<number | null>(null);
 const mensajeRevision = ref('');
+
+/* Salidas de efectivo */
+const cashSoloRepetidas = ref(false);
+const cashSoloProveedores = ref(false);
+const cashBusqueda = ref('');
 
 /* ------------------------------------------------------------------ */
 /* Derivados                                                          */
@@ -80,12 +87,12 @@ type ClaseCard = {
 const clasificaciones = computed<ClaseCard[]>(() => {
   const r = resumen.value;
   const items: Omit<ClaseCard, 'valor'>[] = [
-    { key: 'RAPIDO', label: 'Rápido', icon: '⚡', count: r.rapidos, tone: 'rapido', definicion: 'Cobertura ≤ 14 días' },
-    { key: 'MEDIO', label: 'Medio', icon: '🟡', count: r.medios, tone: 'medio', definicion: 'Cobertura 15–60 días' },
-    { key: 'LENTO', label: 'Lento', icon: '🐢', count: r.lentos, tone: 'lento', definicion: 'Cobertura > 60 días o 14+ días sin moverse' },
-    { key: 'ATORADO', label: 'Atorado', icon: '🧱', count: r.atorados, tone: 'atorado', definicion: 'Con stock y 30+ días sin moverse' },
+    { key: 'RAPIDO', label: 'Rápido', icon: '⚡', count: r.rapidos, tone: 'rapido', definicion: 'Cobertura ≤ 21 días o top seller' },
+    { key: 'MEDIO', label: 'Medio', icon: '🟡', count: r.medios, tone: 'medio', definicion: 'Cobertura 22–60 días' },
+    { key: 'LENTO', label: 'Lento', icon: '🐢', count: r.lentos, tone: 'lento', definicion: 'Cobertura > 60 días o 45+ días sin moverse' },
+    { key: 'ATORADO', label: 'Atorado', icon: '🧱', count: r.atorados, tone: 'atorado', definicion: 'Con stock y 90+ días sin moverse' },
     { key: 'AGOTADO', label: 'Agotado', icon: '📦', count: r.agotados, tone: 'agotado', definicion: 'Sin stock, pero con ventas' },
-    { key: 'SIN_DATOS', label: 'Sin datos', icon: '❔', count: r.sinDatos, tone: 'sindatos', definicion: 'Historial insuficiente o sin ventas ni stock' },
+    { key: 'SIN_DATOS', label: 'Sin datos', icon: '❔', count: r.sinDatos, tone: 'sindatos', definicion: 'Historial insuficiente o nunca vendido sin stock' },
     { key: 'INACTIVO', label: 'Inactivo', icon: '⏸️', count: r.inactivos, tone: 'inactivo', definicion: 'Producto dado de baja' },
   ];
   return items.map(item => ({
@@ -199,6 +206,35 @@ const revisionFiltrada = computed(() => {
 const pendientesRevision = computed(() =>
   productos.value.filter(p => p.enRevision && p.revisionEstado === 'PENDIENTE').length
 );
+
+/* ------------------------------------------------------------------ */
+/* Salidas de efectivo (bitácora de egresos de caja)                   */
+/* ------------------------------------------------------------------ */
+
+const ETIQUETAS_TIPO_CASH: Record<string, string> = {
+  PROVEEDOR: '🚚 Posible proveedor',
+  SERVICIO: '🧾 Servicio',
+  INSUMO: '🥬 Insumo',
+  PRODUCTO: '🍬 Producto',
+  NOMINA: '👤 Nómina',
+  MOVIMIENTO_INTERNO: '🔁 Movimiento interno',
+  OTRO: 'Otro',
+};
+
+function etiquetaTipoCash(tipo: string): string {
+  return ETIQUETAS_TIPO_CASH[tipo] || tipo;
+}
+
+const salidasFiltradas = computed(() => {
+  const q = cashBusqueda.value.trim().toLowerCase();
+  return salidasEfectivo.value.items.filter(s => {
+    if (cashSoloRepetidas.value && s.ocurrencias < 2) return false;
+    if (cashSoloProveedores.value && !s.posibleProveedor) return false;
+    if (!q) return true;
+    return [s.descripcion, s.clave, s.tipo, ...s.productosRelacionados]
+      .some(v => (v || '').toLowerCase().includes(q));
+  });
+});
 
 const ayudaRevision = computed(() => {
   if (revisionTab.value === 'CON_STOCK') {
@@ -592,6 +628,7 @@ function exportarCsv() {
                     <span :class="['ii-badge', p.clasificacion.toLowerCase()]">
                       {{ labelClasificacion(p.clasificacion) }}
                     </span>
+                    <span v-if="p.topSeller" class="ii-fire" title="Top seller: demanda alta y reciente en la tienda">🔥</span>
                   </td>
                   <td class="ii-col-opt">
                     <span :class="['ii-abc', p.abc.toLowerCase()]">
@@ -867,6 +904,129 @@ function exportarCsv() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ========================================================== -->
+      <!-- SALIDAS DE EFECTIVO                                        -->
+      <!-- ========================================================== -->
+      <section class="ii-card">
+        <header class="ii-card-head">
+          <div>
+            <h4>💵 Salidas de efectivo</h4>
+            <p>
+              Bitácora de egresos de caja (últimos {{ salidasEfectivo.ventanaDias }} días). Las
+              descripciones que se repiten se agrupan: si parecen de un proveedor se marcan,
+              se calcula el día que suelen caer y qué productos se vendieron esos días.
+            </p>
+          </div>
+        </header>
+
+        <div v-if="salidasEfectivo.totalEgresos === 0" class="ii-empty">
+          Todavía no hay egresos de caja registrados en la ventana analizada.
+        </div>
+
+        <template v-else>
+          <div class="ii-cash-chips">
+            <div class="ii-cash-chip">
+              <span class="ii-cash-chip-label">Egresos</span>
+              <strong>{{ salidasEfectivo.totalEgresos }}</strong>
+            </div>
+            <div class="ii-cash-chip">
+              <span class="ii-cash-chip-label">Monto total</span>
+              <strong>{{ formatoMoneda(salidasEfectivo.totalMonto) }}</strong>
+            </div>
+            <div class="ii-cash-chip">
+              <span class="ii-cash-chip-label">Patrones repetidos</span>
+              <strong>{{ salidasEfectivo.descripcionesRepetidas }}</strong>
+            </div>
+            <div class="ii-cash-chip ii-cash-chip-proveedor">
+              <span class="ii-cash-chip-label">Posibles proveedores</span>
+              <strong>{{ salidasEfectivo.posiblesProveedores }}</strong>
+            </div>
+          </div>
+
+          <div class="ii-filters">
+            <input
+              v-model="cashBusqueda"
+              class="ii-search"
+              type="search"
+              placeholder="Buscar descripción, tipo o producto…"
+            />
+            <label class="ii-cash-toggle">
+              <input v-model="cashSoloRepetidas" type="checkbox" /> Solo repetidas
+            </label>
+            <label class="ii-cash-toggle">
+              <input v-model="cashSoloProveedores" type="checkbox" /> Posibles proveedores
+            </label>
+            <button
+              v-if="cashSoloRepetidas || cashSoloProveedores || cashBusqueda"
+              class="ii-btn-ghost"
+              type="button"
+              @click="cashSoloRepetidas = false; cashSoloProveedores = false; cashBusqueda = ''"
+            >
+              Limpiar
+            </button>
+            <span class="ii-count">{{ salidasFiltradas.length }} de {{ salidasEfectivo.items.length }}</span>
+          </div>
+
+          <div v-if="salidasFiltradas.length === 0" class="ii-empty">Ningún egreso coincide con el filtro.</div>
+          <div v-else class="ii-table-wrap ii-cash-table-wrap">
+            <table class="ii-table ii-cash-table">
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th class="num">Veces</th>
+                  <th class="num">Total</th>
+                  <th class="num ii-col-opt">Promedio</th>
+                  <th>Último</th>
+                  <th class="ii-col-opt">Días</th>
+                  <th>Suele caer</th>
+                  <th class="ii-col-opt">Productos ese día</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(s, i) in salidasFiltradas" :key="`${s.clave}-${i}`" class="ii-cash-row">
+                  <td class="ii-prod">
+                    <strong>{{ s.descripcion }}</strong>
+                    <small :class="['ii-cash-tipo', 'tipo-' + s.tipo.toLowerCase()]">
+                      {{ etiquetaTipoCash(s.tipo) }}
+                    </small>
+                  </td>
+                  <td class="num">
+                    <span :class="['ii-cash-ocurrencias', { rep: s.ocurrencias >= 2 }]">{{ s.ocurrencias }}</span>
+                  </td>
+                  <td class="num">{{ formatoMoneda(s.total) }}</td>
+                  <td class="num ii-col-opt">{{ formatoMoneda(s.promedio) }}</td>
+                  <td class="ii-cash-ultimo">
+                    {{ formatoMoneda(s.ultimoMonto) }}
+                    <small>{{ formatoFecha(s.ultimaFecha) }}</small>
+                  </td>
+                  <td class="ii-col-opt">
+                    <span v-for="d in s.diasSemana" :key="d" class="ii-cash-dia">{{ formatoDia(d) }}</span>
+                  </td>
+                  <td class="ii-cash-probable">
+                    <template v-if="s.diaProbable">
+                      <strong>{{ formatoDia(s.diaProbable) }}</strong>
+                      <span class="ii-cash-confianza">{{ formatoNumero(s.confianzaDia, 0) }}%</span>
+                      <small v-if="s.proximaFechaProbable">próximo {{ formatoFecha(s.proximaFechaProbable) }}</small>
+                    </template>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="ii-col-opt ii-cash-prod">
+                    <span v-if="s.productosRelacionados.length === 0">—</span>
+                    <span v-for="pr in s.productosRelacionados" :key="pr" class="ii-cash-pill">{{ pr }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="ii-cash-note">
+            ⚠️ Es una lectura operativa de la caja: sirve para detectar a quién se le paga
+            seguido, qué día suele llegar la mercancía y qué productos se mueven ese mismo
+            día. Confirma con el proveedor antes de ajustar el pedido sugerido.
+          </p>
+        </template>
       </section>
 
       <!-- ========================================================== -->
@@ -1500,8 +1660,12 @@ function exportarCsv() {
 
 .ii-table-wrap {
   width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
+  /* La tabla crece con el número de productos y empujaba el resto del panel
+     fuera de la vista. Con alto máximo y scroll propio se ven ~15 filas y el
+     encabezado queda fijo. El scroll general del panel sigue funcionando. */
+  max-height: min(62vh, 620px);
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 0 0.35rem 0.35rem;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-accent) 45%, transparent) transparent;
@@ -1575,6 +1739,13 @@ function exportarCsv() {
 
 @media (max-width: 900px) {
   .ii-prod small.ii-prod-price { display: block; }
+}
+
+/* Indicador de top seller junto al badge de rotación. */
+.ii-fire {
+  margin-left: 0.2rem;
+  font-size: 0.6rem;
+  vertical-align: middle;
 }
 
 /* Etiqueta de gramaje: deja claro que el stock va en gramos y el precio en kg. */
@@ -1998,6 +2169,145 @@ function exportarCsv() {
 }
 
 /* ================================================================== */
+/* SALIDAS DE EFECTIVO                                                */
+/* ================================================================== */
+
+.ii-cash-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+  padding: 0 0.85rem;
+}
+
+.ii-cash-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-bg-secondary) 70%, transparent);
+}
+
+.ii-cash-chip-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.ii-cash-chip strong {
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+.ii-cash-chip-proveedor strong {
+  color: var(--color-success);
+}
+
+.ii-cash-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ii-cash-toggle input {
+  accent-color: var(--color-accent);
+}
+
+.ii-cash-table {
+  min-width: 720px;
+}
+
+.ii-cash-row td small {
+  display: block;
+  font-size: 0.52rem;
+  color: var(--color-text-muted);
+}
+
+.ii-cash-tipo {
+  font-weight: 600;
+}
+
+.ii-cash-tipo.tipo-proveedor {
+  color: var(--color-success);
+}
+
+.ii-cash-tipo.tipo-servicio,
+.ii-cash-tipo.tipo-movimiento_interno {
+  color: var(--color-info);
+}
+
+.ii-cash-tipo.tipo-insumo,
+.ii-cash-tipo.tipo-producto {
+  color: var(--color-warning);
+}
+
+.ii-cash-ocurrencias {
+  display: inline-block;
+  min-width: 1.6rem;
+  padding: 0.05rem 0.25rem;
+  text-align: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+  font-weight: 700;
+}
+
+.ii-cash-ocurrencias.rep {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+}
+
+.ii-cash-ultimo small {
+  display: block;
+}
+
+.ii-cash-dia {
+  display: inline-block;
+  margin-right: 0.2rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
+  font-size: 0.55rem;
+  font-weight: 600;
+}
+
+.ii-cash-confianza {
+  margin-left: 0.3rem;
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+}
+
+.ii-cash-probable small {
+  display: block;
+  font-size: 0.52rem;
+  color: var(--color-text-muted);
+}
+
+.ii-cash-prod .ii-cash-pill {
+  display: inline-block;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-secondary) 60%, transparent);
+  font-size: 0.55rem;
+  color: var(--color-text-secondary);
+}
+
+.ii-cash-note {
+  margin: 0 0.85rem 0.35rem;
+  font-size: 0.58rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* ================================================================== */
 /* RESPONSIVE                                                         */
 /* ================================================================== */
 
@@ -2012,6 +2322,10 @@ function exportarCsv() {
 
   .ii-table {
     min-width: 620px;
+  }
+
+  .ii-table-wrap {
+    max-height: 55vh;
   }
 
   .ii-review-item {

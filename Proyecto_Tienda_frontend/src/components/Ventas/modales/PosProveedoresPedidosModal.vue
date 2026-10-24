@@ -305,8 +305,13 @@ const emit = defineEmits<{
 .pp-tab-icon,.pp-tab-text{display:inline;vertical-align:middle}
 .pp-tab:hover{color:var(--color-text-primary)}
 .pp-tab.active{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,0.2)}
-.pp-body{flex:1;overflow-y:auto;padding:1rem}
+.pp-body{flex:1;min-height:0;overflow-y:auto;padding:1rem}
 .pp-section{display:flex;flex-direction:column;gap:.75rem}
+/* La inteligencia ya trae su propio scroll de panel en las páginas completas.
+   Dentro del modal el scroll debe ser el del cuerpo (.pp-body) para que se
+   pueda llegar hasta el final; la tabla conserva su scroll interno. */
+.pp-section-sugerido{min-height:0}
+.pp-section-sugerido :deep(.ii-panel){height:auto;overflow:visible}
 .pp-toolbar{display:flex;align-items:center;gap:.5rem}
 .pp-btn-add{padding:.5rem 1rem;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--color-accent),var(--color-accent-hover));color:var(--color-on-brand);font-size:.85rem;font-weight:600;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
 .pp-btn-add:hover{box-shadow:5px 5px 10px rgba(0,0,0,0.2);transform:translateY(-1px)}

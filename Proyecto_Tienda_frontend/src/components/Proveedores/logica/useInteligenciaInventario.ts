@@ -64,6 +64,7 @@ export type ProductoInteligencia = {
   estable: boolean;
   clasificacion: Clasificacion;
   clasificacionLabel: string;
+  topSeller: boolean;
   motivo: string;
   recomendacion: string;
   abc: Abc;
@@ -145,6 +146,34 @@ export type Recomendacion = {
   productos: number;
 };
 
+export type SalidaEfectivo = {
+  descripcion: string;
+  clave: string;
+  ocurrencias: number;
+  total: number;
+  promedio: number;
+  ultimoMonto: number;
+  ultimaFecha?: string | null;
+  diasSemana: string[];
+  diaProbable?: string | null;
+  confianzaDia: number;
+  proximaFechaProbable?: string | null;
+  posibleProveedor: boolean;
+  tipo: string;
+  productosRelacionados: string[];
+  ultimaDescripcion?: string | null;
+};
+
+export type SalidasEfectivo = {
+  ventanaDias: number;
+  totalEgresos: number;
+  totalMonto: number;
+  descripcionesDistintas: number;
+  descripcionesRepetidas: number;
+  posiblesProveedores: number;
+  items: SalidaEfectivo[];
+};
+
 export type InteligenciaInventario = {
   generadoEn: string;
   ventanaDias: number;
@@ -158,6 +187,7 @@ export type InteligenciaInventario = {
   calidad: CalidadItem[];
   movimientos: MovimientoTipo[];
   recomendaciones: Recomendacion[];
+  salidasEfectivo: SalidasEfectivo;
 };
 
 /* ------------------------------------------------------------------ */
@@ -210,12 +240,25 @@ const resumenVacio = (): ResumenInteligencia => ({
   totalEntradas: 0,
 });
 
+const salidasEfectivoVacio = (): SalidasEfectivo => ({
+  ventanaDias: 180,
+  totalEgresos: 0,
+  totalMonto: 0,
+  descripcionesDistintas: 0,
+  descripcionesRepetidas: 0,
+  posiblesProveedores: 0,
+  items: [],
+});
+
 const productos = computed<ProductoInteligencia[]>(() => reporte.value?.productos ?? []);
 const resumen = computed<ResumenInteligencia>(() => reporte.value?.resumen ?? resumenVacio());
 const reglas = computed<Regla[]>(() => reporte.value?.reglas ?? []);
 const calidad = computed<CalidadItem[]>(() => reporte.value?.calidad ?? []);
 const movimientos = computed<MovimientoTipo[]>(() => reporte.value?.movimientos ?? []);
 const recomendaciones = computed<Recomendacion[]>(() => reporte.value?.recomendaciones ?? []);
+const salidasEfectivo = computed<SalidasEfectivo>(() =>
+  reporte.value?.salidasEfectivo ?? salidasEfectivoVacio()
+);
 
 const revisionItems = computed(() => productos.value.filter(p => p.enRevision));
 const revisionConStock = computed(() =>
@@ -380,6 +423,21 @@ function formatoPrecioUnitario(
   return `${formatoMoneda(valor)}/${gramaje ? 'kg' : 'ud'}`;
 }
 
+const DIAS_SEMANA: Record<string, string> = {
+  LUN: 'Lun',
+  MAR: 'Mar',
+  MIE: 'Mié',
+  JUE: 'Jue',
+  VIE: 'Vie',
+  SAB: 'Sáb',
+  DOM: 'Dom',
+};
+
+function formatoDia(valor?: string | null): string {
+  if (!valor) return '—';
+  return DIAS_SEMANA[valor] || valor;
+}
+
 function formatoFecha(valor?: string | null): string {
   if (!valor) return '—';
   const texto = valor.length <= 10 ? `${valor}T00:00:00` : valor;
@@ -409,6 +467,7 @@ export function useInteligenciaInventario() {
     calidad,
     movimientos,
     recomendaciones,
+    salidasEfectivo,
     revisionItems,
     revisionConStock,
     revisionSinStock,
@@ -421,6 +480,7 @@ export function useInteligenciaInventario() {
     formatoPorcentaje,
     formatoCantidad,
     formatoPrecioUnitario,
+    formatoDia,
     formatoFecha,
   };
 }
