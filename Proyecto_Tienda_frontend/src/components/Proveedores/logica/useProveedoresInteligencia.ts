@@ -47,6 +47,48 @@ export type RotacionProducto = {
   diasHistorial: number;
 };
 
+export type EstadoRevision = 'PENDIENTE' | 'EN_REVISION' | 'RESUELTO';
+
+export type MotivoRevision =
+  | 'ESTACIONAL'
+  | 'SIN_DEMANDA'
+  | 'STOCK_FISICO'
+  | 'PROVEEDOR'
+  | 'DESCONTINUADO'
+  | 'OTRO';
+
+export type ItemRevision = {
+  idProducto: number;
+  nombre: string;
+  categoria?: string | null;
+  proveedor?: string | null;
+  estatus: 'A' | 'I';
+  inactivo: boolean;
+  stock: number;
+  gramaje: boolean;
+  /** null = nunca se vendió. */
+  diasSinMovimiento: number | null;
+  ultimaVenta?: string | null;
+  precioCosto?: number;
+  valorInmovilizado?: number;
+  clasificacion?: ClasificacionRotacion | null;
+  sugerencia: string;
+  revisionEstado: EstadoRevision;
+  revisionMotivo?: MotivoRevision | null;
+  revisionNota?: string | null;
+  revisionActualizada?: string | null;
+};
+
+export type RevisionMeta = {
+  diasLimite: number;
+  total: number;
+  conStock: number;
+  sinStock: number;
+  inactivos: number;
+  pendientes: number;
+  valorEnRiesgo: number;
+};
+
 const cargando = ref(false);
 const error = ref('');
 const topVentasGranel = ref<ProductoRank[]>([]);
@@ -67,6 +109,21 @@ const rotacionMeta = ref<{ usaFallback: boolean; diasHistorial: number; diasMini
   diasHistorial: 0,
   diasMinimos: 14,
 });
+
+/* ---------- revisión de inventario (productos con >60 días sin venta) ---------- */
+
+const revisionItems = ref<ItemRevision[]>([]);
+const revisionMeta = ref<RevisionMeta>({
+  diasLimite: 60,
+  total: 0,
+  conStock: 0,
+  sinStock: 0,
+  inactivos: 0,
+  pendientes: 0,
+  valorEnRiesgo: 0,
+});
+const cargandoRevision = ref(false);
+const errorRevision = ref('');
 
 const kpiValorInventario = computed(() => {
   return resumenInventario.value?.costoTotal ?? 0;
@@ -108,6 +165,154 @@ const topVelocidadVenta = computed(() =>
     .sort((a, b) => (b.consumoDiario || 0) - (a.consumoDiario || 0))
     .slice(0, 10)
 );
+
+/* ---------- grupos de la cola de revisión ---------- */
+
+/** Activos con stock: dinero detenido que todavía se puede recuperar. */
+const revisionConStock = computed(() =>
+  revisionItems.value.filter(i => !i.inactivo && (i.stock || 0) > 0)
+);
+
+/**
+ * Activos sin stock. Los inactivos NUNCA entran aquí: tienen su propio grupo
+ * para que la notificación de "productos sin stock" no los muestre.
+ */
+const revisionSinStock = computed(() =>
+  revisionItems.value.filter(i => !i.inactivo && (i.stock || 0) <= 0)
+);
+
+/** Inactivos (con o sin stock), separados del resto. */
+const revisionInactivos = computed(() =>
+  revisionItems.value.filter(i => i.inactivo)
+);
+
+const revisionPendientes = computed(() =>
+  revisionItems.value.filter(i => i.revisionEstado === 'PENDIENTE')
+);
+
+function recalcularRevisionMeta() {
+  const items = revisionItems.value;
+  revisionMeta.value = {
+    ...revisionMeta.value,
+    total: items.length,
+    conStock: revisionConStock.value.length,
+    sinStock: revisionSinStock.value.length,
+    inactivos: revisionInactivos.value.length,
+    pendientes: revisionPendientes.value.length,
+    valorEnRiesgo: items.reduce((s, i) => s + (i.valorInmovilizado || 0), 0),
+  };
+}
+
+function normalizarItemRevision(raw: any): ItemRevision | null {
+  const id = Number(raw?.idProducto);
+  if (!id || isNaN(id) || !raw?.nombre) return null;
+  const estado = String(raw?.revisionEstado || 'PENDIENTE').toUpperCase();
+  return {
+    idProducto: id,
+    nombre: raw.nombre,
+    categoria: raw.categoria ?? null,
+    proveedor: raw.proveedor ?? null,
+    estatus: raw.estatus === 'I' ? 'I' : 'A',
+    inactivo: raw.inactivo === true || raw.estatus === 'I',
+    stock: Math.max(0, Number(raw.stock || 0)),
+    gramaje: raw.gramaje === true,
+    diasSinMovimiento: raw.diasSinMovimiento == null ? null : Number(raw.diasSinMovimiento),
+    ultimaVenta: raw.ultimaVenta ?? null,
+    precioCosto: raw.precioCosto != null ? Number(raw.precioCosto) : 0,
+    valorInmovilizado: raw.valorInmovilizado != null ? Number(raw.valorInmovilizado) : 0,
+    clasificacion: raw.clasificacion ?? null,
+    sugerencia: raw.sugerencia || '',
+    revisionEstado: (['PENDIENTE', 'EN_REVISION', 'RESUELTO'].includes(estado) ? estado : 'PENDIENTE') as EstadoRevision,
+    revisionMotivo: raw.revisionMotivo ?? null,
+    revisionNota: raw.revisionNota ?? null,
+    revisionActualizada: raw.revisionActualizada ?? null,
+  };
+}
+
+function procesarRevision(payload: any) {
+  const items = Array.isArray(payload?.items)
+    ? (payload.items.map(normalizarItemRevision).filter(Boolean) as ItemRevision[])
+    : [];
+  revisionItems.value = items;
+  revisionMeta.value = {
+    diasLimite: Number(payload?.diasLimite || 60),
+    total: Number(payload?.total ?? items.length),
+    conStock: Number(payload?.conStock ?? items.filter(i => !i.inactivo && i.stock > 0).length),
+    sinStock: Number(payload?.sinStock ?? items.filter(i => !i.inactivo && i.stock <= 0).length),
+    inactivos: Number(payload?.inactivos ?? items.filter(i => i.inactivo).length),
+    pendientes: Number(payload?.pendientes ?? items.filter(i => i.revisionEstado === 'PENDIENTE').length),
+    valorEnRiesgo: Number(payload?.valorEnRiesgo || 0),
+  };
+}
+
+async function cargarRevision(dias = 60) {
+  cargandoRevision.value = true;
+  errorRevision.value = '';
+  try {
+    const res = await fetch(`${API_BASE}/inteligencia/revision?dias=${dias}`);
+    const data = await res.json();
+    if (data?.codigo === 200) {
+      procesarRevision(data.datos);
+    } else {
+      revisionItems.value = [];
+      errorRevision.value = data?.mensaje || 'No se pudo cargar la revisión';
+    }
+  } catch (e) {
+    console.error('Error cargando revisión:', e);
+    errorRevision.value = 'Error al cargar la revisión de inventario';
+  } finally {
+    cargandoRevision.value = false;
+  }
+}
+
+async function actualizarRevision(
+  idProducto: number,
+  estado: EstadoRevision,
+  motivo?: MotivoRevision | null,
+  nota?: string | null
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/inteligencia/revision/${idProducto}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado, motivo: motivo ?? null, nota: nota ?? null }),
+    });
+    const data = await res.json();
+    if (data?.codigo !== 200) return false;
+    const item = revisionItems.value.find(i => i.idProducto === idProducto);
+    if (item) {
+      item.revisionEstado = (data.datos?.estado || estado) as EstadoRevision;
+      item.revisionMotivo = data.datos?.motivo ?? motivo ?? null;
+      item.revisionNota = data.datos?.nota ?? nota ?? null;
+      item.revisionActualizada = data.datos?.fechaActualizacion ?? null;
+      recalcularRevisionMeta();
+    }
+    return true;
+  } catch (e) {
+    console.error('Error actualizando revisión:', e);
+    return false;
+  }
+}
+
+async function reiniciarRevision(idProducto: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/inteligencia/revision/${idProducto}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data?.codigo !== 200) return false;
+    const item = revisionItems.value.find(i => i.idProducto === idProducto);
+    if (item) {
+      item.revisionEstado = 'PENDIENTE';
+      item.revisionMotivo = null;
+      item.revisionNota = null;
+      item.revisionActualizada = null;
+      recalcularRevisionMeta();
+    }
+    return true;
+  } catch (e) {
+    console.error('Error reiniciando revisión:', e);
+    return false;
+  }
+}
 
 function formatoMoneda(v: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
@@ -197,12 +402,16 @@ async function cargarAnalytics() {
       cacheSugerido = { ts: now, data: sugerencias };
     }
 
-    const [resumen, productos, categoriasResp, rotacionResp] = await Promise.all([
+    const [resumen, productos, categoriasResp, rotacionResp, revisionResp] = await Promise.all([
       fetch(API_BASE + '/productos/resumen').then(r => r.json()).catch(() => ({ datos: null })),
       fetch(API_BASE + '/productos/listarProductos').then(r => r.json()).catch(() => ({ datos: [] })),
       fetch(API_BASE + '/categorias/listarCategorias').then(r => r.json()).catch(() => ({ datos: [] })),
-      fetch(API_BASE + '/inteligencia/rotacion').then(r => r.json()).catch(() => ({ datos: null }))
+      fetch(API_BASE + '/inteligencia/rotacion').then(r => r.json()).catch(() => ({ datos: null })),
+      fetch(API_BASE + '/inteligencia/revision?dias=60').then(r => r.json()).catch(() => ({ datos: null }))
     ]);
+
+    // --- Cola de revisión (productos con >60 días sin venta) ---
+    procesarRevision(revisionResp?.datos ?? null);
 
     // --- Motor de rotación (puede no estar disponible si el backend aún no se despliega) ---
     const datosRotacion = rotacionResp?.datos ?? null;
@@ -502,5 +711,17 @@ export function useProveedoresInteligencia() {
     kpiProductosAtorados,
     valorInmovilizadoAtorado,
     valorInmovilizadoLento,
+    // Revisión de inventario
+    revisionItems,
+    revisionMeta,
+    cargandoRevision,
+    errorRevision,
+    revisionConStock,
+    revisionSinStock,
+    revisionInactivos,
+    revisionPendientes,
+    cargarRevision,
+    actualizarRevision,
+    reiniciarRevision,
   };
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useProveedoresInteligencia } from '../logica/useProveedoresInteligencia';
-import type { ProductoRank } from '../logica/useProveedoresInteligencia';
+import type { ProductoRank, ItemRevision, EstadoRevision, MotivoRevision } from '../logica/useProveedoresInteligencia';
 
 const {
   cargando, error,
@@ -12,7 +12,10 @@ const {
   cargarAnalytics, eliminarProducto, eliminarProductosLote, vaciarStock, vaciarStocksLote, formatoMoneda,
   kpiValorInventario, valorRetenidoSinMov,
   rotacionMeta, hayDatosRotacion, rotacionPorClase, topVelocidadVenta,
-  kpiProductosAtorados, valorInmovilizadoAtorado, valorInmovilizadoLento
+  kpiProductosAtorados, valorInmovilizadoAtorado, valorInmovilizadoLento,
+  revisionItems, revisionMeta, cargandoRevision, errorRevision,
+  revisionConStock, revisionSinStock, revisionInactivos,
+  cargarRevision, actualizarRevision, reiniciarRevision
 } = useProveedoresInteligencia();
 
 onMounted(() => cargarAnalytics());
@@ -266,6 +269,83 @@ async function ejecutarVaciarLote() {
   const err = fallidos > 0 ? ' ❌ ' + fallidos + ' fallido(s)' : '';
   alert(msg + err);
 }
+
+/* ---------- revisión de inventario (>60 días sin venta) ---------- */
+type FiltroRevision = 'con-stock' | 'sin-stock' | 'inactivos' | 'todos';
+
+const rvFilter = ref<FiltroRevision>('con-stock');
+const rvBusqueda = ref('');
+const rvLimite = ref(60);
+
+const MOTIVOS: { value: MotivoRevision; label: string }[] = [
+  { value: 'ESTACIONAL', label: 'Estacional' },
+  { value: 'SIN_DEMANDA', label: 'Sin demanda' },
+  { value: 'STOCK_FISICO', label: 'Stock físico mal capturado' },
+  { value: 'PROVEEDOR', label: 'Problema con proveedor' },
+  { value: 'DESCONTINUADO', label: 'Descontinuado' },
+  { value: 'OTRO', label: 'Otro' },
+];
+
+const rvBase = computed<ItemRevision[]>(() => {
+  switch (rvFilter.value) {
+    case 'con-stock': return revisionConStock.value;
+    case 'sin-stock': return revisionSinStock.value;
+    case 'inactivos': return revisionInactivos.value;
+    default: return revisionItems.value;
+  }
+});
+
+const rvFiltrados = computed<ItemRevision[]>(() => {
+  const q = rvBusqueda.value.trim().toLowerCase();
+  if (!q) return rvBase.value;
+  return rvBase.value.filter(i =>
+    (i.nombre || '').toLowerCase().includes(q) ||
+    (i.categoria || '').toLowerCase().includes(q) ||
+    (i.proveedor || '').toLowerCase().includes(q) ||
+    (i.sugerencia || '').toLowerCase().includes(q)
+  );
+});
+
+const rvVisibles = computed(() => rvFiltrados.value.slice(0, rvLimite.value));
+const rvHayMas = computed(() => rvFiltrados.value.length > rvLimite.value);
+
+watch([rvFilter, rvBusqueda], () => { rvLimite.value = 60; });
+
+function estadoRevisionLabel(estado: EstadoRevision) {
+  if (estado === 'EN_REVISION') return 'En revisión';
+  if (estado === 'RESUELTO') return 'Resuelto';
+  return 'Pendiente';
+}
+
+function estadoRevisionClass(estado: EstadoRevision) {
+  if (estado === 'EN_REVISION') return 'rv-estado-revision';
+  if (estado === 'RESUELTO') return 'rv-estado-resuelto';
+  return 'rv-estado-pendiente';
+}
+
+function diasRevisionTexto(item: ItemRevision) {
+  if (item.diasSinMovimiento == null) return 'Sin ventas registradas';
+  if (item.diasSinMovimiento <= 0) return 'Vendido hoy';
+  return item.diasSinMovimiento + ' días sin vender';
+}
+
+async function marcarRevision(item: ItemRevision, estado: EstadoRevision) {
+  const ok = await actualizarRevision(item.idProducto, estado, item.revisionMotivo ?? null, item.revisionNota ?? null);
+  if (!ok) alert('No se pudo guardar la revisión de ' + item.nombre);
+}
+
+async function cambiarMotivoRevision(item: ItemRevision, ev: Event) {
+  const value = (ev.target as HTMLSelectElement).value as MotivoRevision | '';
+  item.revisionMotivo = value || null;
+  const ok = await actualizarRevision(item.idProducto, item.revisionEstado, item.revisionMotivo, item.revisionNota ?? null);
+  if (!ok) alert('No se pudo guardar el motivo de ' + item.nombre);
+}
+
+async function reiniciarRevisionItem(item: ItemRevision) {
+  const ok = await reiniciarRevision(item.idProducto);
+  if (!ok) alert('No se pudo reiniciar la revisión de ' + item.nombre);
+}
+
 </script>
 
 <template>
@@ -674,6 +754,94 @@ async function ejecutarVaciarLote() {
         </div>
       </div>
 
+      <!-- REVISIÓN DE INVENTARIO (>60 días sin venta) -->
+      <div class="ia-section ia-section-full rv-section">
+        <div class="ia-section-header">
+          <h4 class="ia-section-title">🔎 Revisión de inventario</h4>
+          <span class="info-tip" data-tip="Productos que llevan más de 60 días sin venderse o que nunca se vendieron. Los inactivos se muestran en su propio grupo y no cuentan como 'sin stock'.">?</span>
+          <button class="rv-refresh" @click="cargarRevision()" :disabled="cargandoRevision" title="Recalcular revisión">
+            <span :class="{ spin: cargandoRevision }">🔄</span>
+          </button>
+        </div>
+        <p class="ia-section-desc">
+          {{ revisionMeta.total }} producto(s) con más de {{ revisionMeta.diasLimite }} días sin venderse
+          <span class="ia-section-highlight">Valor en riesgo: {{ formatoMoneda(revisionMeta.valorEnRiesgo) }}</span>
+        </p>
+
+        <!-- Grupos: con stock / sin stock / inactivos / todos -->
+        <div class="rv-kpis">
+          <button type="button" class="rv-kpi" :class="{ active: rvFilter === 'con-stock' }" @click="rvFilter = 'con-stock'" title="Activos con stock: dinero detenido que todavía puedes recuperar">
+            <span class="rv-kpi-icon">📦</span>
+            <span class="rv-kpi-body"><strong>{{ revisionMeta.conStock }}</strong><small>Con stock</small></span>
+          </button>
+          <button type="button" class="rv-kpi" :class="{ active: rvFilter === 'sin-stock' }" @click="rvFilter = 'sin-stock'" title="Activos sin stock: no reponer hasta validar la demanda">
+            <span class="rv-kpi-icon">🚫</span>
+            <span class="rv-kpi-body"><strong>{{ revisionMeta.sinStock }}</strong><small>Sin stock</small></span>
+          </button>
+          <button type="button" class="rv-kpi rv-kpi-inactivo" :class="{ active: rvFilter === 'inactivos' }" @click="rvFilter = 'inactivos'" title="Productos inactivos: se muestran aparte y no entran en la notificación de sin stock">
+            <span class="rv-kpi-icon">🗄️</span>
+            <span class="rv-kpi-body"><strong>{{ revisionMeta.inactivos }}</strong><small>Inactivos</small></span>
+          </button>
+          <button type="button" class="rv-kpi" :class="{ active: rvFilter === 'todos' }" @click="rvFilter = 'todos'" title="Todos los productos en revisión">
+            <span class="rv-kpi-icon">📋</span>
+            <span class="rv-kpi-body"><strong>{{ revisionMeta.total }}</strong><small>Todos</small></span>
+          </button>
+        </div>
+
+        <div class="rv-toolbar">
+          <input v-model="rvBusqueda" class="rv-search" type="search" placeholder="Buscar producto, categoría o proveedor…" />
+          <span class="rv-count">{{ rvFiltrados.length }} de {{ rvBase.length }} · {{ revisionMeta.pendientes }} pendiente(s)</span>
+        </div>
+
+        <div v-if="errorRevision" class="ia-error">
+          <span>⚠️ {{ errorRevision }}</span>
+          <button @click="cargarRevision()">Reintentar</button>
+        </div>
+        <div v-else-if="cargandoRevision && revisionItems.length === 0" class="ia-empty">Cargando revisión…</div>
+        <div v-else-if="rvFiltrados.length === 0" class="ia-empty">
+          No hay productos en este grupo 🎉
+        </div>
+        <div v-else class="rv-list">
+          <div v-for="item in rvVisibles" :key="item.idProducto" class="rv-item" :class="{ 'rv-item-inactivo': item.inactivo }">
+            <div class="rv-item-main">
+              <div class="rv-item-title">
+                <span class="rv-name" :title="item.nombre">{{ item.nombre }}</span>
+                <span v-if="item.inactivo" class="rv-badge-inactivo">INACTIVO</span>
+                <span v-if="item.clasificacion" class="rot-badge rot-badge-sm" :class="rotClass(item.clasificacion)">{{ rotLabel(item.clasificacion) }}</span>
+                <span class="rv-estado" :class="estadoRevisionClass(item.revisionEstado)">{{ estadoRevisionLabel(item.revisionEstado) }}</span>
+              </div>
+              <div class="rv-item-meta">
+                <span v-if="item.categoria">📁 {{ item.categoria }}</span>
+                <span v-if="item.proveedor">🚚 {{ item.proveedor }}</span>
+                <span class="rv-dias">{{ diasRevisionTexto(item) }}</span>
+                <span v-if="item.ultimaVenta">Última venta: {{ item.ultimaVenta }}</span>
+              </div>
+              <div class="rv-sugerencia">💡 {{ item.sugerencia }}</div>
+            </div>
+            <div class="rv-item-nums">
+              <span class="rv-stock">{{ item.stock }} {{ item.gramaje ? 'kg' : 'uds' }}</span>
+              <span class="rv-valor">{{ formatoMoneda(item.valorInmovilizado || 0) }}</span>
+            </div>
+            <div class="rv-item-actions">
+              <select class="rv-select" :value="item.revisionMotivo || ''" @change="cambiarMotivoRevision(item, $event)" title="Motivo de la revisión">
+                <option value="">Motivo…</option>
+                <option v-for="m in MOTIVOS" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <button type="button" class="rv-btn rv-btn-revision" @click="marcarRevision(item, 'EN_REVISION')" title="Marcar en revisión">🔍 Revisar</button>
+              <button type="button" class="rv-btn rv-btn-resuelto" @click="marcarRevision(item, 'RESUELTO')" title="Marcar como resuelto">✅ Resuelto</button>
+              <button v-if="item.revisionEstado !== 'PENDIENTE'" type="button" class="rv-btn rv-btn-reset" @click="reiniciarRevisionItem(item)" title="Volver a pendiente">↩️</button>
+            </div>
+          </div>
+          <button v-if="rvHayMas" type="button" class="rv-more" @click="rvLimite += 60">
+            Ver {{ rvFiltrados.length - rvVisibles.length }} más
+          </button>
+        </div>
+        <p class="ia-section-foot">
+          Los inactivos se muestran en su propio grupo y nunca se cuentan como “sin stock”.
+          El pedido sugerido tampoco los repone.
+        </p>
+      </div>
+
       <!-- EMPTY STATE cuando todo esta bien -->
       <div v-if="!cargando && topVentasGranel.length === 0 && topVentasUnitarios.length === 0 && sinMovimiento.length === 0 && bajaRotacion.length === 0 && mayorUtilidad.length === 0" class="ia-empty-full">
         <div class="empty-icon">✅</div>
@@ -862,10 +1030,59 @@ async function ejecutarVaciarLote() {
 .sm-item-vaciar{background:none;border:none;cursor:pointer;font-size:.75rem;padding:.1rem;opacity:.4;transition:all .15s;border-radius:3px;line-height:1}
 .sm-item-vaciar:hover{opacity:1;background:color-mix(in srgb,var(--color-info) 15%,transparent)}
 
+/* ---------- REVISIÓN DE INVENTARIO ---------- */
+.rv-section{border-left:3px solid color-mix(in srgb,var(--color-warning) 55%,transparent)}
+.rv-refresh{margin-left:auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:6px;cursor:pointer;font-size:.75rem;transition:all .15s;flex-shrink:0;color:var(--color-text-primary)}
+.rv-refresh:hover:not(:disabled){border-color:var(--color-accent)}
+.rv-refresh:disabled{opacity:.4;cursor:default}
+.rv-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem}
+.rv-kpi{display:flex;align-items:center;gap:.4rem;padding:.4rem .5rem;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:8px;cursor:pointer;text-align:left;transition:all .15s;color:var(--color-text-primary);font-family:inherit}
+.rv-kpi:hover{border-color:var(--color-accent)}
+.rv-kpi.active{border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 12%,transparent)}
+.rv-kpi-icon{font-size:.95rem;flex-shrink:0;line-height:1}
+.rv-kpi-body{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.rv-kpi-body strong{font-size:.85rem;font-weight:800}
+.rv-kpi-body small{font-size:.52rem;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600;white-space:nowrap}
+.rv-kpi-inactivo.active{border-color:#a855f7;background:color-mix(in srgb,#a855f7 12%,transparent)}
+.rv-toolbar{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.rv-search{flex:1;min-width:150px;padding:.32rem .5rem;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text-primary);font-size:.65rem;font-family:inherit}
+.rv-search:focus{outline:none;border-color:var(--color-accent)}
+.rv-count{font-size:.58rem;color:var(--color-text-secondary);font-weight:600;white-space:nowrap}
+.rv-list{display:flex;flex-direction:column;gap:.3rem;max-height:520px;overflow-y:auto;overflow-x:hidden;padding-right:.15rem}
+.rv-item{display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;background:var(--color-bg-primary);border:1px solid color-mix(in srgb,var(--color-border) 60%,transparent);border-left:3px solid color-mix(in srgb,var(--color-warning) 60%,transparent);border-radius:7px}
+.rv-item-inactivo{border-left-color:#a855f7;opacity:.92}
+.rv-item-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:.12rem}
+.rv-item-title{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;min-width:0}
+.rv-name{font-size:.68rem;font-weight:700;color:var(--color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.rv-badge-inactivo{font-size:.48rem;font-weight:800;letter-spacing:.03em;padding:.05rem .3rem;border-radius:3px;background:color-mix(in srgb,#a855f7 18%,transparent);color:#c084fc;border:1px solid color-mix(in srgb,#a855f7 40%,transparent);white-space:nowrap}
+.rv-estado{font-size:.5rem;font-weight:700;padding:.05rem .3rem;border-radius:3px;white-space:nowrap}
+.rv-estado-pendiente{background:color-mix(in srgb,var(--color-warning) 15%,transparent);color:var(--color-warning)}
+.rv-estado-revision{background:color-mix(in srgb,var(--color-info) 15%,transparent);color:var(--color-info)}
+.rv-estado-resuelto{background:color-mix(in srgb,var(--color-success) 15%,transparent);color:var(--color-success)}
+.rv-item-meta{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;font-size:.55rem;color:var(--color-text-secondary)}
+.rv-dias{font-weight:700;color:var(--color-warning)}
+.rv-sugerencia{font-size:.56rem;color:var(--color-text-primary);opacity:.85;line-height:1.3}
+.rv-item-nums{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;flex-shrink:0;min-width:70px}
+.rv-stock{font-family:monospace;font-weight:700;font-size:.62rem;color:var(--color-text-primary)}
+.rv-valor{font-family:monospace;font-weight:700;font-size:.6rem;color:var(--color-warning)}
+.rv-item-actions{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;flex-shrink:0}
+.rv-select{padding:.22rem .3rem;background:var(--color-bg-secondary);border:1px solid var(--color-border);border-radius:5px;color:var(--color-text-primary);font-size:.56rem;max-width:130px;font-family:inherit;cursor:pointer}
+.rv-select:focus{outline:none;border-color:var(--color-accent)}
+.rv-btn{padding:.22rem .4rem;border:none;border-radius:5px;font-size:.56rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;line-height:1.2}
+.rv-btn-revision{background:color-mix(in srgb,var(--color-info) 15%,transparent);color:var(--color-info)}
+.rv-btn-revision:hover{background:color-mix(in srgb,var(--color-info) 28%,transparent)}
+.rv-btn-resuelto{background:color-mix(in srgb,var(--color-success) 15%,transparent);color:var(--color-success)}
+.rv-btn-resuelto:hover{background:color-mix(in srgb,var(--color-success) 28%,transparent)}
+.rv-btn-reset{background:color-mix(in srgb,var(--color-text-secondary) 12%,transparent);color:var(--color-text-secondary)}
+.rv-btn-reset:hover{background:color-mix(in srgb,var(--color-text-secondary) 24%,transparent)}
+.rv-more{align-self:center;margin-top:.2rem;padding:.3rem .6rem;border:1px dashed var(--color-border);border-radius:6px;background:transparent;color:var(--color-accent);font-size:.6rem;font-weight:700;cursor:pointer;font-family:inherit}
+.rv-more:hover{border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 6%,transparent)}
+
 /* ---------- RESPONSIVE: TABLET (1024px) ---------- */
 @media(max-width:1024px){
   .ia-kpis{grid-template-columns:repeat(3,1fr)}
   .ia-desc{font-size:.62rem}
+  .rv-kpis{grid-template-columns:repeat(2,1fr)}
 }
 
 /* ---------- RESPONSIVE: SMALL TABLET (768px) ---------- */
@@ -911,6 +1128,13 @@ async function ejecutarVaciarLote() {
   .sm-bar-selectall{font-size:.55rem}
   .sm-bar-info{font-size:.52rem}
   .sm-btn{font-size:.55rem;padding:.2rem .4rem}
+
+  /* Revisión de inventario */
+  .rv-item{flex-wrap:wrap;gap:.35rem}
+  .rv-item-main{min-width:calc(100% - 80px)}
+  .rv-item-nums{flex-direction:row;align-items:center;gap:.5rem;min-width:0}
+  .rv-item-actions{width:100%;justify-content:flex-end}
+  .rv-list{max-height:420px}
 }
 
 /* ---------- RESPONSIVE: MOBILE (480px) ---------- */
@@ -987,6 +1211,24 @@ async function ejecutarVaciarLote() {
   .ia-alert-tag{order:2;margin-left:auto}
   .ia-alert-icon{order:0}
   .info-tip::after{width:160px;font-size:9px;right:-8px;left:auto;transform:none}
+
+  /* Revisión de inventario */
+  .rv-kpis{grid-template-columns:1fr 1fr;gap:.25rem}
+  .rv-kpi{padding:.3rem .35rem;gap:.25rem}
+  .rv-kpi-icon{font-size:.8rem}
+  .rv-kpi-body strong{font-size:.7rem}
+  .rv-kpi-body small{font-size:.45rem}
+  .rv-toolbar{gap:.25rem}
+  .rv-search{font-size:.55rem;min-width:120px}
+  .rv-count{font-size:.5rem}
+  .rv-list{max-height:360px}
+  .rv-item{padding:.3rem .35rem}
+  .rv-name{font-size:.6rem}
+  .rv-item-meta{font-size:.5rem;gap:.3rem}
+  .rv-sugerencia{font-size:.52rem}
+  .rv-select{max-width:110px;font-size:.52rem}
+  .rv-btn{font-size:.52rem;padding:.2rem .35rem}
+  .rv-item-actions{justify-content:flex-start}
 }
 
 /* ---------- RESPONSIVE: TINY MOBILE (360px) ---------- */
@@ -1014,5 +1256,13 @@ async function ejecutarVaciarLote() {
   .ia-grid > .ia-section:nth-child(4) .ia-table td:nth-child(4) { display:none }
 
   .info-tip::after{width:140px;font-size:8px;right:-4px}
+
+  /* Revisión de inventario */
+  .rv-kpi-body small{font-size:.42rem}
+  .rv-name{font-size:.55rem}
+  .rv-item-meta{font-size:.46rem}
+  .rv-sugerencia{font-size:.48rem}
+  .rv-select{max-width:95px}
+  .rv-btn{font-size:.48rem;padding:.18rem .3rem}
 }
 </style>
