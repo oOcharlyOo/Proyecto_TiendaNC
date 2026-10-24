@@ -282,10 +282,13 @@ async function crearPedidoPorProveedor(idProveedor: number, nombreProveedor: str
     idProducto: s.idProducto,
     cantidad: s.cantidadSugerida,
     precioUnitario: s.precioCosto,
-    subtotal: s.precioCosto * s.cantidadSugerida
+    // Gramaje: cantidad son gramos y precioCosto es por kg.
+    subtotal: s.isGramaje
+      ? Math.round(s.precioCosto * s.cantidadSugerida) / 1000
+      : s.precioCosto * s.cantidadSugerida
   }));
 
-  const montoTotal = detalles.reduce((sum, d) => sum + d.subtotal, 0);
+  const montoTotal = Math.round(detalles.reduce((sum, d) => sum + d.subtotal, 0) * 100) / 100;
 
   try {
     const res = await fetch(`${API_BASE}/pedidos-proveedor/crear`, {

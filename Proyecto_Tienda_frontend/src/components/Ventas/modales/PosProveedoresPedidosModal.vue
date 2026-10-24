@@ -201,12 +201,12 @@
                       class="pp-dropdown-item"
                       @click="emit('select-producto-pedido', prod)"
                     >
-                      <span class="pp-dropdown-name">{{ prod.nombre }}</span>
-                      <span class="pp-dropdown-price">{{ formatoMoneda(prod.precio_costo) }}</span>
+                      <span class="pp-dropdown-name">{{ prod.nombre }}<template v-if="prod.isGramaje"> <span class="pp-gram">⚖️ g</span></template></span>
+                      <span class="pp-dropdown-price">{{ formatoMoneda(prod.precio_costo) }}{{ prod.isGramaje ? '/kg' : '' }}</span>
                     </div>
                   </div>
                 </div>
-                <input :value="newDetallePedido.cantidad" @input="emit('update:newDetallePedido', { ...newDetallePedido, cantidad: Number(($event.target as HTMLInputElement).value) })" type="number" min="1" placeholder="Cant" class="pp-input pp-qty" />
+                <input :value="newDetallePedido.cantidad" @input="emit('update:newDetallePedido', { ...newDetallePedido, cantidad: Number(($event.target as HTMLInputElement).value) })" type="number" min="1" :placeholder="newDetallePedido.isGramaje ? 'Gramos' : 'Cant'" class="pp-input pp-qty" />
                 <input :value="newDetallePedido.precioUnitario" @input="emit('update:newDetallePedido', { ...newDetallePedido, precioUnitario: Number(($event.target as HTMLInputElement).value) })" type="number" step="0.01" min="0" placeholder="$" class="pp-input pp-price" />
                 <button class="pp-btn-add-prod" @click="emit('add-detalle-pedido')">+</button>
               </div>
@@ -364,6 +364,7 @@ const emit = defineEmits<{
 .pp-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--color-bg-panel);border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,0.3);max-height:200px;overflow-y:auto;z-index:10}
 .pp-dropdown-item{padding:.5rem .75rem;cursor:pointer;font-size:.85rem;color:var(--color-text-primary)}
 .pp-dropdown-item:hover{background:color-mix(in srgb,var(--color-accent) 10%,transparent)}
+.pp-gram{font-size:.6rem;color:var(--color-info);font-weight:700}
 .pp-qty,.pp-price{width:70px}
 .pp-detalle-row{display:flex;align-items:center;gap:.5rem;padding:.4rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);margin-bottom:.3rem;font-size:.85rem}
 .pp-detalle-name{flex:1}

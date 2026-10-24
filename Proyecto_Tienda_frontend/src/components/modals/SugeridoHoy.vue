@@ -38,6 +38,7 @@ type Sugerencia = {
   ahorroEstimado?: number;
   sugerirCaja?: boolean;
   diasStockConCaja?: number;
+  cajaEstimada?: boolean;
 };
 
 type SugeridoHoy = {
@@ -57,6 +58,9 @@ type SugeridoHoy = {
   presupuestoDisponible: number;
   sugeridoExcedePresupuesto: boolean;
   presupuestoAjustado: boolean;
+  origenSaldo?: string;
+  presupuestoConocido?: boolean;
+  omitidosPresupuesto?: string[];
 };
 
 const grupos = ref<SugeridoHoy[]>([]);
@@ -72,7 +76,10 @@ async function cargar() {
   cargando.value = true;
   buscarProducto.value = '';
   try {
-    const res = await fetch(`${API_BASE}/pedidos-proveedor/sugerido-hoy`);
+    // En modo reportes no hay caja abierta: el backend debe tomar el último
+    // cierre (el dinero real) y no un monto inicial de fantasía.
+    const modo = localStorage.getItem('modoReportes') === 'true' ? 'reportes' : 'normal';
+    const res = await fetch(`${API_BASE}/pedidos-proveedor/sugerido-hoy?modo=${modo}`);
     const data = await res.json();
     if (data.codigo === 200 && data.datos) {
       grupos.value = data.datos;
@@ -166,6 +173,27 @@ const infoCaja = computed(() => {
   return grupos.value[0];
 });
 
+// Cuanto queda del presupuesto tras lo seleccionado. Si el saldo no se pudo
+// determinar, no hay limite que mostrar.
+const presupuestoRestante = computed(() => {
+  const caja = infoCaja.value;
+  if (!caja || caja.presupuestoConocido === false) return Number.POSITIVE_INFINITY;
+  return (caja.presupuestoDisponible || 0) - totalSeleccionado.value;
+});
+
+const excedePresupuestoSeleccion = computed(() => {
+  const caja = infoCaja.value;
+  return !!caja && caja.presupuestoConocido !== false && presupuestoRestante.value < 0;
+});
+
+const etiquetaSaldo = computed(() => {
+  switch (infoCaja.value?.origenSaldo) {
+    case 'CIERRE_ANTERIOR': return '🌙 Cierre del dia anterior:';
+    case 'DESCONOCIDO': return '💰 Saldo en caja:';
+    default: return '💰 Saldo del turno:';
+  }
+});
+
 function formatoMoneda(v: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
 }
@@ -240,10 +268,13 @@ async function crearPedidoPorGrupo(grupo: SugeridoHoy) {
     idProducto: s.idProducto,
     cantidad: s.cantidadSugerida,
     precioUnitario: s.precioCosto,
-    subtotal: s.precioCosto * s.cantidadSugerida
+    // Gramaje: cantidad son gramos y precioCosto es por kg.
+    subtotal: s.isGramaje
+      ? Math.round(s.precioCosto * s.cantidadSugerida) / 1000
+      : s.precioCosto * s.cantidadSugerida
   }));
 
-  const montoTotal = detalles.reduce((sum, d) => sum + d.subtotal, 0);
+  const montoTotal = Math.round(detalles.reduce((sum, d) => sum + d.subtotal, 0) * 100) / 100;
 
   const notasPartes = [`Pedido sugerido para ${grupo.diaEntrega}`];
   if (grupo.diasPedido) notasPartes.push(`Días pedido: ${grupo.diasPedido}`);
@@ -329,23 +360,29 @@ defineExpose({ cargar });
         <span class="total-label">Total estimado:</span>
         <span class="total-value">{{ formatoMoneda(totalSeleccionado) }}</span>
         <span class="total-ganancia">Ganancia: {{ formatoMoneda(gananciaSeleccionada) }}</span>
+        <span v-if="infoCaja && infoCaja.presupuestoConocido" class="total-restante" :class="{ 'negativo': presupuestoRestante < 0 }">
+          Quedan: {{ formatoMoneda(presupuestoRestante) }}
+        </span>
       </div>
 
-      <div v-if="infoCaja" class="sh-caja-bar" :class="{ 'excede': infoCaja.sugeridoExcedePresupuesto, 'ajustado': infoCaja.presupuestoAjustado }">
+      <div v-if="infoCaja" class="sh-caja-bar" :class="{ 'excede': infoCaja.sugeridoExcedePresupuesto, 'ajustado': infoCaja.presupuestoAjustado, 'desconocido': infoCaja.presupuestoConocido === false }">
         <div class="caja-bar-row">
-          <span class="caja-bar-label">💰 Saldo en caja:</span>
-          <span class="caja-bar-value">{{ formatoMoneda(infoCaja.saldoCajaActual) }}</span>
+          <span class="caja-bar-label">{{ etiquetaSaldo }}</span>
+          <span class="caja-bar-value">{{ infoCaja.presupuestoConocido === false ? 'No determinada' : formatoMoneda(infoCaja.saldoCajaActual) }}</span>
         </div>
         <div class="caja-bar-row">
-          <span class="caja-bar-label">📦 Pedidos por entregar hoy:</span>
+          <span class="caja-bar-label">📦 Pedidos por pagar (hoy y vencidos):</span>
           <span class="caja-bar-value egreso">-{{ formatoMoneda(infoCaja.totalPedidosEntregarHoy) }}</span>
         </div>
         <div class="caja-bar-row">
           <span class="caja-bar-label">🎯 Presupuesto disponible:</span>
-          <span class="caja-bar-value" :class="{ 'negativo': infoCaja.presupuestoDisponible < 0 }">{{ formatoMoneda(infoCaja.presupuestoDisponible) }}</span>
+          <span class="caja-bar-value" :class="{ 'negativo': infoCaja.presupuestoDisponible < 0 }">{{ infoCaja.presupuestoConocido === false ? '—' : formatoMoneda(infoCaja.presupuestoDisponible) }}</span>
         </div>
-        <div v-if="infoCaja.presupuestoAjustado" class="caja-bar-info">
-          ✂️ Cantidades ajustadas automáticamente al presupuesto disponible
+        <div v-if="infoCaja.presupuestoConocido === false" class="caja-bar-info">
+          ❓ No se pudo determinar el efectivo de caja (ni turno abierto ni cierres). El sugerido no se limitó por presupuesto.
+        </div>
+        <div v-else-if="infoCaja.presupuestoAjustado" class="caja-bar-info">
+          ✂️ Ajustado al presupuesto: se completaron/recortaron cajas completas y se omitieron los productos que no cupieron.
         </div>
         <div v-else-if="infoCaja.sugeridoExcedePresupuesto" class="caja-bar-alerta">
           ⚠️ No hay presupuesto disponible. Revisa la caja antes de crear pedidos.
@@ -377,7 +414,7 @@ defineExpose({ cargar });
             </div>
             <div class="sh-grupo-totals">
               <span class="grupo-costo">{{ formatoMoneda(grupo.costoTotal) }}</span>
-              <button class="btn-crear-pedido" @click.stop="crearPedidoPorGrupo(grupo)" :disabled="!grupo.productos.some(p => seleccionados.has(p.idProducto))">
+              <button class="btn-crear-pedido" @click.stop="crearPedidoPorGrupo(grupo)" :disabled="!grupo.productos.some(p => seleccionados.has(p.idProducto)) || excedePresupuestoSeleccion">
                 🛒 Crear Pedido
               </button>
             </div>
@@ -406,7 +443,7 @@ defineExpose({ cargar });
                 </div>
                 <div v-if="p.sugerirCaja && p.cajaSugerida" class="sh-caja-badge">
                   <span class="caja-icon">📦</span>
-                  <span class="caja-text">Sugerido: Caja de {{ p.cajaSugerida }} pzs × {{ p.cajasSugeridas }} = {{ p.cantidadSugerida }} pzs</span>
+                  <span class="caja-text">Sugerido: Caja de {{ p.cajaSugerida }} pzs × {{ p.cajasSugeridas }} = {{ p.cantidadSugerida }} pzs<span v-if="p.cajaEstimada" class="caja-estimada">(estimada por tus compras)</span></span>
                   <span v-if="p.ahorroEstimado && p.ahorroEstimado > 0" class="caja-ahorro">Ahorro: {{ formatoMoneda(p.ahorroEstimado) }}</span>
                   <span v-if="p.diasStockConCaja" class="caja-dias">Duración: ~{{ p.diasStockConCaja }}d</span>
                 </div>
@@ -439,6 +476,10 @@ defineExpose({ cargar });
             <div v-if="filteredProductos(grupo).length === 0" class="sh-no-results">
               No se encontraron productos
             </div>
+          </div>
+
+          <div v-if="grupo.omitidosPresupuesto && grupo.omitidosPresupuesto.length > 0" class="sh-omitidos">
+            💸 Sin presupuesto disponible para: {{ grupo.omitidosPresupuesto.join(', ') }}
           </div>
         </div>
       </div>
@@ -473,6 +514,10 @@ defineExpose({ cargar });
 .sh-productos{display:flex;flex-direction:column;gap:.25rem;padding:.25rem .75rem .6rem}.sh-producto{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:var(--color-bg-primary);border:none;border-radius:8px;cursor:pointer;transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,.05)}.sh-producto:hover{transform:translateY(-1px);box-shadow:4px 4px 8px rgba(0,0,0,.1)}.sh-producto.selected{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 2px var(--color-accent)}.sh-producto.urgencia-alta{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-error) 30%,transparent)}.sh-producto.urgencia-media{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-warning) 30%,transparent)}.sh-producto.urgencia-baja{box-shadow:2px 2px 4px rgba(0,0,0,.05),0 0 0 1px color-mix(in srgb,var(--color-success) 20%,transparent)}.sh-prod-check{width:20px;height:20px;border:none;border-radius:4px;background:var(--color-bg-secondary);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 1px 1px 2px rgba(0,0,0,.1)}.check-mark{font-size:.7rem;color:var(--color-accent);font-weight:900}.sh-prod-info{flex:1;min-width:0}.sh-prod-name{font-size:.75rem;font-weight:700;color:var(--color-text-primary)}.sh-prod-stats{display:flex;gap:.6rem;margin-top:.15rem;font-size:.6rem;color:var(--color-text-secondary)}.sh-prod-stats strong{color:var(--color-text-primary)}.margin-stat strong.margin-val{color:var(--color-accent)}.sh-prod-suggestion{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;flex-shrink:0}.sug-cantidad{font-size:.75rem;font-weight:800;color:var(--color-accent)}.sug-costo{font-size:.65rem;color:var(--color-warning);font-weight:600}.sug-ganancia{font-size:.62rem;color:var(--color-success);font-weight:600}
 
 .sh-caja-badge{display:flex;align-items:center;gap:.3rem;margin-top:.25rem;padding:.15rem .4rem;background:color-mix(in srgb,var(--color-info) 10%,transparent);border-radius:4px;font-size:.55rem;color:var(--color-info)}.caja-icon{font-size:.7rem}.caja-dias{margin-left:auto;font-size:.5rem;opacity:.7}.sh-caja-options{display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.2rem}.caja-options-label{font-size:.5rem;color:var(--color-text-secondary)}.caja-option-btn{border:none;padding:.15rem .35rem;border-radius:3px;background:var(--color-bg-secondary);color:var(--color-text-secondary);font-size:.52rem;cursor:pointer;box-shadow:1px 1px 2px rgba(0,0,0,.04)}.caja-option-btn:hover{color:var(--color-text-primary)}.caja-option-btn.recommended{background:color-mix(in srgb,var(--color-accent) 15%,transparent);color:var(--color-accent);box-shadow:0 0 4px color-mix(in srgb,var(--color-accent) 20%,transparent)}.caja-option-ahorro{font-size:.45rem;color:var(--color-success)}.caja-ahorro{font-size:.52rem;color:var(--color-success);font-weight:600}.sh-no-results{padding:1rem;text-align:center;font-size:.7rem;color:var(--color-text-secondary)}
+.caja-estimada{font-style:italic;font-size:.85em;opacity:.85;margin-left:.2rem}
+.total-restante{font-size:.72rem;color:var(--color-text-secondary);font-weight:600;margin-left:auto}.total-restante.negativo{color:var(--color-error)}
+.sh-omitidos{margin:.4rem .75rem .5rem;padding:.35rem .55rem;background:color-mix(in srgb,var(--color-warning) 10%,transparent);border-radius:6px;font-size:.6rem;color:var(--color-warning)}
+.sh-caja-bar.desconocido{box-shadow:0 0 0 1px color-mix(in srgb,var(--color-info) 40%,transparent),3px 3px 6px rgba(0,0,0,.08)}
 .sh-caja-admin-row{display:flex;justify-content:flex-end;margin-top:.2rem}.btn-editar-cajas{border:none;padding:.18rem .45rem;border-radius:4px;background:color-mix(in srgb,var(--color-warning) 12%,transparent);color:var(--color-warning);font-size:.55rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}.btn-editar-cajas:hover{background:var(--color-warning);color:#fff;transform:translateY(-1px)}
 
 @media(max-width:768px){.sh-grupo-header{flex-direction:column;align-items:stretch;gap:.4rem}.sh-grupo-totals{justify-content:space-between}.sh-producto{flex-wrap:wrap}}

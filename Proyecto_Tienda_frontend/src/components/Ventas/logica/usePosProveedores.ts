@@ -21,8 +21,8 @@ const showPedidoForm = ref(false);
 const montoManual = ref(false);
 const searchProductoPedido = ref('');
 const showProductoDropdownPedido = ref(false);
-const newDetallePedido = ref<{ idProducto: number; nombre: string; cantidad: number; precioUnitario: number }>({ idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 });
-const productosDisponibles = ref<{ idProducto: number; nombre: string; precio_costo: number; codigoBarras?: string }[]>([]);
+const newDetallePedido = ref<{ idProducto: number; nombre: string; cantidad: number; precioUnitario: number; isGramaje?: boolean }>({ idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0, isGramaje: false });
+const productosDisponibles = ref<{ idProducto: number; nombre: string; precio_costo: number; codigoBarras?: string; isGramaje?: boolean }[]>([]);
 const searchWrapperRef = ref<HTMLElement | null>(null);
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -42,7 +42,8 @@ async function cargarProveedoresPedidos() {
     const resProd = await fetch(`${API_BASE}/productos/listarProductos`);
     const dataProd = await resProd.json();
     productosDisponibles.value = (dataProd.datos ?? dataProd).map((p: any) => ({
-      idProducto: p.idProducto, nombre: p.nombre, precio_costo: p.precio_costo || 0, codigoBarras: p.codigoBarras
+      idProducto: p.idProducto, nombre: p.nombre, precio_costo: p.precio_costo || 0, codigoBarras: p.codigoBarras,
+      isGramaje: !!p.isGramaje
     }));
   } catch (e) { console.error('Error productos:', e); }
 }
@@ -87,19 +88,27 @@ function openPedidoModal(p?: any) {
     montoManual.value = false;
   }
   searchProductoPedido.value = '';
-  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 };
+  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0, isGramaje: false };
   showPedidoForm.value = true;
 }
 
 function addDetallePedido() {
   if (!newDetallePedido.value.idProducto || !newDetallePedido.value.cantidad || !newDetallePedido.value.precioUnitario) return;
+  const esGramaje = !!newDetallePedido.value.isGramaje;
+  // Gramaje: la cantidad se captura en gramos (es lo que se suma al stock al
+  // recibir) y el precio unitario viene por kg, así que el subtotal real es
+  // gramos ÷ 1000 × precio/kg.
+  const subtotal = esGramaje
+    ? Math.round(newDetallePedido.value.cantidad * newDetallePedido.value.precioUnitario) / 1000
+    : newDetallePedido.value.cantidad * newDetallePedido.value.precioUnitario;
   pedidoForm.value.detalles.push({
     idProducto: newDetallePedido.value.idProducto, nombreProducto: newDetallePedido.value.nombre,
     cantidad: newDetallePedido.value.cantidad, precioUnitario: newDetallePedido.value.precioUnitario,
-    subtotal: newDetallePedido.value.cantidad * newDetallePedido.value.precioUnitario
+    isGramaje: esGramaje,
+    subtotal
   });
   recalcTotalPedido();
-  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0 };
+  newDetallePedido.value = { idProducto: 0, nombre: '', cantidad: 1, precioUnitario: 0, isGramaje: false };
   searchProductoPedido.value = '';
   showProductoDropdownPedido.value = false;
 }
@@ -110,10 +119,11 @@ function recalcTotalPedido() {
   if (!montoManual.value) pedidoForm.value.montoTotal = pedidoForm.value.detalles.reduce((sum: number, d: any) => sum + d.subtotal, 0);
 }
 
-function selectProductoForPedido(prod: { idProducto: number; nombre: string; precio_costo: number }) {
+function selectProductoForPedido(prod: { idProducto: number; nombre: string; precio_costo: number; isGramaje?: boolean }) {
   newDetallePedido.value.idProducto = prod.idProducto;
   newDetallePedido.value.nombre = prod.nombre;
   newDetallePedido.value.precioUnitario = prod.precio_costo;
+  newDetallePedido.value.isGramaje = !!prod.isGramaje;
   searchProductoPedido.value = prod.nombre;
   showProductoDropdownPedido.value = false;
 }
