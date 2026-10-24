@@ -4,7 +4,7 @@ const { activeTab, showProveedorModal, editingProveedor, proveedorForm, showPedi
 import PedidoSugerido from '../modals/PedidoSugerido.vue';
 import SugeridoHoy from '../modals/SugeridoHoy.vue';
 import AsignarProductosProveedor from '../modals/AsignarProductosProveedor.vue';
-import AnalisisInventario from './secciones/AnalisisInventario.vue';
+import InteligenciaInventario from './secciones/InteligenciaInventario.vue';
 </script>
 
 <template>
@@ -329,7 +329,7 @@ import AnalisisInventario from './secciones/AnalisisInventario.vue';
 
     <!-- INTELIGENCIA -->
     <div v-if="activeTab === 'inteligencia'" class="tab-content tab-inteligencia">
-      <AnalisisInventario />
+      <InteligenciaInventario />
     </div>
 
     <!-- MODAL PROVEEDOR -->

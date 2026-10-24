@@ -108,7 +108,7 @@
           </div>
           <!-- INTELIGENCIA -->
           <div v-if="pedidoProveedorTab === 'inteligencia'" class="pp-section pp-section-sugerido">
-            <AnalisisInventario />
+            <InteligenciaInventario />
           </div>
         </div>
 
@@ -240,7 +240,7 @@
 import { formatoMoneda } from '../logica/usePosTicket'
 import PedidoSugerido from '../../modals/PedidoSugerido.vue'
 import SugeridoHoy from '../../modals/SugeridoHoy.vue'
-import AnalisisInventario from '../../Proveedores/secciones/AnalisisInventario.vue'
+import InteligenciaInventario from '../../Proveedores/secciones/InteligenciaInventario.vue'
 
 interface Props {
   open: boolean

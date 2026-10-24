@@ -7,7 +7,7 @@ import Categorias from '../Categorias/Categorias.vue';
 import Subcategorias from '../Subcategorias/Subcategorias.vue';
 import Proveedores from '../Proveedores/Proveedores.vue';
 import ReporteVentas from '../ReporteVentas/ReporteVentas.vue';
-import AnalisisInventario from '../Proveedores/secciones/AnalisisInventario.vue';
+import InteligenciaInventario from '../Proveedores/secciones/InteligenciaInventario.vue';
 import ProductosToolbar from './secciones/ProductosToolbar.vue';
 import ProductosTabs from './secciones/ProductosTabs.vue';
 import AjustePrecioAdmin from './secciones/AjustePrecioAdmin.vue';
@@ -111,7 +111,7 @@ async function onCajasGuardadas(cajas: number[]) {
       />
 
       <div v-if="tabActiva === 'inteligencia'" class="tab-content tab-inteligencia">
-        <AnalisisInventario />
+        <InteligenciaInventario />
       </div>
       <div v-else-if="tabActiva === 'categorias'" class="tab-content">
         <Categorias @categorias-changed="cargarCategorias" />
