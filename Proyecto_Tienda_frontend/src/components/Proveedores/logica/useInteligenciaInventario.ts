@@ -351,6 +351,35 @@ function formatoPorcentaje(valor: number | null | undefined): string {
   return `${formatoNumero(numero, 2)}%`;
 }
 
+/**
+ * Formatea una cantidad con su unidad real.
+ *
+ * En gramaje el stock y las ventas vienen en gramos, pero el precio está por
+ * kilogramo. Para que la pantalla no mezcle unidades, mostramos g o kg según
+ * el tamaño; para productos normales mostramos piezas.
+ */
+function formatoCantidad(
+  valor: number | null | undefined,
+  gramaje = false,
+  decimales = 0,
+): string {
+  const numero = Number(valor ?? 0);
+  if (!Number.isFinite(numero)) return gramaje ? '0 g' : '0 u';
+  if (!gramaje) return `${formatoNumero(numero, decimales)} u`;
+  if (Math.abs(numero) >= 1000) {
+    return `${formatoNumero(numero / 1000, Math.max(2, decimales))} kg`;
+  }
+  return `${formatoNumero(numero, decimales)} g`;
+}
+
+/** Precio con la unidad en la que está capturado: por kg o por pieza. */
+function formatoPrecioUnitario(
+  valor: number | null | undefined,
+  gramaje = false,
+): string {
+  return `${formatoMoneda(valor)}/${gramaje ? 'kg' : 'ud'}`;
+}
+
 function formatoFecha(valor?: string | null): string {
   if (!valor) return '—';
   const texto = valor.length <= 10 ? `${valor}T00:00:00` : valor;
@@ -390,6 +419,8 @@ export function useInteligenciaInventario() {
     formatoMoneda,
     formatoNumero,
     formatoPorcentaje,
+    formatoCantidad,
+    formatoPrecioUnitario,
     formatoFecha,
   };
 }

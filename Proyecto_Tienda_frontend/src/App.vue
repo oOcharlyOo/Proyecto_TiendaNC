@@ -18,10 +18,11 @@ const showNavbar = computed(() => route.name !== 'Login');
 
 <style>
 .app-shell {
+  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .view-shell {

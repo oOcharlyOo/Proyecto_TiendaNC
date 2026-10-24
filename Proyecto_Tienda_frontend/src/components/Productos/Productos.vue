@@ -203,7 +203,7 @@ async function onCajasGuardadas(cajas: number[]) {
 </template>
 
 <style scoped>
-.productos-layout{height:100dvh;width:100%;padding:1rem;overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--gradient-bg-start) 0%,var(--gradient-bg-mid) 50%,var(--color-bg-primary) 100%);position:relative}
+.productos-layout{height:100%;width:100%;padding:1rem;overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--gradient-bg-start) 0%,var(--gradient-bg-mid) 50%,var(--color-bg-primary) 100%);position:relative}
 .productos-layout :deep(.productos-panel){flex:1;min-height:0;display:flex;flex-direction:column;background:var(--color-bg-secondary);border:none;border-radius:14px;box-shadow:10px 10px 30px rgba(0,0,0,.35),-4px -4px 16px rgba(255,255,255,.03);overflow:hidden}
 .productos-layout .tab-content{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .productos-layout .tab-proveedores{overflow-y:auto}

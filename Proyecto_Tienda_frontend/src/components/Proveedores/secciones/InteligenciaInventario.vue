@@ -27,6 +27,8 @@ const {
   formatoMoneda,
   formatoNumero,
   formatoPorcentaje,
+  formatoCantidad,
+  formatoPrecioUnitario,
   formatoFecha,
 } = useInteligenciaInventario();
 
@@ -63,6 +65,8 @@ const meta = computed(() => ({
   diasRevision: reporte.value?.diasRevision ?? diasRevision.value,
 }));
 
+const hayGramaje = computed(() => productos.value.some(p => p.gramaje));
+
 type ClaseCard = {
   key: Clasificacion;
   label: string;
@@ -98,7 +102,7 @@ const kpis = computed(() => {
       icon: '💰',
       label: 'Valor del inventario',
       value: formatoMoneda(r.valorInventario),
-      sub: `${r.conStock} productos con stock · costo`,
+      sub: `${r.conStock} productos con stock · costo${hayGramaje.value ? ' (gramaje en kg)' : ''}`,
       tone: 'accent',
     },
     {
@@ -276,13 +280,39 @@ function diasSinMovimiento(dias: number | null | undefined): string {
   return `${dias} d`;
 }
 
+/**
+ * Explica el valor con las unidades correctas. En gramaje el stock se
+ * convierte a kg para poder multiplicarlo por el costo/precio por kg.
+ */
+function formulaValor(p: ProductoInteligencia, tipo: 'costo' | 'venta'): string {
+  const precio = tipo === 'costo' ? p.precioCosto : p.precioVenta;
+  const total = tipo === 'costo' ? p.valorInmovilizado : p.valorVentaPotencial;
+  if (p.gramaje) {
+    // En la fórmula siempre mostramos kg, aunque el stock sea menor a 1000 g,
+    // para que la multiplicación por el precio/kg sea coherente.
+    return `${formatoNumero(p.stock / 1000, 3)} kg × ${formatoMoneda(precio)}/kg = ${formatoMoneda(total)}`;
+  }
+  return `${formatoCantidad(p.stock, false)} × ${formatoMoneda(precio)}/ud = ${formatoMoneda(total)}`;
+}
+
+function formulaCobertura(p: ProductoInteligencia): string {
+  if (!p.consumoDiario || p.consumoDiario <= 0) {
+    return `Sin consumo: hay ${formatoCantidad(p.stock, p.gramaje)} en stock y no se puede calcular cobertura`;
+  }
+  // En gramaje el stock y el consumo están en gramos: no se convierte a kg
+  // para dividir, solo se usa kg al mostrar dinero.
+  const unidad = p.gramaje ? 'g' : 'u';
+  const dias = p.stock / p.consumoDiario;
+  return `${formatoNumero(p.stock, 0)} ${unidad} ÷ ${formatoNumero(p.consumoDiario, 3)} ${unidad}/día = ${formatoNumero(dias, 0)} d (se muestra ${cobertura(p.diasCobertura)})`;
+}
+
 function exportarCsv() {
   const filas = productosFiltrados.value;
   const encabezados = [
-    'Producto', 'Categoría', 'Proveedor', 'Estatus', 'Stock', 'Costo', 'Precio venta',
-    'Valor inmovilizado', 'Ventas 7d', 'Ventas 30d', 'Ventas 84d', 'Consumo diario',
-    'Cobertura (días)', 'Días sin movimiento', 'Clasificación', 'ABC', 'Motivo',
-    'Recomendación', 'Revisión',
+    'Producto', 'Categoría', 'Proveedor', 'Estatus', 'Unidad stock', 'Unidad precio',
+    'Stock', 'Costo', 'Precio venta', 'Valor inmovilizado', 'Ventas 7d', 'Ventas 30d',
+    'Ventas 84d', 'Consumo diario', 'Cobertura (días)', 'Días sin movimiento',
+    'Clasificación', 'ABC', 'Motivo', 'Recomendación', 'Revisión',
   ];
   const escapar = (valor: unknown) => `"${String(valor ?? '').replace(/"/g, '""')}"`;
   const lineas = [encabezados.join(',')];
@@ -293,6 +323,8 @@ function exportarCsv() {
       p.categoria,
       p.proveedor,
       p.estatus,
+      p.gramaje ? 'g' : 'ud',
+      p.gramaje ? 'kg' : 'ud',
       p.stock,
       p.precioCosto,
       p.precioVenta,
@@ -343,6 +375,7 @@ function exportarCsv() {
               {{ meta.historialSuficiente ? '✅ Datos suficientes' : '⚠️ Historial insuficiente' }}
             </span>
             <span class="ii-chip">🔎 Revisión &gt; {{ meta.diasRevision }} días</span>
+            <span v-if="hayGramaje" class="ii-chip">⚖️ Gramaje: stock en g, precio por kg</span>
             <span class="ii-chip">🕒 {{ ultimaActualizacion || 'Sin actualizar' }}</span>
           </div>
         </div>
@@ -505,6 +538,12 @@ function exportarCsv() {
           <span class="ii-count">{{ productosFiltrados.length }} de {{ productos.length }}</span>
         </div>
 
+        <p v-if="hayGramaje" class="ii-unit-note ii-unit-note-table">
+          ⚖️ <strong>Gramaje:</strong> el stock y las ventas se manejan en gramos y aquí se muestran
+          en g o kg; el costo y el precio de venta son por kilogramo. La columna Valor ya está
+          convertida a dinero con <code>gramos ÷ 1000 × precio/kg</code>.
+        </p>
+
         <div class="ii-table-wrap">
           <table class="ii-table">
             <thead>
@@ -532,15 +571,21 @@ function exportarCsv() {
                 >
                   <td class="ii-expand">{{ detalleAbierto === p.idProducto ? '▾' : '▸' }}</td>
                   <td class="ii-prod">
-                    <strong>{{ p.nombre }}</strong>
+                    <strong>
+                      {{ p.nombre }}
+                      <span v-if="p.gramaje" class="ii-gramaje-badge" title="Stock y ventas en gramos; costo y venta por kilogramo">⚖️ kg</span>
+                    </strong>
                     <small>{{ p.proveedor || 'Sin proveedor' }}</small>
+                    <small class="ii-prod-price">{{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}</small>
                   </td>
                   <td class="ii-col-opt">{{ p.categoria || 'Sin categoría' }}</td>
-                  <td class="num">{{ p.stock }}</td>
-                  <td class="num ii-col-opt">{{ formatoMoneda(p.precioCosto) }}</td>
+                  <td class="num">{{ formatoCantidad(p.stock, p.gramaje) }}</td>
+                  <td class="num ii-col-opt" :title="p.gramaje ? 'Costo por kilogramo' : 'Costo por unidad'">
+                    {{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}
+                  </td>
                   <td class="num">{{ formatoMoneda(p.valorInmovilizado) }}</td>
-                  <td class="num ii-col-opt">{{ formatoNumero(p.ventas30d, 0) }}</td>
-                  <td class="num ii-col-opt">{{ formatoNumero(p.consumoDiario, 3) }}</td>
+                  <td class="num ii-col-opt">{{ formatoCantidad(p.ventas30d, p.gramaje) }}</td>
+                  <td class="num ii-col-opt">{{ formatoCantidad(p.consumoDiario, p.gramaje, 3) }}/d</td>
                   <td class="num">{{ cobertura(p.diasCobertura) }}</td>
                   <td class="num">{{ diasSinMovimiento(p.diasSinMovimiento) }}</td>
                   <td>
@@ -560,14 +605,14 @@ function exportarCsv() {
                   <td colspan="13">
                     <div class="ii-detail">
                       <div class="ii-detail-grid">
-                        <div><span>Ventas 7d</span><strong>{{ formatoNumero(p.ventas7d, 0) }}</strong></div>
-                        <div><span>Ventas 30d</span><strong>{{ formatoNumero(p.ventas30d, 0) }}</strong></div>
-                        <div><span>Ventas 84d</span><strong>{{ formatoNumero(p.ventas84d, 0) }}</strong></div>
+                        <div><span>Ventas 7d</span><strong>{{ formatoCantidad(p.ventas7d, p.gramaje) }}</strong></div>
+                        <div><span>Ventas 30d</span><strong>{{ formatoCantidad(p.ventas30d, p.gramaje) }}</strong></div>
+                        <div><span>Ventas 84d</span><strong>{{ formatoCantidad(p.ventas84d, p.gramaje) }}</strong></div>
                         <div><span>Días con venta</span><strong>{{ p.diasConVenta }}</strong></div>
                         <div><span>Última salida</span><strong>{{ formatoFecha(p.ultimaSalida) }}</strong></div>
                         <div><span>Días sin mover</span><strong>{{ diasSinMovimiento(p.diasSinMovimiento) }}</strong></div>
-                        <div><span>Consumo ponderado</span><strong>{{ formatoNumero(p.consumoDiario, 4) }}</strong></div>
-                        <div><span>Consumo simple</span><strong>{{ formatoNumero(p.consumoDiarioSimple, 4) }}</strong></div>
+                        <div><span>Consumo ponderado</span><strong>{{ formatoCantidad(p.consumoDiario, p.gramaje, 3) }}/d</strong></div>
+                        <div><span>Consumo simple</span><strong>{{ formatoCantidad(p.consumoDiarioSimple, p.gramaje, 3) }}/d</strong></div>
                         <div><span>Cobertura</span><strong>{{ cobertura(p.diasCobertura) }}</strong></div>
                         <div><span>Estabilidad (CV)</span><strong>{{ formatoNumero(p.coeficienteVariacion, 2) }}</strong></div>
                         <div><span>ABC</span><strong>{{ p.abc === 'SIN_VENTAS' ? 'Sin ventas' : p.abc }}</strong></div>
@@ -579,9 +624,7 @@ function exportarCsv() {
                           <h5>¿Cómo se obtuvo la clasificación?</h5>
                           <p><strong>{{ labelClasificacion(p.clasificacion) }}:</strong> {{ p.motivo }}</p>
                           <p>
-                            <strong>Cobertura:</strong> {{ p.stock }} unidades /
-                            {{ formatoNumero(p.consumoDiario, 4) }} por día =
-                            {{ cobertura(p.diasCobertura) }}.
+                            <strong>Cobertura:</strong> {{ formulaCobertura(p) }}.
                           </p>
                           <p>
                             <strong>Última salida:</strong> {{ formatoFecha(p.ultimaSalida) }}
@@ -596,12 +639,18 @@ function exportarCsv() {
                         </div>
                         <div>
                           <h5>Datos del producto</h5>
-                          <p><strong>Costo:</strong> {{ formatoMoneda(p.precioCosto) }} · <strong>Venta:</strong> {{ formatoMoneda(p.precioVenta) }}</p>
-                          <p><strong>Mínimo:</strong> {{ p.cantidadMin }} · <strong>Máximo:</strong> {{ p.cantidadMax }}</p>
+                          <p><strong>Costo:</strong> {{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }} · <strong>Venta:</strong> {{ formatoPrecioUnitario(p.precioVenta, p.gramaje) }}</p>
+                          <p><strong>Mínimo:</strong> {{ formatoCantidad(p.cantidadMin, p.gramaje) }} · <strong>Máximo:</strong> {{ formatoCantidad(p.cantidadMax, p.gramaje) }}</p>
                           <p><strong>Valor inmovilizado:</strong> {{ formatoMoneda(p.valorInmovilizado) }}</p>
+                          <p class="ii-formula-line">{{ formulaValor(p, 'costo') }}</p>
                           <p><strong>Valor de venta potencial:</strong> {{ formatoMoneda(p.valorVentaPotencial) }}</p>
-                          <p><strong>Estatus:</strong> {{ p.inactivo ? 'Inactivo' : 'Activo' }} · <strong>Gramaje:</strong> {{ p.gramaje ? 'Sí' : 'No' }}</p>
+                          <p class="ii-formula-line">{{ formulaValor(p, 'venta') }}</p>
+                          <p><strong>Estatus:</strong> {{ p.inactivo ? 'Inactivo' : 'Activo' }} · <strong>Gramaje:</strong> {{ p.gramaje ? 'Sí (stock en g, precio por kg)' : 'No (piezas)' }}</p>
                           <p><strong>Historial usado:</strong> {{ p.diasHistorial }} días{{ p.usaFallback ? ' (insuficiente)' : '' }}</p>
+                          <p v-if="p.gramaje" class="ii-unit-note">
+                            ⚖️ El stock y las ventas están en gramos; el costo y la venta son por
+                            kilogramo. El dinero se calcula con <code>gramos ÷ 1000 × precio/kg</code>.
+                          </p>
                         </div>
                       </div>
 
@@ -670,13 +719,16 @@ function exportarCsv() {
           <article v-for="item in revisionFiltrada" :key="item.idProducto" class="ii-review-item">
             <div class="ii-review-main">
               <div class="ii-review-name">
-                <strong>{{ item.nombre }}</strong>
+                <strong>
+                  {{ item.nombre }}
+                  <span v-if="item.gramaje" class="ii-gramaje-badge" title="Stock y ventas en gramos; costo y venta por kilogramo">⚖️ kg</span>
+                </strong>
                 <span class="ii-review-meta">
                   {{ item.categoria || 'Sin categoría' }} · {{ item.proveedor || 'Sin proveedor' }}
                 </span>
               </div>
               <div class="ii-review-numbers">
-                <span><b>{{ item.stock }}</b> stock</span>
+                <span><b>{{ formatoCantidad(item.stock, item.gramaje) }}</b> stock</span>
                 <span><b>{{ formatoMoneda(item.valorInmovilizado) }}</b> inmovilizado</span>
                 <span><b>{{ diasSinMovimiento(item.diasSinMovimiento) }}</b> sin mover</span>
                 <span><b>{{ formatoFecha(item.ultimaSalida) }}</b> última salida</span>
@@ -862,10 +914,51 @@ function exportarCsv() {
   flex-direction: column;
   gap: 0.85rem;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0.25rem;
   color: var(--color-text-primary);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-accent) 45%, transparent) transparent;
+}
+
+/*
+ * Sin esto, los hijos directos del flex column se encogen para caber en el
+ * alto del panel (flex-shrink: 1 por defecto). Las tarjetas terminaban con
+ * ~2px de alto, sin scroll y con todo pegado. El panel debe desbordar y
+ * desplazarse; las secciones conservan su altura natural.
+ */
+.ii-panel > * {
+  flex: 0 0 auto;
+}
+
+.ii-panel::-webkit-scrollbar,
+.ii-review-list::-webkit-scrollbar,
+.ii-table-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.ii-panel::-webkit-scrollbar-track,
+.ii-review-list::-webkit-scrollbar-track,
+.ii-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ii-panel::-webkit-scrollbar-thumb,
+.ii-review-list::-webkit-scrollbar-thumb,
+.ii-table-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-accent) 38%, transparent);
+  border-radius: 999px;
+}
+
+.ii-panel::-webkit-scrollbar-thumb:hover,
+.ii-review-list::-webkit-scrollbar-thumb:hover,
+.ii-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-accent) 60%, transparent);
 }
 
 /* ================================================================== */
@@ -1408,7 +1501,10 @@ function exportarCsv() {
 .ii-table-wrap {
   width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 0 0.35rem 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-accent) 45%, transparent) transparent;
 }
 
 .ii-table {
@@ -1465,6 +1561,60 @@ function exportarCsv() {
 
 .ii-prod small {
   display: block;
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+}
+
+/* En pantallas donde se oculta la columna de costo, mostramos el precio
+   debajo del nombre para que el gramaje ($/kg) siga siendo visible. */
+.ii-prod small.ii-prod-price {
+  display: none;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .ii-prod small.ii-prod-price { display: block; }
+}
+
+/* Etiqueta de gramaje: deja claro que el stock va en gramos y el precio en kg. */
+.ii-gramaje-badge {
+  display: inline-block;
+  margin-left: 0.2rem;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-info) 45%, transparent);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
+  font-size: 0.5rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ii-unit-note,
+.ii-detail-explain p.ii-unit-note {
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.5rem;
+  border-left: 2px solid var(--color-info);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: color-mix(in srgb, var(--color-info) 7%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
+.ii-unit-note code {
+  font-size: 0.56rem;
+  color: var(--color-info);
+}
+
+.ii-unit-note-table {
+  margin: 0 0.85rem 0.5rem;
+}
+
+.ii-detail-explain p.ii-formula-line {
+  margin-top: 0.05rem;
   font-size: 0.55rem;
   color: var(--color-text-muted);
 }
@@ -1649,6 +1799,11 @@ function exportarCsv() {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0 0.85rem 0.85rem;
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-accent) 45%, transparent) transparent;
 }
 
 .ii-review-item {
@@ -1847,17 +2002,90 @@ function exportarCsv() {
 /* ================================================================== */
 
 @media (max-width: 900px) {
-  .ii-col-opt { display: none; }
-  .ii-table { min-width: 620px; }
-  .ii-review-item { grid-template-columns: 1fr; }
+  .ii-panel {
+    gap: 0.65rem;
+  }
+
+  .ii-col-opt {
+    display: none;
+  }
+
+  .ii-table {
+    min-width: 620px;
+  }
+
+  .ii-review-item {
+    grid-template-columns: 1fr;
+  }
+
+  .ii-review-list {
+    max-height: 60vh;
+  }
 }
 
 @media (max-width: 620px) {
-  .ii-header { flex-direction: column; }
-  .ii-header-actions { align-self: flex-end; }
-  .ii-kpis { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
-  .ii-class-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
-  .ii-card-head { flex-direction: column; }
-  .ii-count { margin-left: 0; }
+  .ii-panel {
+    gap: 0.55rem;
+    padding: 0.1rem;
+  }
+
+  .ii-header {
+    flex-direction: column;
+    padding: 0.7rem 0.75rem;
+  }
+
+  .ii-header-actions {
+    align-self: flex-end;
+  }
+
+  .ii-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  }
+
+  .ii-class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .ii-card-head {
+    flex-direction: column;
+  }
+
+  .ii-count {
+    margin-left: 0;
+  }
+
+  .ii-review-list {
+    max-height: 55vh;
+  }
+}
+
+@media (max-width: 420px) {
+  .ii-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .ii-class-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ii-review-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ii-review-controls label,
+  .ii-review-controls select,
+  .ii-review-controls input,
+  .ii-review-controls button {
+    width: 100%;
+  }
+
+  .ii-review-controls button {
+    min-height: 2rem;
+  }
+
+  .ii-table {
+    min-width: 560px;
+  }
 }
 </style>
