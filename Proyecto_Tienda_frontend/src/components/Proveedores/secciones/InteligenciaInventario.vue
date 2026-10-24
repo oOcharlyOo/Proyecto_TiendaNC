@@ -44,12 +44,14 @@ type ClasificacionFiltro = Clasificacion | 'TODAS';
 type AbcFiltro = 'TODOS' | 'A' | 'B' | 'C' | 'SIN_VENTAS';
 type EstadoFiltro = 'TODOS' | 'ACTIVOS' | 'INACTIVOS';
 type RevisionTab = 'CON_STOCK' | 'SIN_STOCK' | 'INACTIVO';
+type OrdenTabla = 'ROTACION' | 'PROVEEDOR' | 'VALOR' | 'COBERTURA';
 
 const reglasAbiertas = ref(true);
 const busqueda = ref('');
 const filtroClasificacion = ref<ClasificacionFiltro>('TODAS');
 const filtroAbc = ref<AbcFiltro>('TODOS');
 const filtroEstado = ref<EstadoFiltro>('TODOS');
+const ordenTabla = ref<OrdenTabla>('ROTACION');
 const detalleAbierto = ref<number | null>(null);
 const revisionTab = ref<RevisionTab>('CON_STOCK');
 const guardandoRevision = ref<number | null>(null);
@@ -190,12 +192,44 @@ const productosFiltrados = computed(() => {
         .some(v => (v || '').toLowerCase().includes(q));
     })
     .sort((a, b) => {
-      const oa = orden[a.clasificacion] ?? 9;
-      const ob = orden[b.clasificacion] ?? 9;
-      if (oa !== ob) return oa - ob;
-      return (b.valorInmovilizado || 0) - (a.valorInmovilizado || 0);
+      switch (ordenTabla.value) {
+        case 'PROVEEDOR': {
+          // Agrupa por el proveedor más barato; los sin proveedor quedan al final.
+          const pa = (a.proveedor || '').trim().toLowerCase();
+          const pb = (b.proveedor || '').trim().toLowerCase();
+          if (!pa && pb) return 1;
+          if (pa && !pb) return -1;
+          const cmp = pa.localeCompare(pb, 'es');
+          if (cmp !== 0) return cmp;
+          return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+        }
+        case 'VALOR':
+          return (b.valorInmovilizado || 0) - (a.valorInmovilizado || 0);
+        case 'COBERTURA': {
+          const ca = a.diasCobertura >= 0 ? a.diasCobertura : Number.MAX_SAFE_INTEGER;
+          const cb = b.diasCobertura >= 0 ? b.diasCobertura : Number.MAX_SAFE_INTEGER;
+          return ca - cb;
+        }
+        default: {
+          const oa = orden[a.clasificacion] ?? 9;
+          const ob = orden[b.clasificacion] ?? 9;
+          if (oa !== ob) return oa - ob;
+          return (b.valorInmovilizado || 0) - (a.valorInmovilizado || 0);
+        }
+      }
     });
 });
+
+/** Texto para el tooltip/badge cuando un producto tiene varios proveedores. */
+function detalleProveedores(p: ProductoInteligencia): string {
+  if (!p.listaProveedores || p.listaProveedores.length === 0) return '';
+  return p.listaProveedores
+    .map(pr => {
+      const precio = pr.precio != null ? `${formatoMoneda(pr.precio)}/${p.gramaje ? 'kg' : 'ud'}` : 'sin precio';
+      return `${pr.elMasBarato ? '✓ ' : ''}${pr.nombre}: ${precio}`;
+    })
+    .join(' · ');
+}
 
 const revisionFiltrada = computed(() => {
   if (revisionTab.value === 'CON_STOCK') return revisionConStock.value;
@@ -345,7 +379,7 @@ function formulaCobertura(p: ProductoInteligencia): string {
 function exportarCsv() {
   const filas = productosFiltrados.value;
   const encabezados = [
-    'Producto', 'Categoría', 'Proveedor', 'Estatus', 'Unidad stock', 'Unidad precio',
+    'Producto', 'Categoría', 'Proveedor', 'Total proveedores', 'Mejor precio', 'Estatus', 'Unidad stock', 'Unidad precio',
     'Stock', 'Costo', 'Precio venta', 'Valor inmovilizado', 'Ventas 7d', 'Ventas 30d',
     'Ventas 84d', 'Consumo diario', 'Cobertura (días)', 'Días sin movimiento',
     'Clasificación', 'ABC', 'Motivo', 'Recomendación', 'Revisión',
@@ -358,6 +392,8 @@ function exportarCsv() {
       p.nombre,
       p.categoria,
       p.proveedor,
+      p.totalProveedores ?? 1,
+      p.mejorPrecio ?? '',
       p.estatus,
       p.gramaje ? 'g' : 'ud',
       p.gramaje ? 'kg' : 'ud',
@@ -611,7 +647,13 @@ function exportarCsv() {
                       {{ p.nombre }}
                       <span v-if="p.gramaje" class="ii-gramaje-badge" title="Stock y ventas en gramos; costo y venta por kilogramo">⚖️ kg</span>
                     </strong>
-                    <small>{{ p.proveedor || 'Sin proveedor' }}</small>
+                    <small :title="detalleProveedores(p)">
+                      {{ p.proveedor || 'Sin proveedor' }}
+                      <span v-if="p.totalProveedores > 1" class="ii-prov-badge" :title="`${p.totalProveedores} proveedores · ${detalleProveedores(p)}`">
+                        🏷️×{{ p.totalProveedores }}
+                      </span>
+                      <span v-else-if="p.mejorPrecio != null" class="ii-prov-precio">{{ formatoMoneda(p.mejorPrecio) }}/{{ p.gramaje ? 'kg' : 'ud' }}</span>
+                    </small>
                     <small class="ii-prod-price">{{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}</small>
                   </td>
                   <td class="ii-col-opt">{{ p.categoria || 'Sin categoría' }}</td>
@@ -654,6 +696,28 @@ function exportarCsv() {
                         <div><span>Estabilidad (CV)</span><strong>{{ formatoNumero(p.coeficienteVariacion, 2) }}</strong></div>
                         <div><span>ABC</span><strong>{{ p.abc === 'SIN_VENTAS' ? 'Sin ventas' : p.abc }}</strong></div>
                         <div><span>Participación</span><strong>{{ formatoPorcentaje(p.participacionVentas) }}</strong></div>
+                      </div>
+
+                      <div v-if="p.listaProveedores && p.listaProveedores.length > 0" class="ii-prov-compare">
+                        <h5>
+                          🏷️ Proveedores
+                          <small v-if="p.totalProveedores > 1">— el orden y la ficha usan el más barato</small>
+                        </h5>
+                        <ul>
+                          <li v-for="pr in p.listaProveedores" :key="`${p.idProducto}-${pr.idProveedor ?? pr.nombre}`" :class="{ barato: pr.elMasBarato }">
+                            <strong>{{ pr.nombre }}</strong>
+                            <span v-if="pr.precio != null" class="ii-prov-precio-val">
+                              {{ formatoMoneda(pr.precio) }}/{{ p.gramaje ? 'kg' : 'ud' }}
+                            </span>
+                            <span v-else class="ii-prov-precio-val sin">sin precio</span>
+                            <span class="ii-prov-meta">
+                              {{ pr.fuente === 'COMPRA' ? `última compra ${formatoFecha(pr.ultimaCompra)}`
+                                : pr.fuente === 'ACORDADO' ? 'precio acordado' : 'sin compras registradas' }}
+                              <template v-if="pr.vecesComprado"> · {{ pr.vecesComprado }} compra(s)</template>
+                            </span>
+                            <span v-if="pr.elMasBarato" class="ii-prov-tag">más barato ✓</span>
+                          </li>
+                        </ul>
                       </div>
 
                       <div class="ii-detail-explain">
@@ -1746,6 +1810,95 @@ function exportarCsv() {
   margin-left: 0.2rem;
   font-size: 0.6rem;
   vertical-align: middle;
+}
+
+/* Badge de "varios proveedores" en la celda del producto. */
+.ii-prov-badge {
+  margin-left: 0.25rem;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-accent);
+  font-size: 0.5rem;
+  font-weight: 700;
+  cursor: help;
+}
+
+.ii-prod small .ii-prov-precio {
+  margin-left: 0.3rem;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+/* Comparativa de proveedores en la fila expandida. */
+.ii-prov-compare {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-bg-secondary) 55%, transparent);
+}
+
+.ii-prov-compare h5 {
+  margin: 0 0 0.35rem;
+  font-size: 0.62rem;
+  color: var(--color-text-primary);
+}
+
+.ii-prov-compare h5 small {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.ii-prov-compare ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ii-prov-compare li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  color: var(--color-text-secondary);
+}
+
+.ii-prov-compare li strong {
+  color: var(--color-text-primary);
+}
+
+.ii-prov-compare li.barato {
+  color: var(--color-success);
+}
+
+.ii-prov-precio-val {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.ii-prov-precio-val.sin {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.ii-prov-meta {
+  font-size: 0.53rem;
+  color: var(--color-text-muted);
+}
+
+.ii-prov-tag {
+  padding: 0.02rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+  font-size: 0.5rem;
+  font-weight: 700;
 }
 
 /* Etiqueta de gramaje: deja claro que el stock va en gramos y el precio en kg. */

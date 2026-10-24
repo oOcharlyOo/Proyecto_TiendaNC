@@ -19,6 +19,17 @@ export type Abc = 'A' | 'B' | 'C' | 'SIN_VENTAS';
 
 export type EstadoRevision = 'PENDIENTE' | 'EN_REVISION' | 'RESUELTO';
 
+export type ProveedorProductoPrecio = {
+  idProveedor?: number | null;
+  nombre: string;
+  /** Ultimo precio efectivo: $/pieza o $/kg si es gramaje. */
+  precio?: number | null;
+  ultimaCompra?: string | null;
+  fuente?: 'COMPRA' | 'ACORDADO' | 'SIN_PRECIO' | string;
+  elMasBarato: boolean;
+  vecesComprado?: number;
+};
+
 export type MotivoRevision =
   | 'ESTACIONAL'
   | 'SIN_DEMANDA'
@@ -41,6 +52,9 @@ export type ProductoInteligencia = {
   nombre: string;
   categoria?: string | null;
   proveedor?: string | null;
+  mejorPrecio?: number | null;
+  totalProveedores: number;
+  listaProveedores: ProveedorProductoPrecio[];
   estatus: 'A' | 'I';
   inactivo: boolean;
   gramaje: boolean;
