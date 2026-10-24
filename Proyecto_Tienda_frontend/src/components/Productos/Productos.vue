@@ -7,6 +7,7 @@ import Categorias from '../Categorias/Categorias.vue';
 import Subcategorias from '../Subcategorias/Subcategorias.vue';
 import Proveedores from '../Proveedores/Proveedores.vue';
 import ReporteVentas from '../ReporteVentas/ReporteVentas.vue';
+import AnalisisInventario from '../Proveedores/secciones/AnalisisInventario.vue';
 import ProductosToolbar from './secciones/ProductosToolbar.vue';
 import ProductosTabs from './secciones/ProductosTabs.vue';
 import AjustePrecioAdmin from './secciones/AjustePrecioAdmin.vue';
@@ -32,7 +33,7 @@ const {
   abrirModalCategoria, aplicarCambioCategoria
 } = useProductos();
 
-type TabActiva = 'productos' | 'inactivos' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio';
+type TabActiva = 'productos' | 'inactivos' | 'inteligencia' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio';
 
 const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
 const productoEditandoCajas = ref<ProductoDTO | null>(null);
@@ -109,7 +110,10 @@ async function onCajasGuardadas(cajas: number[]) {
         @editar-cajas="abrirEditarCajas"
       />
 
-      <div v-if="tabActiva === 'categorias'" class="tab-content">
+      <div v-if="tabActiva === 'inteligencia'" class="tab-content tab-inteligencia">
+        <AnalisisInventario />
+      </div>
+      <div v-else-if="tabActiva === 'categorias'" class="tab-content">
         <Categorias @categorias-changed="cargarCategorias" />
       </div>
       <div v-else-if="tabActiva === 'subcategorias'" class="tab-content">
