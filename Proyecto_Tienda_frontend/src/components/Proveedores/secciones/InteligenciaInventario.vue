@@ -623,6 +623,7 @@ function exportarCsv() {
                 <th class="ii-expand"></th>
                 <th>Producto</th>
                 <th class="ii-col-opt">Categoría</th>
+                <th class="ii-col-opt">Proveedor</th>
                 <th class="num">Stock</th>
                 <th class="num ii-col-opt">Costo</th>
                 <th class="num">Valor</th>
@@ -647,16 +648,18 @@ function exportarCsv() {
                       {{ p.nombre }}
                       <span v-if="p.gramaje" class="ii-gramaje-badge" title="Stock y ventas en gramos; costo y venta por kilogramo">⚖️ kg</span>
                     </strong>
-                    <small :title="detalleProveedores(p)">
-                      {{ p.proveedor || 'Sin proveedor' }}
-                      <span v-if="p.totalProveedores > 1" class="ii-prov-badge" :title="`${p.totalProveedores} proveedores · ${detalleProveedores(p)}`">
-                        🏷️×{{ p.totalProveedores }}
-                      </span>
-                      <span v-else-if="p.mejorPrecio != null" class="ii-prov-precio">{{ formatoMoneda(p.mejorPrecio) }}/{{ p.gramaje ? 'kg' : 'ud' }}</span>
-                    </small>
                     <small class="ii-prod-price">{{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}</small>
                   </td>
                   <td class="ii-col-opt">{{ p.categoria || 'Sin categoría' }}</td>
+                  <td class="ii-col-opt" :title="detalleProveedores(p)">
+                    {{ p.proveedor || 'Sin proveedor' }}
+                    <span
+                      v-if="p.totalProveedores > 1"
+                      class="ii-prov-badge"
+                      :title="`${p.totalProveedores} proveedores · ${detalleProveedores(p)}`"
+                    >🏷️×{{ p.totalProveedores }}</span>
+                    <span v-else-if="p.mejorPrecio != null" class="ii-prov-precio">{{ formatoMoneda(p.mejorPrecio) }}/{{ p.gramaje ? 'kg' : 'ud' }}</span>
+                  </td>
                   <td class="num">{{ formatoCantidad(p.stock, p.gramaje) }}</td>
                   <td class="num ii-col-opt" :title="p.gramaje ? 'Costo por kilogramo' : 'Costo por unidad'">
                     {{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}
@@ -681,7 +684,7 @@ function exportarCsv() {
                 </tr>
 
                 <tr v-if="detalleAbierto === p.idProducto" class="ii-detail-row">
-                  <td colspan="13">
+                  <td colspan="14">
                     <div class="ii-detail">
                       <div class="ii-detail-grid">
                         <div><span>Ventas 7d</span><strong>{{ formatoCantidad(p.ventas7d, p.gramaje) }}</strong></div>
@@ -1739,7 +1742,7 @@ function exportarCsv() {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.64rem;
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .ii-table thead th {
