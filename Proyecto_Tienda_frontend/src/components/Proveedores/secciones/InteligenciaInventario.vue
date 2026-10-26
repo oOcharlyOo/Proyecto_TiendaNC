@@ -644,37 +644,37 @@ function exportarCsv() {
             <thead>
               <tr>
                 <th class="ii-expand"></th>
-                <th>Producto</th>
-                <th class="ii-col-opt">Categoría</th>
-                <th class="ii-col-opt">Proveedor</th>
-                <th class="num">Stock</th>
-                <th class="num ii-col-opt">Costo</th>
-                <th class="num">Valor</th>
-                <th class="num ii-col-opt">Ventas 30d</th>
-                <th class="num ii-col-opt">Consumo/día</th>
-                <th class="num">Cobertura</th>
-                <th class="num">Sin mover</th>
-                <th>Rotación</th>
-                <th class="ii-col-opt">ABC</th>
-                <th>Recomendación</th>
+                <th class="g-id">Producto</th>
+                <th class="ii-col-opt g-id">Categoría</th>
+                <th class="ii-col-opt g-id">Proveedor</th>
+                <th class="num g-stock">Stock</th>
+                <th class="num ii-col-opt g-stock">Costo</th>
+                <th class="num g-stock">Valor</th>
+                <th class="num ii-col-opt g-dem">Ventas 30d</th>
+                <th class="num ii-col-opt g-dem">Consumo/día</th>
+                <th class="num g-dem">Cobertura</th>
+                <th class="num g-dem">Sin mover</th>
+                <th class="g-dec">Rotación</th>
+                <th class="ii-col-opt g-dec">ABC</th>
+                <th class="g-dec">Recomendación</th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="p in productosFiltrados" :key="p.idProducto">
+              <template v-for="(p, idx) in productosFiltrados" :key="p.idProducto">
                 <tr
-                  :class="['ii-row', { 'ii-row-open': detalleAbierto === p.idProducto }]"
+                  :class="['ii-row', `cls-${p.clasificacion.toLowerCase()}`, { 'ii-alt': idx % 2 === 1, 'ii-row-open': detalleAbierto === p.idProducto }]"
                   @click="toggleDetalle(p.idProducto)"
                 >
                   <td class="ii-expand">{{ detalleAbierto === p.idProducto ? '▾' : '▸' }}</td>
-                  <td class="ii-prod">
+                  <td class="ii-prod c-id">
                     <strong>
                       {{ p.nombre }}
                       <span v-if="p.gramaje" class="ii-gramaje-badge" title="Stock y ventas en gramos; costo y venta por kilogramo">⚖️ kg</span>
                     </strong>
                     <small class="ii-prod-price">{{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}</small>
                   </td>
-                  <td class="ii-col-opt">{{ p.categoria || 'Sin categoría' }}</td>
-                  <td class="ii-col-opt" :title="detalleProveedores(p)">
+                  <td class="ii-col-opt c-id">{{ p.categoria || 'Sin categoría' }}</td>
+                  <td class="ii-col-opt c-id" :title="detalleProveedores(p)">
                     {{ p.proveedor || 'Sin proveedor' }}
                     <span
                       v-if="p.totalProveedores > 1"
@@ -683,30 +683,30 @@ function exportarCsv() {
                     >🏷️×{{ p.totalProveedores }}</span>
                     <span v-else-if="p.mejorPrecio != null" class="ii-prov-precio">{{ formatoMoneda(p.mejorPrecio) }}/{{ p.gramaje ? 'kg' : 'ud' }}</span>
                   </td>
-                  <td class="num">{{ formatoCantidad(p.stock, p.gramaje) }}</td>
-                  <td class="num ii-col-opt" :title="p.gramaje ? 'Costo por kilogramo' : 'Costo por unidad'">
+                  <td class="num c-stock">{{ formatoCantidad(p.stock, p.gramaje) }}</td>
+                  <td class="num ii-col-opt c-stock" :title="p.gramaje ? 'Costo por kilogramo' : 'Costo por unidad'">
                     {{ formatoPrecioUnitario(p.precioCosto, p.gramaje) }}
                   </td>
-                  <td class="num">{{ formatoMoneda(p.valorInmovilizado) }}</td>
-                  <td class="num ii-col-opt">{{ formatoCantidad(p.ventas30d, p.gramaje) }}</td>
-                  <td class="num ii-col-opt">{{ formatoCantidad(p.consumoDiario, p.gramaje, 3) }}/d</td>
-                  <td class="num">{{ cobertura(p.diasCobertura) }}</td>
-                  <td class="num">{{ diasSinMovimiento(p.diasSinMovimiento) }}</td>
-                  <td>
+                  <td class="num c-stock">{{ formatoMoneda(p.valorInmovilizado) }}</td>
+                  <td class="num ii-col-opt c-dem">{{ formatoCantidad(p.ventas30d, p.gramaje) }}</td>
+                  <td class="num ii-col-opt c-dem">{{ formatoCantidad(p.consumoDiario, p.gramaje, 3) }}/d</td>
+                  <td class="num c-dem">{{ cobertura(p.diasCobertura) }}</td>
+                  <td class="num c-dem">{{ diasSinMovimiento(p.diasSinMovimiento) }}</td>
+                  <td class="c-dec">
                     <span :class="['ii-badge', p.clasificacion.toLowerCase()]">
                       {{ labelClasificacion(p.clasificacion) }}
                     </span>
                     <span v-if="p.topSeller" class="ii-fire" title="Top seller: demanda alta y reciente en la tienda">🔥</span>
                   </td>
-                  <td class="ii-col-opt">
+                  <td class="ii-col-opt c-dec">
                     <span :class="['ii-abc', p.abc.toLowerCase()]">
                       {{ p.abc === 'SIN_VENTAS' ? '—' : p.abc }}
                     </span>
                   </td>
-                  <td class="ii-rec">{{ p.recomendacion }}</td>
+                  <td class="ii-rec c-dec">{{ p.recomendacion }}</td>
                 </tr>
 
-                <tr v-if="detalleAbierto === p.idProducto" class="ii-detail-row">
+                <tr v-if="detalleAbierto === p.idProducto" :class="['ii-detail-row', `cls-${p.clasificacion.toLowerCase()}`]">
                   <td colspan="14">
                     <div class="ii-detail">
                       <div class="ii-detail-grid">
@@ -1797,6 +1797,60 @@ function exportarCsv() {
 .ii-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
 
 .ii-row-open { background: color-mix(in srgb, var(--color-accent) 9%, transparent); }
+
+/* ============================================================ */
+/* COLORES DE COLUMNAS Y REGISTROS                              */
+/* ============================================================ */
+/* Matiz por grupo funcional de columnas: identidad del producto, */
+/* inventario/valor, demanda y decisión. El encabezado pinta el    */
+/* texto y su subrayado; las celdas llevan un fondo muy tenue,    */
+/* así las bandas verticales se leen sin cansar la vista.          */
+.ii-table {
+  --g-id: #b48cff;    /* Producto / Categoría / Proveedor (violeta) */
+  --g-stock: #58c8b6; /* Stock / Costo / Valor (verde azulado)      */
+  --g-dem: #7fb2ff;   /* Ventas / Consumo / Cobertura / Sin mover   */
+  --g-dec: #e8b56a;   /* Rotación / ABC / Recomendación (ámbar)     */
+}
+
+.ii-table thead th.g-id { color: var(--g-id); border-bottom-color: color-mix(in srgb, var(--g-id) 55%, transparent); }
+.ii-table thead th.g-stock { color: var(--g-stock); border-bottom-color: color-mix(in srgb, var(--g-stock) 55%, transparent); }
+.ii-table thead th.g-dem { color: var(--g-dem); border-bottom-color: color-mix(in srgb, var(--g-dem) 55%, transparent); }
+.ii-table thead th.g-dec { color: var(--g-dec); border-bottom-color: color-mix(in srgb, var(--g-dec) 55%, transparent); }
+
+.ii-table tbody td.c-id { background: color-mix(in srgb, var(--g-id) 5%, transparent); }
+.ii-table tbody td.c-stock { background: color-mix(in srgb, var(--g-stock) 6%, transparent); }
+.ii-table tbody td.c-dem { background: color-mix(in srgb, var(--g-dem) 5%, transparent); }
+.ii-table tbody td.c-dec { background: color-mix(in srgb, var(--g-dec) 5%, transparent); }
+
+/* Cebra: filas alternadas para seguir el registro de punta a punta. */
+.ii-row.ii-alt { background: color-mix(in srgb, var(--color-bg-primary) 50%, transparent); }
+
+/* El hover y la fila abierta pesan más que la cebra (van después). */
+.ii-row:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.ii-row.ii-row-open { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+
+/* Barra de severidad a la izquierda de cada registro según su     */
+/* clasificación; coincide con el color del badge de rotación.     */
+.ii-row,
+.ii-detail-row { --cls-tone: transparent; }
+
+.ii-row.cls-rapido,
+.ii-detail-row.cls-rapido { --cls-tone: var(--color-success); }
+.ii-row.cls-medio,
+.ii-detail-row.cls-medio { --cls-tone: var(--color-info); }
+.ii-row.cls-lento,
+.ii-detail-row.cls-lento { --cls-tone: var(--color-warning); }
+.ii-row.cls-atorado,
+.ii-detail-row.cls-atorado { --cls-tone: var(--color-error); }
+.ii-row.cls-agotado,
+.ii-detail-row.cls-agotado { --cls-tone: #7fb2ff; }
+.ii-row.cls-sin_datos,
+.ii-detail-row.cls-sin_datos { --cls-tone: var(--color-text-muted); }
+.ii-row.cls-inactivo,
+.ii-detail-row.cls-inactivo { --cls-tone: #9a8fb0; }
+
+.ii-row > td:first-child { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--cls-tone) 85%, transparent); }
+.ii-detail-row > td { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--cls-tone) 85%, transparent); }
 
 .ii-expand {
   width: 1.1rem;

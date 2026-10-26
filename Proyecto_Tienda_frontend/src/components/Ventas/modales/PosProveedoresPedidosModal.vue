@@ -295,7 +295,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .pos-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);z-index: 200;display:grid;place-items:center;padding:1rem}
-.pos-modal-card{background:var(--color-bg-panel);border-radius:var(--radius-lg);width:min(100%,960px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:8px 8px 24px rgba(0,0,0,0.35),-4px -4px 16px rgba(255,255,255,0.03)}
+.pos-modal-card{background:var(--color-bg-panel);border-radius:var(--radius-lg);width:min(100%,1280px);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:8px 8px 24px rgba(0,0,0,0.35),-4px -4px 16px rgba(255,255,255,0.03)}
 .pp-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:var(--color-bg-secondary);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 .pp-header h3{margin:0;font-size:1.1rem;color:var(--color-accent)}
 .btn-close{width:34px;height:34px;border-radius:50%;border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
@@ -312,6 +312,8 @@ const emit = defineEmits<{
    pueda llegar hasta el final; la tabla conserva su scroll interno. */
 .pp-section-sugerido{min-height:0}
 .pp-section-sugerido :deep(.ii-panel){height:auto;overflow:visible}
+/* El modal es más alto que la página: la tabla puede aprovechar hasta 70vh. */
+.pp-section-sugerido :deep(.ii-table-wrap){max-height:min(70vh,760px)}
 .pp-toolbar{display:flex;align-items:center;gap:.5rem}
 .pp-btn-add{padding:.5rem 1rem;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--color-accent),var(--color-accent-hover));color:var(--color-on-brand);font-size:.85rem;font-weight:600;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
 .pp-btn-add:hover{box-shadow:5px 5px 10px rgba(0,0,0,0.2);transform:translateY(-1px)}
