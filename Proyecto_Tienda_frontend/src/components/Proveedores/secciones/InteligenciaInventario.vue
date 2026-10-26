@@ -44,7 +44,7 @@ type ClasificacionFiltro = Clasificacion | 'TODAS';
 type AbcFiltro = 'TODOS' | 'A' | 'B' | 'C' | 'SIN_VENTAS';
 type EstadoFiltro = 'TODOS' | 'ACTIVOS' | 'INACTIVOS';
 type RevisionTab = 'CON_STOCK' | 'SIN_STOCK' | 'INACTIVO';
-type OrdenTabla = 'ROTACION' | 'PROVEEDOR' | 'VALOR' | 'COBERTURA';
+type OrdenTabla = 'ROTACION' | 'PROVEEDOR' | 'CATEGORIA' | 'VALOR' | 'COBERTURA';
 
 const reglasAbiertas = ref(true);
 const busqueda = ref('');
@@ -203,6 +203,21 @@ const productosFiltrados = computed(() => {
           if (cmp !== 0) return cmp;
           return (a.nombre || '').localeCompare(b.nombre || '', 'es');
         }
+        case 'CATEGORIA': {
+          // Agrupa por categoría; las "Sin categoría" quedan al final y dentro
+          // de cada grupo se subordena por proveedor y luego por nombre.
+          const ca = (a.categoria || '').trim().toLowerCase();
+          const cb = (b.categoria || '').trim().toLowerCase();
+          if (!ca && cb) return 1;
+          if (ca && !cb) return -1;
+          const cmp = ca.localeCompare(cb, 'es');
+          if (cmp !== 0) return cmp;
+          const pa = (a.proveedor || '').trim().toLowerCase();
+          const pb = (b.proveedor || '').trim().toLowerCase();
+          const cmpP = pa.localeCompare(pb, 'es');
+          if (cmpP !== 0) return cmpP;
+          return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+        }
         case 'VALOR':
           return (b.valorInmovilizado || 0) - (a.valorInmovilizado || 0);
         case 'COBERTURA': {
@@ -303,6 +318,7 @@ function limpiarFiltros() {
   filtroClasificacion.value = 'TODAS';
   filtroAbc.value = 'TODOS';
   filtroEstado.value = 'TODOS';
+  ordenTabla.value = 'ROTACION';
 }
 
 function cambiarDiasRevision(evento: Event) {
@@ -599,8 +615,15 @@ function exportarCsv() {
             <option value="ACTIVOS">Solo activos</option>
             <option value="INACTIVOS">Solo inactivos</option>
           </select>
+          <select v-model="ordenTabla" class="ii-select" title="Cómo ordenar la tabla">
+            <option value="ROTACION">Orden: rotación</option>
+            <option value="PROVEEDOR">Orden: proveedor (más barato)</option>
+            <option value="CATEGORIA">Orden: categoría</option>
+            <option value="VALOR">Orden: valor inmovilizado</option>
+            <option value="COBERTURA">Orden: cobertura</option>
+          </select>
           <button
-            v-if="filtroClasificacion !== 'TODAS' || filtroAbc !== 'TODOS' || filtroEstado !== 'TODOS' || busqueda"
+            v-if="filtroClasificacion !== 'TODAS' || filtroAbc !== 'TODOS' || filtroEstado !== 'TODOS' || ordenTabla !== 'ROTACION' || busqueda"
             class="ii-btn-ghost"
             type="button"
             @click="limpiarFiltros"
