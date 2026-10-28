@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useUsuarios } from './logica/useUsuarios';
-const { usuarios, cargando, modalAbierto, editando, modalSueldoAbierto, seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas, diasTrabajados, cargandoAsistencias, guardandoHora, avatarPreview, dragando, form, tipoUsuarioActual, esAdmin, puedeEditar, esEdicionPerfilPropio, usuarioTop, cargarUsuarios, cargarVentasPorUsuario, cargarAsistencias, guardarHoraCaja, eliminarTurno, cambiarSeccion, formatoMoneda, formatoFecha, formatoCantidad, abrirModalNuevo, abrirModalEditar, cerrarModal, handleDragOver, handleDragLeave, handleDrop, handleFileSelect, formatAvatarUrl, guardarUsuario, eliminarUsuario, getTipoLabel, getNombreMes, getIniciales, getHorasTotales, getHorasFormateadas, formatoHora, getHorasDelDia, getDiasCalendario, semanasDelMes, getPagoSemanal, getPagoTotal, getSueldoHora, getHorasSemana } = useUsuarios();
+const { usuarios, cargando, modalAbierto, editando, modalSueldoAbierto, seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas, diasTrabajados, cargandoAsistencias, guardandoHora, configAsistencia, guardandoConfig, guardarConfigAsistencia, avatarPreview, dragando, form, tipoUsuarioActual, esAdmin, puedeEditar, esEdicionPerfilPropio, usuarioTop, cargarUsuarios, cargarVentasPorUsuario, cargarAsistencias, guardarHoraCaja, eliminarTurno, cambiarSeccion, formatoMoneda, formatoFecha, formatoCantidad, abrirModalNuevo, abrirModalEditar, cerrarModal, handleDragOver, handleDragLeave, handleDrop, handleFileSelect, formatAvatarUrl, guardarUsuario, eliminarUsuario, getTipoLabel, getNombreMes, getIniciales, getHorasTotales, getHorasFormateadas, formatoHora, getHorasDelDia, getDiasCalendario, semanasDelMes, getPagoSemanal, getPagoTotal, getSueldoHora, getHorasSemana } = useUsuarios();
 
 const semanasDelMesArray = computed(() => {
   if (!diasTrabajados.value) return [];
@@ -21,6 +21,17 @@ async function eliminarTurnoHandler(detalle: { idUsuario: number; fecha: string;
   if (ok) {
     const [y, m] = detalle.fecha.split('-');
     cargarAsistencias(Number(m), Number(y));
+  }
+}
+
+// Guarda el tope de jornada y recalcula el mes con el nuevo tope.
+async function guardarConfig(horas: number) {
+  const ok = await guardarConfigAsistencia(horas);
+  if (ok) {
+    const [y, m] = (filtroMesVentas.value || '').split('-');
+    if (y && m) {
+      cargarAsistencias(Number(m), Number(y));
+    }
   }
 }
 
@@ -103,9 +114,12 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
       :get-sueldo-hora="getSueldoHora"
       :get-horas-semana="getHorasSemana"
       :formato-moneda="formatoMoneda"
+      :horas-max-jornada="configAsistencia?.horasMaxJornada ?? null"
+      :guardando-config="guardandoConfig"
       @cargar-asistencias="() => { const [y, m] = (filtroMesVentas || '').split('-'); cargarAsistencias(Number(m), Number(y)); }"
       @update:filtro-mes-ventas="filtroMesVentas = $event"
       @guardar-hora="guardarHora"
+      @guardar-config="guardarConfig"
       @eliminar-turno="eliminarTurnoHandler"
     />
 
@@ -229,7 +243,16 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.ventas-list){display:flex;flex-direction:column;gap:.15rem}.usuarios-layout :deep(.venta-item){display:flex;align-items:center;gap:.5rem;padding:.15rem .5rem;background:var(--color-bg-primary);border-radius:4px;font-size:.68rem}.usuarios-layout :deep(.venta-ticket){color:var(--color-accent);font-weight:700}.usuarios-layout :deep(.venta-fecha){color:var(--color-text-secondary)}.usuarios-layout :deep(.venta-monto){margin-left:auto;color:var(--color-success);font-weight:700}
 .usuarios-layout :deep(.seccion-asistencias){flex:1;min-height:0;overflow-y:auto;padding:1rem 1.5rem;display:flex;flex-direction:column;gap:.85rem}
 .usuarios-layout :deep(.asistencias-content){display:flex;flex-direction:column;gap:1rem}
+.usuarios-layout :deep(.calendario-header){display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .usuarios-layout :deep(.calendario-header h3){margin:0;font-size:1rem;color:var(--color-accent);font-weight:800}
+.usuarios-layout :deep(.tope-jornada){display:flex;align-items:center;gap:.45rem;font-size:.72rem;color:var(--color-text-secondary);background:var(--color-bg-secondary);border-radius:8px;padding:.35rem .6rem;box-shadow:3px 3px 6px rgba(0,0,0,.12)}
+.usuarios-layout :deep(.tope-jornada label){font-weight:700;white-space:nowrap}
+.usuarios-layout :deep(.tope-jornada input){width:60px;padding:.3rem .4rem;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:5px;color:var(--color-text-primary);font-size:.72rem;font-family:inherit}
+.usuarios-layout :deep(.tope-jornada input:focus){outline:none;border-color:var(--color-accent)}
+.usuarios-layout :deep(.tope-jornada .tope-unidad small){color:var(--color-text-muted);font-size:.58rem}
+.usuarios-layout :deep(.btn-tope-guardar){padding:.32rem .7rem;border:none;border-radius:5px;background:var(--color-accent);color:var(--color-on-brand);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s}
+.usuarios-layout :deep(.btn-tope-guardar:hover:not(:disabled)){filter:brightness(1.1)}
+.usuarios-layout :deep(.btn-tope-guardar:disabled){opacity:.45;cursor:not-allowed}
 .usuarios-layout :deep(.calendario-grid){display:flex;flex-direction:column;gap:.25rem;background:var(--color-bg-secondary);border:none;border-radius:14px;padding:1rem;box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02)}
 .usuarios-layout :deep(.dias-semana){display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.usuarios-layout :deep(.dias-semana span){text-align:center;font-size:.6rem;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.04em;padding:.3rem 0}
 .usuarios-layout :deep(.calendario-dias){display:grid;grid-template-columns:repeat(7,1fr);gap:3px}

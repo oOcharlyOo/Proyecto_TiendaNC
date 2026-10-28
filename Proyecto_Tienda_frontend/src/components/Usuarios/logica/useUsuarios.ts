@@ -90,6 +90,11 @@ export type SemanaInfo = {
   fechaFin: string;
 };
 
+export type ConfigAsistencia = {
+  /** Tope de horas por dia; 0 = sin limite. */
+  horasMaxJornada: number;
+};
+
 export type TrabajadorInfo = {
   nombre: string;
   horas: number;
@@ -421,7 +426,10 @@ export function useUsuarios() {
     const m = mes ?? now.getMonth() + 1;
     const a = anio ?? now.getFullYear();
     try {
-      const data = await fetchApi<{ codigo: number; datos: DiasTrabajadosData }>(`${API_BASE}/asistencias/dias-trabajados?mes=${m}&anio=${a}`);
+      const [data] = await Promise.all([
+        fetchApi<{ codigo: number; datos: DiasTrabajadosData }>(`${API_BASE}/asistencias/dias-trabajados?mes=${m}&anio=${a}`),
+        cargarConfigAsistencia(),
+      ]);
       if (data?.codigo === 200 && data.datos) {
         diasTrabajados.value = data.datos;
         await nextTick();
@@ -430,6 +438,44 @@ export function useUsuarios() {
       console.error('Error al cargar asistencias:', error);
     } finally {
       cargandoAsistencias.value = false;
+    }
+  }
+
+  // Configuracion de asistencia de la sucursal (tope de jornada).
+  const configAsistencia = ref<ConfigAsistencia | null>(null);
+  const guardandoConfig = ref(false);
+
+  async function cargarConfigAsistencia() {
+    try {
+      const data = await fetchApi<{ codigo: number; datos: ConfigAsistencia }>(`${API_BASE}/asistencias/config`);
+      if (data?.codigo === 200 && data.datos) {
+        configAsistencia.value = data.datos;
+      }
+    } catch (error) {
+      console.error('Error al cargar configuracion de asistencia:', error);
+    }
+  }
+
+  async function guardarConfigAsistencia(horasMaxJornada: number): Promise<boolean> {
+    guardandoConfig.value = true;
+    try {
+      const res = await fetch(`${API_BASE}/asistencias/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ horasMaxJornada })
+      });
+      const json = await res.json();
+      if (json.codigo === 200) {
+        configAsistencia.value = json.datos;
+        return true;
+      }
+      console.error('Error al guardar configuracion:', json.mensaje);
+      return false;
+    } catch (error) {
+      console.error('Error de red al guardar configuracion:', error);
+      return false;
+    } finally {
+      guardandoConfig.value = false;
     }
   }
 
@@ -611,6 +657,7 @@ export function useUsuarios() {
     seccionActiva, ventasPorUsuario, cargandoVentas, filtroMesVentas,
     diasTrabajados, cargandoAsistencias,
     guardandoHora,
+    configAsistencia, guardandoConfig, cargarConfigAsistencia, guardarConfigAsistencia,
     avatarPreview, dragando, form,
     tipoUsuarioActual, esAdmin, puedeEditar,
     esEdicionPerfilPropio, usuarioTop,

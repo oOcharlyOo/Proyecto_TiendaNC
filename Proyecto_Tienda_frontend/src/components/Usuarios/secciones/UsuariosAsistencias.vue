@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { DiasTrabajadosData, SemanaInfo, UsuarioDiasData } from '../logica/useUsuarios';
 
 const props = defineProps<{
@@ -9,6 +9,8 @@ const props = defineProps<{
   filtroMesVentas: string;
   esAdmin: boolean;
   semanasDelMes: SemanaInfo[];
+  horasMaxJornada: number | null;
+  guardandoConfig: boolean;
   formatAvatarUrl: (url: string | null) => string | undefined;
   getNombreMes: (mes: number) => string;
   getIniciales: (nombre: string) => string;
@@ -26,12 +28,30 @@ const props = defineProps<{
 type TrabajadorCal = { idUsuario: number; nombre: string; horas: number; apertura: string; cierre: string | null };
 type DiaCal = { numero: number; fecha: string; esHoy: boolean; trabajadores: TrabajadorCal[]; esVacio: boolean; horasTotales: number; esOverflow: boolean };
 
-const DURACION_TURNO_HORAS = 6.5;
-const UMBRAL_AUTO_CIERRE_HORAS = 10;
+const DURACION_TURNO_DEFECTO = 6.5;
+const UMBRAL_AUTO_CIERRE_DEFECTO = 10;
+
+/* El tope de jornada de la sucursal manda: si esta configurado (> 0), el
+   cierre sugerido y el umbral de cierre automatico usan ese valor. */
+const duracionTurnoSugerida = computed(() =>
+  props.horasMaxJornada && props.horasMaxJornada > 0 ? props.horasMaxJornada : DURACION_TURNO_DEFECTO
+);
+const umbralAutoCierre = computed(() =>
+  props.horasMaxJornada && props.horasMaxJornada > 0 ? props.horasMaxJornada : UMBRAL_AUTO_CIERRE_DEFECTO
+);
 
 const editModal = ref<{ fecha: string; idUsuario: number; nombre: string; turnoAbierto: boolean } | null>(null);
 const entradaInput = ref('');
 const salidaInput = ref('');
+
+/* Edicion del tope de jornada (input del header). */
+const topeInput = ref<number | null>(null);
+watch(
+  () => props.horasMaxJornada,
+  (v) => { topeInput.value = v ?? null; },
+  { immediate: true }
+);
+const topeModificado = computed(() => topeInput.value !== props.horasMaxJornada);
 
 function sumarHoras(hhmm: string, horas: number): string {
   const [h, m] = hhmm.split(':').map(Number);
@@ -52,7 +72,7 @@ function abrirEdicionHora(t: TrabajadorCal, fecha: string) {
   entradaInput.value = t.apertura ? props.formatoHora(t.apertura) : '';
   salidaInput.value = t.cierre
     ? props.formatoHora(t.cierre)
-    : (t.apertura ? sumarHoras(props.formatoHora(t.apertura), DURACION_TURNO_HORAS) : '');
+    : (t.apertura ? sumarHoras(props.formatoHora(t.apertura), duracionTurnoSugerida.value) : '');
 }
 
 function cerrarEdicionHora() {
@@ -72,10 +92,10 @@ function guardarEdicionHora() {
   if (salida && !re.test(salida)) { alert('Hora de salida inválida (use HH:MM)'); return; }
 
   if (!salida && mod.turnoAbierto && entrada) {
-    if (horasTranscurridas(entrada, mod.fecha) >= UMBRAL_AUTO_CIERRE_HORAS) {
-      emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: sumarHoras(entrada, DURACION_TURNO_HORAS), tipo: 'cierre' });
+    if (horasTranscurridas(entrada, mod.fecha) >= umbralAutoCierre.value) {
+      emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: sumarHoras(entrada, duracionTurnoSugerida.value), tipo: 'cierre' });
     } else {
-      alert('El turno aún puede estar activo (lleva menos de 10h desde la entrada). Escribe la hora de salida para cerrarlo.');
+      alert(`El turno aún puede estar activo (lleva menos de ${umbralAutoCierre.value}h desde la entrada). Escribe la hora de salida para cerrarlo.`);
       return;
     }
   }
@@ -198,6 +218,7 @@ const emit = defineEmits<{
   'update:filtro-mes-ventas': [value: string];
   'guardar-hora': [{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }];
   'eliminar-turno': [{ idUsuario: number; fecha: string; nombre: string }];
+  'guardar-config': [horas: number];
 }>();
 </script>
 
@@ -228,6 +249,25 @@ const emit = defineEmits<{
     <div v-else class="asistencias-content">
       <div class="calendario-header">
         <h3>📅 Calendario de Asistencias - {{ getNombreMes(diasTrabajados.mes) }} {{ diasTrabajados.anio }}</h3>
+        <div class="tope-jornada" title="Horas máximo que se contabilizan por día en este negocio. 0 = sin límite.">
+          <label for="tope-jornada-input">⏱ Tope de jornada</label>
+          <input
+            id="tope-jornada-input"
+            v-model.number="topeInput"
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+          />
+          <span class="tope-unidad">h <small>(0 = sin límite)</small></span>
+          <button
+            class="btn-tope-guardar"
+            :disabled="!topeModificado || guardandoConfig || topeInput === null || topeInput < 0 || topeInput > 24"
+            @click="emit('guardar-config', topeInput ?? 0)"
+          >
+            {{ guardandoConfig ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
       </div>
 
       <div class="calendario-grid">
@@ -429,7 +469,7 @@ const emit = defineEmits<{
             <span class="modal-edit-fecha">📅 {{ editModal.fecha }}</span>
           </div>
           <div v-if="editModal.turnoAbierto" class="modal-edit-alert">
-            🔴 Turno abierto sin cierre. Se cerrará solo si lleva más de 10h; si no, escribe la hora de salida.
+            🔴 Turno abierto sin cierre. Se cerrará solo si lleva más de {{ umbralAutoCierre }}h; si no, escribe la hora de salida.
           </div>
           <div class="modal-edit-fields">
             <label>
