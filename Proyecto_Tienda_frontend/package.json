@@ -12,10 +12,13 @@
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
+    "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
+    "sweetalert2": "^11.26.24",
     "vue": "^3.4.27",
     "vue-chartjs": "^5.3.3",
-    "vue-router": "^4.3.0"
+    "vue-router": "^4.3.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.0",
@@ -27,9 +30,9 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "~5.4.5",
-    "vite": "^5.2.11",
+    "vite": "^5.4.21",
     "vite-plugin-compression": "^0.5.1",
-    "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-pwa": "^0.19.8",
     "vite-plugin-vue-devtools": "^7.0.5",
     "vue-tsc": "^2.0.19"
   },

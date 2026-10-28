@@ -2000,3 +2000,69 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* ============================================================
+   PUENTE DE TOKENS — proyecto generico
+   ------------------------------------------------------------
+   Los componentes de la rama de bitacora/inteligencia consumen
+   el sistema --color-* (ademas de --radius-*, --space-*, etc.).
+   Los temas genericos solo definen la paleta con nombres cortos
+   (--bg-primary, --accent-color...), asi que aqui se mapean al
+   sistema nuevo con var(): los colores los sigue eligiendo cada
+   tema (classic/modern/ocean/forest), sin estilos de Zelda.
+   ============================================================ */
+[data-theme="classic"],
+[data-theme="modern"],
+[data-theme="ocean"],
+[data-theme="forest"] {
+  /* Superficie */
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-panel: var(--bg-panel);
+
+  /* Texto */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-secondary);
+
+  /* Bordes */
+  --color-border: var(--border-color);
+
+  /* Acento / Marca */
+  --color-brand: var(--accent-color);
+  --color-brand-hover: var(--accent-hover);
+  --color-accent: var(--accent-color);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-brand: var(--bg-primary);
+
+  /* Estado */
+  --color-success: var(--success-color);
+  --color-error: var(--error-color);
+  --color-warning: #eab308;
+  --color-info: #38bdf8;
+
+  /* Sombras */
+  --color-shadow: var(--shadow-color);
+
+  /* Tipografia generica (sin fuentes de Zelda) */
+  --font-title: 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Segoe UI', system-ui, sans-serif;
+
+  /* Aliases de compatibilidad usados por componentes heredados */
+  --zelda-gold: var(--accent-color);
+  --infoBlueColor: #38bdf8;
+  --btn-text: var(--bg-primary);
+
+  /* Geometria y transiciones (mismos valores que la rama de origen) */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+}

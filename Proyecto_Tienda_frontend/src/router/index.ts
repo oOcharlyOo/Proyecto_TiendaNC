@@ -1,11 +1,14 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router';
-import Login from '../components/Login.vue';
-import Ventas from '../components/Ventas.vue';
-import Productos from "@/components/Productos.vue";
-import Inventario from "@/components/Inventario.vue";
-import Corte from "@/components/Corte.vue";
-import Usuarios from "@/components/Usuarios.vue";
+import Login from '../components/Login/Login.vue';
+import Ventas from '../components/Ventas/Ventas.vue';
+import Productos from "@/components/Productos/Productos.vue";
+import Inventario from "@/components/Inventario/Inventario.vue";
+import Corte from "@/components/Corte/Corte.vue";
+import Finanzas from "@/components/Finanzas/Finanzas.vue";
+import Rental from "@/components/Rental/Rental.vue";
+import Usuarios from "@/components/Usuarios/Usuarios.vue";
+import Ambulante from "@/components/Ambulante/Ambulante.vue";
 
 const AUTH_KEY = 'isAuth';
 
@@ -43,7 +46,25 @@ const routes = [
     path: '/usuarios',
     name: 'Usuarios',
     component: Usuarios,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/finanzas',
+    name: 'Finanzas',
+    component: Finanzas,
     meta: { requiresAuth: true, adminOnly: true },
+  },
+  {
+    path: '/rental',
+    name: 'Rental',
+    component: Rental,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/ambulante',
+    name: 'Ambulante',
+    component: Ambulante,
+    meta: { requiresAuth: true },
   }
 ];
 

@@ -1,0 +1,23 @@
+tunnel: 7fe518b68ee86cfbcb7126765d62b2cb
+protocol: http2
+
+ingress:
+  - hostname: api.laleyendadeldulce.com
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 60s
+      tlsTimeout: 10s
+    service: http://backend:8080
+  - hostname: laleyendadeldulce.com
+    originRequest:
+      noTLSVerify: true
+    service: http://frontend:80
+  - hostname: minio.laleyendadeldulce.com
+    originRequest:
+      noTLSVerify: true
+    service: http://minio:9000
+  - hostname: miniodash.laleyendadeldulce.com
+    originRequest:
+      noTLSVerify: true
+    service: http://minio:9001
+  - service: http_status:404
