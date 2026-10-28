@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '@/composables/useTheme';
+import { usarApariencia } from '@/composables/useApariencia';
 
 const AUTH_KEY = 'isAuth';
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -26,9 +27,11 @@ export function useNavbar() {
   });
 
   const sucursalLabel = computed(() => {
-    // En el generico el nombre visible viene del registro de sucursales
-    // (grabado por useSucursal al seleccionar); fallback al slug.
-    return localStorage.getItem('sucursalNombre') || sucursalActiva.value;
+    // Nombre real de la rama: primero el registro del servidor (puede
+    // haberse renombrado en el wizard), luego el cacheado en localStorage
+    // y al final el slug.
+    const { config } = usarApariencia();
+    return config.value?.sucursalNombre || localStorage.getItem('sucursalNombre') || sucursalActiva.value;
   });
 
   const sucursalIcon = computed(() => '🏪');

@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useNavbar } from './logica/useNavbar';
+import { usarApariencia } from '@/composables/useApariencia';
+import AparienciaModal from '../modals/AparienciaModal.vue';
 import type { Theme } from '@/composables/useTheme';
-const { route, menuAbierto, syncLoading, syncDirection, syncMessage, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, sincronizarUsuarios, currentTheme, setTheme } = useNavbar();
+const { route, menuAbierto, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, currentTheme, setTheme } = useNavbar();
+const { nombreNegocio } = usarApariencia();
+
+const aparienciaAbierta = ref(false);
 
 const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   { id: 'classic', icon: '🟠', label: 'Tema Clásico' },
@@ -16,7 +22,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
     <nav class="navbar panel">
       <div class="brand">
         <div class="brand-text">
-          <span class="brand-title">Mi Negocio POS</span>
+          <span class="brand-title">{{ nombreNegocio }}</span>
         </div>
         <span class="sucursal-badge">{{ sucursalIcon }} {{ sucursalLabel }}</span>
       </div>
@@ -109,36 +115,15 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
             </RouterLink>
           </div>
 
-          <div v-if="esAdministrador" class="sync-section">
-            <span class="sync-label">Sincronizar Usuarios</span>
-            <div class="sync-buttons">
-              <button 
-                type="button" 
-                class="sync-btn" 
-                :class="{ loading: syncLoading && syncDirection === 'abarrotera', success: syncMessage && syncMessage.includes('Abarrotera') }"
-                @click="sincronizarUsuarios('abarrotera')"
-                :disabled="syncLoading"
-              >
-                <svg viewBox="0 0 24 24" class="sync-icon">
-                  <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>Dulceria -> Abarrotera</span>
-              </button>
-              <button 
-                type="button" 
-                class="sync-btn" 
-                :class="{ loading: syncLoading && syncDirection === 'dulceria', success: syncMessage && syncMessage.includes('Dulceria') }"
-                @click="sincronizarUsuarios('dulceria')"
-                :disabled="syncLoading"
-              >
-                <svg viewBox="0 0 24 24" class="sync-icon">
-                  <path d="M19 12H5M12 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>Abarrotera -> Dulceria</span>
-              </button>
-            </div>
-            <p v-if="syncMessage" class="sync-msg" :class="{ error: !syncMessage.includes('sincronizados') }">{{ syncMessage }}</p>
-          </div>
+          <button
+            v-if="esAdministrador"
+            type="button"
+            class="personalizar-btn"
+            @click="aparienciaAbierta = true"
+          >
+            <span class="personalizar-icon">🎨</span>
+            <span>Personalizar apariencia</span>
+          </button>
 
           <div class="theme-selector">
             <div class="theme-label">
@@ -174,6 +159,8 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
         </div>
       </Transition>
     </nav>
+
+    <AparienciaModal :open="aparienciaAbierta" @close="aparienciaAbierta = false" />
   </header>
 </template>
 
@@ -648,6 +635,28 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   border-color: var(--color-accent-hover);
   box-shadow: 0 0 15px color-mix(in srgb, var(--color-brand) 30%, transparent);
 }
+
+.navbar-wrap .personalizar-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  margin-top: 0.4rem;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  color: var(--color-text-primary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.navbar-wrap .personalizar-btn:hover {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  border-style: solid;
+}
+.navbar-wrap .personalizar-icon { font-size: 0.9rem; }
 
 .navbar-wrap .theme-selector {
   padding: 0.8rem;

@@ -2,6 +2,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTheme } from '@/composables/useTheme';
 import { useSucursal, type Sucursal } from '@/composables/useSucursal';
+import { usarApariencia } from '@/composables/useApariencia';
 
 const AUTH_KEY = 'isAuth';
 const AUTH_USER_ID_KEY = 'idUsuario';
@@ -34,6 +35,9 @@ export function useLogin() {
 
   onMounted(() => {
     cargarSucursales();
+    // la marca de la rama (tema/acento/nombre) puede haber cambiado:
+    // traerla al montar el login, no solo al elegir rama.
+    usarApariencia().cargar();
     verificarExisteUsuarios();
   });
 
@@ -124,6 +128,8 @@ export function useLogin() {
     setSucursal(sucursal, nombre || sucursales.value.find(s => s.slug === sucursal)?.nombre);
     existeUsuarios.value = null;
     verificarExisteUsuarios();
+    // cada rama tiene su propia marca (nombre + colores)
+    usarApariencia().cargar();
   }
 
   async function iniciarSesion() {

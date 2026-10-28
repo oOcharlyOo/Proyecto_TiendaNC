@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useLogin } from './logica/useLogin';
-const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, sucursales, creandoSucursal, errorSucursal, crearSucursal, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin, modoAmbulante } = useLogin();
+import { usarApariencia } from '@/composables/useApariencia';
+const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, sucursales, creandoSucursal, errorSucursal, crearSucursal, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme } = useLogin();
+const { nombreNegocio } = usarApariencia();
 import type { Theme } from '@/composables/useTheme';
 import MontoInicialModal from '../modals/MontoInicialModal.vue';
 import LoginAmbiente from './secciones/LoginAmbiente.vue';
 import LoginSucursalSelector from './secciones/LoginSucursalSelector.vue';
 import LoginForm from './secciones/LoginForm.vue';
-import FirstAdminForm from './secciones/FirstAdminForm.vue';
+import SetupWizard from './secciones/SetupWizard.vue';
 import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
 
 </script>
@@ -24,7 +26,7 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
 
       <div class="login-logo" aria-hidden="true">🏪</div>
 
-      <h2 class="classic-title">Mi Negocio POS</h2>
+      <h2 class="classic-title">{{ nombreNegocio }}</h2>
       <p class="classic-subtitle">Sistema punto de venta</p>
 
       <template v-if="existeUsuarios === null">
@@ -37,9 +39,7 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
       <template v-else-if="existeUsuarios === false">
         <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" :sucursales="sucursales" :creando="creandoSucursal" :error="errorSucursal" @seleccionar="seleccionarSucursal" @crear="crearSucursal" />
 
-        <FirstAdminForm @submit="(d) => crearPrimerAdmin(d)" />
-
-        <p v-if="creandoPrimerAdmin" class="creating-text">Creando administrador...</p>
+        <SetupWizard />
       </template>
 
       <template v-else>
