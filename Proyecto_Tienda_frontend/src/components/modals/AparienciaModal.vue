@@ -17,6 +17,7 @@ const { config, guardar, cargar, aplicar } = usarApariencia();
 const nombre = ref('');
 const temaBase = ref('classic');
 const acento = ref('#f97316');
+const fondo = ref('');
 const guardando = ref(false);
 const error = ref('');
 const exito = ref('');
@@ -30,6 +31,7 @@ watch(
     nombre.value = config.value?.sucursalNombre ?? '';
     temaBase.value = config.value?.temaBase || 'classic';
     acento.value = config.value?.acento || '#f97316';
+    fondo.value = config.value?.fondo || '';
   }
 );
 
@@ -43,7 +45,12 @@ async function guardarCambios() {
     return;
   }
   guardando.value = true;
-  const r = await guardar({ nombre: n, temaBase: temaBase.value, acento: acento.value });
+  const r = await guardar({
+    nombre: n,
+    temaBase: temaBase.value,
+    acento: acento.value,
+    fondo: temaBase.value === 'custom' ? fondo.value : '',
+  });
   guardando.value = false;
   if (!r.ok) {
     error.value = r.mensaje || 'No se pudo guardar.';
@@ -76,7 +83,7 @@ onBeforeUnmount(() => aplicar());
           <input v-model="nombre" type="text" maxlength="60" class="ap-nombre" :disabled="guardando">
         </label>
 
-        <PasoApariencia v-model:temaBase="temaBase" v-model:acento="acento" />
+        <PasoApariencia v-model:temaBase="temaBase" v-model:acento="acento" v-model:fondo="fondo" />
 
         <p v-if="error" class="ap-error">{{ error }}</p>
         <p v-if="exito" class="ap-exito">{{ exito }}</p>

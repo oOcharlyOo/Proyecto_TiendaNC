@@ -20,6 +20,7 @@ const error = ref('');
 const nombre = ref('');
 const temaBase = ref('classic');
 const acento = ref('#f97316');
+const fondo = ref('');
 
 // sembrar con lo que ya exista en el servidor
 function sincronizar() {
@@ -27,6 +28,7 @@ function sincronizar() {
   nombre.value = c?.sucursalNombre && c.sucursalNombre !== 'Sucursal Principal' ? c.sucursalNombre : '';
   temaBase.value = c?.temaBase || 'classic';
   acento.value = c?.acento || '#f97316';
+  fondo.value = c?.fondo || '';
 }
 sincronizar();
 
@@ -34,7 +36,11 @@ sincronizar();
 // wizard mientras el usuario no haya escrito todavia.
 watch(config, () => {
   if (paso.value === 0 && !nombre.value.trim() && !guardando.value) sincronizar();
-  else if (paso.value === 1) { temaBase.value = config.value?.temaBase || temaBase.value; acento.value = config.value?.acento || acento.value; }
+  else if (paso.value === 1) {
+    temaBase.value = config.value?.temaBase || temaBase.value;
+    acento.value = config.value?.acento || acento.value;
+    fondo.value = config.value?.fondo || '';
+  }
 });
 
 // Si el login llega aqui, la rama esta virgen: el paso de colores sigue
@@ -62,7 +68,11 @@ async function siguiente() {
     paso.value = 1;
   } else if (paso.value === 1) {
     guardando.value = true;
-    const r = await guardar({ temaBase: temaBase.value, acento: acento.value });
+    const r = await guardar({
+      temaBase: temaBase.value,
+      acento: acento.value,
+      fondo: temaBase.value === 'custom' ? fondo.value : '',
+    });
     guardando.value = false;
     if (!r.ok) { error.value = r.mensaje || 'No se pudo guardar la apariencia.'; return; }
     paso.value = 2;
@@ -114,7 +124,7 @@ onBeforeUnmount(async () => {
     </div>
 
     <div v-else-if="paso === 1" class="sw-cuerpo">
-      <PasoApariencia v-model:temaBase="temaBase" v-model:acento="acento" />
+      <PasoApariencia v-model:temaBase="temaBase" v-model:acento="acento" v-model:fondo="fondo" />
     </div>
 
     <div v-else class="sw-cuerpo">

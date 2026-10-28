@@ -4,12 +4,14 @@ import { usarApariencia } from '@/composables/useApariencia';
 
 /**
  * Paso "Personalizacion" del wizard (tambien lo reutiliza el panel de admin):
- * elige tema base y color de acento con vista previa en vivo de toda la app.
+ * elige tema base —los 4 preset o un color hexadecimal propio, igual que el
+ * acento— con vista previa en vivo de toda la app.
  */
-const props = defineProps<{ temaBase: string; acento: string }>();
+const props = defineProps<{ temaBase: string; acento: string; fondo?: string }>();
 const emit = defineEmits<{
   'update:temaBase': [value: string];
   'update:acento': [value: string];
+  'update:fondo': [value: string];
 }>();
 
 const { aplicarValores } = usarApariencia();
@@ -26,17 +28,29 @@ const paleta = [
   '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#f43f5e',
 ];
 
+// Fondos propios sugeridos (el resto lo pone el picker)
+const FONDO_DEFECTO = '#15223a';
+const fondoActivo = computed(() => props.fondo || FONDO_DEFECTO);
+const esCustom = computed(() => props.temaBase === 'custom');
+
 function elegirTema(id: string) {
   emit('update:temaBase', id);
-  aplicarValores(id, props.acento, true);
+  emit('update:fondo', '');
+  aplicarValores(id, props.acento, null, true);
+}
+
+function elegirFondoPropio(hex: string) {
+  emit('update:temaBase', 'custom');
+  emit('update:fondo', hex);
+  aplicarValores('custom', props.acento, hex, true);
 }
 
 function elegirAcento(color: string) {
   emit('update:acento', color);
-  aplicarValores(props.temaBase, color, true);
+  aplicarValores(props.temaBase, color, esCustom.value ? fondoActivo.value : null, true);
 }
 
-const esPersonalizado = computed(
+const esAcentoPersonalizado = computed(
   () => !paleta.some(c => c.toLowerCase() === props.acento.toLowerCase())
 );
 </script>
@@ -59,6 +73,30 @@ const esPersonalizado = computed(
         </span>
         <span class="ap-tema-nombre">{{ t.nombre }}</span>
       </button>
+
+      <!-- Tema propio por hexadecimal, igual que el acento -->
+      <label
+        class="ap-tema ap-tema-custom"
+        :class="{ activo: esCustom }"
+        :style="{ background: esCustom ? fondoActivo : undefined }"
+        title="Fondo personalizado (hex)"
+      >
+        <template v-if="!esCustom">
+          <span class="ap-tema-panel custom-macro"><span class="ap-tema-chip">🎨</span></span>
+          <span class="ap-tema-nombre">Propio</span>
+        </template>
+        <template v-else>
+          <span class="ap-tema-panel" :style="{ background: fondoActivo }">
+            <span class="ap-tema-chip" :style="{ background: acento }" />
+          </span>
+          <span class="ap-tema-nombre">{{ fondoActivo }}</span>
+        </template>
+        <input
+          type="color"
+          :value="esCustom ? fondoActivo : FONDO_DEFECTO"
+          @input="elegirFondoPropio(($event.target as HTMLInputElement).value)"
+        >
+      </label>
     </div>
 
     <span class="ap-label">Color de acento</span>
@@ -75,7 +113,7 @@ const esPersonalizado = computed(
       />
       <label
         class="ap-acento ap-acento-custom"
-        :class="{ activo: esPersonalizado }"
+        :class="{ activo: esAcentoPersonalizado }"
         title="Color personalizado"
       >
         <input
@@ -103,13 +141,14 @@ const esPersonalizado = computed(
 }
 .ap-temas {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.45rem;
 }
 .ap-tema {
+  position: relative;
   border: 2px solid transparent;
   border-radius: 10px;
-  padding: 0.45rem 0.3rem 0.35rem;
+  padding: 0.45rem 0.25rem 0.35rem;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -119,6 +158,15 @@ const esPersonalizado = computed(
 }
 .ap-tema:hover { transform: translateY(-2px); }
 .ap-tema.activo { border-color: var(--accent-color); }
+.ap-tema input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border-radius: 10px;
+}
 .ap-tema-panel {
   width: 100%;
   height: 26px;
@@ -127,15 +175,23 @@ const esPersonalizado = computed(
   align-items: center;
   justify-content: center;
 }
+.ap-tema-panel.custom-macro {
+  background: linear-gradient(135deg, #0f766e, #334155, #4c1d95);
+}
 .ap-tema-chip {
-  width: 60%;
+  min-width: 60%;
   height: 9px;
   border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
 }
 .ap-tema-nombre {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 700;
   color: var(--text-primary, #f1f5f9);
+  white-space: nowrap;
 }
 .ap-acentos {
   display: flex;
