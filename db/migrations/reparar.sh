@@ -126,10 +126,9 @@ CREATE TABLE IF NOT EXISTS tiendadb_control.sucursales (
 INSERT INTO tiendadb_control.sucursales (nombre, slug, slot, db_name, esquema, orden)
 VALUES ('Sucursal Principal', 'dulceria', 'b1', 'dulcesnc', 'tiendadb', 1)
 ON CONFLICT (slot) DO NOTHING;
-
-INSERT INTO tiendadb_control.sucursales (nombre, slug, slot, db_name, esquema, orden)
-VALUES ('Sucursal 2', 'abarrotera', 'b2', 'dulcesnc_abarrotera', 'tiendadb_abarrotera', 2)
-ON CONFLICT (slot) DO NOTHING;
+-- El generico arranca con UNA sola sucursal. "abarrotera" es una rama
+-- historica de La Leyenda: su base existe en el servidor pero NO se registra
+-- ni se ofrece en el login; las demas ramas se crean dinamicamente (b3..b6).
 EOSQL
 
 # --- Plantilla para sucursales nuevas (dulcesnc_tpl) ---
