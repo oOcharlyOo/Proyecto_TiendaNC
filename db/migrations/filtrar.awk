@@ -154,6 +154,22 @@ function emitir(sentencia,   minuscula) {
         return
     }
 
+    # Modo "rewrite": base de una rama dinamica (b3..b6). Las sentencias
+    # calificadas con tiendadb. se reescriben al esquema de la rama
+    # (p. ej. tiendadb_b3.); las de tiendadb_abarrotera. no aplican.
+    if (rewrite != "") {
+        if (minuscula ~ /tiendadb_abarrotera\./) {
+            return
+        }
+        if (minuscula ~ /tiendadb\./) {
+            gsub(/tiendadb\./, esquema ".", sentencia)
+            minuscula = tolower(sentencia)
+        }
+        print sentencia ";"
+        print "-- @@stmt"
+        return
+    }
+
     # Sentencias calificadas: solo aplican a la base que contiene el esquema.
     if (minuscula ~ /tiendadb_abarrotera\./) {
         if (base != "dulcesnc_abarrotera") {

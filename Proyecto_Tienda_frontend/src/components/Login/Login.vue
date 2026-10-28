@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useLogin } from './logica/useLogin';
-const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin, modoAmbulante } = useLogin();
-import type { Sucursal } from '@/composables/useSucursal';
+const { name, pass, sucursalSeleccionada, toastContainer, modalMontoInicialAbierto, currentTheme, existeUsuarios, creandoPrimerAdmin, sucursales, creandoSucursal, errorSucursal, crearSucursal, seleccionarSucursal, iniciarSesion, registrarMontoInicial, cerrarModalMontoInicial, setTheme, crearPrimerAdmin, modoAmbulante } = useLogin();
 import type { Theme } from '@/composables/useTheme';
 import MontoInicialModal from '../modals/MontoInicialModal.vue';
 import LoginAmbiente from './secciones/LoginAmbiente.vue';
@@ -36,7 +35,7 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
       </template>
 
       <template v-else-if="existeUsuarios === false">
-        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" @seleccionar="(v: string) => seleccionarSucursal(v as Sucursal)" />
+        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" :sucursales="sucursales" :creando="creandoSucursal" :error="errorSucursal" @seleccionar="seleccionarSucursal" @crear="crearSucursal" />
 
         <FirstAdminForm @submit="(d) => crearPrimerAdmin(d)" />
 
@@ -44,7 +43,7 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
       </template>
 
       <template v-else>
-        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" @seleccionar="(v: string) => seleccionarSucursal(v as Sucursal)" />
+        <LoginSucursalSelector :sucursal-seleccionada="sucursalSeleccionada" :sucursales="sucursales" :creando="creandoSucursal" :error="errorSucursal" @seleccionar="seleccionarSucursal" @crear="crearSucursal" />
 
         <LoginForm :name="name" :pass="pass" @update:name="name = $event" @update:pass="pass = $event" @submit="iniciarSesion" />
       </template>

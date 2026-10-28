@@ -18,14 +18,67 @@ const modoAmbulante = ref<boolean>(false);
 const existeUsuarios = ref<boolean | null>(null);
 const creandoPrimerAdmin = ref(false);
 
+// Ramas registradas en el servidor (GET /sucursales). Fallback a la rama
+// principal si el backend aun no expone el registro.
+const sucursales = ref<Array<{ slug: string; nombre: string }>>([
+  { slug: 'dulceria', nombre: 'Sucursal Principal' },
+]);
+const cargandoSucursales = ref(false);
+const creandoSucursal = ref(false);
+const errorSucursal = ref('');
+
 export function useLogin() {
   const router = useRouter();
   const { currentTheme, setTheme } = useTheme();
   const { setSucursal, getHeader, clearSucursal } = useSucursal();
 
   onMounted(() => {
+    cargarSucursales();
     verificarExisteUsuarios();
   });
+
+  async function cargarSucursales() {
+    cargandoSucursales.value = true;
+    try {
+      const res = await fetch(`${API_BASE}/sucursales`, { headers: getHeader() });
+      const data = await res.json();
+      if (data.codigo === 200 && Array.isArray(data.datos) && data.datos.length > 0) {
+        sucursales.value = data.datos.map((s: { slug: string; nombre: string }) => ({ slug: s.slug, nombre: s.nombre }));
+      }
+    } catch {
+      // registro no disponible: se mantiene el fallback local
+    } finally {
+      cargandoSucursales.value = false;
+    }
+  }
+
+  async function crearSucursal(datos: { nombre: string; claveMaestra: string }) {
+    if (creandoSucursal.value) return;
+    creandoSucursal.value = true;
+    errorSucursal.value = '';
+    try {
+      const res = await fetch(`${API_BASE}/sucursales/crear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getHeader() },
+        body: JSON.stringify(datos),
+      });
+      const data = await res.json();
+      if (data.codigo === 201) {
+        await cargarSucursales();
+        const nueva = sucursales.value.find(s => s.slug === data.datos?.slug);
+        if (nueva) {
+          seleccionarSucursal(nueva.slug, nueva.nombre);
+        }
+        mostrarToast(`Sucursal "${data.datos?.nombre ?? ''}" creada con su propia base de datos.`, 'success');
+      } else {
+        errorSucursal.value = data.mensaje || 'No se pudo crear la sucursal.';
+      }
+    } catch {
+      errorSucursal.value = 'Error de conexión al crear la sucursal.';
+    } finally {
+      creandoSucursal.value = false;
+    }
+  }
 
   async function verificarExisteUsuarios() {
     try {
@@ -62,9 +115,15 @@ export function useLogin() {
     }
   }
 
-  function seleccionarSucursal(sucursal: Sucursal) {
+  function seleccionarSucursal(sucursal: Sucursal, nombre?: string) {
     sucursalSeleccionada.value = sucursal;
     modoAmbulante.value = sucursal.startsWith('ambulante');
+    // Persistir la seleccion para que el interceptor envie el X-Sucursal
+    // correcto en TODAS las llamadas (existeUsuarios, login, demas), y
+    // revalidar si la rama elegida ya tiene usuarios.
+    setSucursal(sucursal, nombre || sucursales.value.find(s => s.slug === sucursal)?.nombre);
+    existeUsuarios.value = null;
+    verificarExisteUsuarios();
   }
 
   async function iniciarSesion() {
@@ -84,7 +143,8 @@ export function useLogin() {
       const usuario = await resLogin.json();
       if (usuario.codigo === 200) {
         localStorage.setItem(AUTH_KEY, 'true');
-        setSucursal(sucursalSeleccionada.value);
+        setSucursal(sucursalSeleccionada.value,
+          sucursales.value.find(s => s.slug === sucursalSeleccionada.value)?.nombre);
         if (usuario?.datos?.idUsuario) {
           const userId = usuario.datos.idUsuario;
           localStorage.setItem(AUTH_USER_ID_KEY, String(userId));
@@ -192,6 +252,8 @@ export function useLogin() {
     name, pass, sucursalSeleccionada, toastContainer,
     modalMontoInicialAbierto, idUsuarioActual,
     existeUsuarios, creandoPrimerAdmin,
+    sucursales, cargandoSucursales, creandoSucursal, errorSucursal,
+    cargarSucursales, crearSucursal,
     currentTheme, setTheme,
     seleccionarSucursal, iniciarSesion, verificarCajaActiva,
     registrarMontoInicial, cerrarModalMontoInicial, mostrarToast,

@@ -57,6 +57,7 @@ asegurar_tabla_control() {
 aplicar_en_base() {
     local base="$1"
     local esquema="$2"
+    local rewrite="${3:-}"
     local archivo nombre ya tmp
 
     echo "--- Migraciones en $base (esquema $esquema) ---"
@@ -75,7 +76,7 @@ aplicar_en_base() {
         fi
 
         tmp="$(mktemp)"
-        awk -v base="$base" -v esquema="$esquema" \
+        awk -v base="$base" -v esquema="$esquema" -v rewrite="$rewrite" \
             -f "$MIGRACIONES_DIR/filtrar.awk" "$archivo" > "$tmp"
 
         # Si el archivo no tiene sentencias para esta base, no se registra:
@@ -95,7 +96,29 @@ aplicar_en_base() {
     done
 }
 
+# Bases de las ramas dinamicas (sucursales b3..b6) registradas por el backend.
+# Si el registro de control aun no existe (instalacion virgen), devuelve nada.
+listar_ramas_dinamicas() {
+    psql_bd --dbname "$BASE_DULCESNC" -tA -c \
+        "SELECT db_name || ' ' || esquema FROM tiendadb_control.sucursales
+         WHERE estado = 'ACTIVA' AND slot NOT IN ('b1', 'b2')" 2>/dev/null || true
+}
+
+existe_base() {
+    psql_bd --dbname postgres -tA -c \
+        "SELECT 1 FROM pg_database WHERE datname = '$1'" 2>/dev/null | grep -q '^1$'
+}
+
 echo "=== Aplicando migraciones pendientes ==="
 aplicar_en_base "$BASE_DULCESNC" "$ESQUEMA_DULCESNC"
 aplicar_en_base "$BASE_ABARROTERA" "$ESQUEMA_ABARROTERA"
+
+while read -r rama_db rama_esq; do
+    [ -n "$rama_db" ] || continue
+    if existe_base "$rama_db"; then
+        aplicar_en_base "$rama_db" "$rama_esq" rewrite
+    fi
+done <<EOF
+$(listar_ramas_dinamicas)
+EOF
 echo "=== Migraciones al dia ==="

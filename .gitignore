@@ -2,3 +2,7 @@ Proyecto_TiendaNC/
 db/backups/dump-*.sql
 temp_bundle.js
 graphify-out/
+
+# Secretos locales del despliegue generico
+/.env
+!/.env.example

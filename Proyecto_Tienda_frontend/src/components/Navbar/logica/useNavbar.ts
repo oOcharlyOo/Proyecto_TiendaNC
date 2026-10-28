@@ -26,19 +26,12 @@ export function useNavbar() {
   });
 
   const sucursalLabel = computed(() => {
-    const s = sucursalActiva.value;
-    if (s === 'abarrotera') return 'Abarrotera';
-    if (s === 'ambulante_dulceria') return 'Ambulante Dulceria';
-    if (s === 'ambulante_abarrotera') return 'Ambulante Abarrotera';
-    return 'Dulceria';
+    // En el generico el nombre visible viene del registro de sucursales
+    // (grabado por useSucursal al seleccionar); fallback al slug.
+    return localStorage.getItem('sucursalNombre') || sucursalActiva.value;
   });
 
-  const sucursalIcon = computed(() => {
-    const s = sucursalActiva.value;
-    if (s === 'abarrotera') return '🏪';
-    if (s === 'ambulante_dulceria' || s === 'ambulante_abarrotera') return '🛺';
-    return '🍬';
-  });
+  const sucursalIcon = computed(() => '🏪');
 
   async function sincronizarUsuarios(direccion: 'abarrotera' | 'dulceria') {
     if (syncLoading.value) return;
@@ -102,11 +95,6 @@ export function useNavbar() {
       { to: '/rental', label: 'Rental', adminOnly: false, icon: 'clock' },
       { to: '/finanzas', label: 'Finanzas', adminOnly: true, icon: 'triforce' }
     ];
-
-    const esAmbulante = sucursalActiva.value === 'ambulante_dulceria' || sucursalActiva.value === 'ambulante_abarrotera';
-    if (esAmbulante) {
-      linksBase.splice(0, 0, { to: '/ambulante', label: 'Ambulante', adminOnly: false, icon: 'truck' });
-    }
 
     return linksBase.filter(l => !l.adminOnly || esAdministrador.value);
   });

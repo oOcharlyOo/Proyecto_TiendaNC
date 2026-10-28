@@ -18,6 +18,9 @@ services:
       - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:8081,https://laleyendadeldulce.com,https://www.laleyendadeldulce.com,https://api.laleyendadeldulce.com
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=qwen2.5:7b
+      # Clave maestra para el alta de sucursales (lee .env del proyecto; no
+      # se versiona). Sin valor, el alta responde 503 y queda deshabilitada.
+      - SUCURSAL_MASTER_KEY=${SUCURSAL_MASTER_KEY:-}
     volumes:
       - backup-trigger:/trigger
       - ./db/backups:/deployments/db/backups
@@ -173,7 +176,7 @@ echo 'Ollama listo. Descargando llama3.1:8b...';
     restart: always
     command: >
       tunnel run 
-      --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiNWYzNGQwNjYtZDE4NC00NzhhLTk4ZDItYjliMzJkY2M3ZDljIiwicyI6Ik1tWmpOV0kwWXpZdFpHRXpNeTAwTkRBeExXSTNaVFl0WVRCbU9ETTNZbVk1TXpWaSJ9
+      --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiYWRiM2JkZTUtNTkwZC00MDM1LTlkMTUtMjRjODk1YWJiN2NkIiwicyI6Ik1qTTFaV1V6TlRRdFkyVmlaaTAwTWpJMExXRTBNR1F0TVRsaU1qRmxabU0yTmpNeCJ9
     environment:
       - TUNNEL_ORIGIN_SERVER_NAME=api.laleyendadeldulce.com
       - NO_TLS_VERIFY=true

@@ -1,18 +1,33 @@
-export type Sucursal = 'dulceria' | 'abarrotera' | 'ambulante_dulceria' | 'ambulante_abarrotera';
+/**
+ * Sucursal activa del navegador.
+ *
+ * En el proyecto genérico las sucursales son dinámicas: el valor es el slug
+ * que devuelve el registro del backend (GET /sucursales), no una lista fija.
+ * Se conserva el soporte del modo ambulante en el header por compatibilidad
+ * con el backend, aunque la UI ya no lo expone.
+ */
+export type Sucursal = string;
 
 const SUCURSAL_KEY = 'sucursalActiva';
+const SUCURSAL_NOMBRE_KEY = 'sucursalNombre';
 
 export function useSucursal() {
   function getSucursal(): Sucursal {
-    return (localStorage.getItem(SUCURSAL_KEY) as Sucursal) || 'dulceria';
+    return localStorage.getItem(SUCURSAL_KEY) || 'dulceria';
   }
 
-  function setSucursal(sucursal: Sucursal) {
+  function setSucursal(sucursal: Sucursal, nombre?: string) {
     localStorage.setItem(SUCURSAL_KEY, sucursal);
+    if (nombre) localStorage.setItem(SUCURSAL_NOMBRE_KEY, nombre);
+  }
+
+  function getSucursalNombre(): string {
+    return localStorage.getItem(SUCURSAL_NOMBRE_KEY) || getSucursal();
   }
 
   function clearSucursal() {
     localStorage.removeItem(SUCURSAL_KEY);
+    localStorage.removeItem(SUCURSAL_NOMBRE_KEY);
   }
 
   function isAmbulante(): boolean {
@@ -34,23 +49,17 @@ export function useSucursal() {
   }
 
   function getLabel(): string {
-    const s = getSucursal();
-    if (s === 'abarrotera') return 'Abarrotera';
-    if (s === 'ambulante_dulceria') return 'Ambulante (Dulcería)';
-    if (s === 'ambulante_abarrotera') return 'Ambulante (Abarrotera)';
-    return 'Dulcería';
+    return getSucursalNombre();
   }
 
   function getIcon(): string {
-    const s = getSucursal();
-    if (s === 'abarrotera') return '🏪';
-    if (s === 'ambulante_dulceria' || s === 'ambulante_abarrotera') return '🛺';
-    return '🍬';
+    return '🏪';
   }
 
   return {
     getSucursal,
     setSucursal,
+    getSucursalNombre,
     clearSucursal,
     isAmbulante,
     getOrigen,
