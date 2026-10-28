@@ -493,7 +493,7 @@ const emit = defineEmits<{
               <input v-model="salidaInput" type="time" placeholder="HH:MM" />
             </label>
           </div>
-          <p class="modal-edit-hint">Los tiempos se redondean a los 15 min más cercanos para el cálculo de nómina. Si la salida es menor que la entrada se cuenta como turno que cruza medianoche.</p>
+          <p class="modal-edit-hint">Regla fija de nómina: minutos &lt; 15 cuentan en la hora en punto, 15–44 a y media, y ≥ 45 en la siguiente hora. Si la salida es menor que la entrada se cuenta como turno que cruza medianoche.</p>
           <div class="modal-edit-actions">
             <button class="btn-edit-cancel" @click="cerrarEdicionHora">Cancelar</button>
             <button class="btn-edit-save" @click="guardarEdicionHora" :disabled="guardandoHora">
