@@ -9,9 +9,26 @@ const semanasDelMesArray = computed(() => {
 });
 
 async function guardarHora(detalle: { idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }) {
-  const ok = await guardarHoraCaja(detalle.idUsuario, detalle.fecha, detalle.hora, detalle.tipo);
-  if (ok) {
-    const [y, m] = detalle.fecha.split('-');
+  return await guardarHoraCaja(detalle.idUsuario, detalle.fecha, detalle.hora, detalle.tipo);
+}
+
+// Guarda entrada y salida EN SECUENCIA y recarga una sola vez al final.
+// Antes cada operacion recargaba el mes por su cuenta y las respuestas
+// competian: la pantalla podia quedarse con datos previos ("no cambia").
+async function guardarHorasLote(ops: Array<{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }>) {
+  let fallo: string | null = null;
+  for (const op of ops) {
+    const ok = await guardarHora(op);
+    if (!ok) {
+      fallo = `${op.tipo === 'apertura' ? 'la entrada' : 'la salida'} ${op.hora} del ${op.fecha}`;
+      break;
+    }
+  }
+  if (fallo) {
+    alert(`No se pudo guardar ${fallo}. Verifica que exista la apertura del día e inténtalo de nuevo.`);
+  }
+  const [y, m] = (ops[0]?.fecha || '').split('-');
+  if (y && m) {
     cargarAsistencias(Number(m), Number(y));
   }
 }
@@ -118,7 +135,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
       :guardando-config="guardandoConfig"
       @cargar-asistencias="() => { const [y, m] = (filtroMesVentas || '').split('-'); cargarAsistencias(Number(m), Number(y)); }"
       @update:filtro-mes-ventas="filtroMesVentas = $event"
-      @guardar-hora="guardarHora"
+      @guardar-horas="guardarHorasLote"
       @guardar-config="guardarConfig"
       @eliminar-turno="eliminarTurnoHandler"
     />

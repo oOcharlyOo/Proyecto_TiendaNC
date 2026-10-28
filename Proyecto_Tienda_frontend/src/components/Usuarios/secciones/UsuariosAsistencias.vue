@@ -91,17 +91,29 @@ function guardarEdicionHora() {
   if (entrada && !re.test(entrada)) { alert('Hora de entrada inválida (use HH:MM)'); return; }
   if (salida && !re.test(salida)) { alert('Hora de salida inválida (use HH:MM)'); return; }
 
-  if (!salida && mod.turnoAbierto && entrada) {
+  if (entrada && salida && entrada === salida) {
+    if (!window.confirm('La salida es igual a la entrada: el día marcará 0h 0m. ¿Guardar de todos modos?')) return;
+  }
+
+  let cierre = salida;
+  if (!cierre && mod.turnoAbierto && entrada) {
     if (horasTranscurridas(entrada, mod.fecha) >= umbralAutoCierre.value) {
-      emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: sumarHoras(entrada, duracionTurnoSugerida.value), tipo: 'cierre' });
+      cierre = sumarHoras(entrada, duracionTurnoSugerida.value);
     } else {
       alert(`El turno aún puede estar activo (lleva menos de ${umbralAutoCierre.value}h desde la entrada). Escribe la hora de salida para cerrarlo.`);
       return;
     }
   }
 
-  if (entrada) emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: entrada, tipo: 'apertura' });
-  if (salida) emit('guardar-hora', { idUsuario: mod.idUsuario, fecha: mod.fecha, hora: salida, tipo: 'cierre' });
+  // Se emiten ambas operaciones juntas y el padre las guarda en secuencia:
+  // así la recarga del mes ocurre una sola vez, al final, y la pantalla ya
+  // no se queda con datos viejos por la carrera entre los dos POST.
+  const ops: Array<{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }> = [];
+  if (entrada) ops.push({ idUsuario: mod.idUsuario, fecha: mod.fecha, hora: entrada, tipo: 'apertura' });
+  if (cierre) ops.push({ idUsuario: mod.idUsuario, fecha: mod.fecha, hora: cierre, tipo: 'cierre' });
+  if (ops.length === 0) return;
+
+  emit('guardar-horas', ops);
   cerrarEdicionHora();
 }
 
@@ -216,7 +228,7 @@ const totalesPago = computed(() => {
 const emit = defineEmits<{
   'cargar-asistencias': [];
   'update:filtro-mes-ventas': [value: string];
-  'guardar-hora': [{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }];
+  'guardar-horas': [ops: Array<{ idUsuario: number; fecha: string; hora: string; tipo: 'apertura' | 'cierre' }>];
   'eliminar-turno': [{ idUsuario: number; fecha: string; nombre: string }];
   'guardar-config': [horas: number];
 }>();
@@ -481,7 +493,7 @@ const emit = defineEmits<{
               <input v-model="salidaInput" type="time" placeholder="HH:MM" />
             </label>
           </div>
-          <p class="modal-edit-hint">Los tiempos se redondean a los 15 min más cercanos para el cálculo de nómina.</p>
+          <p class="modal-edit-hint">Los tiempos se redondean a los 15 min más cercanos para el cálculo de nómina. Si la salida es menor que la entrada se cuenta como turno que cruza medianoche.</p>
           <div class="modal-edit-actions">
             <button class="btn-edit-cancel" @click="cerrarEdicionHora">Cancelar</button>
             <button class="btn-edit-save" @click="guardarEdicionHora" :disabled="guardandoHora">
