@@ -9,6 +9,7 @@ const apellidoM = ref('');
 const usuario = ref('');
 const password = ref('');
 
+const verPassword = ref(false);
 const loading = ref(false);
 
 function onSubmit() {
@@ -58,8 +59,14 @@ function onSubmit() {
 
     <div>
       <label for="fa-password">Contraseña</label>
-      <input id="fa-password" v-model="password" type="password" placeholder="........" autocomplete="new-password"
-        :disabled="loading" required>
+      <div class="campo-pass">
+        <input id="fa-password" v-model="password" :type="verPassword ? 'text' : 'password'" placeholder="........"
+          autocomplete="new-password" :disabled="loading" required>
+        <button type="button" class="ojo-btn" :disabled="loading"
+          :aria-label="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          :title="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          @click="verPassword = !verPassword">{{ verPassword ? '🙈' : '👁' }}</button>
+      </div>
     </div>
 
     <button type="submit" :disabled="loading || !nombre.trim() || !apellidoP.trim() || !usuario.trim() || !password.trim()">
@@ -86,6 +93,23 @@ function onSubmit() {
 
 .name-row {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+}
+
+/* Campo de contraseña con boton "ojo" para revelarla */
+.campo-pass { position: relative; }
+.campo-pass input { padding-right: 2.6rem !important; }
+.ojo-btn {
+  position: absolute; right: 0.45rem; top: 50%;
+  width: auto !important; min-width: 0; margin: 0 !important;
+  padding: 0.15rem 0.3rem !important; border: none !important;
+  background: transparent !important; box-shadow: none !important;
+  transform: translateY(-50%); font-size: 1.05rem; line-height: 1;
+  text-transform: none !important; letter-spacing: 0 !important;
+  color: var(--text-secondary) !important; cursor: pointer;
+}
+.ojo-btn:hover {
+  background: transparent !important; transform: translateY(-50%) !important;
+  color: var(--text-primary) !important;
 }
 
 .btn-spinner {

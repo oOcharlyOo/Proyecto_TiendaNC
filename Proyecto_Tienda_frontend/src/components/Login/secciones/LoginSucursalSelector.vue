@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const mostrandoForm = ref(false);
 const nombreNueva = ref('');
 const claveNueva = ref('');
+const verClave = ref(false);
 
 // Cuando el alta termina bien (cambia la lista), el formulario se cierra solo.
 watch(() => props.sucursales.length, () => {
@@ -72,13 +73,23 @@ function submit() {
       </label>
       <label class="sucursal-add-label">
         Clave maestra del propietario
-        <input
-          v-model="claveNueva"
-          type="password"
-          placeholder="••••••••••"
-          autocomplete="off"
-          :disabled="creando"
-        >
+        <div class="campo-pass">
+          <input
+            v-model="claveNueva"
+            :type="verClave ? 'text' : 'password'"
+            placeholder="••••••••••"
+            autocomplete="off"
+            :disabled="creando"
+          >
+          <button
+            type="button"
+            class="ojo-btn"
+            :disabled="creando"
+            :aria-label="verClave ? 'Ocultar clave' : 'Mostrar clave'"
+            :title="verClave ? 'Ocultar clave' : 'Mostrar clave'"
+            @click="verClave = !verClave"
+          >{{ verClave ? '🙈' : '👁' }}</button>
+        </div>
       </label>
       <p v-if="error" class="sucursal-add-error">{{ error }}</p>
       <div class="sucursal-add-actions">
@@ -134,6 +145,16 @@ function submit() {
   outline: none;
   border-color: var(--color-accent, #d4a84b);
 }
+.campo-pass { position: relative; display: block; }
+.campo-pass input { width: 100%; padding-right: 2.2rem; }
+.ojo-btn {
+  position: absolute; right: 0.3rem; top: 50%;
+  width: auto; min-width: 0; margin: 0; padding: 0.1rem 0.25rem;
+  border: none; background: transparent; box-shadow: none;
+  transform: translateY(-50%); font-size: 0.95rem; line-height: 1;
+  color: var(--color-text-secondary, #b0a890); cursor: pointer;
+}
+.ojo-btn:hover { background: transparent; color: var(--color-text-primary, #e8e0d0); }
 .sucursal-add-error {
   margin: 0;
   font-size: 0.7rem;

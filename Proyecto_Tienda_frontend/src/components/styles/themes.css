@@ -588,6 +588,27 @@
   color: var(--text-secondary);
 }
 
+/* ---------- Legibilidad de lo escrito (temas claros incluidos) ----------
+   El autofill de Chrome pinta fondo y texto propios e ignora `color`; con
+   un fondo claro dejaba texto claro sobre blanco. Forzamos el color del
+   token y el caret, y repintamos el fondo del autofill con el del tema. */
+input,
+select,
+textarea {
+  caret-color: var(--text-primary);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-primary) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* ---------- Modal header/body/actions ---------- */
 [data-theme="classic"] .modal-header,
 [data-theme="modern"] .modal-header,

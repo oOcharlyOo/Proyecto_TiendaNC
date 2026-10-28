@@ -135,8 +135,11 @@ export function usarApariencia() {
       root.style.setProperty('--chart-border', mezclar(fondo, claro ? false : true, 0.25));
       root.style.setProperty('--chart-border-light', mezclar(fondo, claro ? false : true, 0.15));
       root.style.setProperty('--chart-item-bg', rgba(acento && HEX_RE.test(acento) ? acento : '#64748b', 0.12));
+      // Controles nativos (selects, date pickers, autofill, scrollbars) acordes al fondo
+      root.style.colorScheme = claro ? 'light' : 'dark';
     } else {
       VARIABLES_FONDO.forEach(v => root.style.removeProperty(v));
+      root.style.removeProperty('color-scheme');
     }
 
     if (acento && HEX_RE.test(acento)) {
