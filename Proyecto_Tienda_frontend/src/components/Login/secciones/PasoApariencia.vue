@@ -79,7 +79,7 @@ const esAcentoPersonalizado = computed(
         class="ap-tema ap-tema-custom"
         :class="{ activo: esCustom }"
         :style="{ background: esCustom ? fondoActivo : undefined }"
-        title="Fondo personalizado (hex)"
+        title="Fondo personalizado (claro u oscuro)"
       >
         <template v-if="!esCustom">
           <span class="ap-tema-panel custom-macro"><span class="ap-tema-chip">🎨</span></span>
