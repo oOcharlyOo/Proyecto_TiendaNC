@@ -1763,8 +1763,9 @@ textarea:-webkit-autofill {
 [data-theme="modern"] td,
 [data-theme="ocean"] td,
 [data-theme="forest"] td {
+  /* El color se hereda de `table`; fijarlo aquí pisaba clases semánticas
+     como .venta, .costo o .gain (ganaban por especificidad [data-theme] td). */
   border-bottom: 1px solid var(--bg-panel);
-  color: var(--text-primary);
 }
 
 [data-theme="classic"] .id-badge,

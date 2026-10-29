@@ -128,6 +128,7 @@ export function esGaming(idCat?: number) { return !!(idCat && gamingCategoryId.v
 export function stockClass(p: ProductoDTO) {
   const s = Number(p.stock), m = Number(p.cantidad_min);
   if (s === 0) return 'agotado';
+  if (s < m * 0.5) return 'critico';
   if (s < m) return 'bajo';
   if (s >= m * 3) return 'ok';
   return 'normal';
