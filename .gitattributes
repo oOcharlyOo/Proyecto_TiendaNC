@@ -1,0 +1,4 @@
+# Los scripts se ejecutan dentro de contenedores Linux: siempre con LF.
+# En Windows, core.autocrlf=true los dejaria con CRLF y bash fallaria.
+*.sh  text eol=lf
+*.awk text eol=lf

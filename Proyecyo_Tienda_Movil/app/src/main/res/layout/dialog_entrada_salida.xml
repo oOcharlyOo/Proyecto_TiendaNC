@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC060d09">
+
+    <LinearLayout
+        android:layout_width="360dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/zelda_panel"
+        android:padding="@dimen/space_xl">
+
+        <TextView
+            android:id="@+id/tvTitulo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💰 Movimiento de Efectivo"
+            android:textColor="@color/gold_light"
+            android:textSize="@dimen/text_xl"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="@dimen/space_lg" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/gold_dark"
+            android:layout_marginBottom="@dimen/space_sm" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Monto"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_sm"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <EditText
+            android:id="@+id/etMonto"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/card_height_md"
+            android:background="@drawable/zelda_panel_active"
+            android:inputType="numberDecimal"
+            android:textColor="@color/white"
+            android:textSize="@dimen/text_lg"
+            android:paddingHorizontal="@dimen/space_lg"
+            android:layout_marginBottom="@dimen/space_sm" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="DescripciÃ³n"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_sm"
+            android:layout_marginBottom="@dimen/space_xs" />
+
+        <EditText
+            android:id="@+id/etDescripcion"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/card_height_md"
+            android:background="@drawable/zelda_panel_active"
+            android:textColor="@color/white"
+            android:textSize="@dimen/text_body"
+            android:paddingHorizontal="@dimen/space_lg"
+            android:layout_marginBottom="@dimen/space_lg" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnCancelar"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/touch_target_large"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/space_sm"
+                android:background="@drawable/zelda_btn_cancel"
+                android:gravity="center"
+                android:text="Cancelar"
+                android:textColor="@color/white"
+                android:textSize="@dimen/text_lg"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnAceptar"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/touch_target_large"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/space_sm"
+                android:background="@drawable/zelda_btn_confirm"
+                android:gravity="center"
+                android:text="Guardar"
+                android:textColor="@color/white"
+                android:textSize="@dimen/text_lg"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

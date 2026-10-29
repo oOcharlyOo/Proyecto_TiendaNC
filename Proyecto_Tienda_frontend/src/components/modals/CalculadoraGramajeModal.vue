@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+
 type ProductoGramaje = {
   id: number;
   nombre: string;
@@ -11,6 +13,9 @@ type ProductoGramaje = {
 const props = defineProps<{
   open: boolean;
   producto: ProductoGramaje | null;
+  isEditing?: boolean;
+  cantidadInicial?: number;
+  precioInicial?: number;
 }>();
 
 const emit = defineEmits<{
@@ -20,26 +25,72 @@ const emit = defineEmits<{
 
 const gramos = ref<number | null>(null);
 const precioTotal = ref<number | null>(null);
-const precioPorKilo = computed(() => Number(props.producto?.precio ?? 0));
+const precioPorKilo = ref<number>(0);
+const loading = ref(false);
 
 watch(
   () => props.open,
-  (abierto) => {
+  async (abierto) => {
     if (!abierto) return;
     gramos.value = null;
     precioTotal.value = null;
+    
+    if (props.isEditing && props.cantidadInicial && props.precioInicial) {
+      gramos.value = props.cantidadInicial;
+      precioTotal.value = props.cantidadInicial * props.precioInicial;
+    }
   }
 );
 
+watch(() => props.producto, async (prod) => {
+  if (prod?.precio) {
+    precioPorKilo.value = prod.precio;
+  }
+  
+  if (prod?.id && props.open) {
+    await cargarPrecioPorKilo(prod.id);
+  }
+}, { immediate: true });
+
+async function cargarPrecioPorKilo(idProducto: number) {
+  loading.value = true;
+  try {
+    const respuesta = await fetch(`${API_BASE}/ventasDetalle/calcularGramaje`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idProducto: idProducto,
+        cantidad: 0,
+        tipoInput: 'GRAMOS'
+      })
+    });
+    const res = await respuesta.json();
+    
+    if (res?.datos?.precioPorKilo) {
+      precioPorKilo.value = Number(res.datos.precioPorKilo);
+    }
+  } catch (e) {
+    console.error('Error al cargar precio por kilo:', e);
+  } finally {
+    loading.value = false;
+  }
+}
+
 function recalcularDesdeGramos() {
   const nuevoGramaje = Number(gramos.value ?? 0);
-  if (nuevoGramaje <= 0 || precioPorKilo.value <= 0) return;
+  if (nuevoGramaje <= 0 || precioPorKilo.value <= 0) {
+    precioTotal.value = null;
+    return;
+  }
   precioTotal.value = Number(((nuevoGramaje / 1000) * precioPorKilo.value).toFixed(2));
 }
 
 function recalcularDesdeTotal() {
   const nuevoTotal = Number(precioTotal.value ?? 0);
-  if (nuevoTotal <= 0 || precioPorKilo.value <= 0) return;
+  if (nuevoTotal <= 0 || precioPorKilo.value <= 0) {
+    gramos.value = null;
+    return;
+  }
   gramos.value = Math.round((nuevoTotal / precioPorKilo.value) * 1000);
 }
 
@@ -50,6 +101,14 @@ function setGramaje(valor: number) {
 
 function setTotalRapido(valor: number) {
   precioTotal.value = valor;
+  recalcularDesdeTotal();
+}
+
+function onGramosChange() {
+  recalcularDesdeGramos();
+}
+
+function onTotalChange() {
   recalcularDesdeTotal();
 }
 
@@ -68,284 +127,394 @@ function confirmar() {
 
 <template>
   <div v-if="open" class="modal-overlay" @click.self="emit('close')">
-    <section class="modal-card panel">
-      <header class="modal-header">
-        <h3>Calculadora de Gramaje</h3>
-      </header>
+    <section class="scale-modal">
+      <div class="scale-decor top">
+        <span class="scale-pan"></span>
+        <span class="scale-string"></span>
+      </div>
+      
+      <div class="modal-card panel">
+        <div class="modal-glow"></div>
+        
+        <header class="modal-header">
+          <div class="header-icon">⚖️</div>
+          <h3>{{ isEditing ? 'Editar Gramaje' : 'Calculadora de Gramaje' }}</h3>
+          <p>Pesa tu producto y calcula el precio</p>
+        </header>
 
-      <div class="modal-body">
-        <label>Producto</label>
-        <input type="text" :value="producto?.nombre || ''" readonly>
-
-        <div class="inputs-grid">
-          <section class="input-block">
-            <label>Gramaje a vender (g)</label>
-            <input
-              v-model.number="gramos"
-              class="input-lg"
-              type="number"
-              min="0"
-              step="10"
-              placeholder="0"
-              @input="recalcularDesdeGramos"
-            >
-
-            <div class="quick-buttons">
-              <button type="button" class="btn-secondary" @click="setGramaje(250)">250g</button>
-              <button type="button" class="btn-secondary" @click="setGramaje(500)">500g</button>
-              <button type="button" class="btn-secondary" @click="setGramaje(1000)">1kg</button>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Producto</label>
+            <div class="product-name">
+              <span class="product-icon">📦</span>
+              <span>{{ producto?.nombre || '' }}</span>
             </div>
-          </section>
+          </div>
 
-          <section class="input-block">
-            <label>Total a cobrar</label>
-            <input
-              v-model.number="precioTotal"
-              class="input-lg"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              @input="recalcularDesdeTotal"
+          <div v-if="loading" class="loading-indicator">
+            Calculando...
+          </div>
+
+          <div class="inputs-grid">
+            <section class="input-block">
+              <label>⚖️ Gramaje (g)</label>
+              <div class="input-wrapper">
+                <input
+                  v-model.number="gramos"
+                  class="input-lg"
+                  type="number"
+                  min="0"
+                  step="10"
+                  placeholder="0"
+                  @input="onGramosChange"
+                >
+                <span class="input-unit">g</span>
+              </div>
+
+              <div class="quick-buttons">
+                <button type="button" class="btn-quick" @click="setGramaje(250)">250g</button>
+                <button type="button" class="btn-quick" @click="setGramaje(500)">500g</button>
+                <button type="button" class="btn-quick" @click="setGramaje(1000)">1kg</button>
+              </div>
+            </section>
+
+            <section class="input-block">
+              <label>💰 Total a cobrar</label>
+              <div class="input-wrapper currency">
+                <span class="currency-symbol">$</span>
+                <input
+                  v-model.number="precioTotal"
+                  class="input-lg"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  @input="onTotalChange"
+                >
+              </div>
+
+              <div class="quick-buttons">
+                <button type="button" class="btn-quick" @click="setTotalRapido(10)">$10</button>
+                <button type="button" class="btn-quick" @click="setTotalRapido(20)">$20</button>
+                <button type="button" class="btn-quick" @click="setTotalRapido(30)">$30</button>
+              </div>
+            </section>
+          </div>
+
+          <div v-if="precioPorKilo > 0" class="precio-kilo-info">
+            <span class="precio-kilo-label">Precio por kilo:</span>
+            <span class="precio-kilo-value">${{ precioPorKilo }}</span>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" @click="emit('close')">
+              Cancelar
+            </button>
+            <button 
+              type="button" 
+              class="btn-primary" 
+              :disabled="!gramos || !precioTotal || loading"
+              @click="confirmar"
             >
-
-            <div class="quick-buttons">
-              <button type="button" class="btn-secondary" @click="setTotalRapido(5)">$5</button>
-              <button type="button" class="btn-secondary" @click="setTotalRapido(10)">$10</button>
-              <button type="button" class="btn-secondary" @click="setTotalRapido(20)">$20</button>
-            </div>
-          </section>
-        </div>
-
-        <div class="result-card">
-          <p>Precio por kilo: <strong>{{ precioPorKilo.toFixed(2) }}</strong></p>
-          <p>Gramaje: <strong>{{ Number(gramos || 0) }} g</strong></p>
-          <p>Total: <strong>{{ Number(precioTotal || 0).toFixed(2) }}</strong></p>
+              {{ isEditing ? 'Actualizar' : 'Agregar' }}
+            </button>
+          </div>
         </div>
       </div>
 
-      <footer class="modal-actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">
-          <span class="btn-icono">✕</span>
-          <span class="btn-texto">Cancelar</span>
-        </button>
-        <button type="button" @click="confirmar">
-          <span class="btn-icono">➕</span>
-          <span class="btn-texto">Agregar</span>
-        </button>
-      </footer>
+      <div class="scale-decor bottom">
+        <span class="scale-pan"></span>
+        <span class="scale-string"></span>
+      </div>
     </section>
   </div>
 </template>
 
 <style scoped>
 .modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgba(2, 4, 2, 0.92);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.4);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1100;
+  animation: calcFadeIn .25s ease;
 }
+@keyframes calcFadeIn{from{opacity:0}to{opacity:1}}
 
-.modal-card {
-  width: min(100%, 480px);
-  background: linear-gradient(180deg, #1f5b35 0%, #133523 100%);
-  border: 4px solid #f8d667;
-  box-shadow: 
-    0 0 0 4px #2f1f09,
-    0 14px 0 #271c0f,
-    0 20px 28px rgba(0, 0, 0, 0.5);
-  padding: 1.2rem;
-  display: grid;
-  gap: 0.8rem;
+.scale-modal {
+  width: min(94%, 390px);
   position: relative;
-  animation: popIn 150ms steps(4);
-}
-
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.modal-card::before {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 2px dashed rgba(248, 214, 103, 0.4);
-  pointer-events: none;
-}
-
-.modal-header {
-  position: relative;
-  border-bottom: 2px solid rgba(248, 214, 103, 0.3);
-  padding-bottom: 0.5rem;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: #f8d667;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-weight: 900;
-  text-shadow: 2px 2px 0 #000;
-}
-
-.modal-header h3::before {
-  content: "⚖️ ";
-}
-
-.modal-body {
-  display: grid;
-  gap: 0.7rem;
-  position: relative;
-}
-
-.modal-body label {
-  font-size: 0.72rem;
-  color: #f6f2de;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-family: "Courier New", monospace;
-}
-
-.modal-body input[type="text"],
-.modal-body input[type="number"] {
-  width: 100%;
-  background: #f2e8bf;
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.7rem;
-  color: #1d1606;
-  font-family: "Courier New", monospace;
-  font-size: 1rem;
-  font-weight: 600;
-  outline: none;
-  box-shadow: inset 0 0 0 2px #d4c27e;
-}
-
-.modal-body input[type="text"]:focus,
-.modal-body input[type="number"]:focus {
-  box-shadow: inset 0 0 0 2px #e1cc80, 0 0 0 3px #f8d667;
-}
-
-.modal-body input[type="text"] {
-  background: #e8d9a8;
-  cursor: not-allowed;
-}
-
-.inputs-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
-}
-
-.input-block {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.quick-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.35rem;
-}
-
-.quick-buttons button {
-  border: 2px solid #2a1807;
-  padding: 0.35rem 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-family: "Courier New", monospace;
-  cursor: pointer;
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
-  box-shadow: 0 2px 0 #6f4b1c;
-  transition: transform 60ms steps(2), filter 60ms linear;
-}
-
-.quick-buttons button:hover {
-  filter: brightness(1.08);
-}
-
-.quick-buttons button:active {
-  transform: translateY(2px);
-  box-shadow: none;
-}
-
-.result-card {
-  border: 3px solid #2a1807;
-  background: linear-gradient(180deg, #ffe48b 0%, #f8d667 50%, #e2b84f 100%);
-  color: #1a1401;
-  padding: 0.65rem;
-  display: grid;
-  gap: 0.15rem;
-  box-shadow: inset 0 0 0 3px #ffeeb4, 0 4px 0 #6f4b1c;
-}
-
-.result-card p {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: 0.03em;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
 }
 
-.result-card p strong {
-  font-family: "Courier New", monospace;
-  font-size: 0.85rem;
+.scale-decor { display:flex; flex-direction:column; align-items:center; width:100% }
+.scale-decor.top { margin-bottom:-26px; z-index:1 }
+.scale-decor.bottom { display:none }
+
+.scale-string {
+  width: 3px; height: 28px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 70%, #fff) 0%, var(--color-accent) 40%, color-mix(in srgb, var(--color-accent) 60%, #000) 100%);
+  border-radius: 2px;
+  box-shadow: 2px 0 3px rgba(0,0,0,.2);
 }
 
-.modal-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+.scale-pan {
+  width: 120px; height: 42px;
+  border-radius: 0 0 100px 100px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--color-accent) 85%, #fff) 0%,
+    var(--color-accent) 20%,
+    color-mix(in srgb, var(--color-accent) 70%, #000) 100%);
+  box-shadow:
+    inset 0 -4px 8px rgba(0,0,0,.3),
+    0 6px 12px rgba(0,0,0,.25),
+    0 1px 0 color-mix(in srgb, var(--color-accent) 60%, #fff);
+}
+
+.scale-modal .modal-card {
+  width: 100%;
+  background: var(--color-bg-secondary);
+  border-radius: 18px;
+  animation: calcPopIn .25s ease-out;
+  box-shadow:
+    10px 10px 30px rgba(0,0,0,.4),
+    -6px -6px 20px rgba(255,255,255,.04),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  overflow: hidden;
   position: relative;
-  padding-top: 0.5rem;
-  border-top: 2px solid rgba(248, 214, 103, 0.3);
 }
 
-.modal-actions button {
-  border: 3px solid #2a1807;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-family: "Courier New", monospace;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 3px 0 #6f4b1c, 0 5px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 80ms steps(2), filter 80ms linear;
+@keyframes calcPopIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+.modal-glow {
+  position:absolute; inset:12px; pointer-events:none; border-radius:8px;
+  box-shadow: inset 0 0 40px color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
-.modal-actions button:first-child {
-  background: linear-gradient(180deg, #e2deca 0%, #bdb696 100%);
-  color: #1a1401;
+.scale-modal .modal-header {
+  text-align: center;
+  padding: 1rem 1rem .7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  box-shadow: 0 1px 0 rgba(255,255,255,.03);
+  position: relative;
 }
 
-.modal-actions button:last-child {
-  background: linear-gradient(180deg, #9fd98a 0%, #5ab848 50%, #3d8a2f 100%);
-  color: #0a2008;
+.scale-modal .header-icon {
+  display: inline-flex; align-items:center; justify-content:center;
+  width: 48px; height: 48px;
+  margin-bottom: .4rem;
+  font-size: 1.7rem;
+  background: var(--color-bg-primary);
+  border-radius: 50%;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,.15), 3px 3px 6px rgba(0,0,0,.08);
 }
 
-.modal-actions button:hover {
-  filter: brightness(1.1);
+.scale-modal .modal-header h3 {
+  color: var(--color-text-primary);
+  font-size: 1.05rem; margin:0; font-weight:700;
+  letter-spacing: .02em;
+}
+
+.scale-modal .modal-header p {
+  color: var(--color-text-secondary);
+  font-size: .7rem; margin:.2rem 0 0; opacity:.8;
+}
+
+.scale-modal .modal-body {
+  padding: .85rem 1rem 1rem;
+  display: flex; flex-direction:column; gap:.65rem;
+}
+
+.scale-modal .form-group { display:flex; flex-direction:column; gap:.3rem }
+.scale-modal .form-group label {
+  color: var(--color-text-secondary); font-size:.7rem; font-weight:600;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+
+.scale-modal .product-name {
+  display:flex; align-items:center; gap:.4rem;
+  padding: .55rem .65rem;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  font-size: .82rem; font-weight: 500;
+  box-shadow: inset 3px 3px 6px rgba(0,0,0,.12), 0 0 0 1px rgba(255,255,255,.02);
+}
+
+.scale-modal .product-icon { font-size:.95rem; opacity:.7 }
+
+.scale-modal .inputs-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:.55rem;
+}
+
+.scale-modal .input-block { display:flex; flex-direction:column; gap:.3rem }
+.scale-modal .input-block label {
+  color: var(--color-text-secondary); font-size:.7rem; font-weight:600;
+  text-transform: uppercase; letter-spacing:.04em;
+}
+
+.scale-modal .input-wrapper {
+  display:flex; align-items:center;
+  background: var(--color-bg-primary);
+  border-radius: 8px; overflow:hidden;
+  box-shadow:
+    inset 3px 3px 6px rgba(0,0,0,.15),
+    inset -1px -1px 2px rgba(255,255,255,.03);
+  transition: box-shadow .2s;
+}
+
+.scale-modal .input-wrapper:focus-within {
+  box-shadow:
+    inset 3px 3px 8px rgba(0,0,0,.2),
+    0 0 0 2px var(--color-accent);
+}
+
+.scale-modal .input-lg {
+  flex:1; padding:.55rem .6rem;
+  background:transparent; border:none;
+  color:var(--color-text-primary); font-size:1rem; font-weight:600;
+  outline:none; width:100%;
+}
+
+.scale-modal .input-lg::placeholder{color:var(--color-text-secondary);opacity:.5}
+
+.scale-modal .input-unit {
+  padding:0 .55rem; color:var(--color-text-secondary);
+  font-weight:500; font-size:.82rem;
+}
+
+.scale-modal .input-wrapper.currency{padding-left:.2rem}
+
+.scale-modal .currency-symbol {
+  padding:0 .1rem 0 .55rem;
+  color:var(--color-success); font-weight:700; font-size:1rem;
+}
+
+.scale-modal .quick-buttons{display:flex;gap:.3rem;margin-top:.1rem}
+
+.scale-modal .btn-quick {
+  flex:1; padding:.35rem .1rem;
+  background: var(--color-bg-secondary);
+  border:none; border-radius:7px;
+  color:var(--color-text-secondary); font-size:.64rem; font-weight:600;
+  cursor:pointer; transition:all .18s;
+  box-shadow: 3px 3px 6px rgba(0,0,0,.12), -1px -1px 3px rgba(255,255,255,.03);
+}
+
+.scale-modal .btn-quick:hover {
+  transform: translateY(-1px);
+  box-shadow: 5px 5px 10px rgba(0,0,0,.18), -2px -2px 5px rgba(255,255,255,.04);
+  background: var(--color-accent);
+  color: var(--color-on-brand);
+}
+
+.scale-modal .btn-quick:active {
+  transform: translateY(1px);
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,.2);
+}
+
+.scale-modal .precio-kilo-info {
+  display:flex; justify-content:center; align-items:center; gap:.5rem;
+  padding:.6rem;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  box-shadow: inset 3px 3px 6px rgba(0,0,0,.1), 0 0 0 1px rgba(255,255,255,.02);
+}
+
+.scale-modal .precio-kilo-label {
+  color:var(--color-text-secondary); font-size:.72rem; font-weight:500;
+}
+
+.scale-modal .precio-kilo-value {
+  color:var(--color-accent); font-weight:700; font-size:.95rem;
+  text-shadow: 0 1px 0 rgba(0,0,0,.1);
+}
+
+.scale-modal .modal-actions{display:flex;gap:.55rem;margin-top:.3rem}
+
+.scale-modal .btn-secondary,
+.scale-modal .btn-primary {
+  flex:1; padding:.7rem .5rem; border-radius:10px;
+  font-size:.82rem; font-weight:700; cursor:pointer;
+  transition:all .18s; border:none; letter-spacing:.03em;
+}
+
+.scale-modal .btn-secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  box-shadow: 4px 4px 8px rgba(0,0,0,.15), -2px -2px 5px rgba(255,255,255,.03);
+}
+
+.scale-modal .btn-secondary:hover {
   transform: translateY(-2px);
+  box-shadow: 6px 6px 14px rgba(0,0,0,.22), -3px -3px 8px rgba(255,255,255,.04);
+  color: var(--color-text-primary);
 }
 
-.modal-actions button:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 0 0 2px #ffeeb4, 0 1px 0 #6f4b1c;
+.scale-modal .btn-secondary:active {
+  transform: translateY(1px);
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,.18), 1px 1px 3px rgba(0,0,0,.05);
 }
 
-@media (max-width: 760px) {
-  .inputs-grid {
-    grid-template-columns: 1fr;
-  }
+.scale-modal .btn-primary {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--color-accent) 90%, #fff) 0%,
+    var(--color-accent) 40%,
+    color-mix(in srgb, var(--color-accent) 75%, #000) 100%);
+  color: var(--color-on-brand);
+  box-shadow:
+    4px 4px 10px rgba(0,0,0,.2),
+    -1px -1px 4px rgba(255,255,255,.04),
+    inset 0 1px 0 rgba(255,255,255,.1);
 }
+
+.scale-modal .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    7px 7px 16px rgba(0,0,0,.28),
+    -3px -3px 8px rgba(255,255,255,.05),
+    inset 0 1px 0 rgba(255,255,255,.15);
+}
+
+.scale-modal .btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 3px 3px 8px rgba(0,0,0,.25),
+    2px 2px 4px rgba(0,0,0,.1);
+}
+
+.scale-modal .btn-primary:disabled {
+  opacity:.4; cursor:not-allowed; transform:none;
+  box-shadow: 2px 2px 4px rgba(0,0,0,.08);
+}
+
+.loading-indicator {
+  text-align:center; padding:.7rem;
+  color:var(--color-text-secondary);
+  font-size:.75rem; font-weight:500;
+  animation: calcPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes calcPulse {
+  0%,100%{opacity:.4} 50%{opacity:1}
+}
+
+@media(max-width:480px){
+  .scale-modal{width:95vw}
+  .scale-pan{width:90px;height:34px}
+  .scale-string{height:20px}
+  .scale-decor.top{margin-bottom:-20px}
+  .scale-modal .modal-card{border-radius:14px}
+  .scale-modal .modal-header{padding:.8rem .7rem .55rem}
+  .scale-modal .modal-body{padding:.7rem .8rem}
+  .scale-modal .inputs-grid{grid-template-columns:1fr;gap:.45rem}
+  .scale-modal .modal-header h3{font-size:.95rem}
+  .scale-modal .header-icon{width:40px;height:40px;font-size:1.4rem}
+  .scale-modal .input-lg{font-size:.9rem;padding:.48rem .5rem}
+  .scale-modal .btn-quick{font-size:.6rem}
+  .scale-modal .btn-secondary,.scale-modal .btn-primary{font-size:.78rem;padding:.6rem .4rem}
+}
+
 </style>
+

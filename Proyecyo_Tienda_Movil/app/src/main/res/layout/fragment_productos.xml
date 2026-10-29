@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?><androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"    xmlns:app="http://schemas.android.com/apk/res-auto"    xmlns:tools="http://schemas.android.com/tools"    android:layout_width="match_parent"    android:layout_height="match_parent"    android:background="@color/bg_main"    android:padding="@dimen/padding_screen">    <androidx.cardview.widget.CardView        android:id="@+id/cardSearch"        android:layout_width="0dp"        android:layout_height="@dimen/card_height_sm"        android:background="@drawable/zelda_panel"        app:cardBackgroundColor="@android:color/transparent"        app:cardCornerRadius="@dimen/corner_md"        app:cardElevation="0dp"        app:layout_constraintEnd_toStartOf="@id/btnAgregar"        app:layout_constraintStart_toStartOf="parent"        app:layout_constraintTop_toTopOf="parent">        <com.google.android.material.textfield.TextInputLayout            android:layout_width="match_parent"            android:layout_height="match_parent"            app:boxBackgroundMode="none"            app:endIconMode="clear_text"            app:endIconTint="@color/white"            app:hintEnabled="false">            <com.google.android.material.textfield.TextInputEditText                android:id="@+id/etBuscar"                android:layout_width="match_parent"                android:layout_height="match_parent"                android:background="@android:color/transparent"                android:drawableStart="@android:drawable/ic_menu_search"                android:drawableTint="@color/white"                android:hint="Buscar producto..."                android:imeOptions="actionSearch"                android:inputType="text"                android:paddingHorizontal="@dimen/space_lg"                android:textColor="@color/white"                android:textColorHint="@color/white"                android:textSize="@dimen/text_body" />        </com.google.android.material.textfield.TextInputLayout>    </androidx.cardview.widget.CardView>    <androidx.cardview.widget.CardView        android:id="@+id/btnAgregar"        android:layout_width="@dimen/touch_target"        android:layout_height="@dimen/card_height_sm"        android:layout_marginStart="@dimen/space_sm"        android:background="@drawable/zelda_selector"        app:cardBackgroundColor="@android:color/transparent"        app:cardCornerRadius="@dimen/corner_md"        app:cardElevation="0dp"        app:layout_constraintBottom_toBottomOf="@id/cardSearch"        app:layout_constraintEnd_toEndOf="parent"        app:layout_constraintTop_toTopOf="@id/cardSearch"        android:clickable="true"        android:focusable="true">        <TextView            android:layout_width="match_parent"            android:layout_height="match_parent"            android:gravity="center"            android:text="+"            android:textColor="@color/gold_light"            android:textSize="@dimen/text_display"            android:textStyle="bold" />    </androidx.cardview.widget.CardView>        <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvProductos"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/space_md"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_sm"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cardSearch"
+        tools:listitem="@layout/item_producto_lista" />
+
+    <TextView
+        android:id="@+id/btnCategorias"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_sm"
+        android:background="@drawable/zelda_selector"
+        android:paddingHorizontal="@dimen/space_lg"
+        android:paddingVertical="@dimen/space_xs"
+        android:text="🗂 Categorias"
+        android:textColor="@color/gold_light"
+        android:textSize="@dimen/text_body"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rvProductos" />
+</androidx.constraintlayout.widget.ConstraintLayout>

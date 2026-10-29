@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/itemView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/zelda_panel"
+    android:padding="@dimen/space_sm"
+    android:layout_marginBottom="@dimen/space_xs">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvNombrePersona"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Persona"
+            android:textColor="@color/white"
+            android:textSize="@dimen/text_sm" />
+
+        <TextView
+            android:id="@+id/tvDeudaPersona"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Deuda: $0.00"
+            android:textColor="@color/warning"
+            android:textSize="@dimen/text_xs" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Editar"
+        android:textColor="@color/gold_light"
+        android:textSize="@dimen/text_xs"
+        android:clickable="false" />
+</LinearLayout>

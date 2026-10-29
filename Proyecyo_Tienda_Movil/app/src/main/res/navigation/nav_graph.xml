@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/loginFragment">
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.dulcesnc.pos.ui.login.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_login_to_sucursal"
+            app:destination="@id/sucursalFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/sucursalFragment"
+        android:name="com.dulcesnc.pos.ui.login.SucursalFragment"
+        android:label="Sucursal"
+        tools:layout="@layout/fragment_sucursal">
+        <action
+            android:id="@+id/action_sucursal_to_ventas"
+            app:destination="@id/ventasFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/ventasFragment"
+        android:name="com.dulcesnc.pos.ui.ventas.VentasFragment"
+        android:label="Ventas"
+        tools:layout="@layout/fragment_ventas">
+        <action android:id="@+id/action_ventas_to_productos" app:destination="@id/productosFragment" />
+        <action android:id="@+id/action_ventas_to_usuarios" app:destination="@id/usuariosFragment" />
+        <action android:id="@+id/action_ventas_to_corte" app:destination="@id/corteFragment" />
+        <action android:id="@+id/action_ventas_to_finanzas" app:destination="@id/finanzasFragment" />
+        <action android:id="@+id/action_ventas_to_rental" app:destination="@id/rentalFragment" />
+        <action android:id="@+id/action_ventas_to_inventario" app:destination="@id/inventarioFragment" />
+        <action android:id="@+id/action_ventas_to_historial" app:destination="@id/historialFragment" />
+        <action android:id="@+id/action_ventas_to_apartados" app:destination="@id/apartadosFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/productosFragment"
+        android:name="com.dulcesnc.pos.ui.productos.ProductosFragment"
+        android:label="Productos"
+        tools:layout="@layout/fragment_productos" />
+
+    <fragment
+        android:id="@+id/usuariosFragment"
+        android:name="com.dulcesnc.pos.ui.usuarios.UsuariosFragment"
+        android:label="Usuarios"
+        tools:layout="@layout/fragment_usuarios" />
+
+    <fragment
+        android:id="@+id/corteFragment"
+        android:name="com.dulcesnc.pos.ui.corte.CorteFragment"
+        android:label="Corte"
+        tools:layout="@layout/fragment_corte" />
+
+    <fragment
+        android:id="@+id/finanzasFragment"
+        android:name="com.dulcesnc.pos.ui.finanzas.FinanzasFragment"
+        android:label="Finanzas"
+        tools:layout="@layout/fragment_finanzas" />
+
+    <fragment
+        android:id="@+id/rentalFragment"
+        android:name="com.dulcesnc.pos.ui.rental.RentalFragment"
+        android:label="Rental"
+        tools:layout="@layout/fragment_rental" />
+
+    <fragment
+        android:id="@+id/inventarioFragment"
+        android:name="com.dulcesnc.pos.ui.inventario.InventarioFragment"
+        android:label="Inventario"
+        tools:layout="@layout/fragment_inventario" />
+
+    <fragment
+        android:id="@+id/apartadosFragment"
+        android:name="com.dulcesnc.pos.ui.ventas.ApartadosFragment"
+        android:label="Apartados"
+        tools:layout="@layout/fragment_apartados" />
+
+    <fragment
+        android:id="@+id/historialFragment"
+        android:name="com.dulcesnc.pos.ui.ventas.HistorialVentasFragment"
+        android:label="Historial"
+        tools:layout="@layout/fragment_historial_ventas" />
+
+</navigation>

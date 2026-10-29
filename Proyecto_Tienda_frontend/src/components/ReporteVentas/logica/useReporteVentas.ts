@@ -1,0 +1,2208 @@
+import { ref, onMounted, computed, watch } from 'vue';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+
+export type VentasDetalleListDTO = {
+  idVentaDetalle: number;
+  idVenta: number;
+  idProducto: number;
+  productoNombre: string;
+  productoPrecioCosto: number;
+  productoIsGramaje: boolean;
+  productoCategoria: string;
+  productoSubcategoria: string;
+  cantidad: number;
+  precioUnitarioVenta: number;
+  tipoPrecioAplicado: string;
+  cobroEnvase?: boolean;
+  cantidadEnvase?: number;
+  cobroEnvaseTotal?: number;
+  Venta: {
+    idVenta?: number;
+    fechaVenta: string;
+    metodoPago: string;
+    montoTotal: number;
+    estatus: string;
+  };
+};
+
+export type ProductoStats = {
+  nombre: string;
+  cantidadTotal: number;
+  montoTotal: number;
+  costoTotal: number;
+  gananciaTotal: number;
+  isGramaje: boolean;
+};
+
+export type MetodoStats = {
+  metodo: string;
+  cantidad: number;
+  monto: number;
+};
+
+export type CategoriaStats = {
+  categoria: string;
+  subcategoria: string;
+  cantidad: number;
+  monto: number;
+  ganancia: number;
+};
+
+export type CategoriaJerarquica = {
+  categoria: string;
+  totalMonto: number;
+  totalCosto: number;
+  totalCantidad: number;
+  totalGanancia: number;
+  subcategorias: { nombre: string; monto: number; cantidad: number; ganancia: number; costo: number }[];
+};
+
+export type DiaStats = {
+  fecha: string;
+  label: string;
+  ventas: number;
+  monto: number;
+  ganancia: number;
+};
+
+export type MovimientoCaja = {
+  idCaja: number;
+  fechaMovimiento: string;
+  tipoMovimiento: string;
+  monto: number;
+  descripcion: string;
+  saldoResultante: number;
+  montoInicial?: number;
+  usuario?: { idUsuario?: number; nombre?: string; apellido_p?: string; apellido_m?: string; usuario?: string };
+};
+
+export function nombreDeUsuario(m: MovimientoCaja): string {
+  const u = m.usuario;
+  if (!u) return '—';
+  const n = [u.nombre, u.apellido_p, u.apellido_m].filter(Boolean).join(' ').trim();
+  return n || u.usuario || '—';
+}
+
+export const entradasCaja = ref<MovimientoCaja[]>([]);
+export const salidasCaja = ref<MovimientoCaja[]>([]);
+export const proveedoresLista = ref<string[]>([]);
+export const montoInicialPeriodo = ref<number>(0);
+export const aperturasPorDia = ref<Map<string, number>>(new Map());
+export const sueldosPeriodo = ref<number>(0);
+export const rentaMensual = ref<number>(0);
+export const esAdmin = computed(() => Number(localStorage.getItem('tipoUsuario') || 2) === 1);
+export const esMovil = ref(typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(max-width: 768px)').matches
+  : false);
+export const rentaPeriodo = computed(() => {
+  if (periodo.value === 'mes') return rentaMensual.value;
+  if (periodo.value === 'anio') return Math.round(rentaMensual.value * 12 * 100) / 100;
+  return 0;
+});
+
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export const periodo = ref<'dia' | 'semana' | 'mes' | 'anio'>('mes');
+export const fechaSeleccionada = ref('');
+export const detalles = ref<VentasDetalleListDTO[]>([]);
+export const cargando = ref(false);
+export const modalCategoriaOpen = ref(false);
+export const categoriaSeleccionada = ref('');
+export const subCategoriaSeleccionada = ref('');
+
+export const ventasMap = computed(() => {
+  const map = new Map<number, { 
+    idVenta: number; 
+    fecha: string; 
+    metodoPago: string; 
+    montoTotal: number; 
+    detalles: VentasDetalleListDTO[] 
+  }>();
+  
+  for (const d of detalles.value) {
+    const ventaId = d.Venta?.idVenta || d.idVenta;
+    if (!ventaId) continue;
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    
+    if (!map.has(ventaId)) {
+      map.set(ventaId, {
+        idVenta: ventaId,
+        fecha: d.Venta.fechaVenta || '',
+        metodoPago: d.Venta.metodoPago || 'N/D',
+        montoTotal: Number(d.Venta.montoTotal || 0),
+        detalles: []
+      });
+    }
+    map.get(ventaId)!.detalles.push(d);
+  }
+  return map;
+});
+
+export const productosTop = computed<ProductoStats[]>(() => {
+  const map = new Map<string, ProductoStats>();
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    
+    const key = d.productoNombre || 'Sin nombre';
+    const existing = map.get(key);
+    const cantidad = Number(d.cantidad || 0);
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      monto = precioVenta * cantidad;
+      costo = precioCostoKg * cantidad;
+    }
+    
+    const ganancia = monto - costo;
+    
+    if (existing) {
+      existing.cantidadTotal += cantidad;
+      existing.montoTotal += monto;
+      existing.costoTotal += costo;
+      existing.gananciaTotal += ganancia;
+    } else {
+      map.set(key, {
+        nombre: key,
+        cantidadTotal: cantidad,
+        montoTotal: monto,
+        costoTotal: costo,
+        gananciaTotal: ganancia,
+        isGramaje: d.productoIsGramaje || false
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.montoTotal - a.montoTotal);
+});
+
+export const productosUnitarios = computed<ProductoStats[]>(() => {
+  return productosTop.value.filter(p => !p.isGramaje).slice(0, 10);
+});
+
+export const productosGramaje = computed<ProductoStats[]>(() => {
+  return productosTop.value.filter(p => p.isGramaje).slice(0, 10);
+});
+
+export const productosTopGanancia = computed<ProductoStats[]>(() => {
+  return [...productosTop.value].sort((a, b) => b.gananciaTotal - a.gananciaTotal).slice(0, 10);
+});
+
+export const productosUnitariosGanancia = computed<ProductoStats[]>(() => {
+  return productosTopGanancia.value.filter(p => !p.isGramaje).slice(0, 10);
+});
+
+export const productosGramajeGanancia = computed<ProductoStats[]>(() => {
+  return productosTop.value
+    .filter(p => p.isGramaje)
+    .sort((a, b) => b.gananciaTotal - a.gananciaTotal)
+    .slice(0, 10);
+});
+
+export const metodosStats = computed<MetodoStats[]>(() => {
+  const map = new Map<string, MetodoStats>();
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    const metodo = d.Venta.metodoPago || 'N/D';
+    const monto = d.tipoPrecioAplicado === 'VENTA_GRAMAJE'
+      ? Number(d.precioUnitarioVenta || 0)
+      : Number(d.precioUnitarioVenta || 0) * Number(d.cantidad || 0);
+    const existing = map.get(metodo);
+    if (existing) {
+      existing.cantidad += 1;
+      existing.monto += monto;
+    } else {
+      map.set(metodo, { metodo, cantidad: 1, monto });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.monto - a.monto);
+});
+
+export const categoriasJerarquicas = computed<CategoriaJerarquica[]>(() => {
+  const catMap = new Map<string, CategoriaJerarquica>();
+  const subMap = new Map<string, Map<string, { nombre: string; monto: number; cantidad: number; ganancia: number; costo: number }>>();
+  
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    const cat = d.productoCategoria || 'Sin categoría';
+    const subRaw = d.productoSubcategoria || '';
+    const sub = (!subRaw || subRaw === '-' || subRaw.toLowerCase() === 'general') ? 'Sin subcategoría' : subRaw;
+    const cantidad = Number(d.cantidad || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      monto = precioVenta * cantidad;
+      costo = precioCostoKg * cantidad;
+    }
+    
+    const ganancia = monto - costo;
+    
+    if (!catMap.has(cat)) {
+      catMap.set(cat, { categoria: cat, totalMonto: 0, totalCosto: 0, totalCantidad: 0, totalGanancia: 0, subcategorias: [] });
+      subMap.set(cat, new Map());
+    }
+    
+    const catEntry = catMap.get(cat)!;
+    catEntry.totalMonto += monto;
+    catEntry.totalCosto += costo;
+    catEntry.totalCantidad += cantidad;
+    catEntry.totalGanancia += ganancia;
+    
+    const subCatMap = subMap.get(cat)!;
+    if (!subCatMap.has(sub)) {
+      subCatMap.set(sub, { nombre: sub, monto: 0, cantidad: 0, ganancia: 0, costo: 0 });
+    }
+    const subEntry = subCatMap.get(sub)!;
+    subEntry.monto += monto;
+    subEntry.cantidad += cantidad;
+    subEntry.ganancia += ganancia;
+    subEntry.costo += costo;
+  }
+  
+  for (const [cat, subCatMap] of subMap.entries()) {
+    const catEntry = catMap.get(cat)!;
+    catEntry.subcategorias = Array.from(subCatMap.values()).sort((a, b) => b.monto - a.monto);
+  }
+  
+  return Array.from(catMap.values()).sort((a, b) => b.totalMonto - a.totalMonto);
+});
+
+export const categoriasStats = computed<CategoriaStats[]>(() => {
+  const result: CategoriaStats[] = [];
+  for (const cat of categoriasJerarquicas.value) {
+    result.push({
+      categoria: cat.categoria,
+      subcategoria: '',
+      cantidad: cat.totalCantidad,
+      monto: cat.totalMonto,
+      ganancia: cat.totalGanancia
+    });
+    for (const sub of cat.subcategorias) {
+      result.push({
+        categoria: cat.categoria,
+        subcategoria: sub.nombre,
+        cantidad: sub.cantidad,
+        monto: sub.monto,
+        ganancia: sub.ganancia
+      });
+    }
+  }
+  return result;
+});
+
+export const ventasPorDia = computed<DiaStats[]>(() => {
+  const map = new Map<string, DiaStats>();
+  
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    if (!d.Venta.fechaVenta) continue;
+    
+    const fechaStr = d.Venta.fechaVenta;
+    const fecha = new Date(fechaStr);
+    if (isNaN(fecha.getTime())) continue;
+    
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    const cantidad = Number(d.cantidad || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+    } else {
+      monto = precioVenta * cantidad;
+    }
+    
+    if (d.productoIsGramaje) {
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      costo = precioCostoKg * cantidad;
+    }
+    const ganancia = monto - costo;
+    
+    const y = fecha.getFullYear();
+    const m = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const h = fecha.getHours();
+    
+    let key: string;
+    let label: string;
+    
+    if (periodo.value === 'dia') {
+      key = `${y}-${m}-${day}-${String(h).padStart(2, '0')}`;
+      label = `${h.toString().padStart(2, '0')}:00`;
+    } else if (periodo.value === 'semana') {
+      key = `${y}-${m}-${day}`;
+      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      label = `${dias[fecha.getDay()]} ${fecha.getDate()}`;
+    } else if (periodo.value === 'mes') {
+      key = `${y}-${m}-${day}`;
+      label = `${fecha.getDate()}`;
+    } else {
+      key = `${y}-${m}`;
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      label = meses[fecha.getMonth()];
+    }
+    
+    const existing = map.get(key);
+    if (existing) {
+      existing.ventas += 1;
+      existing.monto += monto;
+      existing.ganancia += ganancia;
+    } else {
+      map.set(key, { fecha: key, label, ventas: 1, monto, ganancia });
+    }
+  }
+  
+  const sorted = Array.from(map.values()).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  
+  if (periodo.value === 'dia' && sorted.length > 0) {
+    const firstParts = sorted[0].fecha.split('-');
+    const baseHour = parseInt(firstParts[3], 10);
+    const lastParts = sorted[sorted.length - 1].fecha.split('-');
+    const lastHour = parseInt(lastParts[3], 10);
+    const baseDate = `${firstParts[0]}-${firstParts[1]}-${firstParts[2]}`;
+    
+    const result: DiaStats[] = [];
+    for (let hour = baseHour; hour <= lastHour; hour++) {
+      const key = `${baseDate}-${String(hour).padStart(2, '0')}`;
+      const existing = map.get(key);
+      result.push(existing || {
+        fecha: key,
+        label: `${hour.toString().padStart(2, '0')}:00`,
+        ventas: 0,
+        monto: 0,
+        ganancia: 0
+      });
+    }
+    return result;
+  }
+  
+  if (periodo.value === 'semana' && sorted.length > 0) {
+    const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const firstParts = sorted[0].fecha.split('-');
+    const firstDate = new Date(parseInt(firstParts[0]), parseInt(firstParts[1]) - 1, parseInt(firstParts[2]));
+    const result: DiaStats[] = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(firstDate);
+      day.setDate(firstDate.getDate() + i);
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      const existing = map.get(key);
+      result.push(existing || {
+        fecha: key,
+        label: `${dias[day.getDay()]} ${day.getDate()}`,
+        ventas: 0,
+        monto: 0,
+        ganancia: 0
+      });
+    }
+    return result;
+  }
+  
+  return sorted;
+});
+
+export const totalVentas = computed(() => ventasMap.value.size);
+export const totalMonto = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    sum += v.montoTotal;
+  }
+  return sum;
+});
+export const totalCosto = computed(() => {
+  let sum = 0;
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    const cantidad = Number(d.cantidad || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    if (d.productoIsGramaje) {
+      sum += (precioCostoKg / 1000) * cantidad;
+    } else {
+      sum += precioCostoKg * cantidad;
+    }
+  }
+  return sum;
+});
+export const totalGanancia = computed(() => totalMonto.value - totalCosto.value);
+export const ticketPromedio = computed(() => {
+  if (totalVentas.value === 0) return 0;
+  return Math.round((totalMonto.value / totalVentas.value) * 100) / 100;
+});
+
+export const diasEnPeriodo = computed(() => {
+  const now = new Date();
+  if (periodo.value === 'dia') return 1;
+  if (periodo.value === 'semana') return 7;
+  if (periodo.value === 'anio') return 365;
+  
+  const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
+  const [y, m] = mesStr.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+});
+
+export const etiquetaPromedio = computed(() => {
+  if (periodo.value === 'dia') return 'Ventas del Día';
+  if (periodo.value === 'anio') return 'Promedio Mensual';
+  return 'Promedio Diario';
+});
+
+export const valorPromedio = computed(() => {
+  if (periodo.value === 'anio') {
+    return Math.round((totalVentas.value / 12) * 10) / 10;
+  }
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((totalVentas.value / diasEnPeriodo.value) * 10) / 10;
+});
+export const productosUnicos = computed(() => new Set(detalles.value.map(d => d.idProducto)).size);
+
+export const gananciaPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((totalGanancia.value / diasEnPeriodo.value) * 100) / 100;
+});
+
+export const gananciaBruta = computed(() => totalGanancia.value);
+export const totalSueldosPagados = computed(() => sueldosPeriodo.value);
+export const gananciaNeta = computed(() => Math.round((totalGanancia.value - totalSueldosPagados.value - rentaPeriodo.value) * 100) / 100);
+export const gananciaBrutaPromedioDia = computed(() => gananciaPromedioDia.value);
+export const gananciaNetaPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((gananciaNeta.value / diasEnPeriodo.value) * 100) / 100;
+});
+
+export const ventasPromedioDia = computed(() => {
+  if (diasEnPeriodo.value === 0) return 0;
+  return Math.round((totalMonto.value / diasEnPeriodo.value) * 100) / 100;
+});
+
+export const totalAbonos = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago?.startsWith('ABONO/')) sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+export const totalTransferencias = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago === 'TRANSFERENCIA') sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+export const totalTarjetas = computed(() => {
+  let sum = 0;
+  for (const v of ventasMap.value.values()) {
+    if (v.metodoPago === 'TARJETA') sum += v.montoTotal;
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+export const totalEnvases = computed(() => {
+  let sum = 0;
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    sum += Number(d.cobroEnvaseTotal || 0);
+  }
+  return Math.round(sum * 100) / 100;
+});
+
+export const modalMovimientosOpen = ref(false);
+export const movimientosTitulo = ref('');
+export const movimientosEsSalidas = ref(false);
+export const movimientosFiltro = ref<'todas' | 'proveedores' | 'envases' | 'otras'>('todas');
+export const busquedaMovimiento = ref('');
+export const editandoMovimientoId = ref<number | null>(null);
+export const editandoDescripcion = ref('');
+export const guardandoDescripcion = ref(false);
+export const gruposMovColapsados = ref<Set<string>>(new Set());
+
+export function isGrupoMovExpandido(nombre: string): boolean {
+  return !gruposMovColapsados.value.has(nombre);
+}
+
+export function toggleGrupoMov(nombre: string) {
+  const nuevo = new Set(gruposMovColapsados.value);
+  if (nuevo.has(nombre)) nuevo.delete(nombre);
+  else nuevo.add(nombre);
+  gruposMovColapsados.value = nuevo;
+}
+
+function coincideBusquedaMovimiento(m: MovimientoCaja): boolean {
+  const q = normalizarTexto(busquedaMovimiento.value.trim());
+  if (!q) return true;
+  const campos = [m.descripcion || '', nombreDeUsuario(m)];
+  if (movimientosEsSalidas.value) {
+    const c = clasificarSalida(m);
+    if (c) campos.push(c.proveedor);
+  }
+  return campos.some(v => normalizarTexto(v).includes(q));
+}
+
+export const movimientosVisibles = computed(() => {
+  const fuente = movimientosEsSalidas.value ? salidasCaja.value : entradasCaja.value;
+  let lista = [...fuente].sort((a, b) =>
+    new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime()
+  );
+  if (movimientosEsSalidas.value) {
+    if (movimientosFiltro.value === 'proveedores') {
+      lista = lista.filter(esSalidaProveedor);
+    } else if (movimientosFiltro.value === 'envases') {
+      lista = lista.filter(esSalidaEnvase);
+    } else if (movimientosFiltro.value === 'otras') {
+      lista = lista.filter(m => !esSalidaProveedor(m) && !esSalidaEnvase(m));
+    }
+  }
+  if (busquedaMovimiento.value.trim()) {
+    lista = lista.filter(coincideBusquedaMovimiento);
+  }
+  return lista;
+});
+
+export function abrirMovimientos(tipo: 'entradas' | 'salidas', filtro: 'todas' | 'proveedores' | 'envases' | 'otras' = 'todas') {
+  editandoMovimientoId.value = null;
+  busquedaMovimiento.value = '';
+  gruposMovColapsados.value = new Set();
+  movimientosTitulo.value = tipo === 'entradas' ? 'Entradas de Efectivo' : 'Salidas de Efectivo';
+  movimientosEsSalidas.value = tipo === 'salidas';
+  movimientosFiltro.value = filtro;
+  modalMovimientosOpen.value = true;
+}
+
+export function formatearFechaHora(fecha?: string) {
+  if (!fecha) return 'N/A';
+  const d = new Date(fecha);
+  return d.toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+export function formatearFechaCorta(fecha?: string) {
+  if (!fecha) return 'N/A';
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+export function formatearHoraCorta(fecha?: string) {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function inicialesDeUsuario(m: MovimientoCaja): string {
+  const nombre = nombreDeUsuario(m);
+  if (!nombre || nombre === '—') return '?';
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+export function iniciarEdicionDescripcion(m: MovimientoCaja) {
+  editandoMovimientoId.value = m.idCaja;
+  editandoDescripcion.value = m.descripcion || '';
+}
+
+export function cancelarEdicionDescripcion() {
+  editandoMovimientoId.value = null;
+  editandoDescripcion.value = '';
+}
+
+export async function guardarDescripcion(id: number) {
+  guardandoDescripcion.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/caja/${id}/descripcion`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descripcion: editandoDescripcion.value })
+    });
+    const json = await res.json();
+    if (json.codigo === 200) {
+      const fuente = movimientosEsSalidas.value ? salidasCaja.value : entradasCaja.value;
+      const idx = fuente.findIndex(m => m.idCaja === id);
+      if (idx !== -1) fuente[idx].descripcion = editandoDescripcion.value;
+      editandoMovimientoId.value = null;
+    } else {
+      alert('Error al guardar: ' + json.mensaje);
+    }
+  } catch (e) {
+    alert('Error de red al actualizar descripción');
+  } finally {
+    guardandoDescripcion.value = false;
+  }
+}
+
+export const flujoDineroPorDia = computed(() => {
+  const map = new Map<string, { entradas: number; salidas: number; ventas: number; label: string }>();
+  
+  for (const dia of ventasPorDia.value) {
+    const key = dia.fecha;
+    if (!map.has(key)) {
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label: dia.label });
+    }
+    const existing = map.get(key);
+    if (existing) {
+      existing.ventas += Number(dia.monto || 0);
+    }
+  }
+  
+  function getKeyAndLabel(fecha: Date): { key: string; label: string } {
+    const y = fecha.getFullYear();
+    const m = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const h = fecha.getHours();
+    
+    if (periodo.value === 'dia') {
+      return { key: `${y}-${m}-${day}-${String(h).padStart(2, '0')}`, label: `${h.toString().padStart(2, '0')}:00` };
+    } else if (periodo.value === 'semana') {
+      const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      return { key: `${y}-${m}-${day}`, label: `${dias[fecha.getDay()]} ${fecha.getDate()}` };
+    } else if (periodo.value === 'mes') {
+      return { key: `${y}-${m}-${day}`, label: `${fecha.getDate()}` };
+    } else {
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      return { key: `${y}-${m}`, label: meses[fecha.getMonth()] };
+    }
+  }
+  
+  for (const entrada of entradasCaja.value) {
+    if (!entrada.fechaMovimiento) continue;
+    const fecha = new Date(entrada.fechaMovimiento);
+    if (isNaN(fecha.getTime())) continue;
+    
+    const { key, label } = getKeyAndLabel(fecha);
+    if (!map.has(key)) {
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label });
+    }
+    const existing = map.get(key);
+    if (existing) {
+      existing.entradas += Number(entrada.monto || 0);
+    }
+  }
+  
+  for (const salida of salidasCaja.value) {
+    if (!salida.fechaMovimiento) continue;
+    const fecha = new Date(salida.fechaMovimiento);
+    if (isNaN(fecha.getTime())) continue;
+    
+    const { key, label } = getKeyAndLabel(fecha);
+    if (!map.has(key)) {
+      map.set(key, { entradas: 0, salidas: 0, ventas: 0, label });
+    }
+    const existing = map.get(key);
+    if (existing) {
+      existing.salidas += Number(salida.monto || 0);
+    }
+  }
+  
+  const sorted = Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b));
+  
+  const totalVentasPeriodo = sorted.reduce((sum, [, val]) => sum + val.ventas, 0);
+  const totalEntradasCajaPeriodo = sorted.reduce((sum, [, val]) => sum + val.entradas, 0);
+  const totalSalidasPeriodo = sorted.reduce((sum, [, val]) => sum + val.salidas, 0);
+  const disponibleReal = montoInicialPeriodo.value + totalVentasPeriodo + totalEntradasCajaPeriodo;
+  
+  const resultado = [];
+  let saldoEnCaja = montoInicialPeriodo.value;
+  
+  for (const [key, val] of sorted) {
+    const aperturaDia = aperturasPorDia.value.get(key) ?? saldoEnCaja;
+    const montoInicialDia = periodo.value === 'dia' ? saldoEnCaja : aperturaDia;
+    
+    const ventasDia = val.ventas;
+    const entradasManualesDia = val.entradas;
+    const salidasDia = val.salidas;
+    const totalIngresosDia = ventasDia + entradasManualesDia;
+    
+    const saldoInicio = montoInicialDia;
+    const saldoFinal = saldoInicio + totalIngresosDia - salidasDia;
+    
+    if (periodo.value === 'dia') {
+      saldoEnCaja = saldoFinal;
+    }
+    
+    resultado.push({
+      fecha: key,
+      label: val.label,
+      montoInicial: resultado.length === 0 ? montoInicialPeriodo.value : 0,
+      ventas: Math.round(ventasDia * 100) / 100,
+      entradasManuales: Math.round(entradasManualesDia * 100) / 100,
+      salidas: Math.round(salidasDia * 100) / 100,
+      saldoInicio: Math.round(saldoInicio * 100) / 100,
+      saldoFinal: Math.round(saldoFinal * 100) / 100,
+      apertura: Math.round(montoInicialDia * 100) / 100
+    });
+  }
+  
+  return resultado;
+});
+
+export const totalEntradas = computed(() => {
+  return entradasCaja.value.reduce((sum, e) => sum + Number(e.monto || 0), 0);
+});
+
+export const totalSalidas = computed(() => {
+  return salidasCaja.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+});
+
+export function normalizarTexto(texto?: string): string {
+  return (texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export interface AsignacionPP {
+  idProducto: number;
+  nombreProducto: string;
+  idProveedor: number;
+  nombreProveedor: string;
+  precioAcordado: number | null;
+}
+
+export interface ClasificacionSalida {
+  esProveedor: boolean;
+  proveedor: string;
+  criterio: 'directo' | 'producto' | 'envase';
+  precio: number | null;
+}
+
+export const proveedoresDetalle = ref<{ idProveedor: number; nombre: string }[]>([]);
+const mapaProductoProveedor = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
+const mapaTokensProveedor = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
+const mapaTokensProducto = ref<Map<string, { proveedor: string; precio: number | null }>>(new Map());
+const cacheClasificacion = new Map<string, ClasificacionSalida | null>();
+
+const STOPWORDS_SALIDAS = new Set([
+  'compra', 'compras', 'pago', 'pagos', 'abono', 'abonos',
+  'de', 'del', 'la', 'las', 'el', 'los', 'para', 'a', 'en',
+  'y', 'o', 'u', 'su', 'sus', 'un', 'una', 'con', 'por', 'al', 'que', 'se'
+]);
+
+function formaCanonica(palabra: string): string {
+  if (palabra.length > 3 && palabra.endsWith('es')) return palabra.slice(0, -2);
+  if (palabra.length > 2 && palabra.endsWith('s')) return palabra.slice(0, -1);
+  return palabra;
+}
+
+function variantesNombre(nombre: string): string[] {
+  const base = normalizarTexto(nombre);
+  const variantes = new Set([base]);
+  if (base.length > 3 && base.endsWith('es')) variantes.add(base.slice(0, -2));
+  if (base.length > 2 && base.endsWith('s')) variantes.add(base.slice(0, -1));
+  return [...variantes].filter(v => v.length >= 3);
+}
+
+function tokensSignificativos(texto: string): string[] {
+  return texto
+    .split(' ')
+    .map(t => t.trim())
+    .filter(t => t.length >= 3 && !STOPWORDS_SALIDAS.has(t) && !/^\d+[.,]?\d*$/.test(t))
+    .map(formaCanonica);
+}
+
+export function clasificarSalida(m: MovimientoCaja): ClasificacionSalida | null {
+  const desc = normalizarTexto(m.descripcion);
+  if (!desc) return null;
+  const cached = cacheClasificacion.get(desc);
+  if (cached !== undefined) return cached;
+
+  let resultado: ClasificacionSalida | null = null;
+
+  if (desc.split(' ')[0] === 'importe') {
+    resultado = { esProveedor: true, proveedor: 'Envases', criterio: 'envase', precio: null };
+    cacheClasificacion.set(desc, resultado);
+    return resultado;
+  }
+
+  for (const p of proveedoresDetalle.value) {
+    for (const variante of variantesNombre(p.nombre)) {
+      if (desc.includes(variante)) {
+        resultado = { esProveedor: true, proveedor: p.nombre, criterio: 'directo', precio: null };
+        break;
+      }
+    }
+    if (resultado) break;
+  }
+
+  if (!resultado) {
+    let mejor: { clave: string; r: ClasificacionSalida } | null = null;
+    for (const [nombre, info] of mapaProductoProveedor.value) {
+      for (const variante of variantesNombre(nombre)) {
+        if (desc.includes(variante) && (!mejor || variante.length > mejor.clave.length)) {
+          mejor = { clave: variante, r: { esProveedor: true, proveedor: info.proveedor, criterio: 'producto', precio: info.precio } };
+        }
+      }
+    }
+    if (mejor) resultado = mejor.r;
+  }
+
+  if (!resultado) {
+    for (const t of tokensSignificativos(desc)) {
+      const info = mapaTokensProveedor.value.get(t);
+      if (info) {
+        resultado = { esProveedor: true, proveedor: info.proveedor, criterio: 'directo', precio: info.precio };
+        break;
+      }
+    }
+  }
+
+  if (!resultado) {
+    for (const t of tokensSignificativos(desc)) {
+      const info = mapaTokensProducto.value.get(t);
+      if (info) {
+        resultado = { esProveedor: true, proveedor: info.proveedor, criterio: 'producto', precio: info.precio };
+        break;
+      }
+    }
+  }
+
+  cacheClasificacion.set(desc, resultado);
+  return resultado;
+}
+
+export function esSalidaProveedor(m: MovimientoCaja): boolean {
+  const c = clasificarSalida(m);
+  return c !== null && c.criterio !== 'envase';
+}
+
+export function esSalidaEnvase(m: MovimientoCaja): boolean {
+  return clasificarSalida(m)?.criterio === 'envase';
+}
+
+export function proveedorDeSalida(m: MovimientoCaja): string {
+  return clasificarSalida(m)?.proveedor || '';
+}
+
+export function criterioDeSalida(m: MovimientoCaja): 'directo' | 'producto' | 'envase' | '' {
+  return clasificarSalida(m)?.criterio || '';
+}
+
+export function precioSugeridoDeSalida(m: MovimientoCaja): number | null {
+  return clasificarSalida(m)?.precio ?? null;
+}
+
+export function iconoCriterio(criterio: string): string {
+  if (criterio === 'producto') return '📦';
+  if (criterio === 'envase') return '🍾';
+  return '🚚';
+}
+
+export function tooltipClasificacion(m: MovimientoCaja): string {
+  const c = clasificarSalida(m);
+  if (!c) return '';
+  if (c.criterio === 'envase') return 'Envases (devolución de envases)';
+  const criterioTxt = c.criterio === 'directo'
+    ? 'coincide con el nombre del proveedor'
+    : 'detectado por producto asignado';
+  const precioTxt = c.precio != null ? ` · precio más bajo: ${formatoMoneda(c.precio)}` : '';
+  return `${c.proveedor} (${criterioTxt}${precioTxt})`;
+}
+
+export const salidasProveedores = computed(() => {
+  return salidasCaja.value.filter(esSalidaProveedor);
+});
+
+export const salidasOtras = computed(() => {
+  return salidasCaja.value.filter(m => !esSalidaProveedor(m) && !esSalidaEnvase(m));
+});
+
+export const salidasEnvases = computed(() => {
+  return salidasCaja.value.filter(esSalidaEnvase);
+});
+
+export const totalSalidasProveedores = computed(() => {
+  return salidasProveedores.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+});
+
+export const totalSalidasOtras = computed(() => {
+  return salidasOtras.value.reduce((sum, s) => sum + Number(s.monto || 0), 0);
+});
+
+export const salidasPorProveedor = computed(() => {
+  const grupos = new Map<string, MovimientoCaja[]>();
+  for (const m of salidasProveedores.value) {
+    const clave = clasificarSalida(m)?.proveedor || 'Sin identificar';
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave)!.push(m);
+  }
+  return [...grupos.entries()]
+    .map(([proveedor, movimientos]) => ({
+      proveedor,
+      movimientos: movimientos.sort((a, b) =>
+        new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime()
+      ),
+      total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0)
+    }))
+    .sort((a, b) => b.total - a.total);
+});
+
+export const salidasPorProveedorFiltradas = computed(() => {
+  if (!busquedaMovimiento.value.trim()) return salidasPorProveedor.value;
+  return salidasPorProveedor.value
+    .map(g => {
+      const movimientos = g.movimientos.filter(coincideBusquedaMovimiento);
+      return { ...g, movimientos, total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0) };
+    })
+    .filter(g => g.movimientos.length > 0);
+});
+
+export type GrupoSalidas = { proveedor: string; icono: string; movimientos: MovimientoCaja[]; total: number };
+
+function grupoSalidasFiltrado(lista: MovimientoCaja[], nombre: string, icono: string): GrupoSalidas | null {
+  const movimientos = busquedaMovimiento.value.trim() ? lista.filter(coincideBusquedaMovimiento) : [...lista];
+  if (movimientos.length === 0) return null;
+  movimientos.sort((a, b) => new Date(b.fechaMovimiento).getTime() - new Date(a.fechaMovimiento).getTime());
+  return { proveedor: nombre, icono, movimientos, total: movimientos.reduce((s, m) => s + Number(m.monto || 0), 0) };
+}
+
+export const gruposAcordeon = computed<GrupoSalidas[]>(() => {
+  if (!movimientosEsSalidas.value) return [];
+  if (movimientosFiltro.value === 'proveedores' || movimientosFiltro.value === 'todas') {
+    const grupos: GrupoSalidas[] = salidasPorProveedorFiltradas.value.map(g => ({
+      proveedor: g.proveedor, icono: '🚚', movimientos: g.movimientos, total: g.total
+    }));
+    if (movimientosFiltro.value === 'todas') {
+      const envases = grupoSalidasFiltrado(salidasEnvases.value, 'Envases', '🍾');
+      if (envases) grupos.push(envases);
+      const otras = grupoSalidasFiltrado(salidasOtras.value, 'Otras salidas', '📤');
+      if (otras) grupos.push(otras);
+    }
+    return grupos;
+  }
+  return [];
+});
+
+export const totalVentasPeriodo = computed(() => {
+  return ventasPorDia.value.reduce((sum, d) => sum + d.monto, 0);
+});
+
+export const flujoNeto = computed(() => {
+  return montoInicialPeriodo.value + totalVentasPeriodo.value + totalEntradas.value - totalSalidas.value;
+});
+
+export const chartColors = ['#c99234', '#28a745', '#17a2b8', '#dc3545', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#007bff', '#ffc107', '#6610f2', '#e83e8c', '#20c997', '#fd7e14', '#17a2b8', '#6c757d'];
+
+export const chartVentasCategoria = computed(() => {
+  const categorias = categoriasJerarquicas.value;
+  const allSubs = new Set<string>();
+  for (const cat of categorias) {
+    for (const sub of cat.subcategorias) {
+      allSubs.add(sub.nombre);
+    }
+  }
+  const subNames = Array.from(allSubs).sort();
+  
+  const datasets = subNames.map((subName, idx) => ({
+    label: subName,
+    data: categorias.map(cat => {
+      const sub = cat.subcategorias.find(s => s.nombre === subName);
+      return sub ? Math.round(sub.monto * 100) / 100 : 0;
+    }),
+    backgroundColor: chartColors[idx % chartColors.length],
+    borderRadius: 4,
+    borderSkipped: false
+  }));
+  
+  return {
+    labels: categorias.map(c => c.categoria),
+    datasets
+  };
+});
+
+export const chartGananciaCategoria = computed(() => {
+  const categorias = categoriasJerarquicas.value;
+  const allSubs = new Set<string>();
+  for (const cat of categorias) {
+    for (const sub of cat.subcategorias) {
+      allSubs.add(sub.nombre);
+    }
+  }
+  const subNames = Array.from(allSubs).sort();
+  
+  const datasets = subNames.map((subName, idx) => ({
+    label: subName,
+    data: categorias.map(cat => {
+      const sub = cat.subcategorias.find(s => s.nombre === subName);
+      return sub ? Math.round(sub.ganancia * 100) / 100 : 0;
+    }),
+    backgroundColor: chartColors[idx % chartColors.length] + '99',
+    borderColor: chartColors[idx % chartColors.length],
+    borderWidth: 1,
+    borderRadius: 4,
+    borderSkipped: false
+  }));
+  
+  return {
+    labels: categorias.map(c => c.categoria),
+    datasets
+  };
+});
+
+export const chartVentasCategoriaMovil = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [{
+      label: 'Ventas ($)',
+      data: cats.map(c => Math.round(c.totalMonto * 100) / 100),
+      backgroundColor: cats.map((_, i) => chartColors[i % chartColors.length]),
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+});
+
+export const chartGananciaCategoriaMovil = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [{
+      label: 'Ganancia ($)',
+      data: cats.map(c => Math.round(c.totalGanancia * 100) / 100),
+      backgroundColor: cats.map((_, i) => chartColors[i % chartColors.length] + '99'),
+      borderColor: cats.map((_, i) => chartColors[i % chartColors.length]),
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+});
+
+export function onCategoriaClickMovil(event: any, elements: any[]) {
+  if (elements.length > 0) {
+    const el = elements[0];
+    const catName = chartVentasCategoriaMovil.value.labels[el.index];
+    if (catName) {
+      categoriaSeleccionada.value = catName as string;
+      subCategoriaSeleccionada.value = '';
+      modalCategoriaOpen.value = true;
+    }
+  }
+}
+
+export const chartOptionsCategoriaMovil = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  onClick: onCategoriaClickMovil,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        title: (items: any[]) => {
+          if (!items.length) return '';
+          const catName = items[0].label;
+          const catData = categoriasJerarquicas.value.find(c => c.categoria === catName);
+          return `${catName} — Total: $${catData ? Math.round(catData.totalMonto * 100) / 100 : 0}`;
+        },
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX')}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#888', font: { size: 9 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      ticks: { color: '#f6f2de', font: { size: esMovil.value ? 9 : 11 } },
+      grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
+  }
+}));
+
+export const chartCategoriaComparativa = computed(() => {
+  const cats = categoriasJerarquicas.value.slice(0, 10);
+  return {
+    labels: cats.map(c => c.categoria),
+    datasets: [
+      {
+        label: 'Total Ventas ($)',
+        data: cats.map(c => Math.round(c.totalMonto * 100) / 100),
+        backgroundColor: '#c99234',
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'Costo Total ($)',
+        data: cats.map(c => Math.round(c.totalCosto * 100) / 100),
+        backgroundColor: '#dc3545',
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'Ganancia ($)',
+        data: cats.map(c => Math.round(c.totalGanancia * 100) / 100),
+        backgroundColor: '#28a745',
+        borderRadius: 4,
+        borderSkipped: false
+      }
+    ]
+  };
+});
+
+export const chartOptionsCategoriaComparativa = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: {
+    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12 } },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: false,
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      stacked: false,
+      ticks: { color: '#f6f2de', font: { size: 11 } },
+      grid: { display: false }
+    }
+  }
+};
+
+export const top15 = computed(() => productosTop.value.slice(0, 15));
+
+export const chartTopProductos = computed(() => ({
+  labels: top15.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Monto ($)',
+    data: top15.value.map(p => Math.round(p.montoTotal * 100) / 100),
+    backgroundColor: chartColors.slice(0, top15.value.length),
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const chartTopCantidad = computed(() => ({
+  labels: productosUnitarios.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Cantidad (Unitarios)',
+    data: productosUnitarios.value.map(p => p.cantidadTotal),
+    backgroundColor: chartColors.slice(0, productosUnitarios.value.length).map(c => c + '99'),
+    borderColor: chartColors.slice(0, productosUnitarios.value.length),
+    borderWidth: 2,
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const chartTopGramaje = computed(() => ({
+  labels: productosGramaje.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Cantidad (Gramaje)',
+    data: productosGramaje.value.map(p => p.cantidadTotal),
+    backgroundColor: chartColors.slice(0, productosGramaje.value.length).map(c => c + '99'),
+    borderColor: chartColors.slice(0, productosGramaje.value.length),
+    borderWidth: 2,
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const chartTopGanancia = computed(() => ({
+  labels: productosTopGanancia.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Ganancia ($)',
+    data: productosTopGanancia.value.map(p => Math.round(p.gananciaTotal * 100) / 100),
+    backgroundColor: chartColors.slice(0, productosTopGanancia.value.length),
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const chartGananciaUnitarios = computed(() => ({
+  labels: productosUnitariosGanancia.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Ganancia Unitarios ($)',
+    data: productosUnitariosGanancia.value.map(p => Math.round(p.gananciaTotal * 100) / 100),
+    backgroundColor: '#28a745',
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const chartGananciaGramaje = computed(() => ({
+  labels: productosGramajeGanancia.value.map(p => p.nombre.length > 20 ? p.nombre.slice(0, 20) + '...' : p.nombre),
+  datasets: [{
+    label: 'Ganancia Gramaje ($)',
+    data: productosGramajeGanancia.value.map(p => Math.round(p.gananciaTotal * 100) / 100),
+    backgroundColor: '#17a2b8',
+    borderRadius: 6,
+    borderSkipped: false
+  }]
+}));
+
+export const rangoActual = computed(() => {
+  const now = new Date();
+  let fechaInicio: string;
+  let fechaFin: string;
+  
+  if (periodo.value === 'dia') {
+    fechaInicio = fechaSeleccionada.value || now.toLocaleDateString('en-CA');
+    fechaFin = fechaInicio;
+  } else if (periodo.value === 'semana') {
+    const start = fechaSeleccionada.value ? parseLocalDate(fechaSeleccionada.value) : new Date(now);
+    const dayOfWeek = start.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    start.setDate(start.getDate() - daysToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    fechaInicio = start.toLocaleDateString('en-CA');
+    fechaFin = end.toLocaleDateString('en-CA');
+  } else if (periodo.value === 'mes') {
+    const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
+    fechaInicio = `${mesStr}-01`;
+    const [y, m] = mesStr.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    fechaFin = `${mesStr}-${lastDay}`;
+  } else {
+    const anio = fechaSeleccionada.value || now.getFullYear().toString();
+    fechaInicio = `${anio}-01-01`;
+    fechaFin = `${anio}-12-31`;
+  }
+  
+  return { inicio: fechaInicio, fin: fechaFin };
+});
+
+export const chartMetodos = computed(() => ({
+  labels: metodosStats.value.map(m => m.metodo),
+  datasets: [{
+    data: metodosStats.value.map(m => Math.round(m.monto * 100) / 100),
+    backgroundColor: chartColors.slice(0, metodosStats.value.length),
+    borderWidth: 0
+  }]
+}));
+
+export const chartTendencia = computed(() => ({
+  labels: ventasPorDia.value.map(d => d.label),
+  datasets: [
+    {
+      label: 'Monto ($)',
+      data: ventasPorDia.value.map(d => Math.round(d.monto * 100) / 100),
+      borderColor: '#c99234',
+      backgroundColor: '#c9923422',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    },
+    {
+      label: 'Ganancia ($)',
+      data: ventasPorDia.value.map(d => Math.round(d.ganancia * 100) / 100),
+      borderColor: '#28a745',
+      backgroundColor: '#28a74522',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    },
+    {
+      label: 'Ventas',
+      data: ventasPorDia.value.map(d => d.ventas),
+      borderColor: '#4a90d9',
+      backgroundColor: '#4a90d922',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      yAxisID: 'y1'
+    }
+  ]
+}));
+
+export const chartFlujoDinero = computed(() => {
+  const datos = flujoDineroPorDia.value;
+  const saldos = datos.map(d => d.saldoFinal);
+  const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+
+  return {
+    labels: datos.map(d => d.label),
+    datasets: [{
+      type: 'line' as const,
+      label: 'Saldo Final en Caja ($)',
+      data: saldos,
+      borderColor: '#c99234',
+      backgroundColor: '#c9923415',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 14,
+      pointHoverRadius: 18,
+      pointBackgroundColor: 'transparent',
+      pointBorderColor: 'transparent',
+      pointBorderWidth: 0,
+      borderWidth: 4,
+      segment: {
+        borderColor: (ctx: any) => {
+          const y1 = ctx.p0.parsed.y;
+          const y2 = ctx.p1.parsed.y;
+          if (y1 > media && y2 > media) return '#28a745';
+          if (y1 < media && y2 < media) return '#dc3545';
+          return '#ffc107';
+        }
+      }
+    }]
+  };
+});
+
+export const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label || ''}: $${ctx.parsed.toLocaleString('es-MX')}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#888', maxRotation: 45, font: { size: 11 } },
+      grid: { color: '#33333344' }
+    },
+    y: {
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y1: {
+      position: 'right' as const,
+      ticks: { color: '#28a745', font: { size: 11 } },
+      grid: { drawOnChartArea: false },
+      beginAtZero: true
+    }
+  }
+};
+
+export const chartOptionsTendencia = computed(() => {
+  const movil = esMovil.value;
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: movil ? 10 : 12 }, padding: movil ? 8 : 16 } },
+      tooltip: {
+        backgroundColor: '#1a1a2e',
+        titleColor: '#c99234',
+        bodyColor: '#f6f2de',
+        borderColor: '#c99234',
+        borderWidth: 1,
+        cornerRadius: 8,
+        mode: 'index' as const,
+        intersect: false,
+        callbacks: {
+          label: (ctx: any) => {
+            const val = ctx.parsed.y;
+            if (ctx.dataset.label.includes('$')) {
+              return ` ${ctx.dataset.label}: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            return ` ${ctx.dataset.label}: ${val}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#888', maxRotation: movil ? 0 : 45, font: { size: movil ? 9 : 11 }, maxTicksLimit: movil ? 8 : undefined },
+        grid: { color: '#33333344' }
+      },
+      y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        ticks: { color: '#c99234', font: { size: movil ? 9 : 11 }, callback: (v: any) => `$${v}` },
+        grid: { color: '#33333344' },
+        beginAtZero: true,
+        title: { display: true, text: 'Monto / Ganancia ($)', color: '#c99234' }
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        ticks: { color: '#4a90d9', font: { size: movil ? 9 : 11 } },
+        grid: { drawOnChartArea: false },
+        beginAtZero: true,
+        title: { display: true, text: 'Cantidad', color: '#28a745' }
+      }
+    },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false
+    }
+  };
+});
+
+export const chartOptionsBar = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label || 'Valor'}: ${ctx.parsed.x.toLocaleString('es-MX')}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      ticks: { color: '#f6f2de', font: { size: 11 } },
+      grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
+  }
+};
+
+export const productosCategoriaSeleccionada = computed<ProductoStats[]>(() => {
+  if (!categoriaSeleccionada.value) return [];
+  const map = new Map<string, ProductoStats>();
+  for (const d of detalles.value) {
+    if (!d.Venta || !['C', 'F'].includes(d.Venta.estatus)) continue;
+    if (d.productoCategoria !== categoriaSeleccionada.value) continue;
+    
+    const subCat = d.productoSubcategoria || '';
+    const subCatNormalizada = (!subCat || subCat === '-' || subCat.toLowerCase() === 'general') ? 'Sin subcategoría' : subCat;
+    const esSinSub = subCategoriaSeleccionada.value === 'Sin subcategoría';
+    if (esSinSub) {
+      if (subCatNormalizada !== 'Sin subcategoría') continue;
+    } else if (subCategoriaSeleccionada.value && subCatNormalizada !== subCategoriaSeleccionada.value) {
+      continue;
+    }
+    
+    const key = d.productoNombre || 'Sin nombre';
+    const existing = map.get(key);
+    const cantidad = Number(d.cantidad || 0);
+    const precioVenta = Number(d.precioUnitarioVenta || 0);
+    const precioCostoKg = Number(d.productoPrecioCosto || 0);
+    
+    let monto: number;
+    let costo: number;
+    
+    if (d.tipoPrecioAplicado === 'VENTA_GRAMAJE') {
+      monto = precioVenta;
+      costo = (precioCostoKg / 1000) * cantidad;
+    } else {
+      monto = precioVenta * cantidad;
+      costo = precioCostoKg * cantidad;
+    }
+    
+    const ganancia = monto - costo;
+    
+    if (existing) {
+      existing.cantidadTotal += cantidad;
+      existing.montoTotal += monto;
+      existing.costoTotal += costo;
+      existing.gananciaTotal += ganancia;
+    } else {
+      map.set(key, {
+        nombre: key,
+        cantidadTotal: cantidad,
+        montoTotal: monto,
+        costoTotal: costo,
+        gananciaTotal: ganancia,
+        isGramaje: d.productoIsGramaje || false
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.montoTotal - a.montoTotal);
+});
+
+export const chartProductosCategoria = computed(() => ({
+  labels: productosCategoriaSeleccionada.value.map(p => p.nombre.length > 25 ? p.nombre.slice(0, 25) + '...' : p.nombre),
+  datasets: [
+    {
+      label: 'Monto ($)',
+      data: productosCategoriaSeleccionada.value.map(p => Math.round(p.montoTotal * 100) / 100),
+      backgroundColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length),
+      borderRadius: 6,
+      borderSkipped: false
+    },
+    {
+      label: 'Ganancia ($)',
+      data: productosCategoriaSeleccionada.value.map(p => Math.round(p.gananciaTotal * 100) / 100),
+      backgroundColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length).map(c => c + '88'),
+      borderColor: chartColors.slice(0, productosCategoriaSeleccionada.value.length),
+      borderWidth: 1,
+      borderRadius: 6,
+      borderSkipped: false
+    }
+  ]
+}));
+
+export const chartOptionsProductosCategoria = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  plugins: {
+    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12 } },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: true,
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      stacked: true,
+      ticks: { color: '#f6f2de', font: { size: 11 } },
+      grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
+  }
+};
+
+export function onCategoriaClick(event: any, elements: any[]) {
+  if (elements.length > 0) {
+    const el = elements[0];
+    const catName = chartVentasCategoria.value.labels[el.index];
+    const subName = chartVentasCategoria.value.datasets[el.datasetIndex]?.label;
+    if (catName) {
+      categoriaSeleccionada.value = catName as string;
+      subCategoriaSeleccionada.value = (subName as string) || '';
+      modalCategoriaOpen.value = true;
+    }
+  }
+}
+
+export function cerrarModalCategoria() {
+  modalCategoriaOpen.value = false;
+  categoriaSeleccionada.value = '';
+  subCategoriaSeleccionada.value = '';
+}
+
+export const chartOptionsCategoria = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y' as const,
+  onClick: onCategoriaClick,
+  plugins: {
+    legend: { position: 'top' as const, labels: { color: '#f6f2de', font: { size: 11 }, padding: 12, boxWidth: 14 } },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      mode: 'nearest' as const,
+      intersect: true,
+      callbacks: {
+        title: (items: any[]) => {
+          if (!items.length) return '';
+          const catName = items[0].label;
+          const catData = categoriasJerarquicas.value.find(c => c.categoria === catName);
+          return `${catName} — Total: $${catData ? Math.round(catData.totalMonto * 100) / 100 : 0}`;
+        },
+        label: (ctx: any) => {
+          if (ctx.raw === 0) return '';
+          return ` ${ctx.dataset.label}: $${ctx.parsed.x.toLocaleString('es-MX')}`;
+        },
+        labelColor: (ctx: any) => ({
+          borderColor: ctx.dataset.borderColor || ctx.dataset.backgroundColor,
+          backgroundColor: ctx.dataset.backgroundColor,
+          borderWidth: 2
+        }),
+        filter: (item: any) => item.raw > 0
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: true,
+      ticks: { color: '#888', font: { size: 11 } },
+      grid: { color: '#33333344' },
+      beginAtZero: true
+    },
+    y: {
+      stacked: true,
+      ticks: { color: '#f6f2de', font: { size: 12, weight: 'bold' as const } },
+      grid: { display: false }
+    }
+  },
+  datasets: {
+    bar: {
+      barPercentage: 0.8,
+      categoryPercentage: 0.85
+    }
+  }
+};
+
+export const chartPieOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: esMovil.value ? ('bottom' as const) : ('right' as const),
+      labels: { color: '#f6f2de', font: { size: esMovil.value ? 10 : 12 }, padding: esMovil.value ? 6 : 12 }
+    },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        label: (ctx: any) => ` ${ctx.label}: $${ctx.parsed.toLocaleString('es-MX')}`
+      }
+    }
+  }
+}));
+
+export const chartOptionsFlujo = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a1a2e',
+      titleColor: '#c99234',
+      bodyColor: '#f6f2de',
+      borderColor: '#c99234',
+      borderWidth: 1,
+      cornerRadius: 8,
+      callbacks: {
+        title: (items: any) => `📅 ${items[0].label}`,
+        label: (ctx: any) => {
+          const d = flujoDineroPorDia.value[ctx.dataIndex];
+          if (!d) return '';
+          const saldos = flujoDineroPorDia.value.map(x => x.saldoFinal);
+          const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+          const diff = d.saldoFinal - media;
+          const signo = diff >= 0 ? '+' : '';
+          const estado = diff > 0 ? '📈 Sobre la media' : diff < 0 ? '📉 Bajo la media' : '➡️ En la media';
+          return [
+            ` Saldo: $${d.saldoFinal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            ` ${estado} (${signo}$${Math.abs(diff).toLocaleString('es-MX', { minimumFractionDigits: 2 })})`
+          ];
+        },
+        afterBody: (items: any) => {
+          const d = flujoDineroPorDia.value[items[0].dataIndex];
+          if (!d) return '';
+          return [
+            '',
+            `  Inicio: $${d.saldoInicio.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  +Ventas: $${d.ventas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  +Entradas: $${d.entradasManuales.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+            `  -Salidas: -$${d.salidas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          ];
+        }
+      }
+    },
+    afterDraw: (chart: any) => {
+      const ctx = chart.ctx;
+      const saldos = flujoDineroPorDia.value.map(d => d.saldoFinal);
+      const media = saldos.length > 0 ? saldos.reduce((a, b) => a + b, 0) / saldos.length : 0;
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '18px serif';
+
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((point: any, index: number) => {
+        const saldo = saldos[index];
+        const diff = saldo - media;
+        let color;
+        if (diff > media * 0.02) color = '#28a745';
+        else if (diff < -media * 0.02) color = '#dc3545';
+        else color = '#ffc107';
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#1a1a2e';
+        ctx.font = 'bold 10px Courier New';
+        ctx.fillText('$', point.x, point.y + 1);
+      });
+
+      ctx.restore();
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#888', maxRotation: 45, font: { size: 11 } },
+      grid: { color: '#33333344' }
+    },
+    y: {
+      beginAtZero: false,
+      ticks: { color: '#888', font: { size: 11 }, callback: (v: any) => `$${v}` },
+      grid: { color: '#33333344' },
+      title: { display: true, text: 'Saldo en Caja ($)', color: '#c99234' }
+    }
+  },
+  interaction: {
+    mode: 'index' as const,
+    intersect: false
+  }
+}));
+
+export function inicializarFecha() {
+  const now = new Date();
+  if (periodo.value === 'dia') {
+    fechaSeleccionada.value = now.toLocaleDateString('en-CA');
+  } else if (periodo.value === 'semana') {
+    const startOfWeek = new Date(now);
+    const dayOfWeek = now.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    startOfWeek.setDate(now.getDate() - daysToMonday);
+    fechaSeleccionada.value = startOfWeek.toLocaleDateString('en-CA');
+  } else if (periodo.value === 'mes') {
+    fechaSeleccionada.value = now.toLocaleDateString('en-CA').slice(0, 7);
+  } else {
+    fechaSeleccionada.value = now.getFullYear().toString();
+  }
+}
+
+async function cargarSueldosPeriodo(fechaInicio: string, fechaFin: string) {
+  try {
+    const resUsuarios = await fetch(`${API_BASE}/usuarios/listarUsuarios`);
+    const dataUsuarios = await resUsuarios.json();
+    const sueldoMap = new Map<number, number>();
+    if (dataUsuarios.codigo === 200 && Array.isArray(dataUsuarios.datos)) {
+      for (const u of dataUsuarios.datos) {
+        sueldoMap.set(Number(u.idUsuario), Number(u.sueldo_hora || 0));
+      }
+    }
+
+    const [inicioY, inicioM] = fechaInicio.split('-').map(Number);
+    const [finY, finM] = fechaFin.split('-').map(Number);
+    const inicio = parseLocalDate(fechaInicio);
+    const fin = parseLocalDate(fechaFin);
+
+    let total = 0;
+    let anio = inicioY;
+    let mes = inicioM;
+    while (anio < finY || (anio === finY && mes <= finM)) {
+      const res = await fetch(`${API_BASE}/asistencias/dias-trabajados?mes=${mes}&anio=${anio}`);
+      const data = await res.json();
+      if (data.codigo === 200 && data.datos?.usuarios) {
+        const firstDay = new Date(anio, mes - 1, 1);
+        const offset = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(anio, mes, 0).getDate();
+        const gridStart = new Date(anio, mes - 1, 1 - offset);
+        const gridEnd = new Date(anio, mes - 1, 1 - offset + Math.ceil((offset + daysInMonth) / 7) * 7 - 1);
+        const mesCubiertoCompleto = inicio <= new Date(anio, mes - 1, 1) && fin >= new Date(anio, mes - 1, daysInMonth);
+
+        for (const u of data.datos.usuarios) {
+          const sueldo = sueldoMap.get(Number(u.idUsuario)) || 0;
+          if (sueldo <= 0) continue;
+          let horas = 0;
+          if (u.horasPorDia) {
+            for (const [diaStr, h] of Object.entries(u.horasPorDia)) {
+              const dia = Number(diaStr);
+              const fechaDia = new Date(anio, mes - 1, dia);
+              if (fechaDia >= inicio && fechaDia <= fin) {
+                horas += Number(h);
+              }
+            }
+          }
+          if (mesCubiertoCompleto && Array.isArray(u.overflow)) {
+            for (const ov of u.overflow) {
+              if (!ov || !ov.fecha) continue;
+              const fechaOv = parseLocalDate(String(ov.fecha));
+              if (fechaOv >= gridStart && fechaOv <= gridEnd) {
+                horas += Number(ov.horas || 0);
+              }
+            }
+          }
+          total += horas * sueldo;
+        }
+      }
+      mes++;
+      if (mes > 12) { mes = 1; anio++; }
+    }
+    sueldosPeriodo.value = Math.round(total * 100) / 100;
+  } catch (e) {
+    console.error('Error al cargar sueldos del periodo:', e);
+    sueldosPeriodo.value = 0;
+  }
+}
+
+export async function cargarProveedores() {
+  try {
+    const res = await fetch(`${API_BASE}/proveedores/listar`);
+    const data = await res.json();
+    if (data.codigo === 200 && Array.isArray(data.datos)) {
+      proveedoresDetalle.value = (data.datos as { idProveedor?: number; nombre?: string }[])
+        .map(p => ({ idProveedor: Number(p.idProveedor || 0), nombre: (p.nombre || '').trim() }))
+        .filter(p => p.nombre);
+      const nombres = proveedoresDetalle.value.map(p => p.nombre);
+      proveedoresLista.value = Array.from(new Set(nombres));
+    }
+  } catch (e) {
+    console.error('Error al cargar proveedores:', e);
+    proveedoresLista.value = [];
+  }
+  await cargarMapaProductosProveedor();
+}
+
+function elegirMejorProveedor(candidatos: Map<string, { precio: number | null; veces: number }>): { proveedor: string; precio: number | null } {
+  let mejor: { proveedor: string; precio: number | null; veces: number } | null = null;
+  for (const [prov, info] of candidatos) {
+    if (!mejor) {
+      mejor = { proveedor: prov, precio: info.precio, veces: info.veces };
+      continue;
+    }
+    if (info.precio != null && (mejor.precio == null || info.precio < mejor.precio)) {
+      mejor = { proveedor: prov, precio: info.precio, veces: info.veces };
+    } else if (info.precio != null && mejor.precio != null && info.precio === mejor.precio && prov < mejor.proveedor) {
+      mejor = { proveedor: prov, precio: info.precio, veces: info.veces };
+    } else if (info.precio == null && mejor.precio == null) {
+      if (info.veces > mejor.veces || (info.veces === mejor.veces && prov < mejor.proveedor)) {
+        mejor = { proveedor: prov, precio: info.precio, veces: info.veces };
+      }
+    }
+  }
+  return { proveedor: mejor?.proveedor || '', precio: mejor?.precio ?? null };
+}
+
+function acumularCandidato(mapa: Map<string, Map<string, { precio: number | null; veces: number }>>, clave: string, proveedor: string, precioAcordado: number | null) {
+  if (!clave || !proveedor) return;
+  const precio = precioAcordado != null && Number(precioAcordado) > 0 ? Number(precioAcordado) : null;
+  if (!mapa.has(clave)) mapa.set(clave, new Map());
+  const cand = mapa.get(clave)!;
+  const prev = cand.get(proveedor);
+  if (prev) {
+    prev.veces++;
+    if (precio != null && (prev.precio == null || precio < prev.precio)) prev.precio = precio;
+  } else {
+    cand.set(proveedor, { precio, veces: 1 });
+  }
+}
+
+async function obtenerJsonSeguro(url: string): Promise<any | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+function resolverProveedorActivo(
+  idProveedor: number,
+  nombreProveedor: string,
+  activosPorId: Map<number, string>,
+  nombresActivos: Map<string, string>
+): string | null {
+  const porId = activosPorId.get(Number(idProveedor));
+  if (porId) return porId;
+  const norm = normalizarTexto(nombreProveedor);
+  if (!norm || norm.length < 3) return null;
+  const exacto = nombresActivos.get(norm);
+  if (exacto) return exacto;
+  let mejor: string | null = null;
+  let mejorLen = 0;
+  for (const [normActivo, nombreActivo] of nombresActivos) {
+    if (normActivo.length < 3) continue;
+    if (norm.includes(normActivo) || normActivo.includes(norm)) {
+      if (normActivo.length > mejorLen) { mejor = nombreActivo; mejorLen = normActivo.length; }
+    }
+  }
+  return mejor;
+}
+
+async function cargarMapaProductosProveedor() {
+  try {
+    const dataAsig = await obtenerJsonSeguro(`${API_BASE}/producto-proveedor/listar`);
+
+    const asignaciones: AsignacionPP[] = dataAsig?.codigo === 200 && Array.isArray(dataAsig.datos) ? dataAsig.datos : [];
+
+    const activosPorId = new Map<number, string>();
+    const nombresActivos = new Map<string, string>();
+    for (const p of proveedoresDetalle.value) {
+      if (p.idProveedor) activosPorId.set(p.idProveedor, p.nombre);
+      const norm = normalizarTexto(p.nombre);
+      if (norm) nombresActivos.set(norm, p.nombre);
+    }
+
+    const porProducto = new Map<string, Map<string, { precio: number | null; veces: number }>>();
+    for (const a of asignaciones) {
+      const proveedorActivo = resolverProveedorActivo(a.idProveedor, a.nombreProveedor, activosPorId, nombresActivos);
+      if (!proveedorActivo) continue;
+      acumularCandidato(porProducto, normalizarTexto(a.nombreProducto), proveedorActivo, a.precioAcordado);
+    }
+
+    mapaProductoProveedor.value = new Map([...porProducto.entries()].map(([k, v]) => [k, elegirMejorProveedor(v)]));
+
+    const tokProv = new Map<string, { proveedor: string; precio: number | null }>();
+    for (const p of proveedoresDetalle.value) {
+      for (const t of tokensSignificativos(normalizarTexto(p.nombre))) {
+        if (!tokProv.has(t)) tokProv.set(t, { proveedor: p.nombre, precio: null });
+      }
+    }
+    mapaTokensProveedor.value = tokProv;
+
+    const tokProd = new Map<string, { proveedor: string; precio: number | null }>();
+    for (const [nombre, mejor] of mapaProductoProveedor.value) {
+      for (const t of tokensSignificativos(nombre)) {
+        if (!tokProd.has(t)) tokProd.set(t, mejor);
+      }
+    }
+    mapaTokensProducto.value = tokProd;
+
+    cacheClasificacion.clear();
+  } catch (e) {
+    console.error('Error al cargar mapa producto-proveedor:', e);
+  }
+}
+
+export async function cargarRenta() {
+  try {
+    const res = await fetch(`${API_BASE}/rentaLocal`);
+    const data = await res.json();
+    if (data.codigo === 200) {
+      rentaMensual.value = Number(data.datos || 0);
+    }
+  } catch (e) {
+    console.error('Error al cargar la renta del local:', e);
+    rentaMensual.value = 0;
+  }
+}
+
+export async function guardarRenta(monto: number) {
+  try {
+    const res = await fetch(`${API_BASE}/rentaLocal`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monto_mensual: monto })
+    });
+    const data = await res.json();
+    if (data.codigo === 200) {
+      rentaMensual.value = Number(data.datos || 0);
+    }
+    return data.codigo === 200;
+  } catch (e) {
+    console.error('Error al guardar la renta del local:', e);
+    return false;
+  }
+}
+
+export async function cargarDatos() {
+  cargando.value = true;
+  try {
+    let fechaInicio: string;
+    let fechaFin: string;
+    const now = new Date();
+    
+    if (periodo.value === 'dia') {
+      fechaInicio = fechaSeleccionada.value || now.toLocaleDateString('en-CA');
+      fechaFin = fechaInicio;
+    } else if (periodo.value === 'semana') {
+      const start = fechaSeleccionada.value ? parseLocalDate(fechaSeleccionada.value) : new Date(now);
+      const dayOfWeek = start.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      start.setDate(start.getDate() - daysToMonday);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      fechaInicio = start.toLocaleDateString('en-CA');
+      fechaFin = end.toLocaleDateString('en-CA');
+    } else if (periodo.value === 'mes') {
+      const mesStr = fechaSeleccionada.value || now.toLocaleDateString('en-CA').slice(0, 7);
+      fechaInicio = `${mesStr}-01`;
+      const [y, m] = mesStr.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      fechaFin = `${mesStr}-${lastDay}`;
+    } else {
+      const anio = fechaSeleccionada.value || now.getFullYear().toString();
+      fechaInicio = `${anio}-01-01`;
+      fechaFin = `${anio}-12-31`;
+    }
+    
+    const url = `${API_BASE}/ventasDetalle/porPeriodo?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    console.log('ReporteVentas API call:', url);
+    
+    const res = await fetch(url);
+    const data = await res.json();
+    console.log('ReporteVentas response:', data.codigo, data.datos?.length || 0, 'detalles');
+    if (data.codigo === 200) {
+      detalles.value = data.datos || [];
+    }
+    
+    const urlEntradas = `${API_BASE}/caja/entradas/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    const urlSalidas = `${API_BASE}/caja/egresos/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    const urlReporte = periodo.value === 'dia'
+      ? `${API_BASE}/caja/reporteDiario/${fechaInicio}`
+      : `${API_BASE}/caja/reporteDiario/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    const urlAperturas = `${API_BASE}/caja/aperturas/rango?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    
+    const [resEntradas, resSalidas, resReporte, resAperturas] = await Promise.all([
+      fetch(urlEntradas),
+      fetch(urlSalidas),
+      fetch(urlReporte),
+      fetch(urlAperturas)
+    ]);
+    
+    const dataEntradas = await resEntradas.json();
+    const dataSalidas = await resSalidas.json();
+    const dataReporte = await resReporte.json();
+    const dataAperturas = await resAperturas.json();
+    
+    if (dataEntradas.codigo === 200) {
+      entradasCaja.value = dataEntradas.datos || [];
+    }
+    if (dataSalidas.codigo === 200) {
+      salidasCaja.value = dataSalidas.datos || [];
+    }
+    if (dataReporte.codigo === 200 && dataReporte.datos) {
+      montoInicialPeriodo.value = Number(dataReporte.datos.montoInicial || 0);
+    }
+    if (dataAperturas.codigo === 200 && dataAperturas.datos) {
+      const map = new Map<string, number>();
+      for (const a of dataAperturas.datos) {
+        map.set(a.fecha, Number(a.montoInicial || 0));
+      }
+      aperturasPorDia.value = map;
+    }
+
+    await cargarSueldosPeriodo(fechaInicio, fechaFin);
+    await cargarRenta();
+    await cargarProveedores();
+  } catch (e) {
+    console.error('Error al cargar reporte:', e);
+  } finally {
+    cargando.value = false;
+  }
+}
+
+export function useReporteVentas() {
+  watch(periodo, () => {
+    inicializarFecha();
+    cargarDatos();
+  });
+
+  onMounted(() => {
+    inicializarFecha();
+    cargarDatos();
+  });
+
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => { esMovil.value = e.matches; };
+    if (mq.addEventListener) {
+      mq.addEventListener('change', handler);
+    } else if ((mq as any).addListener) {
+      (mq as any).addListener(handler);
+    }
+  }
+}
+
+export function formatoMoneda(valor: number) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
+}
+
+export function formatoCantidad(cantidad: number, isGramaje: boolean) {
+  if (!isGramaje) return `${cantidad} pza`;
+  if (cantidad >= 1000) {
+    const kg = cantidad / 1000;
+    return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(2)} kg`;
+  }
+  return `${cantidad} g`;
+}
