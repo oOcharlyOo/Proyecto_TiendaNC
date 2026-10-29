@@ -1,28 +1,30 @@
+﻿name: proyecto_tiendanc_panaderia
+
 services:
   backend:
     build:
       context: ./Proyecto_TiendaNC
       dockerfile: Dockerfile.jvm
-    ports:
-      - "8080:8080"
-    container_name: backend
-    restart: on-failure
+    container_name: panaderia-backend
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - TZ=America/Mexico_City
-      - MINIO_ENDPOINT=minio
+      - MINIO_ENDPOINT=panaderia-minio
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=tiendanc
-      - MINIO_PUBLIC_URL=https://minio.laleyendadeldulce.com
+      - MINIO_PUBLIC_URL=https://minioPanaderia.laleyendadeldulce.com
       - QUARKUS_HTTP_CORS=true
-      - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:8081,https://laleyendadeldulce.com,https://www.laleyendadeldulce.com,https://api.laleyendadeldulce.com
-      - OLLAMA_URL=http://ollama:11434
+      - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:18081,http://127.0.0.1:18081,http://localhost:8080,http://127.0.0.1:8080,https://panaderia.laleyendadeldulce.com,https://frontendPanaderia.laleyendadeldulce.com,https://minioPanaderia.laleyendadeldulce.com,https://minioDashPanaderia.laleyendadeldulce.com
+      - OLLAMA_URL=http://panaderia-ollama:11434
       - OLLAMA_MODEL=qwen2.5:7b
-      # Clave maestra para el alta de sucursales (lee .env del proyecto; no
-      # se versiona). Sin valor, el alta responde 503 y queda deshabilitada.
       - SUCURSAL_MASTER_KEY=${SUCURSAL_MASTER_KEY:-}
+    ports:
+      - "18080:8080"
     volumes:
-      - backup-trigger:/trigger
+      - panaderia-backup-trigger:/trigger
       - ./db/backups:/deployments/db/backups
     depends_on:
       database:
@@ -32,50 +34,56 @@ services:
       minio:
         condition: service_started
     networks:
-      - tienda-red
+      - panaderia-red
 
   frontend:
     build:
       context: ./Proyecto_Tienda_frontend
       dockerfile: Dockerfile
-    ports:
-      - "8081:80"
-    container_name: frontend
+    container_name: panaderia-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - TZ=America/Mexico_City
+      - VITE_API_URL=https://panaderia.laleyendadeldulce.com
+    ports:
+      - "18081:80"
     depends_on:
       - backend
     networks:
-      - tienda-red
+      - panaderia-red
 
-  database: 
+  database:
     image: postgres:13
+    container_name: panaderia-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: dulcesnc
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       TZ: America/Mexico_City
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - panaderia-db-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
       - ./db/migrations:/migrations:ro
-    container_name: Dulceria-DB
     ports:
-      - "5432:5432" 
+      - "15432:5432"
     healthcheck:
-      # -h 127.0.0.1 obliga a probar TCP: durante la inicializacion el servidor
-      # temporal solo escucha el socket y el healthcheck pasaria antes de tiempo.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U user -d dulcesnc"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 60s
     networks:
-      - tienda-red
+      - panaderia-red
 
   db-init:
     image: postgres:13
-    container_name: db-init
+    container_name: panaderia-db-init
+    restart: "no"
+    env_file:
+      - .env
     environment:
       - PGHOST=database
       - PGPASSWORD=password
@@ -85,123 +93,116 @@ services:
       - ./db/init:/init:ro
       - ./db/migrations:/migrations:ro
     entrypoint: ["sh", "-c", "bash /init/init.sh"]
-    restart: "no"
     depends_on:
       database:
         condition: service_healthy
     networks:
-      - tienda-red
+      - panaderia-red
 
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: panaderia-minio
+    restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "19000:9000"
+      - "19001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - minio-data:/data
+      - panaderia-minio-data:/data
     command: server /data --console-address ":9001"
     networks:
-      - tienda-red
+      - panaderia-red
 
   db-backup:
     image: postgres:17
-    container_name: db-backup
+    container_name: panaderia-db-backup
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - TZ=America/Mexico_City
       - PGPASSWORD=password
-      - DB_HOST=Dulceria-DB
+      - DB_HOST=database
       - DB_NAME=dulcesnc
       - DB_USER=user
     volumes:
       - ./db/backups:/backups
-      - backup-trigger:/trigger
-    command: ["sh", "-c", "mkdir -p /trigger && chmod 777 /trigger && wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /usr/local/bin/mc && mc alias set minio http://minio:9000 minioadmin minioadmin 2>/dev/null; while true; do if [ -f /trigger/backup ]; then TIMESTAMP=$$(date +%Y%m%d_%H%M%S); echo \"[$$(date)] === BACKUP COMBINADO ===\"; pg_dump -h $${DB_HOST} -U $${DB_USER} -d dulcesnc -F c -f /tmp/dump-dulcesnc.sql && echo \"[$$(date)] OK: dulcesnc\" || echo \"[$$(date)] ERROR: dulcesnc\"; pg_dump -h $${DB_HOST} -U $${DB_USER} -d dulcesnc_abarrotera -F c -f /tmp/dump-dulcesnc_abarrotera.sql && echo \"[$$(date)] OK: dulcesnc_abarrotera\" || echo \"[$$(date)] ERROR: dulcesnc_abarrotera\"; mkdir -p /tmp/minio-tmp && mc mirror --quiet minio/tiendanc /tmp/minio-tmp/ 2>/dev/null && tar -czf /tmp/minio.tar.gz -C /tmp minio-tmp && rm -rf /tmp/minio-tmp && echo \"[$$(date)] MinIO OK\" || { echo \"[$$(date)] MinIO ERROR - continuando sin MinIO\"; rm -rf /tmp/minio-tmp; }; tar -czf /backups/backup-$${TIMESTAMP}.tar.gz -C /tmp dump-dulcesnc.sql dump-dulcesnc_abarrotera.sql minio.tar.gz 2>/dev/null && echo \"[$$(date)] Backup creado: backup-$${TIMESTAMP}.tar.gz\" || echo \"[$$(date)] Error al crear backup combinado\"; rm -f /tmp/dump-dulcesnc.sql /tmp/dump-dulcesnc_abarrotera.sql /tmp/minio.tar.gz; find /backups -name 'backup-*.tar.gz' -mtime +30 -delete; find /backups -name 'dump-*.sql' -mtime +30 -delete; find /backups -name 'minio-*.tar.gz' -mtime +30 -delete; rm -f /trigger/backup; fi; if [ -f /trigger/restore ]; then RESTORE_FILE=$$(cat /trigger/restore); echo \"[$$(date)] === RESTORE: $${RESTORE_FILE} ===\"; if echo \"$${RESTORE_FILE}\" | grep -q '^backup-'; then echo \"[$$(date)] Formato combinado detectado\"; mkdir -p /tmp/restore && tar -xzf /backups/$${RESTORE_FILE} -C /tmp/restore; RC_DULC=0; RC_ABAR=0; RC_MINIO=0; if [ -f /tmp/restore/dump-dulcesnc.sql ]; then pg_restore -h $${DB_HOST} -U $${DB_USER} -d dulcesnc --clean --if-exists --no-owner /tmp/restore/dump-dulcesnc.sql >/tmp/restore-out 2>/tmp/restore-err; RC_DULC=$$?; echo \"[$$(date)] Restore dulcesnc: rc=$$RC_DULC\"; else echo \"[$$(date)] WARN: dump-dulcesnc.sql no encontrado en backup\"; fi; if [ -f /tmp/restore/dump-dulcesnc_abarrotera.sql ]; then pg_restore -h $${DB_HOST} -U $${DB_USER} -d dulcesnc_abarrotera --clean --if-exists --no-owner /tmp/restore/dump-dulcesnc_abarrotera.sql >/tmp/restore-out 2>/tmp/restore-err; RC_ABAR=$$?; echo \"[$$(date)] Restore abarrotera: rc=$$RC_ABAR\"; else echo \"[$$(date)] WARN: dump-dulcesnc_abarrotera.sql no encontrado en backup\"; fi; if [ -f /tmp/restore/minio.tar.gz ]; then mkdir -p /tmp/minio-restore && tar -xzf /tmp/restore/minio.tar.gz -C /tmp/minio-restore && mc mirror --overwrite --quiet /tmp/minio-restore/minio-tmp/ minio/tiendanc/ 2>/tmp/restore-minio-err; RC_MINIO=$$?; echo \"[$$(date)] Restore MinIO: rc=$$RC_MINIO\"; rm -rf /tmp/minio-restore; else echo \"[$$(date)] WARN: minio.tar.gz no encontrado en backup\"; fi; rm -rf /tmp/restore; echo \"OK\" > /trigger/restore-result; echo \"[$$(date)] Restore combinado completado (dulcesnc=$$RC_DULC abarrotera=$$RC_ABAR minio=$$RC_MINIO)\"; elif echo \"$${RESTORE_FILE}\" | grep -q 'minio-'; then echo \"[$$(date)] Restaurando MinIO (formato antiguo)\"; mkdir -p /tmp/minio-restore && tar -xzf /backups/$${RESTORE_FILE} -C /tmp/minio-restore && mc mirror --overwrite --quiet /tmp/minio-restore/minio-tmp/ minio/tiendanc/ 2>/tmp/restore-minio-err; RC=$$?; if [ $$RC -eq 0 ]; then rm -rf /tmp/minio-restore; echo \"OK\" > /trigger/restore-result; echo \"[$$(date)] MinIO Restore OK\"; else echo \"ERROR: $$(cat /tmp/restore-minio-err | tr '\\n' ' ' | head -c 300)\" > /trigger/restore-result; rm -rf /tmp/minio-restore; echo \"[$$(date)] MinIO Restore ERROR\"; fi; else if echo \"$${RESTORE_FILE}\" | grep -q 'abarrotera'; then TARGET_DB=dulcesnc_abarrotera; else TARGET_DB=dulcesnc; fi; pg_restore -h $${DB_HOST} -U $${DB_USER} -d $${TARGET_DB} --clean --if-exists --no-owner /backups/$${RESTORE_FILE} >/tmp/restore-out 2>/tmp/restore-err; RC=$$?; if [ $$RC -le 1 ]; then echo \"OK\" > /trigger/restore-result; echo \"[$$(date)] Restore OK (rc=$$RC): $${RESTORE_FILE}\"; else echo \"ERROR: $$(cat /tmp/restore-err | tr '\\n' ' ' | head -c 500)\" > /trigger/restore-result; echo \"[$$(date)] Restore ERROR (rc=$$RC)\"; fi; fi; rm -f /trigger/restore; fi; sleep 5; done"]
-    restart: unless-stopped
-    networks:
-      - tienda-red
+      - panaderia-backup-trigger:/trigger
+    command: ["sh", "-c", "mkdir -p /trigger && chmod 777 /trigger && wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /usr/local/bin/mc && mc alias set minio http://minio:9000 minioadmin minioadmin 2>/dev/null; while true; do if [ -f /trigger/backup ]; then TIMESTAMP=$$(date +%Y%m%d_%H%M%S); echo \"[$$(date)] === BACKUP COMBINADO ===\"; pg_dump -h $${DB_HOST} -U $${DB_USER} -d dulcesnc -F c -f /tmp/dump-dulcesnc.sql && echo \"[$$(date)] OK: dulcesnc\" || echo \"[$$(date)] ERROR: dulcesnc\"; mkdir -p /tmp/minio-tmp && mc mirror --quiet minio/tiendanc /tmp/minio-tmp/ 2>/dev/null && tar -czf /tmp/minio.tar.gz -C /tmp minio-tmp && rm -rf /tmp/minio-tmp && echo \"[$$(date)] MinIO OK\" || { echo \"[$$(date)] MinIO ERROR - continuando sin MinIO\"; rm -rf /tmp/minio-tmp; }; tar -czf /backups/backup-$${TIMESTAMP}.tar.gz -C /tmp dump-dulcesnc.sql minio.tar.gz 2>/dev/null && echo \"[$$(date)] Backup creado: backup-$${TIMESTAMP}.tar.gz\" || echo \"[$$(date)] Error al crear backup combinado\"; rm -f /tmp/dump-dulcesnc.sql /tmp/minio.tar.gz; find /backups -name 'backup-*.tar.gz' -mtime +30 -delete; rm -f /trigger/backup; fi; if [ -f /trigger/restore ]; then RESTORE_FILE=$$(cat /trigger/restore); echo \"[$$(date)] === RESTORE: $${RESTORE_FILE} ===\"; mkdir -p /tmp/restore && tar -xzf /backups/$${RESTORE_FILE} -C /tmp/restore; RC_DULC=0; RC_MINIO=0; if [ -f /tmp/restore/dump-dulcesnc.sql ]; then pg_restore -h $${DB_HOST} -U $${DB_USER} -d dulcesnc --clean --if-exists --no-owner /tmp/restore/dump-dulcesnc.sql >/tmp/restore-out 2>/tmp/restore-err; RC_DULC=$$?; echo \"[$$(date)] Restore dulcesnc: rc=$$RC_DULC\"; fi; if [ -f /tmp/restore/minio.tar.gz ]; then mkdir -p /tmp/minio-restore && tar -xzf /tmp/restore/minio.tar.gz -C /tmp/minio-restore && mc mirror --overwrite --quiet /tmp/minio-restore/minio-tmp/ minio/tiendanc/ 2>/tmp/restore-minio-err; RC_MINIO=$$?; echo \"[$$(date)] Restore MinIO: rc=$$RC_MINIO\"; rm -rf /tmp/minio-restore; fi; rm -rf /tmp/restore; echo \"OK\" > /trigger/restore-result; echo \"[$$(date)] Restore combinado completado (dulcesnc=$$RC_DULC minio=$$RC_MINIO)\"; rm -f /trigger/restore; fi; sleep 5; done"]
     depends_on:
-      - database
+      database:
+        condition: service_healthy
+    networks:
+      - panaderia-red
 
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: panaderia-ollama
+    restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      - panaderia-ollama-data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_HOST=0.0.0.0
-    restart: unless-stopped
     networks:
-      - tienda-red
+      - panaderia-red
 
   ollama-init:
     image: ollama/ollama:latest
-    container_name: ollama-init
+    container_name: panaderia-ollama-init
+    restart: "no"
+    env_file:
+      - .env
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://panaderia-ollama:11434
     volumes:
-      - ollama_data:/root/.ollama
+      - panaderia-ollama-data:/root/.ollama
     entrypoint: ["sh", "-c", "
       apt-get update -qq && apt-get install -y -qq curl && rm -rf /var/lib/apt/lists/*;
-      echo 'Esperando a que Ollama inicie...';
+      echo 'Esperando a Ollama...';
       for i in $$(seq 1 30); do
-        if curl -s http://ollama:11434/api/tags > /dev/null 2>&1; then
-echo 'Ollama listo. Descargando llama3.1:8b...';
-      ollama pull llama3.1:8b;
-          echo 'Descarga completa.';
+        if curl -s http://panaderia-ollama:11434/api/tags > /dev/null 2>&1; then
+          echo 'Descargando qwen2.5:7b...';
+          ollama pull qwen2.5:7b;
           exit 0;
         fi;
-        echo \"Intento $$i - esperando...\";
         sleep 2;
       done;
-      echo 'No se pudo conectar con Ollama';
       exit 1
     "]
-    restart: "no"
     depends_on:
       - ollama
     networks:
-      - tienda-red
+      - panaderia-red
 
   tunnel:
-    container_name: cloudflared-tunnel
+    container_name: panaderia-cloudflared-tunnel
     image: cloudflare/cloudflared:latest
     restart: always
-    command: >
-      tunnel run 
-      --token eyJhIjoiNzhmZTUxOGI2OGVlODZjZmJjYjdjMTI2NzY1N2Q2MmIiLCJ0IjoiYWRiM2JkZTUtNTkwZC00MDM1LTlkMTUtMjRjODk1YWJiN2NkIiwicyI6Ik1qTTFaV1V6TlRRdFkyVmlaaTAwTWpJMExXRTBNR1F0TVRsaU1qRmxabU0yTmpNeCJ9
+    env_file:
+      - .env
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN_PANADERIA}
     environment:
-      - TUNNEL_ORIGIN_SERVER_NAME=api.laleyendadeldulce.com
       - NO_TLS_VERIFY=true
       - TUNNEL_METRICS=0.0.0.0:9090
       - TUNNEL_LOGLEVEL=info
     networks:
-      - tienda-red
+      - panaderia-red
     depends_on:
       - frontend
       - backend
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
 
 networks:
-  tienda-red:
+  panaderia-red:
     driver: bridge
 
 volumes:
-  db-data:
-  minio-data:
-  backup-trigger:
-  ollama_data:
+  panaderia-db-data:
+  panaderia-minio-data:
+  panaderia-backup-trigger:
+  panaderia-ollama-data:
