@@ -43,7 +43,7 @@ const emit = defineEmits<{
 .vp-modal-head{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;background:var(--color-bg-secondary);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 .vp-modal-title{margin:0;font-size:1.1rem;color:var(--color-accent)}
 .vp-modal-close{width:34px;height:34px;border:none;border-radius:50%;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.15);transition:all .15s}
-.vp-modal-close:hover{background:var(--color-error);color:#fff}
+.vp-modal-close:hover{background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .vp-modal-body-clean{padding:1.25rem;display:flex;flex-direction:column;gap:.85rem;flex:1}
 .pendiente-hint{font-size:.9rem;color:var(--color-text-secondary);font-style:italic;margin:0}
 .pendiente-textarea{width:100%;background:var(--color-bg-secondary);border:none;border-radius:var(--radius-sm);padding:.85rem;font-family:inherit;font-size:.95rem;color:var(--color-text-primary);resize:vertical;min-height:100px;outline:none;box-shadow:inset 3px 3px 6px rgba(0,0,0,0.2),inset -2px -2px 4px rgba(255,255,255,0.02);transition:all .2s;box-sizing:border-box}

@@ -708,8 +708,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-close {
   width: 36px;
   height: 36px;
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   border: 2px solid var(--border-color);
   border-radius: 50%;
   font-size: 1.2rem;
@@ -754,8 +754,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .error-msg {
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   padding: 0.75rem;
   border-radius: 6px;
   margin-bottom: 1rem;
@@ -880,8 +880,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .status-badge.active {
-  background: var(--success-color);
-  color: white;
+  background: var(--success-fill, var(--success-color));
+  color: var(--on-success, #ffffff);
 }
 
 .status-badge.inactive {
@@ -932,7 +932,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 .price-promo {
   font-size: 1rem;
   font-weight: bold;
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .card-actions {
@@ -954,15 +954,15 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .btn-toggle:hover, .btn-edit:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
 }
 
 .btn-delete {
   width: 28px;
   height: 28px;
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -1062,8 +1062,8 @@ function formatImagenUrl(url: string | null): string | undefined {
   right: 4px;
   width: 24px;
   height: 24px;
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   border: none;
   border-radius: 50%;
   font-size: 1rem;
@@ -1154,8 +1154,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-remove-prod {
   width: 24px;
   height: 24px;
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -1209,8 +1209,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-save {
   flex: 2;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
-  color: white;
+  background: var(--success-fill, var(--success-color));
+  color: var(--on-success, #ffffff);
   border: 2px solid var(--border-color);
   border-radius: 6px;
   font-weight: bold;
@@ -1294,8 +1294,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-close-gramaje {
   width: 28px;
   height: 28px;
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
   border: none;
   border-radius: 50%;
   font-size: 1rem;
@@ -1394,13 +1394,13 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .gramaje-quick-btns button:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
 }
 
 .gramaje-subtotal {
   text-align: center;
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
   font-size: 0.9rem;
   margin: 0;
@@ -1434,8 +1434,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-confirmar {
   flex: 1;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
-  color: white;
+  background: var(--success-fill, var(--success-color));
+  color: var(--on-success, #ffffff);
   border: 2px solid var(--border-color);
   border-radius: 6px;
   font-weight: bold;

@@ -299,12 +299,12 @@ const emit = defineEmits<{
 .pp-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:var(--color-bg-secondary);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 .pp-header h3{margin:0;font-size:1.1rem;color:var(--color-accent)}
 .btn-close{width:34px;height:34px;border-radius:50%;border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:3px 3px 6px rgba(0,0,0,0.15);transition:all .15s}
-.btn-close:hover{background:var(--color-error);color:#fff}
+.btn-close:hover{background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .pp-tabs{display:flex;gap:.3rem;padding:.5rem 1rem;background:var(--color-bg-secondary);border-bottom:1px solid var(--color-border);flex-wrap:wrap}
 .pp-tab{padding:.4rem .8rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,0.1);white-space:nowrap}
 .pp-tab-icon,.pp-tab-text{display:inline;vertical-align:middle}
 .pp-tab:hover{color:var(--color-text-primary)}
-.pp-tab.active{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,0.2)}
+.pp-tab.active{background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,0.2)}
 .pp-body{flex:1;min-height:0;overflow-y:auto;padding:1rem}
 .pp-section{display:flex;flex-direction:column;gap:.75rem}
 /* La inteligencia ya trae su propio scroll de panel en las páginas completas.
@@ -319,11 +319,11 @@ const emit = defineEmits<{
 .pp-btn-add:hover{box-shadow:5px 5px 10px rgba(0,0,0,0.2);transform:translateY(-1px)}
 .pp-views{display:flex;gap:.3rem;margin-left:auto}
 .pp-vbtn{width:32px;height:32px;border:none;border-radius:var(--radius-sm);background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s}
-.pp-vbtn.on{background:var(--color-accent);color:var(--color-on-brand)}
+.pp-vbtn.on{background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand)}
 .pp-empty{text-align:center;padding:2rem;color:var(--color-text-secondary)}
 .pp-list{display:flex;flex-direction:column;gap:.4rem}
 .pp-item{display:flex;align-items:center;gap:.75rem;padding:.6rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);box-shadow:2px 2px 4px rgba(0,0,0,0.1)}
-.pp-item-avatar{width:36px;height:36px;border-radius:50%;background:var(--color-accent);color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+.pp-item-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
 .pp-item-info{flex:1;min-width:0}
 .pp-item-name{display:block;font-weight:600;color:var(--color-text-primary);font-size:.9rem}
 .pp-item-detail{display:block;font-size:.75rem;color:var(--color-text-secondary)}
@@ -334,7 +334,7 @@ const emit = defineEmits<{
 .pp-btn-ok:hover{color:var(--color-success)}
 .pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
 .pp-card{background:var(--color-bg-secondary);border-radius:var(--radius-sm);padding:.8rem;box-shadow:3px 3px 6px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;gap:.4rem}
-.pp-card-avatar{width:40px;height:40px;border-radius:50%;background:var(--color-accent);color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem}
+.pp-card-avatar{width:40px;height:40px;border-radius:50%;background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem}
 .pp-card-name{margin:0;font-size:.85rem;color:var(--color-text-primary)}
 .pp-card-details{display:flex;flex-direction:column;gap:.2rem;width:100%}
 .pp-card-detail{font-size:.7rem;color:var(--color-text-secondary)}

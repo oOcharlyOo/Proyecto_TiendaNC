@@ -54,13 +54,13 @@ defineEmits<{ 'abrir-modal-entradas': []; 'abrir-modal-egresos': []; 'abrir-moda
 .stat-label{font-size:.75rem;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px}
 .stat-value{font-size:1.1rem;font-weight:700;}
 .c-inicial .stat-glow{background:radial-gradient(circle,var(--color-success) 0%,transparent 70%);opacity:.18}
-.c-inicial .stat-icon-wrapper{background:color-mix(in srgb,var(--color-success) 12%,var(--color-bg-primary))}
+.c-inicial .stat-icon-wrapper{background:color-mix(in srgb, var(--color-success) 12%, var(--badge-bg, var(--bg-panel)))}
 .c-tickets .stat-glow{background:radial-gradient(circle,var(--color-accent) 0%,transparent 70%);opacity:.18}
-.c-tickets .stat-icon-wrapper{background:color-mix(in srgb,var(--color-accent) 12%,var(--color-bg-primary))}
+.c-tickets .stat-icon-wrapper{background:color-mix(in srgb, var(--color-accent) 12%, var(--badge-bg, var(--bg-panel)))}
 .c-horas .stat-glow{background:radial-gradient(circle,var(--color-info) 0%,transparent 70%);opacity:.18}
-.c-horas .stat-icon-wrapper{background:color-mix(in srgb,var(--color-info) 12%,var(--color-bg-primary))}
+.c-horas .stat-icon-wrapper{background:color-mix(in srgb, var(--color-info) 12%, var(--badge-bg, var(--bg-panel)))}
 .c-info .stat-glow{background:radial-gradient(circle,var(--color-warning) 0%,transparent 70%);opacity:.14}
-.c-info .stat-icon-wrapper{background:color-mix(in srgb,var(--color-warning) 10%,var(--color-bg-primary))}
+.c-info .stat-icon-wrapper{background:color-mix(in srgb, var(--color-warning) 10%, var(--badge-bg, var(--bg-panel)))}
 @media(max-width:768px){.stats-section{grid-template-columns:repeat(2,1fr);gap:.6rem}.stat-card-wrapper{padding:.8rem}.stat-icon-wrapper{width:36px;height:36px;font-size:1.1rem}.stat-value{font-size:.95rem}.stat-label{font-size:.65rem}}
 @media(max-width:480px){.stats-section{grid-template-columns:1fr;gap:.5rem}.stat-card-wrapper{padding:.65rem 1rem}.stat-icon-wrapper{width:32px;height:32px;font-size:.95rem}.stat-value{font-size:.85rem}.stat-label{font-size:.6rem}}
 </style>

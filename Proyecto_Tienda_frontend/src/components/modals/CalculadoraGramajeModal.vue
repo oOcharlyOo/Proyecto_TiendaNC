@@ -405,7 +405,7 @@ function confirmar() {
 .scale-modal .btn-quick:hover {
   transform: translateY(-1px);
   box-shadow: 5px 5px 10px rgba(0,0,0,.18), -2px -2px 5px rgba(255,255,255,.04);
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-on-brand);
 }
 

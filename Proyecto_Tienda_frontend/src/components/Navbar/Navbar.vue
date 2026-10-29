@@ -254,8 +254,8 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   align-items: center;
   gap: 0.3rem;
   padding: 0.2rem 0.6rem;
-  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-primary));
-  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--badge-bg, var(--bg-panel)));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--bg-panel));
   border-radius: 8px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -879,7 +879,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
 }
 
 .navbar-wrap .hamburger.active {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-color: var(--color-brand);
 }
 

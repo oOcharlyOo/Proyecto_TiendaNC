@@ -1773,7 +1773,7 @@ function exportarCsv() {
   top: 0;
   z-index: 1;
   padding: 0.4rem 0.45rem;
-  background: color-mix(in srgb, var(--color-bg-panel) 85%, transparent);
+  background: color-mix(in srgb, var(--badge-bg, var(--color-bg-panel)) 85%, transparent);
   color: var(--color-text-muted);
   font-size: 0.56rem;
   font-weight: 700;
@@ -1818,7 +1818,7 @@ function exportarCsv() {
 .ii-table thead th.g-dec { color: var(--g-dec); border-bottom-color: color-mix(in srgb, var(--g-dec) 55%, transparent); }
 
 .ii-table tbody td.c-id { background: color-mix(in srgb, var(--g-id) 5%, transparent); }
-.ii-table tbody td.c-stock { background: color-mix(in srgb, var(--g-stock) 6%, transparent); }
+.ii-table tbody td.c-stock { background: color-mix(in srgb, var(--g-stock) 6%, var(--badge-bg, var(--bg-panel))); }
 .ii-table tbody td.c-dem { background: color-mix(in srgb, var(--g-dem) 5%, transparent); }
 .ii-table tbody td.c-dec { background: color-mix(in srgb, var(--g-dec) 5%, transparent); }
 
@@ -1897,8 +1897,8 @@ function exportarCsv() {
   margin-left: 0.25rem;
   padding: 0.02rem 0.3rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--bg-panel));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--badge-bg, var(--bg-panel)));
   color: var(--color-accent);
   font-size: 0.5rem;
   font-weight: 700;
@@ -1975,7 +1975,7 @@ function exportarCsv() {
 .ii-prov-tag {
   padding: 0.02rem 0.35rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  background: color-mix(in srgb, var(--color-success) 14%, var(--badge-bg, var(--bg-panel)));
   color: var(--color-success);
   font-size: 0.5rem;
   font-weight: 700;
@@ -1987,8 +1987,8 @@ function exportarCsv() {
   margin-left: 0.2rem;
   padding: 0.02rem 0.3rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--color-info) 45%, transparent);
-  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 45%, var(--bg-panel));
+  background: color-mix(in srgb, var(--color-info) 12%, var(--badge-bg, var(--bg-panel)));
   color: var(--color-info);
   font-size: 0.5rem;
   font-weight: 600;
@@ -2036,8 +2036,8 @@ function exportarCsv() {
   display: inline-block;
   padding: 0.12rem 0.4rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--badge-tone) 45%, transparent);
-  background: color-mix(in srgb, var(--badge-tone) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-tone) 45%, var(--bg-panel));
+  background: color-mix(in srgb, var(--badge-tone) 14%, var(--badge-bg, var(--bg-panel)));
   color: var(--badge-tone);
   font-size: 0.55rem;
   font-weight: 700;

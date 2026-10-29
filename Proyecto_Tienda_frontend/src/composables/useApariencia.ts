@@ -43,14 +43,6 @@ function mezclar(hex: string, haciaBlanco: boolean, factor: number): string {
   return '#' + [m(r), m(g), m(b)].map(c => c.toString(16).padStart(2, '0')).join('');
 }
 
-/** Mezcla lineal de dos colores hex (t = peso del primero). */
-function mezclaDos(a: string, b: string, t: number): string {
-  const A = hexANum(a);
-  const B = hexANum(b);
-  const m = (i: number) => Math.round(A[i] * t + B[i] * (1 - t));
-  return '#' + [m(0), m(1), m(2)].map(c => c.toString(16).padStart(2, '0')).join('');
-}
-
 /** Luminancia perceptual 0-255 (pesos ITU-R BT.601). */
 function luminancia(hex: string): number {
   const [r, g, b] = hexANum(hex);
@@ -135,6 +127,14 @@ const VARIABLES_CONTRASTE = [
   '--color-warning',
   '--color-on-brand',
   '--btn-text',
+  '--success-fill',
+  '--success-fill-hover',
+  '--error-fill',
+  '--error-fill-hover',
+  '--warning-fill',
+  '--warning-fill-hover',
+  '--info-fill',
+  '--info-fill-hover',
   '--on-success',
   '--on-error',
   '--on-info',
@@ -163,6 +163,83 @@ const VARIABLES_FONDO = [
 ];
 
 /**
+ * Paleta semantica basica (verde/rojo/amarillo/azul), independiente del
+ * acento de la marca. Cada estado tiene:
+ *  - fill: relleno vivo para botones, precios y badges.
+ *  - on:   tinta que cumple 4.5:1 sobre ese relleno.
+ *  - text: variante legible como texto/icono sobre las superficies.
+ * Los tonos cambian entre claro y oscuro segun el fondo principal.
+ */
+type EstadoSemantico = {
+  /** Token legacy que se conserva como relleno estable (--success-color...). */
+  token: string;
+  /** Relleno adaptativo (claro/oscuro). */
+  fill: string;
+  fillHover: string;
+  /** Variante para texto e iconos. */
+  texto: string;
+  /** Tinta sobre el relleno. */
+  tinta: string;
+  /** Tono base del que se deriva la variante de texto. */
+  base: string;
+  fillClaro: string;
+  fillOscuro: string;
+  tintaClara: string;
+  tintaOscura: string;
+};
+
+const ESTADOS: EstadoSemantico[] = [
+  {
+    token: '--success-color',
+    fill: '--success-fill',
+    fillHover: '--success-fill-hover',
+    texto: '--color-success',
+    tinta: '--on-success',
+    base: '#16a34a',
+    fillClaro: '#15803d',
+    fillOscuro: '#22c55e',
+    tintaClara: '#ffffff',
+    tintaOscura: '#052e16',
+  },
+  {
+    token: '--error-color',
+    fill: '--error-fill',
+    fillHover: '--error-fill-hover',
+    texto: '--color-error',
+    tinta: '--on-error',
+    base: '#dc2626',
+    fillClaro: '#b91c1c',
+    fillOscuro: '#f87171',
+    tintaClara: '#ffffff',
+    tintaOscura: '#450a0a',
+  },
+  {
+    token: '--warning-color',
+    fill: '--warning-fill',
+    fillHover: '--warning-fill-hover',
+    texto: '--color-warning',
+    tinta: '--on-warning',
+    base: '#eab308',
+    fillClaro: '#eab308',
+    fillOscuro: '#facc15',
+    tintaClara: '#1c1917',
+    tintaOscura: '#422006',
+  },
+  {
+    token: '--info-color',
+    fill: '--info-fill',
+    fillHover: '--info-fill-hover',
+    texto: '--color-info',
+    tinta: '--on-info',
+    base: '#3b82f6',
+    fillClaro: '#1d4ed8',
+    fillOscuro: '#60a5fa',
+    tintaClara: '#ffffff',
+    tintaOscura: '#082f49',
+  },
+];
+
+/**
  * Recalcula los tokens del puente a partir de lo que el tema dejo en <html>.
  * Debe llamarse DESPUES de fijar atributo de tema y variables de fondo/acento.
  */
@@ -174,47 +251,43 @@ function normalizarContraste(root: HTMLElement) {
   const bgPanel = hex(val('--bg-panel')) || bgP;
   if (!bgP || !bgPanel) return;
   const bgSec = hex(val('--bg-secondary')) || bgPanel;
+  const claro = luminancia(bgP) > UMBRAL_CLARO;
 
-  // Texto/iconos: 4.5 sobre cualquiera de las superficies del tema. Ademas
-  // se exige 4.5 sobre el TINTE del propio color (chips y badges usan un
-  // 15% del color sobre la superficie).
+  // Base de los tintes de badges/chips: panel casi blanco en temas claros y
+  // la superficie mas oscura en temas oscuros (si se usa el panel, el tinte
+  // aclara el fondo y el texto claro pierde contraste).
+  root.style.setProperty('--badge-bg', claro ? bgPanel : bgP);
+
+  // Texto/iconos: margen de 6.0 sobre las superficies para que tambien se
+  // lean cuando el mismo tono se usa como tinte de fondo (badges, chips).
   const fondosTexto = [
-    { hex: bgP, min: 4.5 },
-    { hex: bgSec, min: 4.5 },
-    { hex: bgPanel, min: 4.5 },
+    { hex: bgP, min: 6.0 },
+    { hex: bgSec, min: 6.0 },
+    { hex: bgPanel, min: 6.0 },
   ];
-  const conTinte = (color: string) => {
-    const tinte = mezclaDos(color, bgPanel, 0.15);
-    return ajustarContraste(color, [{ hex: tinte, min: 4.5 }]);
-  };
 
   // Acento: el mismo tono pero aclarado/oscurecido lo justo para que se lea
-  // como texto y como icono; los rellenos derivan de aqui.
+  // como texto y como icono. No se mezcla con su propio tinte para no
+  // deslavar el color (era lo que volvia gris el acento en fondos claros).
   const acentoRaw = hex(val('--accent-color'));
-  const acento = acentoRaw ? conTinte(ajustarContraste(acentoRaw, fondosTexto)) : null;
+  const acento = acentoRaw ? ajustarContraste(acentoRaw, fondosTexto) : null;
   if (acento) {
     root.style.setProperty('--accent-color', acento);
     root.style.setProperty('--color-accent', acento);
   }
 
-  // Botones de marca: degradado + tinta que siempre cumplen contraste.
+  // Botones de marca: se conserva el acento VIVO y se elige la tinta que
+  // contraste (oscura sobre ambar/lima, clara sobre azul/violeta). Antes en
+  // temas claros se oscurecia el relleno para forzar tinta blanca, y eso
+  // apagaba los botones de acento (se veian marrones).
   if (acentoRaw && acento) {
-    const claro = luminancia(bgP) > UMBRAL_CLARO;
     let inicio: string;
     let medio: string;
     let finSt: string;
 
-    if (claro) {
-      // Fondo claro: relleno oscurecido para que la tinta blanca cumpla 4.5
-      medio = ajustarContraste(acentoRaw, [{ hex: '#ffffff', min: 4.5 }]);
-      inicio = ajustarContraste(mezclar(medio, true, 0.10), [{ hex: '#ffffff', min: 4.5 }]);
-      finSt = mezclar(medio, false, 0.14);
-    } else {
-      // Fondo oscuro: se conserva el acento vivo y se elige tinta clara/oscura
-      medio = acentoRaw;
-      inicio = mezclar(acentoRaw, true, 0.10);
-      finSt = mezclar(acentoRaw, false, 0.10);
-    }
+    medio = acentoRaw;
+    inicio = mezclar(acentoRaw, true, 0.10);
+    finSt = mezclar(acentoRaw, false, 0.12);
 
     let tinta = etiquetaSobre([inicio, medio, finSt]);
     // Red de seguridad: cada parada debe cumplir contra la tinta elegida
@@ -226,25 +299,37 @@ function normalizarContraste(root: HTMLElement) {
     root.style.setProperty('--gradient-btn-start', inicio);
     root.style.setProperty('--gradient-btn-mid', medio);
     root.style.setProperty('--gradient-btn-end', finSt);
+    // Relleno de acento para botones/chips: el acento VIVO (no la variante
+    // oscurecida que se usa como texto). La tinta --color-on-brand ya esta
+    // calculada contra este mismo relleno.
+    root.style.setProperty('--accent-fill', medio);
     root.style.setProperty('--accent-hover', inicio);
     root.style.setProperty('--btn-text', tinta);
     root.style.setProperty('--color-on-brand', tinta);
   }
 
-  // Estados: el relleno tambien se ajusta y la tinta se calcula sobre el.
-  const estado = (token: string, puente: string, tinta: string) => {
-    const raw = hex(val(token));
-    if (!raw) return;
-    const seguro = conTinte(ajustarContraste(raw, fondosTexto));
-    root.style.setProperty(token, seguro);
-    root.style.setProperty(puente, seguro);
-    root.style.setProperty(tinta, etiquetaSobre([seguro]));
-  };
-  estado('--success-color', '--color-success', '--on-success');
-  estado('--error-color', '--color-error', '--on-error');
-  estado('--color-info', '--color-info', '--on-info');
-  estado('--color-warning', '--color-warning', '--on-warning');
+  // Estados semanticos: verde exito, rojo error, amarillo advertencia y azul
+  // informacion. El relleno es vivo (cambia entre claro y oscuro) y la tinta
+  // se elige para cumplir 4.5:1; el texto usa una variante legible aparte.
+  for (const e of ESTADOS) {
+    const relleno = claro ? e.fillClaro : e.fillOscuro;
+    let tinta = claro ? e.tintaClara : e.tintaOscura;
+    // Red de seguridad: si la tinta elegida no alcanza 4.5, se corrige.
+    if (ratioContraste(relleno, tinta) < 4.5) {
+      tinta = etiquetaSobre([relleno]);
+    }
+    const texto = ajustarContraste(e.base, fondosTexto);
+    const hover = mezclar(relleno, !claro, 0.12);
 
+    root.style.setProperty(e.fill, relleno);
+    root.style.setProperty(e.fillHover, hover);
+    root.style.setProperty(e.tinta, tinta);
+    root.style.setProperty(e.texto, texto);
+    // Token legacy: success/error se usan como relleno estable con tinta
+    // blanca en botones antiguos; warning/info se usan como texto.
+    const legacy = e.token === '--success-color' || e.token === '--error-color' ? relleno : texto;
+    root.style.setProperty(e.token, legacy);
+  }
   // Texto secundario: legible sobre panel y sobre la pagina
   const secundario = hex(val('--text-secondary'));
   if (secundario) {
@@ -299,19 +384,23 @@ export function usarApariencia() {
     // luminancia, para que nunca queden letras claras sobre fondo claro.
     if (fondo && HEX_RE.test(fondo)) {
       const claro = luminancia(fondo) > UMBRAL_CLARO;
-      const mez = (f: number) => mezclar(fondo, !claro, f); // aclara en temas oscuros, oscurece en claros
+      // Elevacion: en ambos modos las superficies se acercan al blanco. En
+      // temas claros esto deja tarjetas casi blancas sobre el fondo (en vez
+      // de grises cada vez mas oscuros, que apagaban acentos y estados).
+      const superficie = (f: number) => mezclar(fondo, true, f);
+      const borde = (f: number) => mezclar(fondo, claro ? false : true, f);
 
       root.style.setProperty('--bg-primary', fondo);
-      root.style.setProperty('--bg-secondary', mez(0.10));
-      root.style.setProperty('--bg-panel', mez(0.20));
-      root.style.setProperty('--border-color', mez(0.30));
-      root.style.setProperty('--gradient-bg-start', mez(0.08));
-      root.style.setProperty('--gradient-bg-mid', claro ? mezclar(fondo, false, 0.12) : mezclar(fondo, false, 0.25));
-      root.style.setProperty('--gradient-panel-start', mez(0.12));
-      root.style.setProperty('--gradient-panel-end', fondo);
+      root.style.setProperty('--bg-secondary', superficie(claro ? 0.45 : 0.08));
+      root.style.setProperty('--bg-panel', superficie(claro ? 0.85 : 0.14));
+      root.style.setProperty('--border-color', borde(0.20));
+      root.style.setProperty('--gradient-bg-start', superficie(claro ? 0.10 : 0.06));
+      root.style.setProperty('--gradient-bg-mid', claro ? mezclar(fondo, false, 0.06) : mezclar(fondo, false, 0.25));
+      root.style.setProperty('--gradient-panel-start', superficie(claro ? 0.95 : 0.22));
+      root.style.setProperty('--gradient-panel-end', superficie(claro ? 0.60 : 0.10));
 
       if (claro) {
-        // INVERSION: fondo claro -> texto oscuro en h1..h4, p, body, inputs
+        // Fondo claro -> texto oscuro en h1..h4, p, body, inputs.
         root.style.setProperty('--text-primary', '#0f172a');
         root.style.setProperty('--text-secondary', '#475569');
         root.style.setProperty('--chart-text', '#0f172a');
@@ -323,8 +412,8 @@ export function usarApariencia() {
         root.style.setProperty('--shadow-color', 'rgba(0, 0, 0, 0.3)');
       }
       root.style.setProperty('--chart-bg', fondo);
-      root.style.setProperty('--chart-border', mezclar(fondo, claro ? false : true, 0.25));
-      root.style.setProperty('--chart-border-light', mezclar(fondo, claro ? false : true, 0.15));
+      root.style.setProperty('--chart-border', borde(0.25));
+      root.style.setProperty('--chart-border-light', borde(0.15));
       root.style.setProperty('--chart-item-bg', rgba(acento && HEX_RE.test(acento) ? acento : '#64748b', 0.12));
       // Controles nativos (selects, date pickers, autofill, scrollbars) acordes al fondo
       root.style.colorScheme = claro ? 'light' : 'dark';

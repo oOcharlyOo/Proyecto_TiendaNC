@@ -194,7 +194,7 @@ async function corregir(ids: number[]) {
 .hist-modal { width: min(100%, 1100px); max-height: 92vh; background: var(--color-bg-panel); border: none; border-radius: var(--radius-lg); box-shadow: 8px 8px 24px rgba(0,0,0,0.35), -4px -4px 16px rgba(255,255,255,0.03); display: flex; flex-direction: column; overflow: hidden; position: relative; animation: slideUp 0.2s; min-height: 0; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .hist-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s; }
-.hist-close:hover { background: var(--color-error); color: white; }
+.hist-close:hover { background: var(--error-fill, var(--color-error)); color: var(--on-error, #ffffff); }
 .hist-header { padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--color-border); }
 .hist-header h2 { margin: 0 0 0.75rem; font-size: 1.2rem; font-weight: 700; color: var(--color-text-primary); }
 .hist-summary { display: flex; gap: 0.75rem; }
@@ -214,7 +214,7 @@ async function corregir(ids: number[]) {
 .hist-btn { padding: 0.35rem 0.7rem; border: none; border-radius: 6px; background: var(--color-bg-secondary); color: var(--color-text-primary); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
 .hist-btn:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
 .hist-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.hist-btn.corr.primary { background: var(--color-accent); color: var(--color-bg-panel); border-color: var(--color-accent); }
+.hist-btn.corr.primary { background: var(--accent-fill, var(--color-accent)); color: var(--color-bg-panel); border-color: var(--color-accent); }
 .hist-correccion-msg { margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--color-success); text-align: center; }
 .hist-vendedores { padding: 0.6rem 1.5rem; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 0.4rem; }
 .hist-vendedor { display: flex; align-items: center; gap: 1rem; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--color-bg-secondary); }
@@ -226,8 +226,8 @@ async function corregir(ids: number[]) {
 .hist-bar-label { font-size: 0.6rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; min-width: 50px; }
 .hist-bar-track { flex: 1; height: 5px; background: var(--color-border); border-radius: 3px; overflow: hidden; }
 .hist-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-.hist-bar-fill.cobro { background: var(--color-accent); }
-.hist-bar-fill.gain { background: var(--color-success); }
+.hist-bar-fill.cobro { background: var(--accent-fill, var(--color-accent)); }
+.hist-bar-fill.gain { background: var(--success-fill, var(--color-success)); }
 .hist-bar-val { font-size: 0.7rem; font-weight: 700; font-family: "Courier New", monospace; min-width: 75px; text-align: right; }
 .hist-table-wrap { flex: 1; overflow-y: auto; min-height: 180px; min-height: 0; }
 .hist-empty { padding: 1.5rem; text-align: center; color: var(--color-text-secondary); }
@@ -262,12 +262,12 @@ async function corregir(ids: number[]) {
 .hist-btn-icon { width: 26px; height: 26px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .hist-btn-icon.cancel { background: #ef4444; color: white; }
 .hist-btn-icon.cancel:hover { background: #dc2626; transform: scale(1.1); }
-.hist-btn-icon.view { background: var(--color-accent); color: var(--color-bg-panel); }
+.hist-btn-icon.view { background: var(--accent-fill, var(--color-accent)); color: var(--color-bg-panel); }
 .hist-btn-icon.view:hover { filter: brightness(1.15); transform: scale(1.1); }
 .hist-btn-icon.edit { width: 26px; height: 26px; background: rgba(59,130,246,0.1); color: #2563eb; }
 .hist-btn-icon.edit:hover { background: rgba(59,130,246,0.22); transform: scale(1.1); }
 .hist-footer { padding: 0.6rem 1.5rem; border-top: 1px solid var(--color-border); display: flex; justify-content: center; }
-.hist-btn-close { padding: 0.5rem 1.5rem; border: none; border-radius: 8px; background: var(--color-accent); color: var(--color-bg-panel); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.hist-btn-close { padding: 0.5rem 1.5rem; border: none; border-radius: 8px; background: var(--accent-fill, var(--color-accent)); color: var(--color-bg-panel); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 .hist-btn-close:hover { filter: brightness(1.1); }
 @media (max-width: 768px) {
   .hist-overlay { padding: 0.5rem; align-items: flex-start; }

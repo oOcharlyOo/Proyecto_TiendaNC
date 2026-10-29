@@ -420,11 +420,11 @@ defineEmits<{
 }
 
 /* Section accent colors */
-.section-ventas .section-accent { background: var(--color-success); }
+.section-ventas .section-accent { background: var(--success-fill, var(--color-success)); }
 .section-ventas .section-title { color: var(--color-success); }
 .section-ventas .section-icon { color: var(--color-success); }
 
-.section-caja .section-accent { background: var(--color-info); }
+.section-caja .section-accent { background: var(--info-fill, var(--color-info)); }
 .section-caja .section-title { color: var(--color-info); }
 .section-caja .section-icon { color: var(--color-info); }
 
@@ -432,7 +432,7 @@ defineEmits<{
 .section-ganancias .section-title { color: #a855f7; }
 .section-ganancias .section-icon { color: #a855f7; }
 
-.section-productos .section-accent { background: var(--color-accent); }
+.section-productos .section-accent { background: var(--accent-fill, var(--color-accent)); }
 .section-productos .section-title { color: var(--color-accent); }
 .section-productos .section-icon { color: var(--color-accent); }
 
@@ -461,7 +461,7 @@ defineEmits<{
 
 .reporte-card.main-card {
   grid-column: span 2;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, transparent), var(--color-bg-panel));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, transparent), var(--badge-bg, var(--color-bg-panel)));
 }
 
 .card-header {

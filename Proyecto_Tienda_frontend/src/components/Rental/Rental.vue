@@ -156,7 +156,7 @@ import RentalModalAgregarProducto from './secciones/RentalModalAgregarProducto.v
   align-items: center;
   justify-content: center;
   padding: 40px 80px;
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-on-brand);
   border: 4px solid var(--color-accent);
   border-radius: 20px;
@@ -372,8 +372,8 @@ import RentalModalAgregarProducto from './secciones/RentalModalAgregarProducto.v
   position: absolute;
   top: -8px;
   right: -8px;
-  background: var(--color-warning);
-  color: var(--color-text-primary);
+  background: var(--warning-fill, var(--color-warning));
+  color: var(--on-warning, #1c1917);
   font-size: 0.7rem;
   font-weight: bold;
   padding: 2px 8px;
@@ -461,21 +461,22 @@ import RentalModalAgregarProducto from './secciones/RentalModalAgregarProducto.v
 
 .rental-container :deep(.btn-cobrar) {
   padding: 12px 24px;
-  background: linear-gradient(135deg, var(--color-accent) 0%, #3d6530 100%);
-  color: var(--color-text-primary);
-  border: 3px solid #2d5016;
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
+  border: 3px solid var(--success-fill-hover, #166534);
   border-radius: 12px;
   font-weight: bold;
   font-family: var(--font-body);
   font-size: 0.95rem;
   cursor: pointer;
   transition: all var(--transition-normal);
-  box-shadow: 3px 3px 0 #2d5016;
+  box-shadow: 3px 3px 0 var(--success-fill-hover, #166534);
 }
 
 .rental-container :deep(.btn-cobrar:hover:not(:disabled)) {
   transform: translateY(-2px);
-  box-shadow: 5px 5px 0 #2d5016;
+  background: var(--success-fill-hover, #166534);
+  box-shadow: 5px 5px 0 var(--success-fill-hover, #166534);
 }
 
 .rental-container :deep(.btn-cobrar:disabled) {

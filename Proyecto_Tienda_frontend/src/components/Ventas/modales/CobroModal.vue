@@ -361,7 +361,7 @@ onUnmounted(() => {
 .corner-br .ornament { border-left: none; border-top: none; border-radius: 0 0 8px 0; }
 
 .modal-header { text-align: center; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--color-border); position: relative; }
-.header-emblem { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; background: var(--color-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+.header-emblem { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; background: var(--accent-fill, var(--color-accent)); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
 .emblem-icon { color: var(--color-on-brand); font-size: 1rem; }
 .modal-header h2 { margin: 0; font-size: 1.2rem; color: var(--color-accent); font-weight: 700; }
 .header-line { margin-top: .5rem; height: 1px; background: linear-gradient(90deg, transparent, var(--color-accent) 20%, var(--color-accent) 80%, transparent); }
@@ -422,7 +422,7 @@ onUnmounted(() => {
 .mixto-panel { width: min(100%, 420px); max-height: 92vh; overflow-y: auto; background: var(--color-bg-panel); border-radius: var(--radius-lg); box-shadow: 8px 8px 24px rgba(0,0,0,0.45), -4px -4px 16px rgba(255,255,255,0.03); padding: 1.25rem; position: relative; animation: mixtoPop .18s ease; }
 @keyframes mixtoPop { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .mixto-close { position: absolute; top: .6rem; right: .6rem; width: 28px; height: 28px; border: none; border-radius: 50%; background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: .95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
-.mixto-close:hover { background: var(--color-error); color: #fff; }
+.mixto-close:hover { background: var(--error-fill, var(--color-error)); color: var(--on-error, #ffffff); }
 .mixto-header { text-align: center; margin-bottom: .35rem; }
 .mixto-header h3 { margin: 0 0 .25rem; font-size: 1.15rem; color: var(--color-accent); }
 .mixto-header p { margin: 0; font-size: .8rem; color: var(--color-text-secondary); }

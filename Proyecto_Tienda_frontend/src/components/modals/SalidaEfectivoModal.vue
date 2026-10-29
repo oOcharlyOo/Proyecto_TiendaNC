@@ -122,8 +122,8 @@ function confirmar() {
   transition: all 0.15s;
 }
 .close-btn:hover {
-  background: var(--color-error);
-  color: #fff;
+  background: var(--error-fill, var(--color-error));
+  color: var(--on-error, #ffffff);
 }
 .close-btn:active { transform: scale(0.95); }
 

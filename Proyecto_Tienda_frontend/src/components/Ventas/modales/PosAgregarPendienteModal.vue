@@ -66,14 +66,14 @@ const emit = defineEmits<{
 .modal-header-clean{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:var(--color-bg-secondary);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 .modal-header-clean h3{margin:0;font-size:1.05rem;color:var(--color-accent);font-weight:700}
 .close-x{width:34px;height:34px;border:none;border-radius:50%;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s}
-.close-x:hover{background:var(--color-error);color:#fff}
+.close-x:hover{background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .modal-body-clean{padding:1rem 1.25rem 1.25rem;overflow-y:auto;flex:1;min-height:0}
 .agregar-pendiente-search{display:flex;gap:.5rem;margin-bottom:.75rem}
 .agregar-pendiente-search input{flex:1;padding:.65rem .8rem;border:none;border-radius:var(--radius-sm);background:var(--color-bg-secondary);color:var(--color-text-primary);font-size:.95rem;outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,0.15)}
 .agregar-pendiente-search input:focus{box-shadow:inset 2px 2px 4px rgba(0,0,0,0.15),0 0 0 2px var(--color-accent)}
 .btn-scanner-mini{width:44px;height:44px;border:none;border-radius:var(--radius-sm);background:var(--color-bg-secondary);color:var(--color-text-secondary);font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,0.1);transition:all .15s;flex-shrink:0}
 .btn-scanner-mini:hover{color:var(--color-accent)}
-.btn-scanner-mini.active{background:var(--color-accent);color:var(--color-on-brand)}
+.btn-scanner-mini.active{background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand)}
 .scanner-mini-viewport{width:100%;height:200px;border-radius:var(--radius-sm);overflow:hidden;margin-bottom:.75rem;background:var(--color-bg-secondary)}
 .agregar-pendiente-results{display:flex;flex-direction:column;gap:.25rem;max-height:200px;overflow-y:auto;margin-bottom:.75rem}
 .result-item{display:flex;justify-content:space-between;align-items:center;padding:.55rem .75rem;border-radius:var(--radius-sm);cursor:pointer;background:var(--color-bg-secondary);font-size:.9rem;transition:all .1s}

@@ -799,7 +799,7 @@ defineExpose({ cargar });
 }
 
 .mode-btn.active {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-text-primary);
   font-weight: 700;
 }
@@ -866,14 +866,17 @@ defineExpose({ cargar });
 
 .budget-btn.active:nth-child(1) {
   background: #34d399;
+  color: #0b1220;
 }
 
 .budget-btn.active:nth-child(2) {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
+  color: var(--color-on-brand);
 }
 
 .budget-btn.active:nth-child(3) {
   background: #f87171;
+  color: #0b1220;
 }
 
 .spin {
@@ -1016,7 +1019,7 @@ defineExpose({ cargar });
 
 .btn-create {
   padding: 0.35rem 0.75rem;
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border: none;
   border-radius: 6px;
   color: var(--color-text-primary);
@@ -1094,7 +1097,7 @@ defineExpose({ cargar });
 }
 
 .s-card.selected .s-check {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-color: var(--color-accent);
 }
 
@@ -1136,7 +1139,7 @@ defineExpose({ cargar });
 }
 
 .badge-cat {
-  background: color-mix(in srgb,var(--color-accent) 15%,transparent);
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--badge-bg, var(--bg-panel)));
   color: var(--color-accent);
 }
 
@@ -1427,8 +1430,8 @@ defineExpose({ cargar });
 }
 
 .btn-editar-cajas:hover {
-  background: var(--color-warning);
-  color: #fff;
+  background: var(--warning-fill, var(--color-warning));
+  color: var(--on-warning, #1c1917);
   transform: translateY(-1px);
 }
 
@@ -1480,7 +1483,7 @@ defineExpose({ cargar });
 }
 
 .s-view-btn.active {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-on-brand);
 }
 

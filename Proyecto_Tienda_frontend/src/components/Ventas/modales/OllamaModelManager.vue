@@ -248,7 +248,7 @@ watch(() => props.open, (val) => {
 .ia-close-btn:hover { color: var(--text-primary); background: var(--bg-secondary); }
 
 .ia-error {
-  color: var(--error-color);
+  color: var(--color-error);
   background: color-mix(in srgb, var(--error-color) 15%, transparent);
   padding: 0.6rem 1rem;
   border-radius: 6px;
@@ -327,7 +327,7 @@ watch(() => props.open, (val) => {
 }
 
 .ia-badge-active {
-  background: var(--success-color);
+  background: var(--success-fill, var(--success-color));
   color: var(--text-primary);
 }
 
@@ -353,7 +353,7 @@ watch(() => props.open, (val) => {
 .ia-pull-status {
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .ia-pull-progress {
@@ -380,13 +380,13 @@ watch(() => props.open, (val) => {
 
 .ia-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .ia-btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; }
-.ia-btn-primary { background: var(--accent-color); color: var(--text-primary); }
+.ia-btn-primary { background: var(--accent-fill, var(--accent-color)); color: var(--text-primary); }
 .ia-btn-primary:hover:not(:disabled) { filter: brightness(1.15); }
 .ia-btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
 .ia-btn-secondary:hover { border-color: var(--accent-color); }
 .ia-btn-outline { background: transparent; border: 1px solid var(--accent-color); color: var(--accent-color); }
 .ia-btn-outline:hover { background: color-mix(in srgb, var(--accent-color) 15%, transparent); }
-.ia-btn-danger { background: transparent; border: 1px solid var(--error-color); color: var(--error-color); }
+.ia-btn-danger { background: transparent; border: 1px solid var(--error-color); color: var(--color-error); }
 .ia-btn-danger:hover { background: color-mix(in srgb, var(--error-color) 15%, transparent); }
 .ia-btn-suggestion { background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-secondary)); color: var(--text-secondary); border: 1px solid var(--border-color); font-size: 0.78rem; padding: 0.3rem 0.6rem; }
 .ia-btn-suggestion:hover:not(:disabled) { border-color: var(--accent-color); color: var(--accent-color); }

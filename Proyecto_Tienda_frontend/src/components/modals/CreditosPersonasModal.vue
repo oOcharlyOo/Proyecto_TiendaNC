@@ -647,9 +647,9 @@ watch(() => props.open, (val) => {
 }
 
 .close-x:hover {
-  background: var(--error-color);
-  border-color: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  border-color: var(--color-error);
+  color: var(--on-error, #ffffff);
 }
 
 .modal-b {
@@ -669,7 +669,7 @@ watch(() => props.open, (val) => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   border-radius: 3px;
 }
 
@@ -776,8 +776,8 @@ watch(() => props.open, (val) => {
 
 .persona-avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
   display: flex; align-items: center; justify-content: center;
   font-weight: bold; font-size: 1rem; flex-shrink: 0;
 }
@@ -818,7 +818,7 @@ watch(() => props.open, (val) => {
 }
 
 .deuda-count.paga {
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .persona-actions {
@@ -843,7 +843,7 @@ watch(() => props.open, (val) => {
 }
 
 .action-del:hover {
-  border-color: var(--error-color);
+  border-color: var(--color-error);
 }
 
 .personas-grid {
@@ -874,8 +874,8 @@ watch(() => props.open, (val) => {
 
 .card-avatar {
   width: 44px; height: 44px; border-radius: 50%;
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
   display: flex; align-items: center; justify-content: center;
   font-weight: bold; font-size: 1.2rem;
 }
@@ -916,7 +916,7 @@ watch(() => props.open, (val) => {
 }
 
 .card-deuda-count.paga {
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .card-actions {
@@ -941,7 +941,7 @@ watch(() => props.open, (val) => {
 }
 
 .card-btn-del:hover {
-  border-color: var(--error-color);
+  border-color: var(--color-error);
 }
 
 /* Inner overlays (creditos panel, forms, abono) */
@@ -1032,13 +1032,13 @@ watch(() => props.open, (val) => {
 }
 
 .badge-pendiente {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
 }
 
 .badge-pagado {
-  background: var(--success-color);
-  color: white;
+  background: var(--success-fill, var(--success-color));
+  color: var(--on-success, #ffffff);
 }
 
 .credito-monto {
@@ -1057,12 +1057,12 @@ watch(() => props.open, (val) => {
 }
 
 .credito-valor.pagado {
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
 }
 
 .credito-valor.saldo {
-  color: var(--error-color);
+  color: var(--color-error);
   font-weight: bold;
 }
 
@@ -1080,10 +1080,10 @@ watch(() => props.open, (val) => {
 
 .btn-abonar {
   padding: 0.35rem 0.6rem;
-  background: var(--success-color);
+  background: var(--success-fill, var(--success-color));
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  color: white;
+  color: var(--on-success, #ffffff);
   font-size: 0.75rem;
   font-weight: bold;
   cursor: pointer;
@@ -1196,10 +1196,10 @@ watch(() => props.open, (val) => {
 
 .btn-save {
   padding: 0.4rem 0.8rem;
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   border: 1px solid var(--border-color);
   border-radius: 5px;
-  color: var(--bg-primary);
+  color: var(--color-on-brand);
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
@@ -1255,13 +1255,13 @@ watch(() => props.open, (val) => {
 }
 
 .toast-ok {
-  background: var(--success-color);
-  color: white;
+  background: var(--success-fill, var(--success-color));
+  color: var(--on-success, #ffffff);
 }
 
 .toast-error {
-  background: var(--error-color);
-  color: white;
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
 }
 
 .toast-info {
@@ -1393,7 +1393,7 @@ watch(() => props.open, (val) => {
 
 .detalle-discrepancia {
   background: color-mix(in srgb, var(--error-color) 12%, transparent);
-  color: var(--error-color);
+  color: var(--color-error);
   padding: 0.35rem 0.5rem;
   border-radius: 5px;
   font-size: 0.75rem;

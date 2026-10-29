@@ -184,7 +184,7 @@ onBeforeUnmount(async () => {
   background: var(--bg-secondary, #334155);
   color: var(--text-primary, #f1f5f9);
 }
-.sw-paso.actual .sw-punto { background: var(--accent-color); color: var(--bg-primary); }
+.sw-paso.actual .sw-punto { background: var(--accent-fill, var(--accent-color)); color: var(--color-on-brand); }
 .sw-paso.hecho .sw-punto { background: var(--success-color, #22c55e); color: var(--bg-primary); }
 .sw-paso-nombre {
   font-size: 0.6rem;

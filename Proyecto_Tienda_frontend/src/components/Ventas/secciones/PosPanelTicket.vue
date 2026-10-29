@@ -349,7 +349,7 @@ const emit = defineEmits<{
 .pos-container .btn-clear-all {
   font-size: 0.7rem;
   font-weight: 600;
-  background: color-mix(in srgb, var(--color-error) 15%, var(--color-bg-panel));
+  background: color-mix(in srgb, var(--color-error) 15%, var(--badge-bg, var(--color-bg-panel)));
   border: none;
   color: var(--color-error);
   padding: 0.25rem 0.6rem;
@@ -495,7 +495,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .promo-price {
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
   font-family: "Courier New", monospace;
 }
@@ -536,7 +536,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--warning-color);
+  color: var(--color-warning);
   cursor: pointer;
   font-weight: 600;
   font-size: 0.7rem;
@@ -552,7 +552,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .envase-toggle input {
-  accent-color: var(--warning-color);
+  accent-color: var(--color-warning);
 }
 
 .pos-container .envase-qty-input {
@@ -561,7 +561,7 @@ const emit = defineEmits<{
   background: color-mix(in srgb, var(--warning-color) 15%, transparent);
   border: 1px solid var(--warning-color);
   border-radius: 4px;
-  color: var(--warning-color);
+  color: var(--color-warning);
   font-size: 0.7rem;
   font-weight: 700;
   font-family: "Courier New", monospace;
@@ -643,7 +643,7 @@ const emit = defineEmits<{
 
 .pos-container .calc-btn:hover {
   background: color-mix(in srgb, var(--success-color) 25%, transparent);
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 .pos-container .qty-val { 
@@ -656,7 +656,7 @@ const emit = defineEmits<{
 
 .pos-container .item-subtotal { 
   font-weight: 700; 
-  color: var(--success-color); 
+  color: var(--color-success); 
   font-size: 0.95rem;
   font-family: "Courier New", monospace;
   flex-shrink: 0;
@@ -815,8 +815,8 @@ const emit = defineEmits<{
 }
 
 .pos-container .btn-remove-item:hover, .pos-container .btn-remove-item:active { 
-  background: var(--color-error);
-  color: #fff;
+  background: var(--error-fill, var(--color-error));
+  color: var(--on-error, #ffffff);
   box-shadow:
     4px 4px 8px rgba(0, 0, 0, 0.2);
 }
@@ -926,8 +926,8 @@ const emit = defineEmits<{
   height: auto;
   min-height: 48px;
   white-space: normal;
-  background: var(--color-success);
-  color: var(--on-success, #0b1220);
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
   border: none;
   transition: all 0.15s;
   padding: 0.6rem 0.8rem;
@@ -943,6 +943,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .checkout-actions-scroll .btn-checkout.primary:hover {
+  background: var(--success-fill-hover, var(--success-fill));
   box-shadow:
     6px 6px 12px rgba(0, 0, 0, 0.25),
     -3px -3px 8px rgba(255, 255, 255, 0.04);
@@ -1015,8 +1016,8 @@ const emit = defineEmits<{
   width: 100%;
   height: auto;
   min-height: 50px;
-  background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 60%, black));
-  color: #fff;
+  background: linear-gradient(135deg, var(--success-fill, var(--color-success)), var(--success-fill-hover, var(--color-success)));
+  color: var(--on-success, #ffffff);
   border: none;
   border-radius: var(--radius-md);
   font-size: 1rem;
@@ -1043,6 +1044,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .btn-checkout.primary:hover:not(:disabled) { 
+  background: linear-gradient(135deg, var(--success-fill-hover, var(--color-success)), var(--success-fill, var(--color-success)));
   box-shadow:
     7px 7px 16px rgba(0, 0, 0, 0.3),
     -4px -4px 10px rgba(255, 255, 255, 0.04);
@@ -1065,9 +1067,10 @@ const emit = defineEmits<{
 
 .pos-container .shortcut-badge {
   display: inline-block;
-  padding: 0.15rem 0.4rem;
-  color: var(--on-success, #0b1220);
-  background: color-mix(in srgb, white 20%, transparent);
+  padding: 0.12rem 0.4rem;
+  color: var(--on-success, #ffffff);
+  background: transparent;
+  border: 1px solid currentColor;
   border-radius: 4px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -1177,7 +1180,7 @@ const emit = defineEmits<{
 .pos-container .cashier-badge .dot { 
   width: 7px; 
   height: 7px; 
-  background: var(--success-color);
+  background: var(--success-fill, var(--success-color));
   border-radius: 50%;
 }
 </style>

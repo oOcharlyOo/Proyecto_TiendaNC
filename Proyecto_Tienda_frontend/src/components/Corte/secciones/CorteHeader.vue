@@ -32,9 +32,9 @@ defineEmits<{ 'cerrar-mensaje': [] }>();
 .mensaje-flash.ok .mensaje-icono{background:color-mix(in srgb,var(--color-success) 25%,transparent);color:var(--color-success)}
 .mensaje-flash.error .mensaje-icono{background:color-mix(in srgb,var(--color-error) 25%,transparent);color:var(--color-error)}
 .mensaje-flash.info .mensaje-icono{background:color-mix(in srgb,var(--color-info) 25%,transparent);color:var(--color-info)}
-.mensaje-flash.ok{background:color-mix(in srgb,var(--color-success) 18%,var(--color-bg-panel));color:var(--color-success);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-success) 30%,transparent)}
-.mensaje-flash.error{background:color-mix(in srgb,var(--color-error) 18%,var(--color-bg-panel));color:var(--color-error);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-error) 30%,transparent)}
-.mensaje-flash.info{background:color-mix(in srgb,var(--color-info) 18%,var(--color-bg-panel));color:var(--color-info);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-info) 30%,transparent)}
+.mensaje-flash.ok{background:color-mix(in srgb,var(--color-success) 18%,var(--badge-bg, var(--color-bg-panel)));color:var(--color-success);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-success) 30%,transparent)}
+.mensaje-flash.error{background:color-mix(in srgb,var(--color-error) 18%,var(--badge-bg, var(--color-bg-panel)));color:var(--color-error);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-error) 30%,transparent)}
+.mensaje-flash.info{background:color-mix(in srgb,var(--color-info) 18%,var(--badge-bg, var(--color-bg-panel)));color:var(--color-info);box-shadow:10px 10px 25px rgba(0,0,0,.3),0 0 0 1px color-mix(in srgb,var(--color-info) 30%,transparent)}
 .mensaje-cerrar{background:none;border:none;color:inherit;cursor:pointer;font-size:1.2rem;opacity:.7;padding:0;line-height:1}.mensaje-cerrar:hover{opacity:1}
 @keyframes slideDown{from{transform:translateX(-50%) translateY(-120%);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
 @media(max-width:768px){.hero-section{padding:1.5rem .5rem}.hero-title{font-size:1.3rem}.hero-decoration{display:none}}

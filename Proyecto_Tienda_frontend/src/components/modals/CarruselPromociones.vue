@@ -273,7 +273,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 <style scoped>
 .promo-carousel {
   --perg-bg:var(--color-bg-primary);--perg-bg-panel:var(--color-bg-panel);--perg-text:var(--color-text-primary);--perg-text-secondary:var(--color-text-secondary);--perg-title:var(--color-accent);--perg-border:var(--color-border);--perg-accent:var(--color-accent);--perg-shadow:var(--color-shadow);--perg-success:var(--color-success);--perg-error:var(--color-error);--perg-warning:var(--color-warning);
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--bg-primary) 90%, var(--accent-color)) 100%);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-panel) 100%);
   border: 3px solid var(--accent-color);
   border-radius: 16px;
   padding: 1rem;
@@ -574,7 +574,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .products-title {
   font-size: 0.8rem;
-  color: var(--accent-color);
+  color: var(--color-success, var(--success-color));
   font-weight: bold;
   margin: 0 0 0.5rem 0;
   display: flex;
@@ -585,7 +585,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 .title-icon {
   font-size: 1rem;
   animation: pulse-glow 2s ease-in-out infinite;
-  filter: drop-shadow(0 1px 3px var(--accent-color));
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--color-success, var(--success-color)) 45%, transparent));
 }
 
 .products-list {
@@ -615,7 +615,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .product-qty {
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: bold;
   min-width: 50px;
   font-family: "Courier New", monospace;
@@ -648,7 +648,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .price-promo-container {
-  background: linear-gradient(135deg, var(--success-color) 0%, #166534 100%);
+  background: var(--success-fill, var(--success-color));
   padding: 0.4rem 1rem;
   border-radius: 8px;
   border: 2px solid #4ade80;
@@ -659,7 +659,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 .price-promo {
   font-size: 1.4rem;
   font-weight: bold;
-  color: white;
+  color: var(--on-success, #ffffff);
   font-family: "Courier New", monospace;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
 }
@@ -669,8 +669,8 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(180deg, var(--accent-color) 0%, #92400e 100%);
-  color: var(--bg-primary);
+  background: linear-gradient(180deg, var(--gradient-btn-start, var(--accent-color)) 0%, var(--gradient-btn-end, var(--accent-color)) 100%);
+  color: var(--btn-text, var(--bg-primary));
   border: 3px solid var(--border-color);
   border-radius: 10px;
   padding: 0.7rem 1.25rem;
@@ -745,8 +745,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .carousel-btn:hover {
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
   transform: translateY(-50%) scale(1.1);
   box-shadow: 0 5px 15px color-mix(in srgb, var(--accent-color) 40%, transparent);
 }
@@ -796,12 +796,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .dot:hover {
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   transform: scale(1.2);
 }
 
 .dot.active {
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   border-color: var(--accent-color);
   transform: scale(1.3);
   box-shadow: 0 0 10px var(--accent-color);

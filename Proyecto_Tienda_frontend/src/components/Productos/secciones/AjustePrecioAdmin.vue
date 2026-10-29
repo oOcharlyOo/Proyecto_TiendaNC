@@ -137,7 +137,7 @@ async function guardar() {
 .ap-toggle input{display:none}
 .ap-toggle-t{width:34px;height:18px;background:var(--color-bg-secondary);border:none;border-radius:9px;position:relative;transition:all .2s;box-shadow:inset 2px 2px 3px rgba(0,0,0,.12);flex-shrink:0}
 .ap-toggle-d{position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--color-text-secondary);border-radius:50%;transition:all .2s;box-shadow:1px 1px 2px rgba(0,0,0,.1)}
-.ap-toggle input:checked+.ap-toggle-t{background:var(--color-accent);box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
+.ap-toggle input:checked+.ap-toggle-t{background:var(--accent-fill, var(--color-accent));box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
 .ap-toggle input:checked+.ap-toggle-t .ap-toggle-d{left:18px;background:var(--color-on-brand)}
 .ap-dia{flex:1;font-size:.85rem;font-weight:700;color:var(--color-text-primary)}
 .ap-monto-wrap{display:flex;align-items:center;background:var(--color-bg-primary);border:none;border-radius:7px;overflow:hidden;box-shadow:inset 2px 2px 4px rgba(0,0,0,.1)}
@@ -148,7 +148,7 @@ async function guardar() {
 .ap-on{color:var(--color-success);background:color-mix(in srgb,var(--color-success) 12%,transparent)}
 .ap-summary{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.6rem .75rem;background:var(--color-bg-panel);border:none;border-radius:10px;box-shadow:inset 2px 2px 4px rgba(0,0,0,.06);flex-wrap:wrap}
 .ap-summary-text{font-size:.75rem;color:var(--color-text-secondary)}
-.ap-guardar{border:none;padding:.5rem 1.1rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-family:var(--font-body);color:var(--color-on-brand);background:var(--color-accent);cursor:pointer;border-radius:8px;box-shadow:3px 3px 8px rgba(0,0,0,.2),-1px -1px 4px rgba(255,255,255,.04);transition:all .2s;flex-shrink:0}
+.ap-guardar{border:none;padding:.5rem 1.1rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-family:var(--font-body);color:var(--color-on-brand);background:var(--accent-fill, var(--color-accent));cursor:pointer;border-radius:8px;box-shadow:3px 3px 8px rgba(0,0,0,.2),-1px -1px 4px rgba(255,255,255,.04);transition:all .2s;flex-shrink:0}
 .ap-guardar:hover:not(:disabled){transform:translateY(-2px);box-shadow:5px 5px 14px rgba(0,0,0,.28)}
 .ap-guardar:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .ap-msg{font-size:.8rem;font-weight:700;padding:.5rem .75rem;border-radius:8px;margin:0}

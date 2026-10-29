@@ -706,8 +706,8 @@ watch(() => props.open, (val) => {
 }
 
 .close-x:hover {
-  background: var(--color-error);
-  color: #fff;
+  background: var(--error-fill, var(--color-error));
+  color: var(--on-error, #ffffff);
 }
 
 .modal-b {
@@ -727,7 +727,7 @@ watch(() => props.open, (val) => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-radius: 3px;
 }
 
@@ -772,7 +772,7 @@ watch(() => props.open, (val) => {
 
 .btn-add:hover {
   color: var(--color-on-brand);
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
 }
 
 .vbtn {
@@ -787,7 +787,7 @@ watch(() => props.open, (val) => {
 }
 
 .vbtn.on {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-on-brand);
 }
 
@@ -1120,13 +1120,13 @@ watch(() => props.open, (val) => {
 }
 
 .st-pendiente {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   color: var(--color-on-brand);
 }
 
 .st-pagado {
-  background: var(--color-success);
-  color: white;
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
 }
 
 .venta-item-right {
@@ -1207,7 +1207,7 @@ watch(() => props.open, (val) => {
 .btn-historial:hover {
   box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
   color: var(--color-on-brand);
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
 }
 
 .historial-arrow {
@@ -1486,13 +1486,13 @@ watch(() => props.open, (val) => {
 }
 
 .toast-ok {
-  background: var(--color-success);
-  color: white;
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
 }
 
 .toast-error {
-  background: var(--color-error);
-  color: white;
+  background: var(--error-fill, var(--color-error));
+  color: var(--on-error, #ffffff);
 }
 
 .toast-info {

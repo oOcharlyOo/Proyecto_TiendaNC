@@ -198,10 +198,10 @@ const nombreUsuario = computed(() => {
 .venta-usuario { font-size: 0.78rem; color: var(--color-text-secondary); white-space: nowrap; }
 .historial-check { margin: 0; padding: 0; display: inline-flex; }
 .metodo-badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; white-space: nowrap; }
-.metodo-badge.efectivo { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); }
-.metodo-badge.transfer { background: color-mix(in srgb, var(--color-info) 15%, transparent); color: var(--color-info); }
-.metodo-badge.tarjeta { background: color-mix(in srgb,var(--color-accent) 15%,transparent); color: var(--color-accent); }
-.discrepancia-badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--color-error) 15%, transparent); color: var(--color-error); white-space: nowrap; }
+.metodo-badge.efectivo { background: color-mix(in srgb, var(--color-success) 15%, var(--badge-bg, var(--bg-panel))); color: var(--color-success); }
+.metodo-badge.transfer { background: color-mix(in srgb, var(--color-info) 15%, var(--badge-bg, var(--bg-panel))); color: var(--color-info); }
+.metodo-badge.tarjeta { background: color-mix(in srgb, var(--color-accent) 15%, var(--badge-bg, var(--bg-panel))); color: var(--color-accent); }
+.discrepancia-badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--color-error) 15%, var(--badge-bg, var(--bg-panel))); color: var(--color-error); white-space: nowrap; }
 
 /* Detalle tabla */
 .venta-metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }

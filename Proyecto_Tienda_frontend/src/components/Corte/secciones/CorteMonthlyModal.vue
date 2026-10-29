@@ -211,23 +211,23 @@ defineEmits<{
   z-index: 1;
 }
 
-.c-ventas { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-panel)), var(--color-bg-panel)); }
+.c-ventas { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 12%, var(--badge-bg, var(--color-bg-panel))), var(--badge-bg, var(--color-bg-panel))); }
 .c-ventas .ri-glow { background: radial-gradient(circle at 30% 20%, var(--color-accent), transparent 70%); }
 .c-ventas strong { color: var(--color-accent); }
 
-.c-ganancia { background: linear-gradient(135deg, color-mix(in srgb, var(--color-success) 12%, var(--color-bg-panel)), var(--color-bg-panel)); }
+.c-ganancia { background: linear-gradient(135deg, color-mix(in srgb, var(--color-success) 12%, var(--badge-bg, var(--color-bg-panel))), var(--badge-bg, var(--color-bg-panel))); }
 .c-ganancia .ri-glow { background: radial-gradient(circle at 30% 20%, var(--color-success), transparent 70%); }
 .c-ganancia strong { color: var(--color-success); }
 
-.c-efectivo { background: linear-gradient(135deg, color-mix(in srgb, #3b82f6 12%, var(--color-bg-panel)), var(--color-bg-panel)); }
+.c-efectivo { background: linear-gradient(135deg, color-mix(in srgb, #3b82f6 12%, var(--badge-bg, var(--color-bg-panel))), var(--badge-bg, var(--color-bg-panel))); }
 .c-efectivo .ri-glow { background: radial-gradient(circle at 30% 20%, #3b82f6, transparent 70%); }
 .c-efectivo strong { color: #60a5fa; }
 
-.c-transferencia { background: linear-gradient(135deg, color-mix(in srgb, #14b8a6 12%, var(--color-bg-panel)), var(--color-bg-panel)); }
+.c-transferencia { background: linear-gradient(135deg, color-mix(in srgb, #14b8a6 12%, var(--badge-bg, var(--color-bg-panel))), var(--badge-bg, var(--color-bg-panel))); }
 .c-transferencia .ri-glow { background: radial-gradient(circle at 30% 20%, #14b8a6, transparent 70%); }
 .c-transferencia strong { color: #5eead4; }
 
-.c-tarjeta { background: linear-gradient(135deg, color-mix(in srgb, #ec4899 12%, var(--color-bg-panel)), var(--color-bg-panel)); }
+.c-tarjeta { background: linear-gradient(135deg, color-mix(in srgb, #ec4899 12%, var(--badge-bg, var(--color-bg-panel))), var(--badge-bg, var(--color-bg-panel))); }
 .c-tarjeta .ri-glow { background: radial-gradient(circle at 30% 20%, #ec4899, transparent 70%); }
 .c-tarjeta strong { color: #f472b6; }
 

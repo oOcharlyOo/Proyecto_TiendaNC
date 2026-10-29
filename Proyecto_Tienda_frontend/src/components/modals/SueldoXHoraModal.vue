@@ -230,7 +230,7 @@ onMounted(() => {
 .modal-corner::after {
   content: '' !important;
   position: absolute !important;
-  background: var(--accent-color) !important;
+  background: var(--accent-fill, var(--accent-color)) !important;
   border-radius: 2px !important;
 }
 
@@ -270,9 +270,9 @@ onMounted(() => {
 }
 
 .btn-cerrar-modal:hover {
-  background: var(--error-color) !important;
-  border-color: var(--error-color) !important;
-  color: white !important;
+  background: var(--error-fill, var(--error-color)) !important;
+  border-color: var(--color-error) !important;
+  color: var(--on-error, #ffffff) !important;
   transform: scale(1.1);
 }
 
@@ -430,8 +430,8 @@ onMounted(() => {
 
 .btn-guardar {
   padding: 0.75rem 1.5rem;
-  background: var(--accent-color);
-  color: white;
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
   border: 2px solid var(--accent-color);
   border-radius: 8px;
   cursor: pointer;

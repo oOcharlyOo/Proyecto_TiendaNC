@@ -849,19 +849,19 @@ const emit = defineEmits<{
 }
 
 .pos-container .badge-cat {
-  background: color-mix(in srgb, var(--perg-accent) 15%, transparent);
+  background: color-mix(in srgb, var(--perg-accent) 15%, var(--badge-bg, var(--bg-panel)));
   color: var(--perg-accent);
   text-shadow: 0 0 4px rgba(40, 20, 10, 0.35);
 }
 
 .pos-container .badge-sub {
-  background: color-mix(in srgb, var(--perg-accent) 15%, transparent);
+  background: color-mix(in srgb, var(--perg-accent) 15%, var(--badge-bg, var(--bg-panel)));
   color: color-mix(in srgb, var(--perg-accent) 60%, var(--perg-bg));
   text-shadow: 0 0 3px rgba(40, 20, 10, 0.3);
 }
 
 .pos-container .badge-gramaje {
-  background: color-mix(in srgb, var(--perg-success) 15%, transparent);
+  background: color-mix(in srgb, var(--perg-success) 15%, var(--badge-bg, var(--bg-panel)));
   color: color-mix(in srgb, var(--perg-success) 60%, var(--perg-bg));
 }
 

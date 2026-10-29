@@ -211,7 +211,7 @@ const emit = defineEmits<{
 }
 
 .pos-container .ticket-nav-item.is-active {
-  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-secondary));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--badge-bg, var(--bg-panel)));
   box-shadow:
     inset 3px 3px 6px rgba(0, 0, 0, 0.15),
     inset -2px -2px 4px rgba(255, 255, 255, 0.02);
@@ -236,7 +236,7 @@ const emit = defineEmits<{
 .pos-container .ticket-nav-item .ticket-total {
   display: block;
   font-size: 0.75rem;
-  color: var(--success-color);
+  color: var(--color-success);
   font-weight: 700;
   white-space: nowrap;
   padding: 0;
@@ -270,7 +270,7 @@ const emit = defineEmits<{
   right: -4px;
   width: 16px;
   height: 16px;
-  background: var(--error-color);
+  background: var(--error-fill, var(--error-color));
   color: var(--text-primary);
   border-radius: 50%;
   border: none;
@@ -354,7 +354,7 @@ const emit = defineEmits<{
   position: absolute;
   top: -4px;
   right: -4px;
-  background: var(--color-error);
+  background: var(--error-fill, var(--color-error));
   color: var(--on-error, #0b1220);
   font-size: 0.7rem;
   font-weight: 700;
@@ -419,9 +419,9 @@ const emit = defineEmits<{
 }
 
 .pos-container .btn-stock-voz-sidebar:hover {
-  border-color: var(--success-color);
+  border-color: var(--color-success);
   background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 @keyframes badge-pulse {

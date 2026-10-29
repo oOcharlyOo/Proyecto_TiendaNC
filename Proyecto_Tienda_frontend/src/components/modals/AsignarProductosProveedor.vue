@@ -931,7 +931,7 @@ onUnmounted(() => {
 }
 
 .ap-lote-item.selected .ap-lote-check {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-color: var(--color-accent);
 }
 
@@ -991,10 +991,10 @@ onUnmounted(() => {
 
 .btn-add {
   padding: 0.4rem 0.75rem;
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border: none;
   border-radius: 6px;
-  color: var(--color-bg-primary);
+  color: var(--color-on-brand);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -1389,10 +1389,10 @@ onUnmounted(() => {
 
 .ap-sinprov-btn {
   padding: 0.25rem 0.5rem;
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border: none;
   border-radius: 4px;
-  color: var(--color-bg-primary);
+  color: var(--color-on-brand);
   font-size: 0.6rem;
   font-weight: 700;
   cursor: pointer;

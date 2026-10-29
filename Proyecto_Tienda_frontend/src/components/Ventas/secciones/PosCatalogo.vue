@@ -178,7 +178,7 @@ const emit = defineEmits<{
 /* Estilos barra tickets móvil */
 .pos-container .tickets-bar-mobile{display:none;align-items:center;gap:.35rem;padding:.4rem .6rem;background:var(--color-bg-secondary);border-bottom:none;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .pos-container .tm-btn{border:none;border-radius:8px;cursor:pointer;font-size:.85rem;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;white-space:nowrap;box-shadow:2px 2px 4px rgba(0,0,0,.08)}
-.pos-container .tm-btn-new{width:32px;height:32px;background:var(--color-accent);color:var(--color-on-brand);font-size:1.2rem;font-weight:700}
+.pos-container .tm-btn-new{width:32px;height:32px;background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);font-size:1.2rem;font-weight:700}
 .pos-container .tm-btn-pending,.pos-container .tm-btn-credits{width:32px;height:32px;background:var(--color-bg-primary);font-size:.9rem}
 .pos-container .tm-btn-toggle{flex:1;height:32px;padding:.3rem .6rem;gap:.4rem;background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.72rem;justify-content:flex-start}
 .pos-container .tm-toggle-icon{font-size:.9rem;flex-shrink:0}
@@ -214,19 +214,19 @@ const emit = defineEmits<{
 }
 
 .pos-container .provision-total-badge.status-ok {
-  background: color-mix(in srgb, var(--success-color) 8%, transparent);
+  background: color-mix(in srgb, var(--success-color) 8%, var(--badge-bg, var(--bg-panel)));
   border-color: var(--success-color, var(--success-color));
   color: var(--success-color, var(--success-color));
 }
 
 .pos-container .provision-total-badge.status-warning {
-  background: color-mix(in srgb, var(--infoBlueColor) 8%, transparent);
+  background: color-mix(in srgb, var(--infoBlueColor) 8%, var(--badge-bg, var(--bg-panel)));
   border-color: var(--info-color, var(--infoBlueColor));
   color: var(--info-color, var(--infoBlueColor));
 }
 
 .pos-container .provision-total-badge.status-danger {
-  background: color-mix(in srgb, var(--error-color) 8%, transparent);
+  background: color-mix(in srgb, var(--error-color) 8%, var(--badge-bg, var(--bg-panel)));
   border-color: var(--error-color, var(--error-color));
   color: var(--error-color, var(--error-color));
 }
@@ -250,7 +250,7 @@ const emit = defineEmits<{
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
   border: 1px solid var(--warning-color, var(--warning-color));
-  background: color-mix(in srgb, var(--warning-color) 10%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 10%, var(--badge-bg, var(--bg-panel)));
   color: var(--warning-color, var(--warning-color));
   min-width: 110px;
   text-align: right;
@@ -489,14 +489,14 @@ const emit = defineEmits<{
 }
 
 .pos-container .btn-mic.is-recording {
-  background: var(--error-color);
+  background: var(--error-fill, var(--error-color));
   color: var(--text-primary);
 }
 
 .pos-container .btn-promo:hover {
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   border-color: var(--accent-color);
-  color: var(--bg-primary);
+  color: var(--color-on-brand);
 }
 
 @media (max-width: 767px) {
@@ -620,7 +620,7 @@ const emit = defineEmits<{
 .pos-container .res-name { font-weight: 600; font-size: 0.95rem; }
 .pos-container .res-code { font-size: 0.75rem; color: var(--text-secondary); }
 .pos-container .res-price { 
-  color: var(--success-color); 
+  color: var(--color-success); 
   font-weight: bold; 
   font-size: 1rem;
 }
@@ -784,8 +784,8 @@ const emit = defineEmits<{
 }
 
 .pos-container .product-price-tag {
-  background: var(--color-success);
-  color: var(--on-success, #0b1220);
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
   padding: 0.25rem 0.7rem;
   border-radius: 6px;
   font-weight: 600;
@@ -799,9 +799,9 @@ const emit = defineEmits<{
   border-radius: 4px;
   font-weight: 600;
 }
-.pos-container .in-stock { background: color-mix(in srgb, var(--color-success) 15%, var(--color-bg-primary)); color: var(--color-success); }
-.pos-container .pos-low-stock { background: color-mix(in srgb, var(--color-error) 15%, var(--color-bg-primary)); color: var(--color-error); }
-.pos-container .stock-badge.rentable { background: color-mix(in srgb, var(--color-info) 15%, var(--color-bg-primary)); color: var(--color-info); }
+.pos-container .in-stock { background: color-mix(in srgb, var(--color-success) 10%, var(--badge-bg, var(--bg-panel))); color: var(--color-success); }
+.pos-container .pos-low-stock { background: color-mix(in srgb, var(--color-error) 10%, var(--badge-bg, var(--bg-panel))); color: var(--color-error); }
+.pos-container .stock-badge.rentable { background: color-mix(in srgb, var(--color-info) 10%, var(--badge-bg, var(--bg-panel))); color: var(--color-info); }
 
 .acceso-rapido-section {
   padding: 1rem;
@@ -857,8 +857,8 @@ const emit = defineEmits<{
 .acceso-code {
   display: inline-block;
   padding: 0.1rem 0.35rem;
-  background: var(--accent-color);
-  color: var(--bg-primary);
+  background: var(--accent-fill, var(--accent-color));
+  color: var(--color-on-brand);
   border-radius: 3px;
   font-size: 0.8rem;
   font-weight: 700;
@@ -880,7 +880,7 @@ const emit = defineEmits<{
 .acceso-price {
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--success-color);
+  color: var(--color-success);
   font-family: monospace;
 }
 </style>

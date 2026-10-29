@@ -677,8 +677,8 @@ onMounted(() => {
   color: #fff;
   box-shadow: 0 6px 20px rgba(0,0,0,.3);
 }
-.toast-ambulante.ok { background: var(--success-color, #3a9e5a); }
-.toast-ambulante.error { background: var(--error-color, #c75a5a); }
+.toast-ambulante.ok { background: var(--success-fill, var(--success-color, #3a9e5a)); color: var(--on-success, #ffffff); }
+.toast-ambulante.error { background: var(--error-fill, var(--error-color, #c75a5a)); color: var(--on-error, #ffffff); }
 
 /* ===== Nav móvil (pestañas horizontales) ===== */
 .amb-tabs-mobile {
@@ -882,7 +882,7 @@ onMounted(() => {
 }
 .amb-mobile-toggle:hover { border-color: var(--color-accent); }
 .amb-mobile-text { font-weight: 600; }
-.amb-mobile-total { margin-left: auto; font-weight: 700; color: var(--success-color); font-family: monospace; }
+.amb-mobile-total { margin-left: auto; font-weight: 700; color: var(--color-success); font-family: monospace; }
 
 .catalog-header {
   display: flex;
@@ -937,7 +937,7 @@ onMounted(() => {
   padding: 0.3rem 0.6rem;
   white-space: nowrap;
 }
-.amb-header-stat.success { color: var(--success-color); }
+.amb-header-stat.success { color: var(--color-success); }
 .amb-header-stat.muted { opacity: 0.85; }
 @media (max-width: 767px) {
   .amb-header-stats { justify-content: flex-end; }
@@ -1014,8 +1014,8 @@ onMounted(() => {
   overflow: hidden;
 }
 .product-price-tag {
-  background: var(--success-color);
-  color: var(--text-primary);
+  background: var(--success-fill, var(--color-success));
+  color: var(--on-success, #ffffff);
   padding: 0.25rem 0.7rem;
   border-radius: 6px;
   font-weight: 600;
@@ -1029,8 +1029,8 @@ onMounted(() => {
   border-radius: 4px;
   font-weight: 600;
 }
-.in-stock { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
-.pos-low-stock { background: color-mix(in srgb, var(--error-color) 15%, transparent); color: var(--error-color); }
+.in-stock { background: color-mix(in srgb, var(--success-color) 10%, var(--badge-bg, var(--bg-panel))); color: var(--color-success); }
+.pos-low-stock { background: color-mix(in srgb, var(--error-color) 10%, var(--badge-bg, var(--bg-panel))); color: var(--color-error); }
 
 .empty-catalog {
   text-align: center;
@@ -1143,7 +1143,7 @@ onMounted(() => {
 .btn-clear-all {
   font-size: 0.7rem;
   font-weight: 600;
-  background: color-mix(in srgb, var(--color-error) 15%, var(--color-bg-panel));
+  background: color-mix(in srgb, var(--color-error) 15%, var(--badge-bg, var(--color-bg-panel)));
   border: none;
   color: var(--color-error);
   padding: 0.25rem 0.6rem;
@@ -1216,9 +1216,9 @@ onMounted(() => {
   border-radius: 999px;
   line-height: 1;
 }
-.amb-est-badge.cargado { background: var(--success-color, #3a9e5a); color: #fff; }
+.amb-est-badge.cargado { background: var(--success-fill, var(--success-color, #3a9e5a)); color: var(--on-success, #ffffff); }
 .amb-est-badge.vendido { background: var(--accent-color, #c9a227); color: #1b1307; }
-.amb-est-badge.devuelto { background: color-mix(in srgb, var(--color-error) 18%, var(--color-bg-panel)); color: var(--color-error); border: 1px solid currentColor; }
+.amb-est-badge.devuelto { background: color-mix(in srgb, var(--color-error) 18%, var(--badge-bg, var(--color-bg-panel))); color: var(--color-error); border: 1px solid currentColor; }
 .amb-row-historial { opacity: 0.72; }
 .amb-row-historial:hover { opacity: 1; }
 .item-subtotal.historial {
@@ -1289,7 +1289,7 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--warning-color);
+  color: var(--color-warning);
   font-weight: 600;
   font-size: 0.7rem;
   background: color-mix(in srgb, var(--warning-color) 10%, transparent);
@@ -1303,7 +1303,7 @@ onMounted(() => {
   background: color-mix(in srgb, var(--warning-color) 15%, transparent);
   border: 1px solid var(--warning-color);
   border-radius: 4px;
-  color: var(--warning-color);
+  color: var(--color-warning);
   font-size: 0.8rem;
   font-weight: 700;
   font-family: "Courier New", monospace;
@@ -1314,7 +1314,7 @@ onMounted(() => {
 
 .item-subtotal {
   font-weight: 700;
-  color: var(--success-color);
+  color: var(--color-success);
   font-size: 0.95rem;
   font-family: "Courier New", monospace;
   flex-shrink: 0;
@@ -1340,7 +1340,7 @@ onMounted(() => {
   transition: all 0.2s;
   box-shadow: 2px 2px 4px rgba(0,0,0,0.15), -1px -1px 3px rgba(255,255,255,0.02);
 }
-.btn-remove-item:hover, .btn-remove-item:active { background: var(--color-error); color: #fff; }
+.btn-remove-item:hover, .btn-remove-item:active { background: var(--error-fill, var(--color-error)); color: var(--on-error, #ffffff); }
 
 .empty-ticket-msg {
   text-align: center;
@@ -1377,8 +1377,8 @@ onMounted(() => {
   padding-top: 0.3rem;
   margin-top: 0.2rem;
 }
-.summary-row.ganancia { color: var(--success-color); }
-.pos-total-amount { font-weight: 700; color: var(--success-color); }
+.summary-row.ganancia { color: var(--color-success); }
+.pos-total-amount { font-weight: 700; color: var(--color-success); }
 
 .metodo-select {
   width: 100%;
@@ -1439,7 +1439,7 @@ onMounted(() => {
 .btn-checkout .shortcut-badge {
   display: inline-block;
   padding: 0.15rem 0.4rem;
-  background: color-mix(in srgb, white 20%, transparent);
+  background: color-mix(in srgb, white 20%, var(--badge-bg, var(--bg-panel)));
   border-radius: 4px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -1479,7 +1479,7 @@ onMounted(() => {
 .report-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .report-ticket { font-weight: 700; font-size: 0.85rem; color: var(--accent-color); }
 .report-meta { font-size: 0.7rem; color: var(--text-secondary); }
-.report-total { font-weight: 800; color: var(--success-color); font-family: "Courier New", monospace; font-size: 0.95rem; }
+.report-total { font-weight: 800; color: var(--color-success); font-family: "Courier New", monospace; font-size: 0.95rem; }
 
 .corte-resumen { gap: 0.6rem; }
 .corte-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
@@ -1501,7 +1501,7 @@ onMounted(() => {
   font-weight: 700;
 }
 .corte-kpi-value { font-size: 1.1rem; font-weight: 900; color: var(--accent-color); font-family: "Courier New", monospace; }
-.corte-kpi-value.success { color: var(--success-color); }
+.corte-kpi-value.success { color: var(--color-success); }
 
 .amb-hint { margin: 0; font-size: 0.7rem; opacity: 0.75; text-align: center; }
 .amb-hint.block { margin-top: 0.4rem; }

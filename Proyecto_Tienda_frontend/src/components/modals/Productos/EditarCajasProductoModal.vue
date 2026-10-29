@@ -178,14 +178,14 @@ async function guardar() {
 .ecm-title{margin:0;font-size:.95rem;font-weight:800;color:var(--color-accent)}
 .ecm-subtitle{margin:.1rem 0 0;font-size:.72rem;color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
 .ecm-close{width:30px;height:30px;border-radius:50%;border:none;background:var(--color-bg-primary);color:var(--color-text-secondary);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:2px 2px 4px rgba(0,0,0,.15);transition:all .15s}
-.ecm-close:hover{background:var(--color-error);color:#fff}
+.ecm-close:hover{background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .ecm-body{padding:1rem 1.1rem;overflow-y:auto;display:flex;flex-direction:column;gap:.55rem}
 .ecm-desc{margin:0;font-size:.72rem;color:var(--color-text-secondary)}
 .ecm-section-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--color-text-secondary);margin-top:.2rem}
 .ecm-chips{display:flex;flex-wrap:wrap;gap:.35rem}
 .ecm-chip{display:flex;flex-direction:column;align-items:center;gap:.05rem;padding:.4rem .6rem;border:none;border-radius:8px;background:var(--color-bg-primary);color:var(--color-text-primary);font-size:.72rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 4px rgba(0,0,0,.08);transition:all .15s;font-family:inherit}
 .ecm-chip:hover{transform:translateY(-1px);box-shadow:3px 3px 6px rgba(0,0,0,.12)}
-.ecm-chip.active{background:var(--color-accent);color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,.18)}
+.ecm-chip.active{background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);box-shadow:3px 3px 6px rgba(0,0,0,.18)}
 .ecm-chip-cost{font-size:.58rem;font-weight:600;opacity:.75}
 .ecm-custom-row{display:flex;gap:.4rem}
 .ecm-input{flex:1;padding:.5rem .7rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.78rem;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12);font-family:inherit}
@@ -193,7 +193,7 @@ async function guardar() {
 .ecm-btn-add{padding:.5rem .8rem;border:none;border-radius:8px;background:var(--color-bg-secondary);color:var(--color-accent);font-size:.72rem;font-weight:700;cursor:pointer;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}
 .ecm-btn-add:hover:not(:disabled){transform:translateY(-1px)}
 .ecm-seleccionadas{display:flex;flex-wrap:wrap;gap:.3rem}
-.ecm-sel-tag{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .45rem;border-radius:6px;background:color-mix(in srgb,var(--color-info) 12%,transparent);color:var(--color-info);font-size:.68rem;font-weight:600}
+.ecm-sel-tag{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .45rem;border-radius:6px;background:color-mix(in srgb, var(--color-info) 12%, var(--badge-bg, var(--bg-panel)));color:var(--color-info);font-size:.68rem;font-weight:600}
 .ecm-sel-remove{background:none;border:none;color:inherit;cursor:pointer;font-size:.65rem;padding:0;line-height:1;opacity:.7}
 .ecm-sel-remove:hover{opacity:1;color:var(--color-error)}
 .ecm-empty-note{margin:0;font-size:.68rem;color:var(--color-text-secondary);font-style:italic}

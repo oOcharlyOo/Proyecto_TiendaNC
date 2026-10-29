@@ -245,7 +245,7 @@
 }
 
 .scroll-visible::-webkit-scrollbar-thumb {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-radius: 4px;
 }
 

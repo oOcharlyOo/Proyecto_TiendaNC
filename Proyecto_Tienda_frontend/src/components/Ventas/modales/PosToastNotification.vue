@@ -31,8 +31,8 @@ defineProps<{
   border: none;
   animation: posToastPop 0.3s ease-out;
 }
-.pos-toast-ok { background: var(--color-success); color: var(--on-success, #0b1220); }
-.pos-toast-error { background: var(--color-error); color: var(--on-error, #0b1220); }
+.pos-toast-ok { background: var(--success-fill, var(--color-success)); color: var(--on-success, #0b1220); }
+.pos-toast-error { background: var(--error-fill, var(--color-error)); color: var(--on-error, #0b1220); }
 .pos-toast-info { background: var(--color-bg-panel); color: var(--color-accent); box-shadow: 6px 6px 16px rgba(0,0,0,0.3); }
 .pos-toast-icon { font-size: 1.1rem; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 .pos-toast-text { max-width: 300px; text-align: center; }

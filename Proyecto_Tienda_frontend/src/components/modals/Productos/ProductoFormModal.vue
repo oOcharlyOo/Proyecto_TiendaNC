@@ -403,7 +403,7 @@ const esCategoriaGaming = computed(() => {
 .modal-scroll{overflow-y:auto;padding-right:.3rem;flex:1}
 .modal-scroll::-webkit-scrollbar{width:6px}
 .modal-scroll::-webkit-scrollbar-track{background:rgba(0,0,0,.1);border-radius:3px}
-.modal-scroll::-webkit-scrollbar-thumb{background:var(--color-accent);border-radius:3px}
+.modal-scroll::-webkit-scrollbar-thumb{background:var(--accent-fill, var(--color-accent));border-radius:3px}
 .modal-card .modal-header{position:relative;padding-bottom:.55rem;margin-bottom:.5rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 25%,transparent)}
 .modal-card .modal-header h3{margin:0;font-size:.95rem;color:var(--color-accent);text-transform:uppercase;letter-spacing:.1em;font-weight:800}
 .modal-card .modal-header p{margin:.25rem 0 0;color:var(--color-text-secondary);font-size:.65rem;letter-spacing:.05em}
@@ -441,7 +441,7 @@ const esCategoriaGaming = computed(() => {
 .check-row:hover{box-shadow:inset 2px 2px 4px rgba(0,0,0,.15)}
 .checkbox-input{display:none}
 .checkbox-custom{width:20px;height:20px;border:none;background:var(--color-bg-primary);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;box-shadow:inset 2px 2px 4px rgba(0,0,0,.2)}
-.checkbox-input:checked+.checkbox-custom{background:var(--color-accent);box-shadow:inset 2px 2px 4px rgba(0,0,0,.2),0 0 6px color-mix(in srgb,var(--color-accent) 40%,transparent)}
+.checkbox-input:checked+.checkbox-custom{background:var(--accent-fill, var(--color-accent));box-shadow:inset 2px 2px 4px rgba(0,0,0,.2),0 0 6px color-mix(in srgb,var(--color-accent) 40%,transparent)}
 .checkbox-input:checked+.checkbox-custom::after{content:'✓';color:var(--color-on-brand);font-weight:900;font-size:.75rem}
 .checkbox-label .hint{font-size:.58rem;opacity:.65;text-transform:none}
 .field-hint{font-size:.58rem;color:var(--color-text-secondary);opacity:.75;margin-top:.15rem}
@@ -459,12 +459,12 @@ const esCategoriaGaming = computed(() => {
 .caja-custom-input{flex:1;max-width:160px;padding:.4rem .55rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.75rem;font-weight:600;outline:none;box-shadow:inset 3px 3px 6px rgba(0,0,0,.15);transition:all .2s}
 .caja-custom-input:focus{box-shadow:inset 3px 3px 8px rgba(0,0,0,.2),0 0 0 2px var(--color-accent)}
 .caja-custom-input::placeholder{color:var(--color-text-secondary);font-weight:400;font-size:.65rem}
-.caja-custom-btn{padding:.4rem .75rem;background:var(--color-accent);border:none;border-radius:8px;color:var(--color-on-brand);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s;box-shadow:3px 3px 6px rgba(0,0,0,.15)}
+.caja-custom-btn{padding:.4rem .75rem;background:var(--accent-fill, var(--color-accent));border:none;border-radius:8px;color:var(--color-on-brand);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s;box-shadow:3px 3px 6px rgba(0,0,0,.15)}
 .caja-custom-btn:hover{transform:translateY(-1px);box-shadow:5px 5px 10px rgba(0,0,0,.2)}
 .caja-custom-btn:active{transform:translateY(1px)}
 .caja-custom-list{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;padding:.35rem 0}
 .caja-custom-list-label{font-size:.6rem;color:var(--color-text-secondary);font-weight:600}
-.caja-custom-chip{display:flex;align-items:center;gap:.25rem;padding:.22rem .45rem;background:color-mix(in srgb,var(--color-accent) 15%,var(--color-bg-primary));border:none;border-radius:6px;font-size:.65rem;font-weight:600;color:var(--color-accent);box-shadow:2px 2px 4px rgba(0,0,0,.1)}
+.caja-custom-chip{display:flex;align-items:center;gap:.25rem;padding:.22rem .45rem;background:color-mix(in srgb, var(--color-accent) 15%, var(--badge-bg, var(--bg-panel)));border:none;border-radius:6px;font-size:.65rem;font-weight:600;color:var(--color-accent);box-shadow:2px 2px 4px rgba(0,0,0,.1)}
 .caja-chip-price{font-size:.58rem;opacity:.75;color:var(--color-text-secondary)}
 .caja-chip-remove{background:none;border:none;color:var(--color-error);font-size:.58rem;cursor:pointer;padding:0;line-height:1;opacity:.6;transition:opacity .15s}
 .caja-chip-remove:hover{opacity:1}

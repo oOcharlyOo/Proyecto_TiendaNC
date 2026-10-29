@@ -177,10 +177,10 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.tabs-container){display:flex;gap:0;background:var(--color-bg-panel);border:none;border-radius:12px 12px 0 0;overflow:hidden;box-shadow:inset 0 -1px 0 var(--color-border)}
 .usuarios-layout :deep(.tab-btn){padding:.7rem 1.4rem;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--color-text-secondary);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;gap:.45rem;transition:all .2s;margin-bottom:-1px;position:relative}
 .usuarios-layout :deep(.tab-btn:hover){color:var(--color-text-primary);background:color-mix(in srgb,var(--color-accent) 5%,transparent)}
-.usuarios-layout :deep(.tab-btn.active){color:var(--color-accent);border-bottom-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,var(--color-bg-primary))}
+.usuarios-layout :deep(.tab-btn.active){color:var(--color-accent);border-bottom-color:var(--color-accent);background:color-mix(in srgb, var(--color-accent) 10%, var(--badge-bg, var(--bg-panel)))}
 .usuarios-layout :deep(.tab-icon){font-size:1.05rem}
 .usuarios-layout :deep(.tab-text){font-family:inherit}
-.usuarios-layout :deep(.tab-badge){font-size:.55rem;padding:.1rem .4rem;border-radius:4px;background:color-mix(in srgb,var(--color-accent) 20%,var(--color-bg-primary));color:var(--color-accent);font-weight:800}
+.usuarios-layout :deep(.tab-badge){font-size:.55rem;padding:.1rem .4rem;border-radius:4px;background:color-mix(in srgb, var(--color-accent) 10%, var(--badge-bg, var(--bg-panel)));color:var(--color-accent);font-weight:800}
 .usuarios-layout :deep(.stats-section){display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;padding:.75rem 1.5rem;flex-shrink:0}
 .usuarios-layout :deep(.stat-card-wrapper){position:relative;background:var(--color-bg-secondary);border:none;border-radius:12px;padding:1rem 1.1rem;display:flex;align-items:center;gap:.85rem;box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02);overflow:hidden}
 .usuarios-layout :deep(.stat-card-wrapper.gold){box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02),0 0 14px color-mix(in srgb,var(--color-accent) 18%,transparent)}
@@ -204,22 +204,22 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.usuario-info){flex:1;min-width:0;display:flex;flex-direction:column;gap:.1rem}
 .usuarios-layout :deep(.usuario-nombre){margin:0;font-size:.9rem;font-weight:800;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .usuarios-layout :deep(.usuario-user){font-size:.68rem;color:var(--color-text-secondary);font-family:monospace}
-.usuarios-layout :deep(.tipo-badge){display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .5rem;border-radius:5px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:color-mix(in srgb,var(--color-info) 12%,var(--color-bg-primary));color:var(--color-info);box-shadow:1px 1px 3px rgba(0,0,0,.06);width:fit-content}
-.usuarios-layout :deep(.tipo-badge.admin){background:color-mix(in srgb,var(--color-accent) 15%,var(--color-bg-primary));color:var(--color-accent)}
+.usuarios-layout :deep(.tipo-badge){display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .5rem;border-radius:5px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:color-mix(in srgb, var(--color-info) 12%, var(--badge-bg, var(--bg-panel)));color:var(--color-info);box-shadow:1px 1px 3px rgba(0,0,0,.06);width:fit-content}
+.usuarios-layout :deep(.tipo-badge.admin){background:color-mix(in srgb, var(--color-accent) 10%, var(--badge-bg, var(--bg-panel)));color:var(--color-accent)}
 .usuarios-layout :deep(.badge-icon){font-size:.7rem}
 .usuarios-layout :deep(.usuario-actions){display:flex;gap:.3rem;flex-shrink:0}
 .usuarios-layout :deep(.btn-edit),.usuarios-layout :deep(.btn-delete){width:36px;height:36px;border:none;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;transition:all .2s;box-shadow:3px 3px 6px rgba(0,0,0,.1)}
 .usuarios-layout :deep(.btn-edit){background:var(--color-bg-primary);color:var(--color-accent)}
-.usuarios-layout :deep(.btn-edit:hover){background:var(--color-accent);color:var(--color-on-brand);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
+.usuarios-layout :deep(.btn-edit:hover){background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .usuarios-layout :deep(.btn-delete){background:var(--color-bg-primary);color:var(--color-error)}
-.usuarios-layout :deep(.btn-delete:hover){background:var(--color-error);color:var(--on-error,#0b1220);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
+.usuarios-layout :deep(.btn-delete:hover){background: var(--error-fill, var(--color-error));color:var(--on-error,#0b1220);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .usuarios-layout :deep(.btn-delete:disabled){opacity:.4;cursor:not-allowed;transform:none;box-shadow:2px 2px 4px rgba(0,0,0,.05)}
 .usuarios-layout :deep(.loading){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;padding:3rem 1rem;color:var(--color-text-secondary)}
 .usuarios-layout :deep(.loading-spinner){width:44px;height:44px;border:4px solid var(--color-border);border-top-color:var(--color-accent);border-radius:50%;animation:spUs 1s linear infinite}
 @keyframes spUs{to{transform:rotate(360deg)}}
 .usuarios-layout :deep(.empty-state){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;padding:3rem 1rem;color:var(--color-text-secondary);text-align:center}
 .usuarios-layout :deep(.empty-icon){font-size:2.5rem;opacity:.5}
-.usuarios-layout :deep(.btn-primary){border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-family:inherit;color:var(--color-on-brand);background:var(--color-accent);cursor:pointer;box-shadow:4px 4px 10px rgba(0,0,0,.2),-1px -1px 4px rgba(255,255,255,.04);transition:all .2s;display:inline-flex;align-items:center;gap:.4rem;border-radius:8px}
+.usuarios-layout :deep(.btn-primary){border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-family:inherit;color:var(--color-on-brand);background:var(--accent-fill, var(--color-accent));cursor:pointer;box-shadow:4px 4px 10px rgba(0,0,0,.2),-1px -1px 4px rgba(255,255,255,.04);transition:all .2s;display:inline-flex;align-items:center;gap:.4rem;border-radius:8px}
 .usuarios-layout :deep(.btn-primary:hover){transform:translateY(-2px);box-shadow:6px 6px 16px rgba(0,0,0,.28),-3px -3px 8px rgba(255,255,255,.05)}
 .usuarios-layout :deep(.btn-primary:active){transform:translateY(1px);box-shadow:inset 2px 2px 5px rgba(0,0,0,.2)}
 .usuarios-layout :deep(.btn-primary:disabled){opacity:.5;cursor:not-allowed;transform:none}
@@ -234,7 +234,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.filtro-fecha){display:flex;gap:.4rem;align-items:center}
 .usuarios-layout :deep(.filtro-fecha input){padding:.5rem .65rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.85rem;outline:none;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12)}
 .usuarios-layout :deep(.filtro-fecha input:focus){box-shadow:inset 2px 2px 4px rgba(0,0,0,.12),0 0 0 2px var(--color-accent)}
-.usuarios-layout :deep(.btn-load){border:none;padding:.5rem .9rem;font-size:.72rem;font-weight:700;text-transform:uppercase;background:var(--color-accent);color:var(--color-on-brand);cursor:pointer;border-radius:8px;box-shadow:3px 3px 6px rgba(0,0,0,.15);transition:all .2s}
+.usuarios-layout :deep(.btn-load){border:none;padding:.5rem .9rem;font-size:.72rem;font-weight:700;text-transform:uppercase;background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);cursor:pointer;border-radius:8px;box-shadow:3px 3px 6px rgba(0,0,0,.15);transition:all .2s}
 .usuarios-layout :deep(.btn-load:hover:not(:disabled)){transform:translateY(-1px);box-shadow:5px 5px 10px rgba(0,0,0,.2)}
 .usuarios-layout :deep(.btn-load:disabled){opacity:.5;cursor:not-allowed}
 .usuarios-layout :deep(.top-vendedor){display:flex;align-items:center;gap:1rem;background:var(--color-bg-secondary);border:none;border-radius:14px;padding:1rem 1.25rem;box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02),0 0 18px color-mix(in srgb,var(--color-accent) 15%,transparent)}
@@ -267,7 +267,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.tope-jornada input){width:60px;padding:.3rem .4rem;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:5px;color:var(--color-text-primary);font-size:.72rem;font-family:inherit}
 .usuarios-layout :deep(.tope-jornada input:focus){outline:none;border-color:var(--color-accent)}
 .usuarios-layout :deep(.tope-jornada .tope-unidad small){color:var(--color-text-muted);font-size:.58rem}
-.usuarios-layout :deep(.btn-tope-guardar){padding:.32rem .7rem;border:none;border-radius:5px;background:var(--color-accent);color:var(--color-on-brand);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s}
+.usuarios-layout :deep(.btn-tope-guardar){padding:.32rem .7rem;border:none;border-radius:5px;background:var(--accent-fill, var(--color-accent));color:var(--color-on-brand);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s}
 .usuarios-layout :deep(.btn-tope-guardar:hover:not(:disabled)){filter:brightness(1.1)}
 .usuarios-layout :deep(.btn-tope-guardar:disabled){opacity:.45;cursor:not-allowed}
 .usuarios-layout :deep(.calendario-grid){display:flex;flex-direction:column;gap:.25rem;background:var(--color-bg-secondary);border:none;border-radius:14px;padding:1rem;box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02)}
@@ -276,14 +276,14 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.dia-cell){min-height:58px;background:var(--color-bg-primary);border:none;border-radius:8px;padding:4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.65rem;font-weight:700;color:var(--color-text-secondary);transition:all .15s;box-shadow:2px 2px 4px rgba(0,0,0,.08);overflow:hidden}
 .usuarios-layout :deep(.dia-cell.dia-vacio){opacity:.2;box-shadow:none;background:transparent}
 .usuarios-layout :deep(.dia-cell.dia-hoy){box-shadow:2px 2px 4px rgba(0,0,0,.08),0 0 10px color-mix(in srgb,var(--color-accent) 35%,transparent);color:var(--color-accent)}
-.usuarios-layout :deep(.dia-cell.dia-trabajado){background:color-mix(in srgb,var(--color-success) 6%,var(--color-bg-primary))}
+.usuarios-layout :deep(.dia-cell.dia-trabajado){background:color-mix(in srgb, var(--color-success) 6%, var(--badge-bg, var(--bg-panel)))}
 .usuarios-layout :deep(.dia-numero){font-size:.6rem;font-weight:800;line-height:1}
 .usuarios-layout :deep(.dia-vacio-text){font-size:.55rem;opacity:.4}
 .usuarios-layout :deep(.dia-hoy-text){font-size:.5rem;color:var(--color-accent);font-weight:800}
 .usuarios-layout :deep(.dia-total-horas){font-size:.5rem;color:var(--color-info);font-weight:700;margin-top:auto}
 .usuarios-layout :deep(.dia-trabajadores){display:flex;flex-direction:column;gap:1px;width:100%}
-.usuarios-layout :deep(.trabajador-chip){display:flex;align-items:center;gap:2px;padding:1px 4px;border-radius:3px;font-size:.48rem;font-weight:600;white-space:nowrap;overflow:hidden;background:color-mix(in srgb,var(--color-info) 12%,var(--color-bg-primary));color:var(--color-info);box-shadow:1px 1px 2px rgba(0,0,0,.05)}
-.usuarios-layout :deep(.trabajador-chip.trabajando){background:color-mix(in srgb,var(--color-success) 15%,var(--color-bg-primary));color:var(--color-success)}
+.usuarios-layout :deep(.trabajador-chip){display:flex;align-items:center;gap:2px;padding:1px 4px;border-radius:3px;font-size:.48rem;font-weight:600;white-space:nowrap;overflow:hidden;background:color-mix(in srgb, var(--color-info) 12%, var(--badge-bg, var(--bg-panel)));color:var(--color-info);box-shadow:1px 1px 2px rgba(0,0,0,.05)}
+.usuarios-layout :deep(.trabajador-chip.trabajando){background:color-mix(in srgb, var(--color-success) 15%, var(--badge-bg, var(--bg-panel)));color:var(--color-success)}
 .usuarios-layout :deep(.trabajador-chip.mas){background:var(--color-bg-primary);color:var(--color-text-secondary);justify-content:center;font-weight:700}
 .usuarios-layout :deep(.trabajador-inicial){font-weight:800;flex-shrink:0}
 .usuarios-layout :deep(.trabajador-horas){margin-left:auto;opacity:.8}
@@ -297,7 +297,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.usuario-asistencia-info){flex:1}.usuarios-layout :deep(.usuario-asistencia-info h4){margin:0;font-size:.78rem;font-weight:700;color:var(--color-text-primary)}
 .usuarios-layout :deep(.usuario-stats-row){display:flex;gap:.4rem;margin-top:.2rem}.usuarios-layout :deep(.stat-badge){display:flex;align-items:center;gap:.2rem;padding:.1rem .4rem;background:var(--color-bg-primary);border-radius:4px;font-size:.6rem;color:var(--color-text-secondary);box-shadow:inset 1px 1px 2px rgba(0,0,0,.05)}.usuarios-layout :deep(.stat-badge.highlight){color:var(--color-accent);font-weight:700}.usuarios-layout :deep(.stat-icon-small){font-size:.65rem}
 .usuarios-layout :deep(.dias-laborados-mini){display:flex;flex-wrap:wrap;gap:3px}
-.usuarios-layout :deep(.dia-chip){display:flex;align-items:center;gap:2px;padding:2px 6px;border-radius:4px;font-size:.6rem;font-weight:600;background:var(--color-bg-primary);color:var(--color-text-secondary);box-shadow:1px 1px 2px rgba(0,0,0,.06)}.usuarios-layout :deep(.dia-chip.sin-cierre){background:color-mix(in srgb,var(--color-success) 12%,var(--color-bg-primary));color:var(--color-success)}.usuarios-layout :deep(.dia-num){font-weight:800}.usuarios-layout :deep(.dia-apertura){opacity:.7;font-size:.5rem}.usuarios-layout :deep(.dia-horas){opacity:.8;font-weight:600}.usuarios-layout :deep(.dia-trabajando-text){font-size:.5rem}
+.usuarios-layout :deep(.dia-chip){display:flex;align-items:center;gap:2px;padding:2px 6px;border-radius:4px;font-size:.6rem;font-weight:600;background:var(--color-bg-primary);color:var(--color-text-secondary);box-shadow:1px 1px 2px rgba(0,0,0,.06)}.usuarios-layout :deep(.dia-chip.sin-cierre){background:color-mix(in srgb, var(--color-success) 12%, var(--badge-bg, var(--bg-panel)));color:var(--color-success)}.usuarios-layout :deep(.dia-num){font-weight:800}.usuarios-layout :deep(.dia-apertura){opacity:.7;font-size:.5rem}.usuarios-layout :deep(.dia-horas){opacity:.8;font-weight:600}.usuarios-layout :deep(.dia-trabajando-text){font-size:.5rem}
 .usuarios-layout :deep(.pago-semanal-section){display:flex;flex-direction:column;gap:.6rem}.usuarios-layout :deep(.pago-semanal-section h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:800}
 .usuarios-layout :deep(.pago-semanal-table-wrapper){overflow-x:auto}.usuarios-layout :deep(.pago-semanal-table){width:100%;border-collapse:collapse;font-size:.78rem;background:var(--color-bg-secondary);border-radius:12px;overflow:hidden;box-shadow:3px 3px 8px rgba(0,0,0,.1)}.usuarios-layout :deep(.pago-semanal-table thead){background:var(--color-bg-panel)}.usuarios-layout :deep(.pago-semanal-table th){padding:.6rem .7rem;text-align:left;font-weight:700;color:var(--color-accent);text-transform:uppercase;font-size:.62rem;letter-spacing:.05em;border-bottom:1px solid var(--color-border);white-space:nowrap}.usuarios-layout :deep(.pago-semanal-table td){padding:.5rem .7rem;border-bottom:1px solid rgba(255,255,255,.02);color:var(--color-text-primary)}.usuarios-layout :deep(.pago-semanal-table tr:hover td){background:color-mix(in srgb,var(--color-accent) 4%,transparent)}
 .usuarios-layout :deep(.pago-usuario-info){display:flex;align-items:center;gap:.4rem}.usuarios-layout :deep(.pago-avatar){width:28px;height:28px;border-radius:50%;object-fit:cover}.usuarios-layout :deep(.pago-avatar-placeholder){width:28px;height:28px;border-radius:50%;background:var(--color-bg-primary);display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:800;color:var(--color-accent)}
@@ -308,14 +308,14 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.btn-edit-hora:hover){opacity:1;transform:scale(1.15)}
 .usuarios-layout :deep(.dia-chip .btn-edit-hora){font-size:.55rem;padding:0 3px}
 .usuarios-layout :deep(.btn-del-hora){border:none;background:var(--color-bg-panel);color:var(--color-error);cursor:pointer;border-radius:3px;padding:0 2px;font-size:.5rem;line-height:1;flex-shrink:0;box-shadow:1px 1px 2px rgba(0,0,0,.08);opacity:.65;transition:all .15s}
-.usuarios-layout :deep(.btn-del-hora:hover){opacity:1;transform:scale(1.15);background:var(--color-error);color:#fff}
+.usuarios-layout :deep(.btn-del-hora:hover){opacity:1;transform:scale(1.15);background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .usuarios-layout :deep(.dia-chip .btn-del-hora){font-size:.55rem;padding:0 3px}
 .usuarios-layout :deep(.modal-edit-hora){position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:1100;padding:1rem}
 .usuarios-layout :deep(.modal-edit-card){background:var(--color-bg-secondary);border:none;border-radius:14px;width:min(100%,360px);overflow:hidden;box-shadow:12px 12px 30px rgba(0,0,0,.4),-6px -6px 20px rgba(255,255,255,.03)}
 .usuarios-layout :deep(.modal-edit-header){display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;border-bottom:1px solid color-mix(in srgb,var(--color-accent) 20%,transparent)}
 .usuarios-layout :deep(.modal-edit-header h3){margin:0;font-size:.9rem;color:var(--color-accent);font-weight:800}
 .usuarios-layout :deep(.modal-edit-close){background:var(--color-bg-primary);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;color:var(--color-text-secondary);font-size:.9rem;box-shadow:2px 2px 4px rgba(0,0,0,.1);transition:all .15s}
-.usuarios-layout :deep(.modal-edit-close:hover){background:var(--color-error);color:#fff}
+.usuarios-layout :deep(.modal-edit-close:hover){background: var(--error-fill, var(--color-error));color: var(--on-error, #ffffff)}
 .usuarios-layout :deep(.modal-edit-body){padding:1rem;display:flex;flex-direction:column;gap:.8rem}
 .usuarios-layout :deep(.modal-edit-info){display:flex;flex-direction:column;gap:.1rem}
 .usuarios-layout :deep(.modal-edit-info strong){font-size:.85rem;color:var(--color-text-primary)}
@@ -330,7 +330,7 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.modal-edit-actions){display:flex;justify-content:flex-end;gap:.4rem;margin-top:.2rem}
 .usuarios-layout :deep(.modal-edit-actions .btn-edit-cancel){border:none;padding:.45rem .8rem;border-radius:7px;background:var(--color-bg-primary);color:var(--color-text-secondary);cursor:pointer;font-size:.7rem;font-weight:700;box-shadow:2px 2px 4px rgba(0,0,0,.08)}
 .usuarios-layout :deep(.modal-edit-actions .btn-edit-cancel:hover){color:var(--color-text-primary)}
-.usuarios-layout :deep(.modal-edit-actions .btn-edit-save){border:none;padding:.45rem .9rem;border-radius:7px;background:var(--color-success);color:#fff;cursor:pointer;font-size:.7rem;font-weight:800;box-shadow:2px 2px 5px rgba(0,0,0,.12);transition:all .15s}
+.usuarios-layout :deep(.modal-edit-actions .btn-edit-save){border:none;padding:.45rem .9rem;border-radius:7px;background: var(--success-fill, var(--color-success));color: var(--on-success, #ffffff);cursor:pointer;font-size:.7rem;font-weight:800;box-shadow:2px 2px 5px rgba(0,0,0,.12);transition:all .15s}
 .usuarios-layout :deep(.modal-edit-actions .btn-edit-save:hover:not(:disabled)){transform:translateY(-1px)}
 .usuarios-layout :deep(.modal-edit-actions .btn-edit-save:disabled){opacity:.5;cursor:not-allowed}
 @media(max-width:992px){.usuarios-layout :deep(.stats-section){grid-template-columns:repeat(3,1fr)}.usuarios-layout :deep(.usuarios-grid){grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}}

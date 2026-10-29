@@ -272,7 +272,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 <style scoped>
 .promo-carousel {
-  background: linear-gradient(135deg, var(--color-bg-panel) 0%, color-mix(in srgb, var(--color-bg-primary) 90%, var(--color-accent)) 100%);
+  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-panel) 100%);
   border-radius: 16px;
   padding: 1rem;
   margin: 0.5rem;
@@ -568,7 +568,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 
 .products-title {
   font-size: 0.8rem;
-  color: var(--color-accent);
+  color: var(--color-success, var(--success-color));
   font-weight: bold;
   margin: 0 0 0.5rem 0;
   display: flex;
@@ -642,18 +642,18 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .price-promo-container {
-  background: linear-gradient(135deg, var(--color-success) 0%, color-mix(in srgb, var(--color-success) 60%, black) 100%);
+  background: var(--success-fill, var(--color-success));
   padding: 0.4rem 1rem;
   border-radius: 8px;
-  border: 2px solid var(--color-success);
-  box-shadow: 0 4px 15px color-mix(in srgb,var(--color-success) 30%,transparent);
-  filter: drop-shadow(0 2px 4px color-mix(in srgb,var(--color-success) 30%,transparent));
+  border: 2px solid var(--success-fill, var(--color-success));
+  box-shadow: 0 4px 15px color-mix(in srgb,var(--success-fill,var(--color-success)) 30%,transparent);
+  filter: drop-shadow(0 2px 4px color-mix(in srgb,var(--success-fill,var(--color-success)) 30%,transparent));
 }
 
 .price-promo {
   font-size: 1.4rem;
   font-weight: bold;
-  color: white;
+  color: var(--on-success, #ffffff);
   font-family: "Courier New", monospace;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
 }
@@ -663,8 +663,8 @@ function formatImagenUrl(url: string | null): string | undefined {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(180deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 50%, black) 100%);
-  color: var(--color-bg-primary);
+  background: linear-gradient(180deg, var(--gradient-btn-start, var(--color-accent)) 0%, var(--gradient-btn-end, var(--color-accent)) 100%);
+  color: var(--btn-text, var(--color-bg-primary));
   border: 3px solid var(--color-border);
   border-radius: 10px;
   padding: 0.7rem 1.25rem;
@@ -739,8 +739,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .carousel-btn:hover {
-  background: var(--color-accent);
-  color: var(--color-bg-primary);
+  background: var(--accent-fill, var(--color-accent));
+  color: var(--color-on-brand);
   transform: translateY(-50%) scale(1.1);
   box-shadow: 0 5px 15px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
@@ -790,12 +790,12 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .dot:hover {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   transform: scale(1.2);
 }
 
 .dot.active {
-  background: var(--color-accent);
+  background: var(--accent-fill, var(--color-accent));
   border-color: var(--color-accent);
   transform: scale(1.3);
   box-shadow: 0 0 10px var(--color-accent);

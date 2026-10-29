@@ -438,11 +438,11 @@ watch(() => props.open, (val) => {
 }
 
 .stock-value-old {
-  color: var(--error-color);
+  color: var(--color-error);
 }
 
 .stock-value-new {
-  color: var(--success-color);
+  color: var(--color-success);
   font-size: 1.1rem;
 }
 
@@ -455,8 +455,8 @@ watch(() => props.open, (val) => {
 }
 
 .stock-result-success {
-  background: color-mix(in srgb, var(--success-color) 15%, transparent);
-  color: var(--success-color);
+  background: color-mix(in srgb, var(--success-color) 15%, var(--badge-bg, var(--bg-panel)));
+  color: var(--color-success);
 }
 
 .vo-lista {
@@ -492,8 +492,8 @@ watch(() => props.open, (val) => {
 .vo-opcion-precio { color: var(--accent-color); font-weight: 700; white-space: nowrap; }
 
 .stock-result-error {
-  background: color-mix(in srgb, var(--error-color) 15%, transparent);
-  color: var(--error-color);
+  background: color-mix(in srgb, var(--error-color) 15%, var(--badge-bg, var(--bg-panel)));
+  color: var(--color-error);
 }
 
 .stock-btn {
@@ -509,7 +509,7 @@ watch(() => props.open, (val) => {
 .stock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .stock-btn-primary {
-  background: var(--accent-color);
+  background: var(--accent-fill, var(--accent-color));
   color: var(--text-primary);
 }
 
@@ -523,9 +523,9 @@ watch(() => props.open, (val) => {
 }
 
 .stock-btn-mic-active {
-  background: var(--error-color);
-  color: #fff;
-  border-color: var(--error-color);
+  background: var(--error-fill, var(--error-color));
+  color: var(--on-error, #ffffff);
+  border-color: var(--color-error);
   animation: stock-mic-pulse 1s infinite;
 }
 
