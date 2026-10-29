@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 let autoPlayTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -143,21 +142,6 @@ function agregarPromocion() {
   }
 }
 
-function formatImagenUrl(url: string | null): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith('data:')) return url;
-  if (url.startsWith('http')) {
-    const urlObj = new URL(url);
-    const path = urlObj.pathname;
-    const fileName = path.split('/').pop();
-    const folder = path.split('/').slice(-2, -1)[0];
-    if (fileName && folder) {
-      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-    }
-    return url;
-  }
-  return url;
-}
 </script>
 
 <template>

@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme, type Theme } from '@/composables/useTheme';
 import { usarApariencia } from '@/composables/useApariencia';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 const AUTH_KEY = 'isAuth';
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
@@ -86,20 +87,7 @@ export function useNavbar() {
   });
 
   function formatAvatarUrl(url: string | null): string | undefined {
-    if (!url) return undefined;
-    if (url.startsWith('data:')) return url;
-
-    if (url.startsWith('http')) {
-      const urlObj = new URL(url);
-      const path = urlObj.pathname;
-      const fileName = path.split('/').pop();
-      const folder = path.split('/').slice(-2, -1)[0];
-      if (fileName && folder) {
-        return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-      }
-      return url;
-    }
-    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+    return formatImagenUrl(url);
   }
 
   const nombreUsuario = computed(() => {

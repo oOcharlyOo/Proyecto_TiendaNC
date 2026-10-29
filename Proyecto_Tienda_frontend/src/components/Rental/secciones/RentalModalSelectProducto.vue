@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProductoDTO } from '../logica/useRental';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 defineProps<{
   open: boolean;
@@ -46,7 +47,7 @@ const emit = defineEmits<{
           @click="emit('seleccionar', producto)"
         >
           <div class="producto-imagen-modal">
-            <img v-if="producto.imagen_url" :src="producto.imagen_url" :alt="producto.nombre" />
+            <img v-if="producto.imagen_url" :src="formatImagenUrl(producto.imagen_url)" :alt="producto.nombre" />
             <span v-else>📦</span>
           </div>
           <div class="producto-datos-modal">

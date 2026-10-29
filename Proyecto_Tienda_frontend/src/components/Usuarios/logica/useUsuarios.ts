@@ -1,6 +1,7 @@
 import { ref, computed, onMounted, watch, shallowRef, nextTick } from 'vue';
 import confetti from 'canvas-confetti';
 import Swal from 'sweetalert2';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 export type Usuario = {
   idUsuario: number;
@@ -190,28 +191,14 @@ export function useUsuarios() {
   }
 
   function formatAvatarUrl(url: string | null): string | undefined {
-    if (!url) return undefined;
-    if (url.startsWith('data:')) return url;
-    if (url.startsWith('http')) {
-      const urlObj = new URL(url);
-      const path = urlObj.pathname;
-      const fileName = path.split('/').pop();
-      const folder = path.split('/').slice(-2, -1)[0];
-      if (fileName && folder) {
-        return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-      }
-      return url;
-    }
-    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+    return formatImagenUrl(url);
   }
 
   async function cargarUsuarios() {
     cargando.value = true;
     try {
       const usuariosData = await fetchApi<{ codigo: number; datos: Usuario[] }>(`${API_BASE}/usuarios/listarUsuarios`);
-      usuarios.value = Array.isArray(usuariosData?.datos)
-        ? usuariosData.datos.map(u => ({ ...u, avatar: u.avatar ? (formatAvatarUrl(u.avatar) ?? null) : null }))
-        : [];
+      usuarios.value = Array.isArray(usuariosData?.datos) ? usuariosData.datos : [];
     } catch (error) {
       usuarios.value = [];
       console.error('Error al cargar usuarios:', error);
@@ -231,7 +218,7 @@ export function useUsuarios() {
   function abrirModalEditar(usuario: Usuario) {
     editando.value = true;
     form.value = { ...usuario, password_hash: '', avatar: usuario.avatar || '' };
-    avatarPreview.value = usuario.avatar;
+    avatarPreview.value = formatAvatarUrl(usuario.avatar) ?? null;
     avatarBase64.value = '';
     modalAbierto.value = true;
   }

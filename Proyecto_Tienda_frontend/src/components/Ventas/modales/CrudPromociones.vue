@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 type PromocionDetalleDTO = {
   id_detalle?: number;
@@ -411,23 +412,6 @@ function calcularPrecioOriginal(detalles: any[]) {
 function cerrar() {
   emit('close');
 }
-
-function formatImagenUrl(url: string | null): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith('data:')) return url;
-  
-  if (url.startsWith('http')) {
-    const urlObj = new URL(url);
-    const path = urlObj.pathname;
-    const fileName = path.split('/').pop();
-    const folder = path.split('/').slice(-2, -1)[0];
-    if (fileName && folder) {
-      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-    }
-    return url;
-  }
-  return url;
-}
 </script>
 
 <template>
@@ -490,7 +474,7 @@ function formatImagenUrl(url: string | null): string | undefined {
                 :data-imagen="promo.imagen_url"
               >
                 <div class="card-image">
-                  <img :src="formatImagenUrl(promo.imagen_url)" :alt="promo.nombre" class="card-img" @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; }">
+                  <img :src="formatImagenUrl(promo.imagen_url)" :alt="promo.nombre" class="card-img" @load="(e) => { (e.target as HTMLImageElement).style.display = ''; }" @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; }">
                   <div v-if="!promo.imagen_url" class="image-placeholder">📦</div>
                 </div>
                 <div class="card-content">
@@ -540,7 +524,7 @@ function formatImagenUrl(url: string | null): string | undefined {
               <label>Imagen de la Promoción</label>
               <div class="imagen-upload">
                 <div v-if="imagenPreview" class="imagen-preview">
-                  <img :src="imagenPreview" alt="Preview">
+                  <img :src="formatImagenUrl(imagenPreview)" alt="Preview">
                   <button class="btn-quitar-imagen" @click="quitarImagen" type="button">×</button>
                 </div>
                 <div v-else class="imagen-placeholder" @click="triggerImagenInput">
@@ -706,14 +690,14 @@ function formatImagenUrl(url: string | null): string | undefined {
   font-family: 'Palatino Linotype', serif;
   font-size: 1.3rem;
   color: var(--perg-title) !important;
-  text-shadow: 2px 2px 0 rgba(40, 20, 10, 0.45) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .btn-close {
   width: 36px;
   height: 36px;
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   border: 2px solid var(--perg-border);
   border-radius: 50%;
   font-size: 1.2rem;
@@ -758,8 +742,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .error-msg {
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   padding: 0.75rem;
   border-radius: 6px;
   margin-bottom: 1rem;
@@ -788,6 +772,11 @@ function formatImagenUrl(url: string | null): string | undefined {
   color: var(--perg-text);
   font-size: 0.9rem;
   outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--perg-text-secondary);
+  opacity: 1;
 }
 
 .loading, .empty-state {
@@ -824,7 +813,7 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .promo-card.inactive {
-  opacity: 0.6;
+  opacity: 0.82;
 }
 
 .promo-card .card-image {
@@ -839,7 +828,7 @@ function formatImagenUrl(url: string | null): string | undefined {
   width: 100%;
   height: 100%;
   object-fit: scale-down;
-  filter: drop-shadow(10px 2px 0px black);
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.25));
 }
 
 .promo-card .image-placeholder {
@@ -884,13 +873,14 @@ function formatImagenUrl(url: string | null): string | undefined {
 }
 
 .status-badge.active {
-  background: var(--perg-success);
-  color: white;
+  background: var(--success-fill);
+  color: var(--on-success);
 }
 
 .status-badge.inactive {
-  background: var(--perg-text-secondary);
-  color: white;
+  background: var(--badge-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .card-desc {
@@ -965,8 +955,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-delete {
   width: 28px;
   height: 28px;
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -1004,6 +994,11 @@ function formatImagenUrl(url: string | null): string | undefined {
 .input-field:focus {
   outline: none;
   border-color: var(--perg-accent);
+}
+
+.input-field::placeholder {
+  color: var(--perg-text-secondary);
+  opacity: 1;
 }
 
 .price-info {
@@ -1066,8 +1061,8 @@ function formatImagenUrl(url: string | null): string | undefined {
   right: 4px;
   width: 24px;
   height: 24px;
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   border: none;
   border-radius: 50%;
   font-size: 1rem;
@@ -1158,8 +1153,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-remove-prod {
   width: 24px;
   height: 24px;
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -1190,6 +1185,11 @@ function formatImagenUrl(url: string | null): string | undefined {
   border-color: var(--perg-accent);
 }
 
+.product-select option {
+  background: var(--perg-bg-panel);
+  color: var(--perg-text);
+}
+
 .form-actions {
   display: flex;
   gap: 0.75rem;
@@ -1213,8 +1213,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-save {
   flex: 2;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--perg-success) 0%, color-mix(in srgb, var(--perg-success) 60%, black) 100%);
-  color: white;
+  background: var(--success-fill);
+  color: var(--on-success);
   border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;
@@ -1303,8 +1303,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-close-gramaje {
   width: 28px;
   height: 28px;
-  background: var(--perg-error);
-  color: white;
+  background: var(--error-fill);
+  color: var(--on-error);
   border: none;
   border-radius: 50%;
   font-size: 1rem;
@@ -1443,8 +1443,8 @@ function formatImagenUrl(url: string | null): string | undefined {
 .btn-confirmar {
   flex: 1;
   padding: 0.75rem;
-  background: linear-gradient(135deg, var(--perg-success) 0%, color-mix(in srgb, var(--perg-success) 60%, black) 100%);
-  color: white;
+  background: var(--success-fill);
+  color: var(--on-success);
   border: 2px solid var(--perg-border);
   border-radius: 6px;
   font-weight: bold;

@@ -1,3 +1,5 @@
+import { ref } from 'vue';
+
 const originalFetch = window.fetch;
 
 const LOCAL_BASE = 'http://localhost:8080';
@@ -42,6 +44,17 @@ function leerCache(): string {
   return '';
 }
 
+/**
+ * Base activa observable. Las imágenes (<img src>) no pasan por el
+ * interceptor de fetch, así que necesitan resolver el backend activo
+ * (localhost o remoto) por su cuenta.
+ */
+export const baseApiRef = ref('');
+
+export function baseApiActual(): string {
+  return baseApiRef.value || currentBase || leerCache() || LOCAL_BASE;
+}
+
 function limpiarDatosBackend() {
   try {
     for (const key of BACKEND_DATA_KEYS) localStorage.removeItem(key);
@@ -53,6 +66,7 @@ function limpiarDatosBackend() {
 function cambiarBase(nueva: string) {
   if (nueva === currentBase) return;
   currentBase = nueva;
+  baseApiRef.value = nueva;
   guardarCache(nueva);
   if (!baseAlCargar || nueva === baseAlCargar) return;
   let yaRecargado = '';
@@ -80,11 +94,13 @@ const pendingBase = (async () => {
   if (cached) {
     currentBase = cached;
     baseAlCargar = cached;
+    baseApiRef.value = cached;
     void reProbe();
     return cached;
   }
   currentBase = await detectLocal();
   baseAlCargar = currentBase;
+  baseApiRef.value = currentBase;
   guardarCache(currentBase);
   return currentBase;
 })();

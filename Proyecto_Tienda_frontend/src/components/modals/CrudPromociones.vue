@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 type PromocionDetalleDTO = {
   id_detalle?: number;
@@ -411,23 +412,6 @@ function calcularPrecioOriginal(detalles: any[]) {
 function cerrar() {
   emit('close');
 }
-
-function formatImagenUrl(url: string | null): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith('data:')) return url;
-  
-  if (url.startsWith('http')) {
-    const urlObj = new URL(url);
-    const path = urlObj.pathname;
-    const fileName = path.split('/').pop();
-    const folder = path.split('/').slice(-2, -1)[0];
-    if (fileName && folder) {
-      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-    }
-    return url;
-  }
-  return url;
-}
 </script>
 
 <template>
@@ -490,7 +474,7 @@ function formatImagenUrl(url: string | null): string | undefined {
                 :data-imagen="promo.imagen_url"
               >
                 <div class="card-image">
-                  <img :src="formatImagenUrl(promo.imagen_url)" :alt="promo.nombre" class="card-img" @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; }">
+                  <img :src="formatImagenUrl(promo.imagen_url)" :alt="promo.nombre" class="card-img" @load="(e) => { (e.target as HTMLImageElement).style.display = ''; }" @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; }">
                   <div v-if="!promo.imagen_url" class="image-placeholder">📦</div>
                 </div>
                 <div class="card-content">
@@ -540,7 +524,7 @@ function formatImagenUrl(url: string | null): string | undefined {
               <label>Imagen de la Promoción</label>
               <div class="imagen-upload">
                 <div v-if="imagenPreview" class="imagen-preview">
-                  <img :src="imagenPreview" alt="Preview">
+                  <img :src="formatImagenUrl(imagenPreview)" alt="Preview">
                   <button class="btn-quitar-imagen" @click="quitarImagen" type="button">×</button>
                 </div>
                 <div v-else class="imagen-placeholder" @click="triggerImagenInput">

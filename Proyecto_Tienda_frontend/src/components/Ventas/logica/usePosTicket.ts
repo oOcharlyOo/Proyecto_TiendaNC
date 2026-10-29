@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import type { ApiRespuesta, Ticket, TicketItem, TicketItemPromocion, VentaPendienteDTO, Producto } from './usePosTipos';
 import { playSound } from './usePosSonido';
 import { useProductosCache } from '@/composables/useProductCache';
+import { formatImagenUrl } from '@/utils/imagenUrl';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 const AUTH_USER_ID_KEY = 'idUsuario';
@@ -399,22 +400,6 @@ function getMetodoClase(metodo: string | undefined): string {
   if (m.includes('TRANSFERENCIA')) return 'transferencia';
   if (m.includes('EFECTIVO')) return 'efectivo';
   return '';
-}
-
-function formatImagenUrl(url: string | null): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith('data:')) return url;
-  if (url.startsWith('http')) {
-    const urlObj = new URL(url);
-    const path = urlObj.pathname;
-    const fileName = path.split('/').pop();
-    const folder = path.split('/').slice(-2, -1)[0];
-    if (fileName && folder) {
-      return `${API_BASE}/imagenes/obtener/${folder}/${fileName}`;
-    }
-    return url;
-  }
-  return url;
 }
 
 export {
