@@ -155,7 +155,7 @@ onBeforeUnmount(() => aplicar());
   font-size: 0.82rem;
   color: var(--color-text-primary, #e8e0d0);
   background: var(--color-bg-primary, #0a1510);
-  border: 1px solid var(--color-border, #4a3520);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 70%, var(--color-bg-primary, #0a1510));
   border-radius: 8px;
 }
 .ap-nombre:focus {

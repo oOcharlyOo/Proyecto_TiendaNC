@@ -53,6 +53,20 @@ function elegirAcento(color: string) {
 const esAcentoPersonalizado = computed(
   () => !paleta.some(c => c.toLowerCase() === props.acento.toLowerCase())
 );
+
+/** Tinta legible (oscura o clara) para el hex de fondo de la tarjeta "Propio". */
+function textoSobre(hex: string): string {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return '#f8fafc';
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const canal = (i: number) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const lum = 0.2126 * canal(0) + 0.7152 * canal(2) + 0.0722 * canal(4);
+  return lum > 0.45 ? '#0b1220' : '#f8fafc';
+}
 </script>
 
 <template>
@@ -63,7 +77,7 @@ const esAcentoPersonalizado = computed(
         v-for="t in temas"
         :key="t.id"
         type="button"
-        class="ap-tema"
+        class="ap-tema ap-tema-preset"
         :class="{ activo: temaBase === t.id }"
         :style="{ background: t.bg }"
         @click="elegirTema(t.id)"
@@ -89,7 +103,7 @@ const esAcentoPersonalizado = computed(
           <span class="ap-tema-panel" :style="{ background: fondoActivo }">
             <span class="ap-tema-chip" :style="{ background: acento }" />
           </span>
-          <span class="ap-tema-nombre">{{ fondoActivo }}</span>
+          <span class="ap-tema-nombre" :style="{ color: textoSobre(fondoActivo) }">{{ fondoActivo }}</span>
         </template>
         <input
           type="color"
@@ -192,6 +206,11 @@ const esAcentoPersonalizado = computed(
   font-weight: 700;
   color: var(--text-primary, #f1f5f9);
   white-space: nowrap;
+}
+/* Las tarjetas de preset siempre tienen fondo oscuro: la etiqueta debe ser clara
+   aunque el tema activo sea claro (antes quedaba texto oscuro sobre fondo oscuro). */
+.ap-tema-preset .ap-tema-nombre {
+  color: #f8fafc;
 }
 .ap-acentos {
   display: flex;
