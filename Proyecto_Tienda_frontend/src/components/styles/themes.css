@@ -448,7 +448,7 @@
 [data-theme="forest"] .menu-link {
   background: linear-gradient(135deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
   border: 1px solid transparent;
-  color: #ffffff;
+  color: var(--btn-text, #ffffff);
   font-weight: 600;
   border-radius: 4px;
 }
@@ -459,7 +459,7 @@
 [data-theme="forest"] .logout-btn {
   background: linear-gradient(135deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 80%, black) 100%);
   border: 1px solid transparent;
-  color: #ffffff;
+  color: var(--on-error, #ffffff);
   border-radius: 4px;
 }
 
@@ -1040,7 +1040,7 @@ textarea:-webkit-autofill {
   width: 18px;
   height: 18px;
   background: var(--bg-primary);
-  border: var(--border-width) solid var(--border-color);
+  border: var(--border-width) solid color-mix(in srgb, var(--text-secondary) 55%, var(--border-color));
   cursor: pointer;
 }
 
@@ -2086,4 +2086,29 @@ textarea:-webkit-autofill {
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
+}
+
+/* ============================================================
+   LEGIBILIDAD DE CONTROLES
+   El tema pinta los botones con el degradado del acento; la tinta
+   la calcula useApariencia segun el contraste real (--btn-text).
+   Los .action-btn son tarjetas de accion (Corte/Finanzas): fondo de
+   panel y texto del tema, no el degradado de marca.
+   ============================================================ */
+[data-theme] button,
+[data-theme] .btn,
+[data-theme] .menu-link,
+[data-theme] .logout-btn {
+  color: var(--btn-text, #ffffff);
+}
+
+[data-theme] .navbar-wrap .menu-link,
+[data-theme] .navbar-wrap .menu-link.activo {
+  color: var(--btn-text, #ffffff);
+}
+
+[data-theme] .action-btn {
+  background: var(--color-bg-secondary);
+  background-image: none;
+  color: var(--color-text-primary);
 }

@@ -297,7 +297,7 @@ const emit = defineEmits<{
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
-  color: color-mix(in srgb, var(--infoBlueColor) 50%, var(--accent-color));
+  color: var(--color-info);
   font-size: 1.2rem;
   cursor: pointer;
   position: relative;
@@ -334,7 +334,7 @@ const emit = defineEmits<{
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
-  color: var(--accent-color);
+  color: var(--color-accent);
   font-size: 1.2rem;
   font-weight: 700;
   cursor: pointer;
@@ -354,8 +354,8 @@ const emit = defineEmits<{
   position: absolute;
   top: -4px;
   right: -4px;
-  background: var(--error-color);
-  color: var(--text-primary);
+  background: var(--color-error);
+  color: var(--on-error, #0b1220);
   font-size: 0.7rem;
   font-weight: 700;
   min-width: 16px;
@@ -388,7 +388,7 @@ const emit = defineEmits<{
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
-  color: color-mix(in srgb, var(--accent-color) 60%, transparent);
+  color: var(--color-accent);
   font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.15s;
@@ -409,7 +409,7 @@ const emit = defineEmits<{
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
-  color: color-mix(in srgb, var(--success-color) 60%, transparent);
+  color: var(--color-success);
   font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.15s;

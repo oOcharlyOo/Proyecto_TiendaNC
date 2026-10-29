@@ -177,10 +177,10 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.tabs-container){display:flex;gap:0;background:var(--color-bg-panel);border:none;border-radius:12px 12px 0 0;overflow:hidden;box-shadow:inset 0 -1px 0 var(--color-border)}
 .usuarios-layout :deep(.tab-btn){padding:.7rem 1.4rem;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--color-text-secondary);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;gap:.45rem;transition:all .2s;margin-bottom:-1px;position:relative}
 .usuarios-layout :deep(.tab-btn:hover){color:var(--color-text-primary);background:color-mix(in srgb,var(--color-accent) 5%,transparent)}
-.usuarios-layout :deep(.tab-btn.active){color:var(--color-accent);border-bottom-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,transparent)}
+.usuarios-layout :deep(.tab-btn.active){color:var(--color-accent);border-bottom-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,var(--color-bg-primary))}
 .usuarios-layout :deep(.tab-icon){font-size:1.05rem}
 .usuarios-layout :deep(.tab-text){font-family:inherit}
-.usuarios-layout :deep(.tab-badge){font-size:.55rem;padding:.1rem .4rem;border-radius:4px;background:color-mix(in srgb,var(--color-accent) 20%,transparent);color:var(--color-accent);font-weight:800}
+.usuarios-layout :deep(.tab-badge){font-size:.55rem;padding:.1rem .4rem;border-radius:4px;background:color-mix(in srgb,var(--color-accent) 20%,var(--color-bg-primary));color:var(--color-accent);font-weight:800}
 .usuarios-layout :deep(.stats-section){display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;padding:.75rem 1.5rem;flex-shrink:0}
 .usuarios-layout :deep(.stat-card-wrapper){position:relative;background:var(--color-bg-secondary);border:none;border-radius:12px;padding:1rem 1.1rem;display:flex;align-items:center;gap:.85rem;box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02);overflow:hidden}
 .usuarios-layout :deep(.stat-card-wrapper.gold){box-shadow:4px 4px 10px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.02),0 0 14px color-mix(in srgb,var(--color-accent) 18%,transparent)}
@@ -204,15 +204,15 @@ import SueldoXHoraModal from '../modals/SueldoXHoraModal.vue';
 .usuarios-layout :deep(.usuario-info){flex:1;min-width:0;display:flex;flex-direction:column;gap:.1rem}
 .usuarios-layout :deep(.usuario-nombre){margin:0;font-size:.9rem;font-weight:800;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .usuarios-layout :deep(.usuario-user){font-size:.68rem;color:var(--color-text-secondary);font-family:monospace}
-.usuarios-layout :deep(.tipo-badge){display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .5rem;border-radius:5px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:color-mix(in srgb,var(--color-info) 12%,transparent);color:var(--color-info);box-shadow:1px 1px 3px rgba(0,0,0,.06);width:fit-content}
-.usuarios-layout :deep(.tipo-badge.admin){background:color-mix(in srgb,var(--color-accent) 15%,transparent);color:var(--color-accent)}
+.usuarios-layout :deep(.tipo-badge){display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .5rem;border-radius:5px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:color-mix(in srgb,var(--color-info) 12%,var(--color-bg-primary));color:var(--color-info);box-shadow:1px 1px 3px rgba(0,0,0,.06);width:fit-content}
+.usuarios-layout :deep(.tipo-badge.admin){background:color-mix(in srgb,var(--color-accent) 15%,var(--color-bg-primary));color:var(--color-accent)}
 .usuarios-layout :deep(.badge-icon){font-size:.7rem}
 .usuarios-layout :deep(.usuario-actions){display:flex;gap:.3rem;flex-shrink:0}
 .usuarios-layout :deep(.btn-edit),.usuarios-layout :deep(.btn-delete){width:36px;height:36px;border:none;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;transition:all .2s;box-shadow:3px 3px 6px rgba(0,0,0,.1)}
 .usuarios-layout :deep(.btn-edit){background:var(--color-bg-primary);color:var(--color-accent)}
 .usuarios-layout :deep(.btn-edit:hover){background:var(--color-accent);color:var(--color-on-brand);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .usuarios-layout :deep(.btn-delete){background:var(--color-bg-primary);color:var(--color-error)}
-.usuarios-layout :deep(.btn-delete:hover){background:var(--color-error);color:#fff;transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
+.usuarios-layout :deep(.btn-delete:hover){background:var(--color-error);color:var(--on-error,#0b1220);transform:translateY(-2px);box-shadow:5px 5px 10px rgba(0,0,0,.18)}
 .usuarios-layout :deep(.btn-delete:disabled){opacity:.4;cursor:not-allowed;transform:none;box-shadow:2px 2px 4px rgba(0,0,0,.05)}
 .usuarios-layout :deep(.loading){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;padding:3rem 1rem;color:var(--color-text-secondary)}
 .usuarios-layout :deep(.loading-spinner){width:44px;height:44px;border:4px solid var(--color-border);border-top-color:var(--color-accent);border-radius:50%;animation:spUs 1s linear infinite}

@@ -883,7 +883,7 @@ const emit = defineEmits<{
 }
 .pos-container .summary-row.total {
   font-size: 1.2rem;
-  color: var(--accent-color);
+  color: var(--color-accent);
   border-top: 1px solid var(--border-color);
   padding-top: 0.3rem;
   margin-top: 0.2rem;
@@ -891,7 +891,7 @@ const emit = defineEmits<{
 
 .pos-container .pos-total-amount { 
   font-weight: 700; 
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
 @media (max-width: 991px) {
@@ -926,7 +926,8 @@ const emit = defineEmits<{
   height: auto;
   min-height: 48px;
   white-space: normal;
-  background: linear-gradient(135deg, var(--color-success), color-mix(in srgb, var(--color-success) 60%, black));
+  background: var(--color-success);
+  color: var(--on-success, #0b1220);
   border: none;
   transition: all 0.15s;
   padding: 0.6rem 0.8rem;
@@ -1065,6 +1066,7 @@ const emit = defineEmits<{
 .pos-container .shortcut-badge {
   display: inline-block;
   padding: 0.15rem 0.4rem;
+  color: var(--on-success, #0b1220);
   background: color-mix(in srgb, white 20%, transparent);
   border-radius: 4px;
   font-size: 0.65rem;

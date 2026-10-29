@@ -156,8 +156,8 @@ import RentalModalAgregarProducto from './secciones/RentalModalAgregarProducto.v
   align-items: center;
   justify-content: center;
   padding: 40px 80px;
-  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-bg-secondary) 100%);
-  color: var(--color-text-primary);
+  background: var(--color-accent);
+  color: var(--color-on-brand);
   border: 4px solid var(--color-accent);
   border-radius: 20px;
   cursor: pointer;

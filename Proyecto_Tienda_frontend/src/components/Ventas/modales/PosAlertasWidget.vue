@@ -146,8 +146,8 @@ onUnmounted(() => {
 .paw-bell-btn{width:44px;height:44px;border:1px solid var(--border-color,#444);border-radius:8px;background:var(--bg-primary,#1a1a2e);color:var(--color-accent);font-size:1.1rem;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .paw-bell-btn:hover{border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 10%,var(--bg-primary,#1a1a2e))}
 .paw-bell-icon{line-height:1}
-.paw-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:50%;background:var(--color-warning,#f59e0b);color:var(--text-primary,#fff);font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;animation:pawPulse 2s infinite}
-.paw-badge.urgent{background:var(--color-error,#ef4444)}
+.paw-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:50%;background:var(--color-warning,#f59e0b);color:var(--on-warning,#0b1220);font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;animation:pawPulse 2s infinite}
+.paw-badge.urgent{background:var(--color-error,#ef4444);color:var(--on-error,#0b1220)}
 @keyframes pawPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 
 .paw-dropdown{width:300px;background:var(--color-bg-panel,#1e1e32);border:1px solid var(--color-border,#333);border-radius:10px;box-shadow:8px 8px 24px rgba(0,0,0,.4);overflow:hidden}

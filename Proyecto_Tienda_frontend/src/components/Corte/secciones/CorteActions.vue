@@ -53,6 +53,7 @@ defineEmits<{
   background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 20%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)) !important;
   border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent) !important;
   box-shadow: 0 0 30px color-mix(in srgb, var(--color-accent) 15%, transparent) !important;
+  color: var(--color-text-primary) !important;
   letter-spacing: 2px;
   transition: all 0.3s ease !important;
 }

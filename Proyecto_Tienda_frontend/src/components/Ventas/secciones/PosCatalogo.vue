@@ -784,8 +784,8 @@ const emit = defineEmits<{
 }
 
 .pos-container .product-price-tag {
-  background: var(--success-color);
-  color: var(--text-primary);
+  background: var(--color-success);
+  color: var(--on-success, #0b1220);
   padding: 0.25rem 0.7rem;
   border-radius: 6px;
   font-weight: 600;
@@ -799,9 +799,9 @@ const emit = defineEmits<{
   border-radius: 4px;
   font-weight: 600;
 }
-.pos-container .in-stock { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
-.pos-container .pos-low-stock { background: color-mix(in srgb, var(--error-color) 15%, transparent); color: var(--error-color); }
-.pos-container .stock-badge.rentable { background: color-mix(in srgb, var(--infoBlueColor) 15%, transparent); color: color-mix(in srgb, var(--infoBlueColor) 60%, white); }
+.pos-container .in-stock { background: color-mix(in srgb, var(--color-success) 15%, var(--color-bg-primary)); color: var(--color-success); }
+.pos-container .pos-low-stock { background: color-mix(in srgb, var(--color-error) 15%, var(--color-bg-primary)); color: var(--color-error); }
+.pos-container .stock-badge.rentable { background: color-mix(in srgb, var(--color-info) 15%, var(--color-bg-primary)); color: var(--color-info); }
 
 .acceso-rapido-section {
   padding: 1rem;

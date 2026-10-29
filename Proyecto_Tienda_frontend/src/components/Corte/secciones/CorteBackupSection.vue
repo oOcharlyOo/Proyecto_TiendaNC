@@ -84,12 +84,12 @@ function triggerFileSelect() {
 
 .action-btn.backup-btn {
   border-color: color-mix(in srgb, var(--color-info) 30%, transparent);
-  color: var(--color-info);
+  color: var(--color-text-primary);
 }
 
 .action-btn.restore-btn {
   border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
-  color: var(--color-success);
+  color: var(--color-text-primary);
 }
 
 .import-modal-overlay {

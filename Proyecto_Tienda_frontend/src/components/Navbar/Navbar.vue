@@ -4,7 +4,7 @@ import { useNavbar } from './logica/useNavbar';
 import { usarApariencia } from '@/composables/useApariencia';
 import AparienciaModal from '../modals/AparienciaModal.vue';
 import type { Theme } from '@/composables/useTheme';
-const { route, menuAbierto, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, currentTheme, setTheme } = useNavbar();
+const { route, menuAbierto, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, currentTheme, elegirTema } = useNavbar();
 const { nombreNegocio } = usarApariencia();
 
 const aparienciaAbierta = ref(false);
@@ -140,7 +140,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
                 type="button"
                 class="theme-btn"
                 :class="{ active: currentTheme === t.id }"
-                @click="setTheme(t.id)"
+                @click="elegirTema(t.id)"
                 :title="t.label"
               >
                 {{ t.icon }}
@@ -254,7 +254,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   align-items: center;
   gap: 0.3rem;
   padding: 0.2rem 0.6rem;
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-primary));
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
   border-radius: 8px;
   font-size: 0.65rem;
@@ -310,7 +310,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   gap: 0.35rem;
   min-width: 90px;
   padding: 0.5rem 0.8rem;
-  color: var(--color-text-primary);
+  color: var(--btn-text, #ffffff);
   text-decoration: none;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -361,7 +361,7 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
     0 1px 0 var(--color-border),
     0 0 25px color-mix(in srgb, var(--color-brand) 50%, transparent);
   border-color: var(--color-accent-hover);
-  color: var(--color-on-brand);
+  color: var(--btn-text, #ffffff);
 }
 
 .navbar-wrap .link-icon {
@@ -627,13 +627,14 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
   border-color: var(--color-accent);
   transform: translateX(5px);
-  color: var(--color-on-brand);
+  color: var(--btn-text, #ffffff);
 }
 
 .navbar-wrap .menu-link-mobile.activo {
   background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-mid) 50%, var(--gradient-btn-end) 100%);
   border-color: var(--color-accent-hover);
   box-shadow: 0 0 15px color-mix(in srgb, var(--color-brand) 30%, transparent);
+  color: var(--btn-text, #ffffff);
 }
 
 .navbar-wrap .personalizar-btn {

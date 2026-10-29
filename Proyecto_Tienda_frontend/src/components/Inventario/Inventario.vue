@@ -91,7 +91,7 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
 .inv__tog--purp input:checked+.inv__tog-t{background:#a855f7;box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
 .inv__tog--purp input:checked+.inv__tog-t .inv__tog-d{left:16px;background:#fff}
 .inv__row.r-inactivo{border-left:2px solid #a855f7;opacity:.85}
-.inv__tag.t-inactivo{background:color-mix(in srgb,#a855f7 15%,transparent);color:#a855f7}
+.inv__tag.t-inactivo{background:color-mix(in srgb,#a855f7 15%,transparent);color:color-mix(in srgb,#a855f7 65%,var(--text-primary))}
 .inv__cd.c-inactivo{box-shadow:4px 4px 8px rgba(0,0,0,.1),0 0 0 1px color-mix(in srgb,#a855f7 45%,transparent);opacity:.9}
 .d-inactivo{background:#a855f7;box-shadow:0 0 5px color-mix(in srgb,#a855f7 50%,transparent)}
 .v-inactivo{color:#a855f7;opacity:.8}
@@ -106,7 +106,7 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
 /* Productos por validar stock (>30 días sin movimiento con stock) — ámbar/naranja #f59e0b */
 .inv__tog--val input:checked+.inv__tog-t{background:#f59e0b;box-shadow:inset 2px 2px 3px rgba(0,0,0,.15)}
 .inv__tog--val input:checked+.inv__tog-t .inv__tog-d{left:16px;background:#fff}
-.inv__tag.t-validar{background:color-mix(in srgb,#f59e0b 18%,transparent);color:#f59e0b;text-transform:none}
+.inv__tag.t-validar{background:color-mix(in srgb,var(--color-warning) 15%,transparent);color:var(--color-warning);text-transform:none}
 
 @media(max-width:1200px){.inv__kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:768px){

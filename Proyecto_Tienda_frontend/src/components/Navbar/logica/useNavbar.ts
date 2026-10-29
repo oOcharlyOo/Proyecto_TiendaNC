@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useTheme } from '@/composables/useTheme';
+import { useTheme, type Theme } from '@/composables/useTheme';
 import { usarApariencia } from '@/composables/useApariencia';
 
 const AUTH_KEY = 'isAuth';
@@ -15,6 +15,24 @@ export function useNavbar() {
   const route = useRoute();
   const router = useRouter();
   const { currentTheme, setTheme, toggleTheme } = useTheme();
+  const { config: apariencia, guardar: guardarApariencia } = usarApariencia();
+
+  /**
+   * Selector rapido de tema del menu. Ademas de aplicarlo debe PERSISTIRLO:
+   * si solo se cambiaba el atributo/localStorage, al recargar volvia la
+   * apariencia guardada y parecia que el tema "no se respetaba".
+   */
+  async function elegirTema(id: string) {
+    const anterior = (apariencia.value?.temaBase || 'classic') as Theme;
+    setTheme(id as Theme);
+    if (!esAdministrador.value) return;
+    const r = await guardarApariencia({
+      temaBase: id,
+      acento: apariencia.value?.acento || '#f97316',
+      fondo: '',
+    });
+    if (!r.ok) setTheme(anterior);
+  }
 
   const tipoUsuario = computed(() => {
     return Number(localStorage.getItem('tipoUsuario') || 2);
@@ -124,6 +142,7 @@ export function useNavbar() {
     menuAbierto,
     currentTheme,
     setTheme,
+    elegirTema,
     toggleTheme,
     syncLoading,
     syncMessage,
