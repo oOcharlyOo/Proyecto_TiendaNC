@@ -1,9 +1,9 @@
-import { ref } from 'vue';
+﻿import { ref } from 'vue';
 
 const originalFetch = window.fetch;
 
 const LOCAL_BASE = 'http://localhost:8080';
-const REMOTE_BASE = 'https://api.laleyendadeldulce.com';
+const REMOTE_BASE = import.meta.env.VITE_API_URL || 'https://panaderia.laleyendadeldulce.com';
 const CACHE_KEY = 'api_base_activo';
 const PROBE_TIMEOUT = 1200;
 const REPROBE_INTERVAL = 30000;
@@ -45,8 +45,8 @@ function leerCache(): string {
 }
 
 /**
- * Base activa observable. Las imágenes (<img src>) no pasan por el
- * interceptor de fetch, así que necesitan resolver el backend activo
+ * Base activa observable. Las imÃ¡genes (<img src>) no pasan por el
+ * interceptor de fetch, asÃ­ que necesitan resolver el backend activo
  * (localhost o remoto) por su cuenta.
  */
 export const baseApiRef = ref('');
@@ -167,3 +167,4 @@ async function fallbackRemoto(url: string, init?: RequestInit): Promise<Response
 }
 
 export {};
+
