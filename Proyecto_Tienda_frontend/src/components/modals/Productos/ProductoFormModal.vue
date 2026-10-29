@@ -468,7 +468,7 @@ const esCategoriaGaming = computed(() => {
 .caja-chip-price{font-size:.58rem;opacity:.75;color:var(--color-text-secondary)}
 .caja-chip-remove{background:none;border:none;color:var(--color-error);font-size:.58rem;cursor:pointer;padding:0;line-height:1;opacity:.6;transition:opacity .15s}
 .caja-chip-remove:hover{opacity:1}
-.modal-actions{display:flex;gap:.55rem;justify-content:flex-end;padding-top:.85rem;margin-top:.4rem;border-top:1px solid color-mix(in srgb,var(--color-accent) 25%,transparent);flex-wrap:wrap}
+.modal-actions{display:flex;gap:.55rem;justify-content:flex-end;padding-top:.85rem;margin-top:.4rem;flex-wrap:wrap}
 .modal-actions button{border:none;padding:.6rem .9rem;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;cursor:pointer;display:flex;align-items:center;gap:.35rem;transition:all .2s;border-radius:10px}
 .btn-primary{background:linear-gradient(145deg,color-mix(in srgb,var(--color-accent) 90%,#fff) 0%,var(--color-accent) 40%,color-mix(in srgb,var(--color-accent) 75%,#000) 100%);color:var(--color-on-brand);box-shadow:4px 4px 10px rgba(0,0,0,.2),-1px -1px 4px rgba(255,255,255,.04)}
 .btn-primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:6px 6px 16px rgba(0,0,0,.28),-3px -3px 8px rgba(255,255,255,.05)}

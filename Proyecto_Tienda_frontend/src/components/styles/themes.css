@@ -647,13 +647,6 @@ textarea:-webkit-autofill {
   border-radius: 6px;
 }
 
-[data-theme="classic"] .modal-actions,
-[data-theme="modern"] .modal-actions,
-[data-theme="ocean"] .modal-actions,
-[data-theme="forest"] .modal-actions {
-  border-top: 1px solid var(--border-color) !important;
-}
-
 [data-theme="classic"] .modal-actions button,
 [data-theme="modern"] .modal-actions button,
 [data-theme="ocean"] .modal-actions button,

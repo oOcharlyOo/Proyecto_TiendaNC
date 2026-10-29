@@ -194,7 +194,7 @@ function detenerScanner() {
 .btn-apply:hover:not(:disabled){transform:translateY(-2px);box-shadow:6px 6px 14px rgba(0,0,0,.28),-3px -3px 8px rgba(255,255,255,.05)}
 .btn-apply:active:not(:disabled){transform:translateY(1px);box-shadow:inset 2px 2px 5px rgba(0,0,0,.2)}
 .btn-apply:disabled{opacity:.5;cursor:not-allowed}
-.modal-actions{display:flex;gap:.5rem;justify-content:flex-end;padding-top:.7rem;border-top:1px solid color-mix(in srgb,var(--color-accent) 25%,transparent)}
+.modal-actions{display:flex;gap:.5rem;justify-content:flex-end;padding-top:.7rem}
 .modal-actions button{border:none;padding:.5rem .8rem;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;cursor:pointer;box-shadow:3px 3px 6px rgba(0,0,0,.15);display:flex;align-items:center;gap:.3rem;transition:all .2s;border-radius:10px}
 .btn-secondary{background:var(--color-bg-secondary);color:var(--color-text-secondary);box-shadow:3px 3px 6px rgba(0,0,0,.1),-1px -1px 3px rgba(255,255,255,.02)}
 .btn-secondary:hover{transform:translateY(-2px);box-shadow:5px 5px 12px rgba(0,0,0,.18);color:var(--color-text-primary)}
