@@ -849,6 +849,13 @@ onUnmounted(() => {
   }
 }
 
+/* Full HD en adelante: columnas en rem para que escalen con la interfaz. */
+@media (min-width: 1920px) {
+  .pos-container {
+    grid-template-columns: 4.375rem 1fr 25rem;
+  }
+}
+
 @media (max-width: 1199px) {
   .pos-container {
     grid-template-columns: 60px 1fr 320px;

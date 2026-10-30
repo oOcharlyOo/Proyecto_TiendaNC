@@ -995,6 +995,28 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
   }
 }
 
+/* Laptops y tablets horizontales: el menu completo no cabe con el ancho
+   minimo de los botones; se compacta en lugar de desbordarse. */
+@media (min-width: 901px) and (max-width: 1279px) {
+  .navbar-wrap .desktop-links {
+    gap: 0.3rem;
+  }
+  .navbar-wrap .menu-link {
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+    letter-spacing: 0.02em;
+  }
+  .navbar-wrap .sucursal-badge {
+    display: none;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1099px) {
+  .navbar-wrap .menu-link .link-icon {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .navbar-wrap {
     padding: 0.5rem 0.5rem 0 0.5rem;

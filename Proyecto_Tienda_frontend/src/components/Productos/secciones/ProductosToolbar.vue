@@ -60,7 +60,7 @@ defineEmits<{
       <button type="button" class="btn-primary" @click="$emit('nuevo-producto')"><span class="btn-icon">＋</span><span class="btn-text">Nuevo</span></button>
     </div>
   </header>
-  <div class="tabs-bar">
+  <div v-submenu class="tabs-bar">
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'productos' }" @click="$emit('update:tabActiva', 'productos')"><span class="tab-icon">📦</span><span class="tab-text">Productos</span></button>
     <button type="button" class="tab-btn tab-btn--inactivos" :class="{ active: tabActiva === 'inactivos' }" title="Productos eliminados (inactivos)" @click="$emit('update:tabActiva', 'inactivos')"><span class="tab-icon">🗑️</span><span class="tab-text">Inactivos</span></button>
     <button type="button" class="tab-btn" :class="{ active: tabActiva === 'inteligencia' }" title="Inteligencia de inventario: rotación, atorados y revisión" @click="$emit('update:tabActiva', 'inteligencia')"><span class="tab-icon">🧠</span><span class="tab-text">Inteligencia</span></button>
