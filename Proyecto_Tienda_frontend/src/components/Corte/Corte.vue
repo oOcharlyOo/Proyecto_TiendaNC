@@ -381,3 +381,8 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
     />
   </div>
 </template>
+
+<style scoped>
+/* Margen lateral en pantallas chicas y ancho contenido en pantallas grandes. */
+.corte-view{width:100%;max-width:90rem;margin:0 auto;padding:0 clamp(.75rem,3vw,2rem) 1.5rem}
+</style>

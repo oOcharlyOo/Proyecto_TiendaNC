@@ -811,7 +811,7 @@ function exportarCsv() {
           </div>
         </header>
 
-        <div class="ii-tabs">
+        <div v-submenu class="ii-tabs">
           <button
             type="button"
             :class="['ii-tab', { active: revisionTab === 'CON_STOCK' }]"

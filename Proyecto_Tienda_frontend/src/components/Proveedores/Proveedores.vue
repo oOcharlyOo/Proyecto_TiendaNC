@@ -13,7 +13,7 @@ import InteligenciaInventario from './secciones/InteligenciaInventario.vue';
       <h2>📦 Proveedores y Pedidos</h2>
     </div>
 
-    <div class="tab-bar">
+    <div v-submenu class="tab-bar">
       <button :class="['tab-btn', { active: activeTab === 'proveedores' }]" @click="activeTab = 'proveedores'">
         <span class="tab-icon">🏢</span>
         <span class="tab-label">Proveedores</span>

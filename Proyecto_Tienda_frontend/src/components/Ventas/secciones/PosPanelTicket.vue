@@ -199,6 +199,14 @@ const emit = defineEmits<{
   }
 }
 
+@media (min-width: 1920px) {
+  .pos-container .pos-right {
+    width: 25rem;
+    min-width: 25rem;
+    max-width: 25rem;
+  }
+}
+
 @media (max-width: 1199px) {
   .pos-container .pos-right {
     width: 320px;

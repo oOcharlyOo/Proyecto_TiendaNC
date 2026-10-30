@@ -301,45 +301,66 @@ const emit = defineEmits<{
             :class="{
               'dia-vacio': dia.esVacio,
               'dia-hoy': dia.esHoy,
-              'dia-trabajado': dia.trabajadores.length > 0
+              'dia-trabajado': dia.trabajadores.length > 0,
+              'dia-overflow': dia.esOverflow,
+              'dia-finde': index % 7 >= 5
             }"
           >
-            <span v-if="!dia.esVacio" class="dia-numero">{{ dia.numero }}</span>
+            <div v-if="!dia.esVacio" class="dia-header">
+              <span class="dia-numero">{{ dia.numero }}</span>
+              <span v-if="dia.esHoy" class="dia-hoy-pill">Hoy</span>
+              <span v-if="dia.horasTotales > 0" class="dia-total-horas" title="Horas totales del día">
+                {{ getHorasFormateadas(dia.horasTotales) }}
+              </span>
+            </div>
             <div v-if="dia.trabajadores.length > 0" class="dia-trabajadores">
               <div
                 v-for="(trabajador, idx) in dia.trabajadores.slice(0, 3)"
                 :key="idx"
                 class="trabajador-chip"
                 :class="{ 'trabajando': !trabajador.cierre }"
-                :title="`${trabajador.nombre}\n🕐 ${formatoHora(trabajador.apertura)} → ${trabajador.cierre ? formatoHora(trabajador.cierre) : '🔴 Trabajando'}\n⏱ ${getHorasFormateadas(trabajador.horas)}`"
+                :title="`${trabajador.nombre}\nEntrada: ${formatoHora(trabajador.apertura)}\nSalida: ${trabajador.cierre ? formatoHora(trabajador.cierre) : 'en turno'}\nHoras: ${getHorasFormateadas(trabajador.horas)}`"
               >
                 <span class="trabajador-inicial">{{ getIniciales(trabajador.nombre) }}</span>
-                <span class="trabajador-horas">{{ getHorasFormateadas(trabajador.horas) }}</span>
-                <span v-if="trabajador.apertura" class="trabajador-apertura">{{ formatoHora(trabajador.apertura) }}</span>
-                <span v-if="!trabajador.cierre" class="trabajando-badge" title="Turno abierto">🟢</span>
-                <button
-                  v-if="esAdmin"
-                  class="btn-edit-hora"
-                  title="Editar entrada/salida"
-                  @click.stop="abrirEdicionHora(trabajador, dia.fecha)"
-                >✏️</button>
-                <button
-                  v-if="esAdmin"
-                  class="btn-del-hora"
-                  title="Eliminar turno"
-                  @click.stop="emit('eliminar-turno', { idUsuario: trabajador.idUsuario, fecha: dia.fecha, nombre: trabajador.nombre })"
-                >🗑️</button>
+                <div class="trabajador-info">
+                  <span class="trabajador-horario">
+                    {{ trabajador.apertura ? formatoHora(trabajador.apertura) : '--:--' }}
+                    –
+                    {{ trabajador.cierre ? formatoHora(trabajador.cierre) : 'en turno' }}
+                  </span>
+                  <span class="trabajador-horas">{{ getHorasFormateadas(trabajador.horas) }}</span>
+                </div>
+                <span v-if="!trabajador.cierre" class="trabajando-dot" aria-label="Turno abierto"></span>
+                <div v-if="esAdmin" class="trabajador-acciones">
+                  <button
+                    class="btn-edit-hora"
+                    title="Editar entrada/salida"
+                    @click.stop="abrirEdicionHora(trabajador, dia.fecha)"
+                  >✏️</button>
+                  <button
+                    class="btn-del-hora"
+                    title="Eliminar turno"
+                    @click.stop="emit('eliminar-turno', { idUsuario: trabajador.idUsuario, fecha: dia.fecha, nombre: trabajador.nombre })"
+                  >🗑️</button>
+                </div>
               </div>
-              <div v-if="dia.trabajadores.length > 3" class="trabajador-chip mas">
-                +{{ dia.trabajadores.length - 3 }}
+              <div
+                v-if="dia.trabajadores.length > 3"
+                class="trabajador-chip mas"
+                :title="dia.trabajadores.slice(3).map(t => t.nombre).join('\n')"
+              >
+                +{{ dia.trabajadores.length - 3 }} más
               </div>
             </div>
-            <span v-else-if="!dia.esVacio && !dia.esHoy" class="dia-vacio-text">-</span>
-            <span v-if="dia.esHoy && dia.trabajadores.length === 0" class="dia-hoy-text">Hoy</span>
-            <span v-if="dia.horasTotales > 0 && !dia.esVacio" class="dia-total-horas">
-              {{ getHorasFormateadas(dia.horasTotales) }}
-            </span>
           </div>
+        </div>
+
+        <div class="calendario-leyenda">
+          <span class="leyenda-item"><i class="leyenda-swatch cerrado"></i>Turno cerrado</span>
+          <span class="leyenda-item"><i class="leyenda-swatch abierto"></i>En turno (sin salida)</span>
+          <span class="leyenda-item"><i class="leyenda-swatch hoy"></i>Hoy</span>
+          <span class="leyenda-item"><i class="leyenda-swatch overflow"></i>Día de otro mes</span>
+          <span v-if="esAdmin" class="leyenda-hint">Pasa el cursor sobre un turno para editarlo o eliminarlo</span>
         </div>
       </div>
 

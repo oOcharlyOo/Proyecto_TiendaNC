@@ -426,7 +426,7 @@ function cerrar() {
         <button class="btn-close" @click="cerrar">×</button>
       </header>
 
-      <nav class="tabs">
+      <nav v-submenu class="tabs">
         <button
           class="tab"
           :class="{ active: activeTab === 'lista' }"
