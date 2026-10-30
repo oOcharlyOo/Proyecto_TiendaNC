@@ -16,7 +16,7 @@ Servicios (contenedores con prefijo `generico-`): `backend` (8080), `frontend` n
 - El frontend se compila con `.env.production` → `VITE_API_URL=https://api.laleyendadeldulce.com`: el navegador llama al backend directo por su dominio (túnel → `backend:8080`), no por el nginx del frontend. El `environment` de compose NO afecta: Vite resuelve en build.
 - El nginx del frontend (inline en `Proyecto_Tienda_frontend/Dockerfile`) también proxea a `backend:8080` como respaldo (p. ej. si se compila con el dominio del frontend). La regex solo proxea `/<recurso>/<algo>` porque `/ventas`, `/productos`, etc. son rutas de la SPA.
 - Cada prefijo nuevo de controlador (`@Path`/`@RequestMapping`) debe agregarse a esa regex; y los endpoints que se llaman **sin subruta** (`/apartado`, `/rentaLocal`, `/ajustePrecio`) necesitan su propio `location` exacto, si no caen en `location /` y un PUT/POST devuelve 405.
-- El backend `Proyecto_TiendaNC/` está en `.gitignore`: no se versiona en ninguna rama.
+- El backend `Proyecto_TiendaNC/` está en el `.gitignore` de este repo porque es **un repositorio git propio** (anidado), con sus propias ramas (`generico`, `dev`, `panaderiaSucursal`, `leyendadeldulce`, ...). Los cambios de backend se hacen y se suben desde esa carpeta, en la rama equivalente.
 
 ## Responsividad (frontend)
 - `src/components/styles/responsive.css`: escala el `font-size` del `html` en ≥1920 / 2560 / 3200 / 3840px. Casi todo usa `rem`, así que usar `rem` (no `px`) para que escale en 2K/4K.
