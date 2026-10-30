@@ -21,7 +21,7 @@ const emit = defineEmits<{
         <h1>{{ pestañaActiva === 'boveda' ? 'Bóveda Real' : 'Ganancias' }}</h1>
         <p class="subtitle">{{ pestañaActiva === 'boveda' ? 'Gestión centralizada del capital y flujo de efectivo' : 'Seguimiento de ganancias y rentabilidad' }}</p>
       </div>
-      <div class="tabs-wrapper">
+      <div v-submenu class="tabs-wrapper">
         <button
           class="tab-btn"
           :class="{ active: pestañaActiva === 'boveda' }"

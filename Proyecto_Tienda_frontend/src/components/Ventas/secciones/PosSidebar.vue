@@ -108,6 +108,14 @@ const emit = defineEmits<{
   }
 }
 
+@media (min-width: 1920px) {
+  .pos-container .pos-sidebar {
+    width: 4.375rem;
+    min-width: 4.375rem;
+    max-width: 4.375rem;
+  }
+}
+
 @media (max-width: 1199px) {
   .pos-container .pos-sidebar {
     width: 60px;

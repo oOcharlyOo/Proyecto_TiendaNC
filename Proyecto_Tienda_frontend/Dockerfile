@@ -49,7 +49,7 @@ RUN echo 'server { \
         access_log off; \
     } \
     \
-    location ~ ^/(backup|caja|ventas|ventasDetalle|boveda|ganancias|gananciasAcumuladas|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito|asistencias|rentaLocal|ajustePrecio|voice)/.+$ { \
+    location ~ ^/(backup|caja|ventas|ventasDetalle|boveda|ganancias|gananciasAcumuladas|usuarios|apartado|corte|productos|producto-proveedor|producto-presentacion-caja|categorias|subcategorias|proveedores|pedidos-proveedor|promociones|imagenes|credito|asistencias|rentaLocal|ajustePrecio|voice|inteligencia|ventasAmbulante|bitacora|sincronizacion)/.+$ { \
         proxy_pass http://backend:8080; \
         proxy_http_version 1.1; \
         proxy_set_header Host $host; \
@@ -63,6 +63,15 @@ RUN echo 'server { \
     } \
     \
     location = /apartado { \
+        proxy_pass http://backend:8080; \
+        proxy_http_version 1.1; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
+    } \
+    \
+    location ~ ^/(rentaLocal|ajustePrecio)$ { \
         proxy_pass http://backend:8080; \
         proxy_http_version 1.1; \
         proxy_set_header Host $host; \

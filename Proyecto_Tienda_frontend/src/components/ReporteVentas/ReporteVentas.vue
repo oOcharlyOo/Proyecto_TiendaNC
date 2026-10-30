@@ -557,7 +557,7 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
             />
             <button v-if="r.busquedaMovimiento.value" class="mov-search-clear" @click="r.busquedaMovimiento.value = ''" title="Limpiar búsqueda">✕</button>
           </div>
-          <div v-if="r.movimientosEsSalidas.value" class="mov-tabs">
+          <div v-if="r.movimientosEsSalidas.value" v-submenu class="mov-tabs">
             <button :class="['mov-tab', { active: r.movimientosFiltro.value === 'todas' }]" @click="r.movimientosFiltro.value = 'todas'">
               Todas ({{ r.salidasCaja.value.length }})
             </button>

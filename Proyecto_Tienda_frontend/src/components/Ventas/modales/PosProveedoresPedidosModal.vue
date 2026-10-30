@@ -5,7 +5,7 @@
           <h3>📦 Proveedores y Pedidos</h3>
           <button class="btn-close" @click="emit('close')">✕</button>
         </div>
-        <div class="pp-tabs">
+        <div v-submenu class="pp-tabs">
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'proveedores' }]" @click="emit('update:pedidoProveedorTab', 'proveedores')"><span class="pp-tab-icon">🚚</span><span class="pp-tab-text">Proveedores</span></button>
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'pedidos' }]" @click="emit('update:pedidoProveedorTab', 'pedidos')"><span class="pp-tab-icon">📦</span><span class="pp-tab-text">Pedidos ({{ pedidosProveedor.length }})</span></button>
           <button :class="['pp-tab', { active: pedidoProveedorTab === 'sugerido' }]" @click="emit('update:pedidoProveedorTab', 'sugerido')"><span class="pp-tab-icon">🧙</span><span class="pp-tab-text">Sugerido</span></button>

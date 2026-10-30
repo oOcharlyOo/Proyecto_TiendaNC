@@ -109,7 +109,7 @@ onMounted(() => {
     <div v-if="mensaje" class="toast-ambulante" :class="mensajeTipo">{{ mensaje }}</div>
 
     <!-- ===== NAV MÓVIL (pestañas horizontales) ===== -->
-    <nav class="amb-tabs-mobile">
+    <nav v-submenu class="amb-tabs-mobile">
       <button
         v-for="tab in tabs"
         :key="tab.k"

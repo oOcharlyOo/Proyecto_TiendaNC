@@ -1,0 +1,13 @@
+**/node_modules/
+**/dist/
+**/target/
+**/build/
+**/.gradle/
+**/.idea/
+**/.vscode/
+db/backups/
+graphify-out/
+**/*.log
+**/maven_debug_log.txt
+**/package-lock.json
+.env

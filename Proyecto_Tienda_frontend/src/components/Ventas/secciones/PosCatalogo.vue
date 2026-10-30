@@ -641,7 +641,7 @@ const emit = defineEmits<{
 
 @media (min-width: 1600px) {
   .pos-container .catalog-grid {
-    max-width: 1400px;
+    max-width: 90rem;
     margin: 0 auto;
   }
 }
@@ -694,7 +694,7 @@ const emit = defineEmits<{
 
 .pos-container .products-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.8rem;
   width: 100%;
   max-width: 100%;
@@ -703,7 +703,7 @@ const emit = defineEmits<{
 
 @media (max-width: 991px) {
   .pos-container .products-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -715,12 +715,19 @@ const emit = defineEmits<{
 
 @media (max-width: 400px) {
   .pos-container .products-grid {
-    grid-template-columns: repeat(1, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
   }
   .pos-container .product-card {
     padding: 0.5rem;
     gap: 0.3rem;
+  }
+}
+
+/* Pantallas grandes: tantas columnas como quepan en lugar de 3 fijas. */
+@media (min-width: 1600px) {
+  .pos-container .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   }
 }
 

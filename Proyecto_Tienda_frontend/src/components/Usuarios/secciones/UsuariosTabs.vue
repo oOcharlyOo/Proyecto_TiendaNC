@@ -11,7 +11,7 @@ const emit = defineEmits<{
 
 <template>
   <section class="tabs-section">
-    <div class="tabs-container">
+    <div v-submenu class="tabs-container">
       <button
         class="tab-btn"
         :class="{ active: seccionActiva === 'usuarios' }"
