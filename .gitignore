@@ -2,3 +2,4 @@ Proyecto_TiendaNC/
 db/backups/dump-*.sql
 temp_bundle.js
 graphify-out/
+.env
