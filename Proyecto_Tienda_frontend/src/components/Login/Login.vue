@@ -522,6 +522,19 @@ import LoginThemeSelector from './secciones/LoginThemeSelector.vue';
   box-shadow: 0 3px 0 var(--border-color), 0 0 20px color-mix(in srgb, var(--zelda-gold) 40%, transparent);
 }
 
+:deep(.ambulante-row) { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+:deep(.ambulante-label) { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+:deep(.ambulante-chip) {
+  padding: 0.25rem 0.7rem; font-size: 0.65rem; font-weight: 700; font-family: "Courier New", monospace; text-transform: uppercase;
+  color: var(--text-primary); background: var(--bg-panel); border: 2px solid var(--border-color); border-radius: 999px;
+  cursor: pointer; transition: all 0.2s ease;
+}
+:deep(.ambulante-chip:hover) { border-color: var(--accent-color); }
+:deep(.ambulante-chip.active) {
+  background: linear-gradient(180deg, var(--gradient-btn-start) 0%, var(--gradient-btn-end) 100%);
+  border-color: var(--accent-color); color: var(--btn-text, var(--bg-primary));
+}
+
 :deep(.sucursal-icon) { font-size: 2rem; line-height: 1; }
 :deep(.sucursal-name) { font-size: 0.85rem; font-weight: 900; color: var(--text-primary); font-family: "Courier New", monospace; text-transform: uppercase; letter-spacing: 0.05em; }
 :deep(.sucursal-desc) { font-size: 0.6rem; color: var(--text-secondary); text-align: center; line-height: 1.2; }

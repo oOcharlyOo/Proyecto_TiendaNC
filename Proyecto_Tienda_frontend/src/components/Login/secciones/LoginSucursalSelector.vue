@@ -19,18 +19,13 @@ defineEmits<{ seleccionar: [value: string] }>();
         <span class="sucursal-name">Abarrotera</span>
         <span class="sucursal-desc">Nueva Sucursal</span>
       </div>
-      <div class="sucursal-card" :class="{ active: sucursalSeleccionada === 'ambulante_dulceria' }"
-        @click="$emit('seleccionar', 'ambulante_dulceria')">
-        <span class="sucursal-icon">🚚</span>
-        <span class="sucursal-name">Ambulante - Dulcería</span>
-        <span class="sucursal-desc">Ventas aisladas, se fusionan al cierre</span>
-      </div>
-      <div class="sucursal-card" :class="{ active: sucursalSeleccionada === 'ambulante_abarrotera' }"
-        @click="$emit('seleccionar', 'ambulante_abarrotera')">
-        <span class="sucursal-icon">🚚</span>
-        <span class="sucursal-name">Ambulante - Abarrotera</span>
-        <span class="sucursal-desc">Ventas aisladas, se fusionan al cierre</span>
-      </div>
+    </div>
+    <div class="ambulante-row">
+      <span class="ambulante-label">🚚 Ambulante</span>
+      <button type="button" class="ambulante-chip" :class="{ active: sucursalSeleccionada === 'ambulante_dulceria' }"
+        title="Ventas aisladas, se fusionan al cierre" @click="$emit('seleccionar', 'ambulante_dulceria')">Dulcería</button>
+      <button type="button" class="ambulante-chip" :class="{ active: sucursalSeleccionada === 'ambulante_abarrotera' }"
+        title="Ventas aisladas, se fusionan al cierre" @click="$emit('seleccionar', 'ambulante_abarrotera')">Abarrotera</button>
     </div>
   </div>
 </template>
