@@ -110,7 +110,7 @@ window.fetch = async function (url: RequestInfo | URL, init?: RequestInit): Prom
 
   const buildHeaders = (existing?: HeadersInit): Headers => {
     const headers = new Headers(existing || {});
-    if (sucursal) headers.set('X-Sucursal', sucursal);
+    if (sucursal && !headers.has('X-Sucursal')) headers.set('X-Sucursal', sucursal);
     if (esAmbulante) {
       headers.set('X-Ambulante', 'true');
       headers.set('X-Sucursal-Origen', origenAmbulante);

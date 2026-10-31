@@ -71,7 +71,7 @@ export function useLogin() {
     const usuarioDTO = { usuario: name.value, password_hash: pass.value };
     try {
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      headers = { ...headers, ...getHeader() };
+      headers = { ...headers, ...getHeader(), 'X-Sucursal': sucursalSeleccionada.value };
       if (modoAmbulante.value) {
         headers['X-Ambulante'] = 'true';
         headers['X-Sucursal-Origen'] = sucursalSeleccionada.value === 'ambulante_dulceria' ? 'dulceria' : 'abarrotera';
