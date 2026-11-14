@@ -44,7 +44,7 @@ defineEmits<{
       </select></span>
       <div class="search-wrapper">
         <span class="search-icon">🔍</span>
-        <input :value="terminoBusqueda" @input="$emit('update:terminoBusqueda', ($event.target as HTMLInputElement).value)" type="text" placeholder="Buscar producto..." class="search-input" />
+        <input :value="terminoBusqueda" @input="$emit('update:terminoBusqueda', ($event.target as HTMLInputElement).value)" type="text" placeholder="Buscar o escanear producto..." class="search-input" data-escaner />
         <button v-if="terminoBusqueda" type="button" class="search-clear" @click="$emit('update:terminoBusqueda', '')">✕</button>
       </div>
       <div class="import-export-group">
