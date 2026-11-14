@@ -189,14 +189,21 @@ export function useProductos() {
       cargarProductos();
       cargarCategorias();
       cargarSubcategorias();
-      window.addEventListener('keydown', manejarEscannerProductos);
-    });
-
-    onUnmounted(() => {
-      window.removeEventListener('keydown', manejarEscannerProductos);
-      if (scannerTimer) clearTimeout(scannerTimer);
     });
   }
+
+  // El escáner se registra en CADA montaje de la vista (antes solo en el primero:
+  // al salir de Productos y volver ya no escuchaba).
+  onMounted(() => {
+    window.removeEventListener('keydown', manejarEscannerProductos, true);
+    window.addEventListener('keydown', manejarEscannerProductos, true);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener('keydown', manejarEscannerProductos, true);
+    if (scannerTimer) clearTimeout(scannerTimer);
+    scannerBuffer = '';
+  });
 
   function obtenerNombreCategoria(idCategoria: number | undefined): string {
     if (!idCategoria) return 'Sin asignar';
@@ -452,36 +459,65 @@ export function useProductos() {
     }
   }
 
-  function manejarEscannerProductos(e: KeyboardEvent) {
-    const target = e.target as HTMLElement;
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  /** Mínimo de caracteres para considerar que fue un escaneo (y no una tecla suelta). */
+  const ESCANEO_MIN = 4;
+  /** Un lector teclea cada pocos ms; una persona tarda bastante más entre teclas. */
+  const ESCANEO_GAP_MS = 60;
 
-    if (e.key === 'Enter' && !isInput && scannerBuffer.length > 0) {
-      e.preventDefault();
-      procesarEscaneoProductos(scannerBuffer);
+  function manejarEscannerProductos(e: KeyboardEvent) {
+    // Solo en las pestañas con buscador de productos.
+    if (tabActiva.value !== 'productos' && tabActiva.value !== 'inactivos') return;
+
+    const target = e.target as HTMLElement;
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
+    // Los buscadores marcados con data-escaner también reciben escaneos; cualquier otro campo
+    // (formularios, modales) se respeta para no interferir con lo que se está escribiendo.
+    const enBuscador = isInput && (target as HTMLElement).dataset?.escaner !== undefined;
+    if (isInput && !enBuscador) return;
+
+    const now = Date.now();
+    const rapido = lastScannerKeyTime > 0 && now - lastScannerKeyTime <= ESCANEO_GAP_MS;
+    const input = enBuscador ? (target as HTMLInputElement) : null;
+
+    if (e.key === 'Enter') {
+      if (scannerBuffer.length >= ESCANEO_MIN && (rapido || !enBuscador)) {
+        e.preventDefault();
+        if (scannerTimer) clearTimeout(scannerTimer);
+        aplicarEscaneo(scannerBuffer, input);
+      }
       scannerBuffer = '';
+      lastScannerKeyTime = 0;
       return;
     }
 
-    if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const now = Date.now();
-      const timeDiff = now - lastScannerKeyTime;
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
 
-      if (lastScannerKeyTime > 0 && timeDiff > 100) {
-        scannerBuffer = '';
-      }
+    // Una pausa larga entre teclas = empieza una captura nueva.
+    if (!rapido) scannerBuffer = '';
+    scannerBuffer += e.key;
+    lastScannerKeyTime = now;
 
-      scannerBuffer += e.key;
-      lastScannerKeyTime = now;
+    if (scannerTimer) clearTimeout(scannerTimer);
+    scannerTimer = setTimeout(() => {
+      // Lectores sin Enter al final: se procesa cuando dejan de llegar teclas.
+      if (scannerBuffer.length >= ESCANEO_MIN) aplicarEscaneo(scannerBuffer, input);
+      scannerBuffer = '';
+      lastScannerKeyTime = 0;
+    }, 150);
+  }
 
-      if (scannerTimer) clearTimeout(scannerTimer);
-      scannerTimer = setTimeout(() => {
-        if (scannerBuffer.length > 0) {
-          procesarEscaneoProductos(scannerBuffer);
-          scannerBuffer = '';
-        }
-      }, 300);
-    }
+  /**
+   * Procesa el código y, si el cursor estaba en el buscador, deja en él SOLO el código nuevo
+   * (el lector lo había tecleado pegado al texto anterior) y lo selecciona para que el
+   * siguiente escaneo o lo que se escriba lo reemplace.
+   */
+  function aplicarEscaneo(codigo: string, input: HTMLInputElement | null) {
+    procesarEscaneoProductos(codigo);
+    if (!input) return;
+    // Se fija el valor del DOM a mano: si el término no cambió (mismo código dos veces),
+    // Vue no repinta y el input se quedaría con el texto duplicado.
+    input.value = tabActiva.value === 'inactivos' ? busquedaInactivos.value : terminoBusqueda.value;
+    input.select();
   }
 
   function normalizarCodigo(codigo: string): string {

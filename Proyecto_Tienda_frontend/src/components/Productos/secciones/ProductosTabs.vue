@@ -129,7 +129,7 @@ function cajasDe(producto: ProductoDTO): number[] {
         <span class="search-icon">🔍</span>
         <input :value="busquedaInactivos" @input="$emit('update:busquedaInactivos', ($event.target as HTMLInputElement).value)"
           @keydown.enter="($event.target as HTMLInputElement).select()"
-          type="text" placeholder="Escanea un código o busca por nombre..." class="search-input" />
+          type="text" placeholder="Escanea un código o busca por nombre..." class="search-input" data-escaner />
         <button v-if="busquedaInactivos" type="button" class="search-clear" @click="$emit('update:busquedaInactivos', '')">✕</button>
       </div>
     </div>
