@@ -331,10 +331,14 @@ function recalcularStatusProvision() {
   else provisionSemanalStatus.value = 'danger';
 }
 
-/** Lee del backend el efectivo actual de la caja (saldo corrido del turno). */
+/** Efectivo en caja del turno abierto: fondo + ventas en efectivo + entradas − egresos (igual que Corte). */
 async function cargarSaldoCaja() {
   try {
-    const res = await getJson<ApiRespuesta<{ saldo: number | null }>>('/caja/saldoActual');
+    const { obtenerIdUsuarioSesion } = await import('./usePosTicket');
+    const idUsuario = obtenerIdUsuarioSesion();
+    if (!idUsuario) { saldoCajaDia.value = null; return; }
+    // Mismo cálculo que "Saldo Final Efectivo" en Corte (turno abierto del usuario).
+    const res = await getJson<ApiRespuesta<{ saldo: number | null }>>(`/caja/saldoActual?idUsuario=${encodeURIComponent(idUsuario)}`);
     const saldo = res?.datos?.saldo;
     saldoCajaDia.value = saldo != null && !isNaN(Number(saldo)) ? Number(saldo) : null;
     recalcularStatusProvision();
