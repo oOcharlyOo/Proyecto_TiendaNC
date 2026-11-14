@@ -19,7 +19,7 @@ import {
   buscarProductoPorCodigoBarras, manejarFocusBusqueda,
   manejarInputBusqueda, ocultarSugerencias, manejarTeclasSugerencias,
   agregarDesdeBuscador, seleccionarSugerencia, agregarProductoATicket,
-  toggleMayoreo, toggleEnvase, cargarProvisionSemanal
+  toggleMayoreo, toggleEnvase, cargarProvisionSemanal, saldoCajaDia, cargarSaldoCaja
 } from './logica/usePosProductos';
 
 import {
@@ -113,6 +113,8 @@ import PosScannerOverlay from './modales/PosScannerOverlay.vue';
 import OllamaModelManager from './modales/OllamaModelManager.vue';
 import VoiceStockConfirmModal from './modales/VoiceStockConfirmModal.vue';
 import VoiceOpcionesVentaModal from './modales/VoiceOpcionesVentaModal.vue';
+import OfertaAtoradoModal from './modales/OfertaAtoradoModal.vue';
+import { cargarAtorados, modalOfertaAbierto, cerrarOferta } from './logica/usePosOfertas';
 
 
 // --- Orchestration state ---
@@ -251,6 +253,7 @@ function stopResize() {
 // --- Keyboard / Scanner ---
 function manejarAtajosTeclado(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    if (modalOfertaAbierto.value) { cerrarOferta(); return; }
     if (modalDetalleVentaAbierto.value) { cerrarDetalleVenta(); return; }
     if (modalCobroPendienteAbierto.value) { modalCobroPendienteAbierto.value = false; ventaPendienteSeleccionada.value = null; return; }
     if (modalVentasPendientesAbierto.value) { modalVentasPendientesAbierto.value = false; return; }
@@ -343,7 +346,7 @@ async function reconocerVoz() {
         if (resp.ok) {
           const data = await resp.json();
           if (data.accion && data.accion !== 'ERROR') {
-            stockData.value = data;
+            stockData.value = { ...data, transcript: transcriptRaw };
             modalStockVozAbierto.value = true;
             recognition.value?.stop();
             isRecording.value = false;
@@ -534,12 +537,22 @@ onMounted(async () => {
   await cargarTicketsDesdeBackend();
   await cargarSiguienteTicket();
   await cargarPromocionesActivas();
+  void cargarAtorados();
+  await cargarSaldoCaja();
   await cargarProvisionSemanal();
+  // Efectivo en caja: se actualiza al cobrar y cada minuto (entradas/salidas de otras cajas).
+  window.addEventListener('venta-completada', refrescarSaldoCaja);
+  saldoCajaTimer = setInterval(refrescarSaldoCaja, 60000);
   await cargarVentasPendientesFn();
   await cargarCreditosResumen();
 });
 
+let saldoCajaTimer: ReturnType<typeof setInterval> | null = null;
+function refrescarSaldoCaja() { void cargarSaldoCaja(); }
+
 onUnmounted(() => {
+  window.removeEventListener('venta-completada', refrescarSaldoCaja);
+  if (saldoCajaTimer) clearInterval(saldoCajaTimer);
   document.removeEventListener('mousemove', doResize);
   document.removeEventListener('mouseup', stopResize);
   document.removeEventListener('touchmove', doResize);
@@ -576,6 +589,7 @@ onUnmounted(() => {
       :categorias="categorias"
       :provision-semanal-total="provisionSemanalTotal"
       :provision-status-class="provisionStatusClass"
+      :saldo-caja-dia="saldoCajaDia"
       :sugerencias-por-nombre="sugerenciasPorNombre"
       :sugerencias-visibles="sugerenciasVisibles"
       :indice-sugerencia-activa="indiceSugerenciaActiva"
@@ -811,6 +825,7 @@ onUnmounted(() => {
       :open="modalModelosIaAbierto"
       @close="modalModelosIaAbierto = false"
     />
+    <OfertaAtoradoModal />
     <VoiceStockConfirmModal
       :open="modalStockVozAbierto"
       :stock-data="stockData"

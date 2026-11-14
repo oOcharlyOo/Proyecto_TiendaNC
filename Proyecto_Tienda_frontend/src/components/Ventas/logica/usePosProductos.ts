@@ -27,6 +27,8 @@ function esCategoriaGaming(idCategoria: number | undefined): boolean {
 }
 
 const provisionSemanalTotal = ref(0);
+/** Efectivo que hay en caja ahora (null = no se pudo saber). */
+const saldoCajaDia = ref<number | null>(null);
 const provisionSemanalStatus = ref<'ok' | 'warning' | 'danger'>('ok');
 const provisionStatusClass = computed(() => ({
   'status-ok': provisionSemanalStatus.value === 'ok',
@@ -283,6 +285,8 @@ async function agregarProductoATicket(producto: Producto) {
   }
   mostrarMensaje(`Agregado: ${producto.nombre}`, 'ok');
   playSound('add');
+  // ¿Es un producto atorado? → ofrecer promoción (2x1, otro atorado por unos pesos más…).
+  import('./usePosOfertas').then(m => m.evaluarOfertaAtorado(producto)).catch(() => { /* sin ofertas */ });
 }
 
 async function toggleMayoreo(item: TicketItem) {
@@ -291,6 +295,8 @@ async function toggleMayoreo(item: TicketItem) {
   const precioAnterior = item.precio;
   item.is_mayoreo = nuevoMayoreo;
   item.precio = nuevoMayoreo ? item.precio_mayoreo : (item.dto?.precio_venta ? Number(item.dto.precio_venta) + montoHoy.value : item.precio);
+  // Con oferta, el mayoreo cambia el precio de las piezas normales (no el de las piezas en oferta).
+  if ((item as any).oferta) (item as any).oferta.precioNormal = item.precio;
   if (item.idVentaDetalle && ticketActual.value) {
     try { await crearDetalleVenta(ticketActual.value.id, item); }
     catch (e) { item.is_mayoreo = !nuevoMayoreo; item.precio = precioAnterior; mostrarMensaje('Error al actualizar precio.', 'error'); }
@@ -310,16 +316,33 @@ async function cargarProvisionSemanal() {
     const res = await getJson<ApiRespuesta<any>>('/pedidos-proveedor/provision-semanal');
     if (res?.datos) {
       provisionSemanalTotal.value = res.datos.reduce((sum: number, d: any) => sum + (d.montoRequerido || 0), 0);
-      const cajaActual = Number(localStorage.getItem('saldoCaja') || 0);
-      const transferencias = Number(localStorage.getItem('saldoTransferencias') || 0);
-      if (cajaActual >= provisionSemanalTotal.value) provisionSemanalStatus.value = 'ok';
-      else if (cajaActual + transferencias >= provisionSemanalTotal.value) provisionSemanalStatus.value = 'warning';
-      else provisionSemanalStatus.value = 'danger';
+      if (saldoCajaDia.value === null) await cargarSaldoCaja();
+      else recalcularStatusProvision();
     }
   } catch (e) { console.error('Error al cargar provision semanal:', e); }
 }
 
+/** Color del "Total por apartar": verde si la caja alcanza, azul con transferencias, rojo si no. */
+function recalcularStatusProvision() {
+  const cajaActual = Number(saldoCajaDia.value ?? 0);
+  const transferencias = Number(localStorage.getItem('saldoTransferencias') || 0);
+  if (cajaActual >= provisionSemanalTotal.value) provisionSemanalStatus.value = 'ok';
+  else if (cajaActual + transferencias >= provisionSemanalTotal.value) provisionSemanalStatus.value = 'warning';
+  else provisionSemanalStatus.value = 'danger';
+}
+
+/** Lee del backend el efectivo actual de la caja (saldo corrido del turno). */
+async function cargarSaldoCaja() {
+  try {
+    const res = await getJson<ApiRespuesta<{ saldo: number | null }>>('/caja/saldoActual');
+    const saldo = res?.datos?.saldo;
+    saldoCajaDia.value = saldo != null && !isNaN(Number(saldo)) ? Number(saldo) : null;
+    recalcularStatusProvision();
+  } catch (e) { console.error('Error al cargar saldo de caja:', e); }
+}
+
 export {
+  saldoCajaDia, cargarSaldoCaja,
   terminoBusqueda, categoriaFiltro, productos, categorias,
   sugerenciasVisibles, indiceSugerenciaActiva,
   provisionSemanalTotal, provisionSemanalStatus, provisionStatusClass,

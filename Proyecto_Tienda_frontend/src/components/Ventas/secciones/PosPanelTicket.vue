@@ -2,6 +2,7 @@
 
 import { formatoMoneda, formatImagenUrl, ticketInfoText } from '../logica/usePosTicket';
 import { playSound } from '../logica/usePosSonido';
+import { quitarOferta } from '../logica/usePosOfertas';
 import { asAny } from '../logica/usePosTipos';
 import type { Ticket, TicketItem, TicketItemPromocion } from '../logica/usePosTipos';
 
@@ -69,6 +70,13 @@ const emit = defineEmits<{
                 </div>
                 <div class="item-meta" v-else>
                   <span class="unit-price" v-if="asAny(item).is_gramaje">{{ formatoMoneda(asAny(item).dto?.precio_venta || item.precio) }}/kg</span>
+                  <span class="unit-price" v-else-if="asAny(item).oferta">
+                    {{ formatoMoneda(asAny(item).oferta.precioNormal) }}
+                    <span class="oferta-badge" :title="`${asAny(item).oferta.piezas} pieza(s) en oferta`">
+                      🔥 {{ asAny(item).oferta.etiqueta }}
+                      <button type="button" class="oferta-badge-quitar" title="Quitar oferta" aria-label="Quitar oferta" @click.stop="quitarOferta(asAny(item))">✕</button>
+                    </span>
+                  </span>
                   <span class="unit-price" v-else>{{ formatoMoneda(item.precio) }}</span>
                   <label v-if="asAny(item).precio_mayoreo && asAny(item).precio_mayoreo > 0" class="mayoreo-toggle">
                     <input type="checkbox" :checked="asAny(item).is_mayoreo" @change="emit('toggle-mayoreo', asAny(item))">
@@ -516,6 +524,9 @@ const emit = defineEmits<{
   flex-wrap: wrap;
 }
 .pos-container .unit-price { color: var(--text-secondary); font-size: 0.7rem; font-family: "Courier New", monospace; }
+.pos-container .oferta-badge { display: inline-block; margin-left: 0.3rem; padding: 0 0.35rem; border-radius: 4px; font-family: inherit; font-weight: 800; font-size: 0.65rem; color: #fff; background: var(--accent-color); white-space: nowrap; }
+.pos-container .oferta-badge-quitar { margin-left: 0.2rem; padding: 0 0.15rem; border: none; background: transparent; color: inherit; font-size: 0.65rem; font-weight: 800; line-height: 1; cursor: pointer; opacity: 0.85; }
+.pos-container .oferta-badge-quitar:hover { opacity: 1; }
 
 .pos-container .mayoreo-toggle {
   display: flex;

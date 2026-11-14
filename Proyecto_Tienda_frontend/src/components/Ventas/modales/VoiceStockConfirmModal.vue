@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
@@ -34,16 +34,41 @@ const vista = ref<'opciones' | 'confirmar' | 'resultado'>('confirmar');
 const formatoMoneda = (v: any) =>
   v != null && !isNaN(Number(v)) ? `$${Number(v).toFixed(2)}` : '';
 
+/** Qué pantalla corresponde a la respuesta del backend. */
+function vistaPara(d: any): 'opciones' | 'confirmar' | 'resultado' {
+  if (d?.opciones?.length > 1) return 'opciones';
+  // Sin cantidad que aplicar es una consulta: se muestra el stock y se ofrece escribir la cantidad.
+  if (d?.accion === 'CONSULTAR' || d?.cantidad == null) return 'resultado';
+  return 'confirmar';
+}
+
+/** Cantidad escrita a mano cuando la voz no la entendió (o para corregirla). */
+const cantidadManual = ref<number | null>(null);
+
 watch(() => props.stockData, (val) => {
   localStockData.value = val;
-  if (val?.opciones?.length > 1) {
-    vista.value = 'opciones';
-  } else {
-    vista.value = 'confirmar';
-  }
+  cantidadManual.value = null;
+  vista.value = vistaPara(val);
 }, { immediate: true });
 
 const showInput = () => !localStockData.value;
+
+/** Calcula el stock propuesto y el mensaje para la acción/cantidad actuales. */
+function prepararConfirmacion(d: any) {
+  const cant = Number(d.cantidad ?? 0);
+  const actual = Number(d.stockActual ?? 0);
+  if (d.tipo === 'INCREMENTO') d.stockNuevo = actual + cant;
+  else if (d.tipo === 'DECREMENTO') d.stockNuevo = Math.max(0, actual - cant);
+  else d.stockNuevo = cant;
+  if (d.accion === 'INCREMENTAR') {
+    d.mensaje = `Hay ${actual} unidades de ${d.nombreProducto}. ¿Quisieras aumentar el stock en ${cant} unidades (quedaria en ${d.stockNuevo})?`;
+  } else if (d.accion === 'DECREMENTAR') {
+    d.mensaje = `Hay ${actual} unidades de ${d.nombreProducto}. ¿Quisieras reducir el stock en ${cant} unidades (quedaria en ${d.stockNuevo})?`;
+  } else {
+    d.mensaje = `Hay ${actual} unidades de ${d.nombreProducto}. ¿Quisieras actualizar el stock a ${d.stockNuevo} unidades?`;
+  }
+  vista.value = 'confirmar';
+}
 
 function elegirOpcion(op: any) {
   const d = localStockData.value;
@@ -51,23 +76,29 @@ function elegirOpcion(op: any) {
   d.productoId = op.productoId;
   d.nombreProducto = op.nombreProducto;
   d.stockActual = op.stock ?? 0;
-  if (d.accion === 'CONSULTAR') {
+  if (d.accion === 'CONSULTAR' || d.cantidad == null) {
+    d.accion = 'CONSULTAR';
     d.mensaje = `El stock actual de ${op.nombreProducto} es de ${op.stock ?? 0} unidades.`;
     vista.value = 'resultado';
     return;
   }
-  const cant = d.cantidad ?? 0;
-  if (d.tipo === 'INCREMENTO') d.stockNuevo = d.stockActual + cant;
-  else if (d.tipo === 'DECREMENTO') d.stockNuevo = Math.max(0, d.stockActual - cant);
-  else d.stockNuevo = cant;
-  if (d.accion === 'INCREMENTAR') {
-    d.mensaje = `Hay ${d.stockActual} unidades de ${op.nombreProducto}. ¿Quisieras aumentar el stock en ${cant} unidades (quedaria en ${d.stockNuevo})?`;
-  } else if (d.accion === 'DECREMENTAR') {
-    d.mensaje = `Hay ${d.stockActual} unidades de ${op.nombreProducto}. ¿Quisieras reducir el stock en ${cant} unidades (quedaria en ${d.stockNuevo})?`;
-  } else {
-    d.mensaje = `Hay ${d.stockActual} unidades de ${op.nombreProducto}. ¿Quisieras actualizar el stock a ${d.stockNuevo} unidades?`;
+  if (!['INCREMENTAR', 'DECREMENTAR'].includes(d.accion)) {
+    d.accion = 'ACTUALIZAR';
+    d.tipo = 'ABSOLUTO';
   }
-  vista.value = 'confirmar';
+  prepararConfirmacion(d);
+}
+
+/** Desde la consulta: "dejar en N" → pasa a confirmar la actualización. */
+function aplicarCantidadManual() {
+  const d = localStockData.value;
+  const n = Number(cantidadManual.value);
+  if (!d?.productoId || !Number.isFinite(n) || n < 0) return;
+  d.accion = 'ACTUALIZAR';
+  d.tipo = 'ABSOLUTO';
+  d.cantidad = Math.round(n);
+  cantidadManual.value = null;
+  prepararConfirmacion(d);
 }
 
 async function parsearComando(textoParaVoz?: string) {
@@ -84,8 +115,9 @@ async function parsearComando(textoParaVoz?: string) {
     if (resp.ok) {
       const data = await resp.json();
       if (data.accion && data.accion !== 'ERROR') {
-        localStockData.value = data;
-        vista.value = data.opciones?.length > 1 ? 'opciones' : 'confirmar';
+        localStockData.value = { ...data, transcript: texto };
+        cantidadManual.value = null;
+        vista.value = vistaPara(data);
         reintentosVoz.value = 0;
         if (textoParaVoz) hablar(data.mensaje || `Se encontro la informacion de ${data.nombreProducto || 'el producto'}.`);
         return;
@@ -154,6 +186,7 @@ async function confirmar() {
     });
     const data = await resp.json();
     if (resp.ok && data.accion !== 'ERROR') {
+      huboCambios.value = true;
       result.value = 'success';
       resultMsg.value = data.mensaje || 'Stock actualizado correctamente';
     } else {
@@ -168,6 +201,26 @@ async function confirmar() {
   }
 }
 
+/** Hubo al menos un cambio de stock: al cerrar hay que recargar productos. */
+const huboCambios = ref(false);
+const inputRef = ref<HTMLInputElement | null>(null);
+
+/** Descarta el comando actual y regresa a la captura, con el texto anterior para corregirlo. */
+function reintentar(limpiarTexto = false) {
+  micRecognition.value?.stop();
+  reconociendo.value = false;
+  reintentosVoz.value = 0;
+  try { window.speechSynthesis?.cancel(); } catch { }
+  const anterior = localStockData.value?.transcript || manualInput.value;
+  localStockData.value = null;
+  result.value = 'idle';
+  resultMsg.value = '';
+  parseError.value = '';
+  vista.value = 'confirmar';
+  manualInput.value = limpiarTexto ? '' : (anterior || '');
+  nextTick(() => inputRef.value?.focus());
+}
+
 function cerrar() {
   micRecognition.value?.stop();
   reconociendo.value = false;
@@ -178,7 +231,17 @@ function cerrar() {
   parseError.value = '';
   manualInput.value = '';
   vista.value = 'confirmar';
-  emit('close');
+  localStockData.value = null;
+  const recargar = huboCambios.value;
+  huboCambios.value = false;
+  if (recargar) emit('done');
+  else emit('close');
+}
+
+function terminar() {
+  huboCambios.value = false;
+  localStockData.value = null;
+  emit('done');
 }
 
 watch(() => props.open, (val) => {
@@ -188,7 +251,12 @@ watch(() => props.open, (val) => {
     parseError.value = '';
     manualInput.value = '';
     reintentosVoz.value = 0;
-    vista.value = localStockData.value?.opciones?.length > 1 ? 'opciones' : 'confirmar';
+    huboCambios.value = false;
+    // Siempre partir de lo que manda Ventas (null = abrir para escribir/dictar un comando nuevo)
+    localStockData.value = props.stockData ?? null;
+    cantidadManual.value = null;
+    vista.value = vistaPara(localStockData.value);
+    if (!localStockData.value) nextTick(() => inputRef.value?.focus());
   } else {
     micRecognition.value?.stop();
     reconociendo.value = false;
@@ -213,6 +281,7 @@ watch(() => props.open, (val) => {
             <label class="stock-input-label">Escribe un comando de inventario:</label>
             <div class="stock-input-row">
               <input
+                ref="inputRef"
                 v-model="manualInput"
                 class="stock-text-input"
                 placeholder="Ej: actualiza el stock de cocacola a 15"
@@ -279,8 +348,33 @@ watch(() => props.open, (val) => {
             </div>
           </div>
 
-          <div v-if="result === 'idle' && !showInput() && vista === 'resultado'" class="stock-result stock-result-success">
-            {{ localStockData?.mensaje }}
+          <div v-if="result === 'idle' && !showInput() && vista === 'resultado'">
+            <div class="stock-ai-message">{{ localStockData?.mensaje }}</div>
+            <div v-if="localStockData?.productoId" class="stock-manual">
+              <label class="stock-input-label" for="stock-cantidad-manual">
+                ¿Quieres cambiarlo? Escribe en cuánto dejar el stock:
+              </label>
+              <div class="stock-input-row">
+                <input
+                  id="stock-cantidad-manual"
+                  v-model.number="cantidadManual"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  class="stock-text-input"
+                  placeholder="Ej: 4"
+                  @keyup.enter="aplicarCantidadManual"
+                />
+                <button
+                  class="stock-btn stock-btn-primary"
+                  @click="aplicarCantidadManual"
+                  :disabled="cantidadManual === null || String(cantidadManual) === '' || Number(cantidadManual) < 0"
+                >
+                  Dejar en {{ cantidadManual ?? '…' }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div v-if="result === 'success'" class="stock-result stock-result-success">
@@ -297,15 +391,22 @@ watch(() => props.open, (val) => {
           </template>
           <template v-if="result === 'idle' && !showInput() && vista === 'opciones'">
             <button class="stock-btn stock-btn-secondary" @click="cerrar">Cancelar</button>
+            <button class="stock-btn stock-btn-secondary" @click="reintentar()">↺ Volver a intentar</button>
           </template>
           <template v-if="result === 'idle' && !showInput() && vista === 'confirmar'">
             <button class="stock-btn stock-btn-secondary" @click="cerrar" :disabled="executing">Cancelar</button>
+            <button class="stock-btn stock-btn-secondary" @click="reintentar()" :disabled="executing">↺ Volver a intentar</button>
             <button class="stock-btn stock-btn-primary" @click="confirmar" :disabled="executing || !localStockData?.productoId">
               {{ executing ? 'Ejecutando...' : '✅ Confirmar' }}
             </button>
           </template>
+          <template v-else-if="result === 'error'">
+            <button class="stock-btn stock-btn-secondary" @click="cerrar">Cerrar</button>
+            <button class="stock-btn stock-btn-primary" @click="reintentar()">↺ Volver a intentar</button>
+          </template>
           <template v-else-if="result !== 'idle' || vista === 'resultado'">
-            <button class="stock-btn stock-btn-secondary" @click="emit('done')">Cerrar</button>
+            <button class="stock-btn stock-btn-secondary" @click="reintentar(true)">Otro comando</button>
+            <button class="stock-btn stock-btn-primary" @click="terminar">Cerrar</button>
           </template>
         </div>
       </div>
@@ -357,6 +458,7 @@ watch(() => props.open, (val) => {
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -408,6 +510,10 @@ watch(() => props.open, (val) => {
   line-height: 1.5;
   color: var(--text-primary);
   border-left: 3px solid var(--accent-color);
+}
+
+.stock-manual {
+  margin-top: 0.25rem;
 }
 
 .stock-details {
