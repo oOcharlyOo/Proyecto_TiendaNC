@@ -19,7 +19,7 @@ services:
       - QUARKUS_HTTP_CORS=true
       - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:8081,http://127.0.0.1:8081,https://laleyendadeldulce.com,https://www.laleyendadeldulce.com,https://api.laleyendadeldulce.com
       - OLLAMA_URL=http://leyenda-ollama:11434
-      - OLLAMA_MODEL=qwen2.5:7b
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
       - SUCURSAL_MASTER_KEY=${SUCURSAL_MASTER_KEY:-}
     ports:
       - "8080:8080"
@@ -145,9 +145,14 @@ services:
       - "11434:11434"
     volumes:
       - leyenda-ollama-data:/root/.ollama
+    # Servidor sin GPU, 16 GB: qwen2.5:3b ocupa ~2.5 GB; el tope evita que Ollama le quite RAM a la BD.
+    mem_limit: 4g
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
       - OLLAMA_HOST=0.0.0.0
     networks:
       - leyenda-red
@@ -160,15 +165,19 @@ services:
       - .env
     environment:
       - OLLAMA_HOST=http://leyenda-ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
     volumes:
       - leyenda-ollama-data:/root/.ollama
+    # Descarga el MISMO modelo que usa el backend y borra los grandes que ya no se usan (libera ~9 GB de disco).
     entrypoint: ["sh", "-c", "
-      apt-get update -qq && apt-get install -y -qq curl && rm -rf /var/lib/apt/lists/*;
       echo 'Esperando a Ollama...';
       for i in $$(seq 1 30); do
-        if curl -s http://leyenda-ollama:11434/api/tags > /dev/null 2>&1; then
-          echo 'Descargando llama3.1:8b...';
-          ollama pull llama3.1:8b;
+        if ollama list > /dev/null 2>&1; then
+          echo \"Descargando $${OLLAMA_MODEL}...\";
+          ollama pull $${OLLAMA_MODEL} || exit 1;
+          for viejo in llama3.1:8b qwen2.5:7b; do
+            if [ \"$$viejo\" != \"$${OLLAMA_MODEL}\" ]; then ollama rm $$viejo > /dev/null 2>&1 || true; fi;
+          done;
           exit 0;
         fi;
         sleep 2;
