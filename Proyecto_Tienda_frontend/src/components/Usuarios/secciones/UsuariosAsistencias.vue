@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { DiasTrabajadosData, SemanaInfo, UsuarioDiasData } from '../logica/useUsuarios';
+import AvatarUsuario from './AvatarUsuario.vue';
 
 const props = defineProps<{
   diasTrabajados: DiasTrabajadosData | null;
@@ -374,14 +375,11 @@ const emit = defineEmits<{
           >
             <div class="usuario-asistencia-header">
               <div class="usuario-avatar-small">
-                <img
-                  v-if="usuario.avatar"
-                  :src="formatAvatarUrl(usuario.avatar)"
-                  :alt="usuario.nombreUsuario"
+                <AvatarUsuario
+                  :src="usuario.avatar ? formatAvatarUrl(usuario.avatar) : null"
+                  :nombre="usuario.nombreUsuario"
+                  placeholder-class="avatar-placeholder-small"
                 />
-                <div v-else class="avatar-placeholder-small">
-                  {{ usuario.nombreUsuario?.charAt(0)?.toUpperCase() || '?' }}
-                </div>
               </div>
               <div class="usuario-asistencia-info">
                 <h4>{{ usuario.nombreUsuario }}</h4>
@@ -445,8 +443,12 @@ const emit = defineEmits<{
               <tr v-for="usuario in usuariosConSueldo" :key="usuario.idUsuario">
                 <td class="pago-usuario">
                   <div class="pago-usuario-info">
-                    <img v-if="usuario.avatar" :src="formatAvatarUrl(usuario.avatar)" :alt="usuario.nombreUsuario" class="pago-avatar" />
-                    <div v-else class="pago-avatar-placeholder">{{ usuario.nombreUsuario?.charAt(0)?.toUpperCase() || '?' }}</div>
+                    <AvatarUsuario
+                      :src="usuario.avatar ? formatAvatarUrl(usuario.avatar) : null"
+                      :nombre="usuario.nombreUsuario"
+                      img-class="pago-avatar"
+                      placeholder-class="pago-avatar-placeholder"
+                    />
                     <div class="pago-usuario-nombre">
                       <span>{{ usuario.nombreUsuario }}</span>
                       <small v-if="getSueldoHora(usuario.idUsuario) > 0">${{ getSueldoHora(usuario.idUsuario).toFixed(2) }}/h</small>

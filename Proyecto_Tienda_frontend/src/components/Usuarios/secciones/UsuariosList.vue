@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Usuario } from '../logica/useUsuarios';
+import AvatarUsuario from './AvatarUsuario.vue';
 
 defineProps<{
   usuarios: Usuario[];
@@ -45,15 +46,13 @@ const emit = defineEmits<{
         :style="{ animationDelay: `${index * 0.05}s` }"
       >
         <div class="avatar-container">
-          <img
-            v-if="usuario.avatar"
-            :src="formatAvatarUrl(usuario.avatar)"
-            :alt="usuario.nombre"
-            class="avatar-img"
+          <AvatarUsuario
+            :src="usuario.avatar ? formatAvatarUrl(usuario.avatar) : null"
+            :nombre="usuario.nombre"
+            :apellido="usuario.apellido_p"
+            img-class="avatar-img"
+            placeholder-class="avatar-placeholder"
           />
-          <div v-else class="avatar-placeholder">
-            {{ usuario.nombre?.charAt(0)?.toUpperCase() || '?' }}
-          </div>
           <div class="avatar-ring"></div>
         </div>
 
