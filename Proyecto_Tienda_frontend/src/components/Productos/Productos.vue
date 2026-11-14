@@ -16,7 +16,7 @@ import { useProductos } from './logica/useProductos';
 import type { ProductoDTO } from './logica/useProductos';
 
 const {
-  productos, productosInactivos, cargandoInactivos, escaneoInactivoId,
+  productos, productosInactivos, cargandoInactivos, escaneoInactivoId, busquedaInactivos, inactivosFiltrados,
   categorias, subcategorias, cargando, guardando,
   terminoBusqueda, categoriaFiltro, subcategoriaFiltro, ordenStock, filtroTipo,
   vistaLista, toasts, tabActiva, modalFormOpen, modalScannerOpen, selectedProduct,
@@ -84,6 +84,9 @@ async function onCajasGuardadas(cajas: number[]) {
         :cargando="cargando"
         :productosFiltrados="productosFiltrados"
         :productosInactivos="productosInactivos"
+        :inactivosFiltrados="inactivosFiltrados"
+        :busquedaInactivos="busquedaInactivos"
+        @update:busquedaInactivos="(v) => { busquedaInactivos = v }"
         :cargandoInactivos="cargandoInactivos"
         :escaneoInactivoId="escaneoInactivoId"
         :vistaLista="vistaLista"

@@ -3,7 +3,7 @@ import type { ProductoDTO } from '../logica/useProductos';
 defineProps<{  tabActiva: string; cargando: boolean; productosFiltrados: ProductoDTO[]; vistaLista: boolean;
   terminoBusqueda: string; categoriaFiltro: number | null;
   selectedProductos: Set<number>; escaneando: boolean; escanerActivo: boolean;
-  productosInactivos: ProductoDTO[]; cargandoInactivos: boolean; escaneoInactivoId: number | null;
+  productosInactivos: ProductoDTO[]; inactivosFiltrados: ProductoDTO[]; busquedaInactivos: string; cargandoInactivos: boolean; escaneoInactivoId: number | null;
   formatMoneda: (v: number) => string; obtenerEmojiDulce: (id?: number) => string;
   esCategoriaGaming: (id?: number) => boolean;
   categoriaNombre: (id?: number) => string;
@@ -11,7 +11,7 @@ defineProps<{  tabActiva: string; cargando: boolean; productosFiltrados: Product
   esAdmin?: boolean;
 }>();
 defineEmits<{
-  'update:tabActiva': [v: string];
+  'update:tabActiva': [v: string]; 'update:busquedaInactivos': [v: string];
   'toggle-seleccion': [id: number]; 'toggle-seleccion-todos': [];
   'editar': [p: ProductoDTO]; 'eliminar': [p?: ProductoDTO]; 'restaurar': [p: ProductoDTO];
   'nuevo-producto': []; 'abrir-modal-categoria': [];
@@ -124,11 +124,24 @@ function cajasDe(producto: ProductoDTO): number[] {
   </div>
 
   <div v-else-if="tabActiva === 'inactivos'" class="tab-content">
+    <div class="inactivos-search">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input :value="busquedaInactivos" @input="$emit('update:busquedaInactivos', ($event.target as HTMLInputElement).value)"
+          @keydown.enter="($event.target as HTMLInputElement).select()"
+          type="text" placeholder="Escanea un código o busca por nombre..." class="search-input" />
+        <button v-if="busquedaInactivos" type="button" class="search-clear" @click="$emit('update:busquedaInactivos', '')">✕</button>
+      </div>
+    </div>
     <div class="table-container">
       <div v-if="cargandoInactivos" class="estado-loading"><div class="loading-spinner"></div><span>Cargando productos inactivos...</span></div>
       <div v-else-if="productosInactivos.length === 0" class="estado-empty">
         <span class="empty-icon">🗑️</span>
         <span class="empty-text">No hay productos inactivos</span>
+      </div>
+      <div v-else-if="inactivosFiltrados.length === 0" class="estado-empty">
+        <span class="empty-icon">🔍</span>
+        <span class="empty-text">Ningún producto inactivo coincide con "{{ busquedaInactivos.trim() }}"</span>
       </div>
       <table v-else class="tabla-productos tabla-inactivos">
         <thead><tr>
@@ -142,7 +155,7 @@ function cajasDe(producto: ProductoDTO): number[] {
           <th class="col-acciones text-center">Acciones</th>
         </tr></thead>
         <tbody>
-          <tr v-for="producto in productosInactivos" :key="producto.idProducto" class="producto-row inactivo-row">
+          <tr v-for="producto in inactivosFiltrados" :key="producto.idProducto" class="producto-row inactivo-row">
             <td class="col-icon"><div class="icon-cell">{{ obtenerEmojiDulce(producto.idProducto) }}</div></td>
             <td class="col-nombre">{{ producto.nombre }}<span class="badge-inactivo">Inactivo</span></td>
             <td class="col-categoria">{{ categoriaNombre(producto.idCategoria) }}</td>
@@ -160,7 +173,11 @@ function cajasDe(producto: ProductoDTO): number[] {
       </table>
     </div>
     <div class="table-footer" v-if="!cargandoInactivos && productosInactivos.length > 0">
-      <span class="footer-count">{{ productosInactivos.length }} producto{{ productosInactivos.length !== 1 ? 's' : '' }} inactivo{{ productosInactivos.length !== 1 ? 's' : '' }}</span>
+      <span class="footer-count">{{ inactivosFiltrados.length }} producto{{ inactivosFiltrados.length !== 1 ? 's' : '' }} inactivo{{ inactivosFiltrados.length !== 1 ? 's' : '' }}<span v-if="busquedaInactivos.trim()" class="filter-indicator"> (filtrado de {{ productosInactivos.length }})</span></span>
     </div>
   </div>
 </template>
+<style scoped>
+.inactivos-search{display:flex;justify-content:flex-end;margin-bottom:.75rem}
+.inactivos-search .search-wrapper{width:100%;max-width:26rem}
+</style>
