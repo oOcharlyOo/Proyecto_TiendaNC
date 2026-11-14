@@ -15,6 +15,7 @@ defineProps<{
   categorias: { idCategoria: number; nombre: string }[];
   provisionSemanalTotal: number;
   provisionStatusClass: Record<string, boolean>;
+  saldoCajaDia?: number | null;
   sugerenciasPorNombre: Producto[];
   sugerenciasVisibles: boolean;
   indiceSugerenciaActiva: number;
@@ -93,9 +94,15 @@ const emit = defineEmits<{
           </div>
         </div>
       </div>
+      <div v-if="provisionSemanalTotal > 0 || saldoCajaDia != null" class="caja-badges">
       <div v-if="provisionSemanalTotal > 0" class="provision-total-badge" :class="provisionStatusClass">
         <span class="provision-label">Total por apartar (7 días)</span>
         <span class="provision-amount">{{ formatoMoneda(provisionSemanalTotal) }}</span>
+      </div>
+      <div v-if="saldoCajaDia != null" class="provision-total-badge caja-dia-badge" title="Efectivo que hay en caja ahora">
+        <span class="provision-label">Total en caja hoy</span>
+        <span class="provision-amount">{{ formatoMoneda(saldoCajaDia) }}</span>
+      </div>
       </div>
       <div v-if="montoHoy > 0" class="ajuste-hoy-badge">
         <span class="ajuste-hoy-label">Hoy aplica</span>
@@ -229,6 +236,19 @@ const emit = defineEmits<{
   background: color-mix(in srgb, var(--error-color) 8%, var(--badge-bg, var(--bg-panel)));
   border-color: var(--error-color, var(--error-color));
   color: var(--error-color, var(--error-color));
+}
+
+.pos-container .caja-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.pos-container .provision-total-badge.caja-dia-badge {
+  background: color-mix(in srgb, var(--success-color) 8%, transparent);
+  border-color: var(--success-color);
+  color: var(--success-color);
 }
 
 .pos-container .provision-label {
@@ -528,6 +548,9 @@ const emit = defineEmits<{
   .pos-container .catalog-header {
     flex-direction: column;
     align-items: stretch;
+  }
+  .pos-container .caja-badges {
+    width: 100%;
   }
   .pos-container .provision-total-badge {
     align-items: center;

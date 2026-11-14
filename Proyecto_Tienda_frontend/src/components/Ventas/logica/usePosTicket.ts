@@ -278,7 +278,27 @@ async function eliminarTicket(id: number) {
   }
 }
 
+/**
+ * Renglón con oferta de producto atorado (2x1, "otra por $X", "+$X llévate…").
+ * El backend guarda UN detalle por producto y venta, así que la oferta vive dentro del
+ * mismo renglón: `piezas` van a `precioOferta` y el resto a `precioNormal`; el precio
+ * unitario es el promedio. Se recalcula cada vez que cambia la cantidad.
+ */
+function aplicarPrecioOferta(item: any) {
+  const o = item?.oferta;
+  if (!o) return;
+  o.piezas = Math.min(o.piezas, Math.max(0, item.cantidad - (o.minimoNormal ?? 0)));
+  if (o.piezas <= 0 || item.cantidad <= 0) {
+    item.precio = o.precioNormal;
+    delete item.oferta;
+    return;
+  }
+  const total = o.precioNormal * (item.cantidad - o.piezas) + o.precioOferta * o.piezas;
+  item.precio = Math.round((total / item.cantidad) * 10000) / 10000;
+}
+
 async function crearDetalleVenta(ventaId: number, item: any) {
+  aplicarPrecioOferta(item);
   const payload = {
     Venta: { idVenta: ventaId },
     Producto: item.dto,
@@ -409,7 +429,7 @@ export {
   obtenerIdUsuarioSesion, obtenerIniciales, getJson, mostrarMensaje,
   cargarSiguienteTicket, crearVentaPendienteEnBackend, crearNuevoTicket,
   cargarTicketsDesdeBackend, seleccionarTicket, eliminarTicket,
-  crearDetalleVenta, aumentarCantidad, disminuirCantidad, quitarItem, limpiarTicket,
+  crearDetalleVenta, aplicarPrecioOferta, aumentarCantidad, disminuirCantidad, quitarItem, limpiarTicket,
   formatoMoneda, formatoMonedaRedondeada, formatearFecha, formatearFechaHora,
   formatoGramaje, getFechaHoy, getMetodoClase, formatImagenUrl
 };
