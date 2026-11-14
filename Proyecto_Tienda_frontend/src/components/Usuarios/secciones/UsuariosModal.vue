@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { UsuarioForm } from '../logica/useUsuarios';
 
-defineProps<{
+const props = defineProps<{
   modalAbierto: boolean;
   editando: boolean;
   form: UsuarioForm;
@@ -25,6 +25,16 @@ const emit = defineEmits<{
 function clickFileInput() {
   fileInputRef.value?.click();
 }
+
+/** La foto guardada no cargó: se muestran las iniciales en lugar de la imagen rota. */
+const previewFallo = ref(false);
+watch(() => props.avatarPreview, () => { previewFallo.value = false; });
+
+const iniciales = computed(() => {
+  const palabras = `${props.form?.nombre ?? ''} ${props.form?.apellido_p ?? ''}`.trim().split(/\s+/).filter(Boolean);
+  if (!palabras.length) return '';
+  return (palabras[0].charAt(0) + (palabras[1]?.charAt(0) ?? '')).toUpperCase();
+});
 </script>
 
 <template>
@@ -62,13 +72,15 @@ function clickFileInput() {
                 />
 
                 <img
-                  v-if="avatarPreview"
+                  v-if="avatarPreview && !previewFallo"
                   :src="avatarPreview"
                   class="avatar-preview"
                   draggable="false"
+                  @error="previewFallo = true"
                 />
                 <div v-else class="dropzone-placeholder">
-                  <span class="drop-icon">📁</span>
+                  <span v-if="iniciales" class="drop-iniciales">{{ iniciales }}</span>
+                  <span v-else class="drop-icon">📁</span>
                   <span>Seleccionar imagen</span>
                 </div>
               </div>
@@ -136,7 +148,7 @@ function clickFileInput() {
 .avatar-upload-section{display:flex;justify-content:center}
 .avatar-dropzone{width:100px;height:100px;border:2px dashed var(--color-border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;overflow:hidden;background:var(--color-bg-primary)}.avatar-dropzone:hover,.avatar-dropzone.dragando{border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 5%,transparent)}
 .avatar-preview{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.dropzone-placeholder{display:flex;flex-direction:column;align-items:center;gap:.2rem;color:var(--color-text-secondary);font-size:.68rem}.drop-icon{font-size:1.5rem}
+.dropzone-placeholder{display:flex;flex-direction:column;align-items:center;gap:.2rem;color:var(--color-text-secondary);font-size:.68rem}.drop-icon{font-size:1.5rem}.drop-iniciales{font-size:1.5rem;font-weight:800;line-height:1;color:var(--color-accent)}
 .form-grid-zelda{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
 .form-group-zelda{display:flex;flex-direction:column;gap:.25rem}.form-group-zelda label{font-size:.65rem;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.04em}
 .zelda-input,.zelda-select{width:100%;padding:.55rem .7rem;background:var(--color-bg-primary);border:none;border-radius:8px;color:var(--color-text-primary);font-size:.85rem;outline:none;box-shadow:inset 3px 3px 6px rgba(0,0,0,.15);transition:all .2s}.zelda-input:focus,.zelda-select:focus{box-shadow:inset 3px 3px 8px rgba(0,0,0,.2),0 0 0 2px var(--color-accent)}.zelda-input::placeholder{color:var(--color-text-secondary);opacity:.5}
