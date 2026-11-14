@@ -47,6 +47,8 @@ const productosInactivos = shallowRef<ProductoDTO[]>([]);
 const cargandoInactivos = ref(false);
 /** id del producto inactivo que apareció por escaneo de código de barras (resaltado con contorno morado). */
 const escaneoInactivoId = ref<number | null>(null);
+/** Buscador de la pestaña Inactivos: código de barras exacto (escáner) o nombre parcial. */
+const busquedaInactivos = ref('');
 const categorias = shallowRef<CategoriaDTO[]>([]);
 const subcategorias = shallowRef<SubcategoriaDTO[]>([]);
 const cargando = ref(false);
@@ -143,6 +145,18 @@ export function useProductos() {
     }
 
     return results;
+  });
+
+  const inactivosFiltrados = computed(() => {
+    const termino = busquedaInactivos.value.trim().toLowerCase();
+    if (!termino) return productosInactivos.value;
+    const codigo = normalizarCodigo(termino);
+    // Si el término coincide exacto con un código de barras (escaneo), solo se muestra ese producto.
+    const porCodigo = productosInactivos.value.filter(p =>
+      !!p.codigoBarras && (p.codigoBarras.toLowerCase() === termino || normalizarCodigo(p.codigoBarras.toLowerCase()) === codigo)
+    );
+    if (porCodigo.length > 0) return porCodigo;
+    return productosInactivos.value.filter(p => (p.nombre || '').toLowerCase().includes(termino));
   });
 
   const subcategoriasFiltradas = computed(() => {
@@ -478,6 +492,12 @@ export function useProductos() {
     const codigoLimpio = codigo.trim();
     if (!codigoLimpio) return;
 
+    // En la pestaña Inactivos el escaneo alimenta su propio buscador.
+    if (tabActiva.value === 'inactivos') {
+      busquedaInactivos.value = codigoLimpio;
+      return;
+    }
+
     const codigoNormalizado = normalizarCodigo(codigoLimpio);
 
     const productoEncontrado = productos.value.find(p => {
@@ -675,6 +695,8 @@ export function useProductos() {
     productosInactivos,
     cargandoInactivos,
     escaneoInactivoId,
+    busquedaInactivos,
+    inactivosFiltrados,
     categorias,
     subcategorias,
     cargando,
