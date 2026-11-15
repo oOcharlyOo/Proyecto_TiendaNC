@@ -5,6 +5,8 @@ import './components/styles/themes.css';
 import './components/styles/base.css';
 import './components/styles/utilities.css';
 import './components/styles/responsive.css';
+import './components/styles/perf-lite.css';
+import './composables/useRendimiento';
 import App from './App.vue';
 import router from './router';
 import { vSubmenu } from './directives/submenu';

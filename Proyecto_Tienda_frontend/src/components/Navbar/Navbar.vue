@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useNavbar } from './logica/useNavbar';
+import { useRendimiento } from '../../composables/useRendimiento';
+const { modo: modoRendimiento, ligeroActivo, setModo: setModoRendimiento } = useRendimiento();
 const { route, menuAbierto, syncLoading, syncDirection, syncMessage, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, sincronizarUsuarios, currentTheme, setTheme } = useNavbar();
 </script>
 
@@ -143,6 +145,15 @@ const { route, menuAbierto, syncLoading, syncDirection, syncMessage, esAdministr
               </button>
             </div>
             <p v-if="syncMessage" class="sync-msg" :class="{ error: !syncMessage.includes('sincronizados') }">{{ syncMessage }}</p>
+          </div>
+
+          <div class="perf-toggle" title="Automático detecta si el equipo es lento y quita efectos visuales">
+            <span class="perf-label">⚡ Rendimiento{{ modoRendimiento === 'auto' ? (ligeroActivo ? ' (auto: ligero)' : ' (auto: completo)') : '' }}</span>
+            <div class="perf-opts">
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'auto' }" @click="setModoRendimiento('auto')">Auto</button>
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'lite' }" @click="setModoRendimiento('lite')">Ligero</button>
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'full' }" @click="setModoRendimiento('full')">Completo</button>
+            </div>
           </div>
 
           <div class="theme-selector">
@@ -1223,4 +1234,5 @@ const { route, menuAbierto, syncLoading, syncDirection, syncMessage, esAdministr
     height: 54px;
   }
 }
+.navbar-wrap .perf-toggle{display:flex;flex-direction:column;gap:.35rem;margin:.5rem 0}.navbar-wrap .perf-label{font-size:.75rem;opacity:.85}.navbar-wrap .perf-opts{display:flex;gap:.35rem}.navbar-wrap .perf-opts .sync-btn{flex:1}.navbar-wrap .perf-opts .sync-btn.active{outline:2px solid var(--zelda-gold)}
 </style>

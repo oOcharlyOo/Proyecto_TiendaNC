@@ -96,7 +96,7 @@ function handleClickOutside(e: MouseEvent) {
 
 onMounted(() => {
   cargarAlertas();
-  intervalId = setInterval(cargarAlertas, 120000);
+  intervalId = setInterval(() => { if (!document.hidden) cargarAlertas(); }, 120000);
   document.addEventListener('click', handleClickOutside);
 });
 

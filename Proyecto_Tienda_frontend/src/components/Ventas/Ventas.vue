@@ -548,7 +548,7 @@ onMounted(async () => {
 });
 
 let saldoCajaTimer: ReturnType<typeof setInterval> | null = null;
-function refrescarSaldoCaja() { void cargarSaldoCaja(); }
+function refrescarSaldoCaja() { if (document.hidden) return; void cargarSaldoCaja(); }
 
 onUnmounted(() => {
   window.removeEventListener('venta-completada', refrescarSaldoCaja);

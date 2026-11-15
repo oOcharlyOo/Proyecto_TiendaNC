@@ -1,14 +1,15 @@
 // src/router/index.ts
+import { useRendimiento } from '../composables/useRendimiento';
 import { createRouter, createWebHistory } from 'vue-router';
 import Login from '../components/Login/Login.vue';
 import Ventas from '../components/Ventas/Ventas.vue';
-import Productos from "@/components/Productos/Productos.vue";
-import Inventario from "@/components/Inventario/Inventario.vue";
-import Corte from "@/components/Corte/Corte.vue";
-import Finanzas from "@/components/Finanzas/Finanzas.vue";
-import Rental from "@/components/Rental/Rental.vue";
-import Usuarios from "@/components/Usuarios/Usuarios.vue";
-import Ambulante from "@/components/Ambulante/Ambulante.vue";
+const Productos = () => import('@/components/Productos/Productos.vue');
+const Inventario = () => import('@/components/Inventario/Inventario.vue');
+const Corte = () => import('@/components/Corte/Corte.vue');
+const Finanzas = () => import('@/components/Finanzas/Finanzas.vue');
+const Rental = () => import('@/components/Rental/Rental.vue');
+const Usuarios = () => import('@/components/Usuarios/Usuarios.vue');
+const Ambulante = () => import('@/components/Ambulante/Ambulante.vue');
 
 const AUTH_KEY = 'isAuth';
 
@@ -97,5 +98,7 @@ router.beforeEach((to, _from, next) => {
 
   next();
 });
+
+router.afterEach(() => { useRendimiento().revigilar(); });
 
 export default router;

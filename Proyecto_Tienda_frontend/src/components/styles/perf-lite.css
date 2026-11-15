@@ -1,0 +1,26 @@
+/* Modo ligero (html.perf-lite): menos trabajo de GPU/CPU en equipos modestos. */
+html.perf-lite *,
+html.perf-lite *::before,
+html.perf-lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation-iteration-count: 1 !important;
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+  text-shadow: none !important;
+}
+html.perf-lite *:not(:focus):not(:focus-within) {
+  filter: none !important;
+  box-shadow: none !important;
+}
+html.perf-lite .custom-scrollbar { scrollbar-width: thin; }
+/* Los fondos del overlay pasan a color sólido, sin desenfoque. */
+html.perf-lite [class*="overlay"] { background: color-mix(in srgb, var(--bg-primary, #000) 92%, transparent) !important; }
+/* Listas largas: el navegador omite pintar lo que no se ve. */
+html.perf-lite .producto-row,
+html.perf-lite .product-card,
+html.perf-lite .producto-card { content-visibility: auto; contain-intrinsic-size: auto 4rem; }
+@media (prefers-reduced-motion: reduce) {
+  html:not(.perf-lite) *, html:not(.perf-lite) *::before, html:not(.perf-lite) *::after { animation-iteration-count: 1 !important; }
+}

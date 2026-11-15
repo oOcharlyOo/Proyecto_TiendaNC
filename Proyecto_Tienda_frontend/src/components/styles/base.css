@@ -13,6 +13,7 @@
   src: url('/src/assets/fonts/HyliaSerifBeta-Regular.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 /* --- Reset --- */
