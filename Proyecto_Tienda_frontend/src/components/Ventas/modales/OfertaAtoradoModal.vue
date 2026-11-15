@@ -12,12 +12,9 @@ const fmt = (v: number) => (Number.isInteger(v) ? `$${v}` : `$${v.toFixed(2)}`);
 const totalActual = computed(() => Math.round(Number(totalVenta.value || 0) * 100) / 100);
 const totalCon = (precioOferta: number) => Math.round((totalActual.value + precioOferta) * 100) / 100;
 
-/** Se muestran pocas al inicio para no abrumar; "Ver más" va descubriendo el resto. */
-const POR_PAGINA = 4;
-const visibles = ref(POR_PAGINA);
 const filtro = ref('');
 
-watch(ofertasActuales, () => { visibles.value = POR_PAGINA; filtro.value = ''; });
+watch(ofertasActuales, () => { filtro.value = ''; });
 
 const quitarAcentos = (s: string) => s.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
 
@@ -27,8 +24,7 @@ const filtradas = computed(() => {
   return ofertasActuales.value.filter(o => quitarAcentos(`${o.nombre} ${o.etiqueta}`).includes(q));
 });
 
-const mostradas = computed(() => (filtro.value.trim() ? filtradas.value : filtradas.value.slice(0, visibles.value)));
-const restantes = computed(() => filtradas.value.length - mostradas.value.length);
+const mostradas = filtradas;
 </script>
 
 <template>
@@ -48,7 +44,7 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
           <button class="oferta-close" type="button" aria-label="Cerrar" @click="cerrarOferta">&times;</button>
         </header>
 
-        <div v-if="ofertasActuales.length > POR_PAGINA" class="oferta-buscar">
+        <div v-if="ofertasActuales.length > 4" class="oferta-buscar">
           <input
             v-model="filtro"
             type="search"
@@ -61,31 +57,32 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
         <div class="oferta-lista">
           <p v-if="!mostradas.length" class="oferta-vacio">Ninguna oferta coincide con "{{ filtro.trim() }}".</p>
           <article v-for="o in mostradas" :key="o.id" class="oferta-card" :class="o.tipo === 'MISMO' ? 'is-mismo' : 'is-otro'">
-            <div class="oferta-etiqueta">{{ o.etiqueta }}</div>
-            <div class="oferta-info">
-              <h3>{{ o.titulo }}</h3>
-              <p>{{ o.descripcion }}</p>
-              <div class="oferta-total">
-                <span class="oferta-total-cuenta">
-                  Total {{ fmt(totalActual) }} + {{ o.nombre }}
-                  {{ o.precioOferta > 0 ? fmt(o.precioOferta) : 'gratis' }}
-                </span>
-                <strong class="oferta-total-nuevo">= {{ fmt(totalCon(o.precioOferta)) }}</strong>
-              </div>
-              <span class="oferta-ahorro">El cliente ahorra {{ fmt(o.ahorro) }}</span>
+            <div class="oc-top">
+              <span class="oc-tipo">{{ o.tipo === 'MISMO' ? '🔁 Otra pieza igual' : '🎁 Agrega otro producto' }}</span>
+              <span class="oc-ahorro">Ahorra {{ fmt(o.ahorro) }}</span>
             </div>
+
+            <div class="oc-producto">
+              <div class="oc-etiqueta">{{ o.etiqueta }}</div>
+              <div class="oc-nombre-wrap">
+                <h3 class="oc-nombre">{{ o.nombre }}</h3>
+                <p class="oc-desc">{{ o.descripcion }}</p>
+              </div>
+              <div class="oc-precios">
+                <span v-if="o.precioNormal > o.precioOferta" class="oc-normal">{{ fmt(o.precioNormal) }}</span>
+                <span class="oc-oferta">{{ o.precioOferta > 0 ? fmt(o.precioOferta) : 'Gratis' }}</span>
+              </div>
+            </div>
+
+            <div class="oc-cuenta" aria-label="Total de la cuenta con la oferta">
+              <span class="oc-cuenta-txt">Cuenta {{ fmt(totalActual) }} + {{ o.precioOferta > 0 ? fmt(o.precioOferta) : '$0' }}</span>
+              <span class="oc-cuenta-total">Total <strong>{{ fmt(totalCon(o.precioOferta)) }}</strong></span>
+            </div>
+
             <button type="button" class="oferta-btn-aceptar" :disabled="aplicandoOferta" @click="aceptarOferta(o)">
-              {{ aplicandoOferta ? '...' : 'Aceptar' }}
+              {{ aplicandoOferta ? 'Agregando…' : '✓ Agregar a la cuenta' }}
             </button>
           </article>
-          <button
-            v-if="restantes > 0"
-            type="button"
-            class="oferta-btn-mas"
-            @click="visibles += POR_PAGINA"
-          >
-            Ver más ofertas ({{ restantes }})
-          </button>
         </div>
 
         <footer class="oferta-footer">
@@ -112,198 +109,258 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
 
 .oferta-modal {
   width: 100%;
-  max-width: 34rem;
-  max-height: 90vh;
-  max-height: 90dvh;
+  max-width: 36rem;
+  max-height: 92vh;
+  max-height: 92dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
   animation: oferta-entrada 0.18s ease-out;
 }
 
 @keyframes oferta-entrada {
-  from { transform: scale(0.96); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: translateY(8px) scale(0.98); opacity: 0; }
+  to { transform: none; opacity: 1; }
 }
 
+/* ---------- Encabezado ---------- */
 .oferta-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1.1rem 1.25rem 0.9rem;
+  padding: 1rem 1.25rem 0.85rem;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color) 14%, transparent), transparent);
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .oferta-header h2 {
   margin: 0;
   font-size: 1.15rem;
+  line-height: 1.25;
   color: var(--accent-color);
 }
 
 .oferta-sub {
-  margin: 0.35rem 0 0;
+  margin: 0.4rem 0 0;
   font-size: 0.85rem;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
+.oferta-sub strong { color: var(--text-primary); }
+
 .oferta-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  font-size: 1.4rem;
   line-height: 1;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0.1rem 0.4rem;
-  border-radius: 6px;
 }
 
-.oferta-close:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.oferta-close:hover { color: var(--text-primary); border-color: var(--accent-color); }
 
-.oferta-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 1rem 1.25rem;
-  overflow-y: auto;
-}
-
-.oferta-buscar {
-  padding: 0.85rem 1.25rem 0;
-}
+/* ---------- Buscador ---------- */
+.oferta-buscar { padding: 0.75rem 1.25rem 0; flex-shrink: 0; }
 
 .oferta-buscar-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.55rem 0.8rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.85rem;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: 1rem;
   outline: none;
 }
 
 .oferta-buscar-input:focus { border-color: var(--accent-color); }
 
+/* ---------- Lista ---------- */
+.oferta-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
 .oferta-vacio {
   margin: 0.5rem 0;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
 }
 
-.oferta-btn-mas {
-  padding: 0.6rem;
-  border: 1px dashed var(--border-color);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--accent-color);
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.oferta-btn-mas:hover { border-color: var(--accent-color); background: var(--bg-secondary); }
-
+/* ---------- Tarjeta de oferta ---------- */
 .oferta-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem 0.85rem;
+  --oc-color: var(--accent-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.85rem;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-left: 4px solid var(--oc-color);
+  border-radius: 12px;
   background: var(--bg-secondary);
 }
 
-.oferta-etiqueta {
-  min-width: 4.2rem;
-  padding: 0.5rem 0.4rem;
-  border-radius: 8px;
+.oferta-card.is-otro { --oc-color: var(--success-color, #2e9d5b); }
+
+.oc-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.oc-tipo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--oc-color);
+}
+
+.oc-ahorro {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--success-color, #2e9d5b);
+  white-space: nowrap;
+}
+
+/* Producto que se ofrece: etiqueta | nombre | precio */
+.oc-producto {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.oc-etiqueta {
+  min-width: 4rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: 10px;
   text-align: center;
   font-weight: 800;
   font-size: 1.05rem;
+  line-height: 1.1;
   white-space: nowrap;
   color: #fff;
-  background: var(--accent-color);
+  background: var(--oc-color);
 }
 
-.oferta-card.is-otro .oferta-etiqueta { background: var(--success-color, #2e9d5b); }
+.oc-nombre-wrap { min-width: 0; }
 
-.oferta-info h3 {
+.oc-nombre {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.oferta-info p {
-  margin: 0.15rem 0 0.25rem;
-  font-size: 0.8rem;
+.oc-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
   color: var(--text-secondary);
 }
 
-.oferta-total {
+.oc-precios {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+
+.oc-normal {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.oc-oferta {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--oc-color);
+  white-space: nowrap;
+}
+
+/* Resumen de la cuenta */
+.oc-cuenta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.3rem;
-  margin: 0.1rem 0 0.25rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 6px;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
   background: var(--bg-primary);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
 }
 
-.oferta-total-cuenta {
-  color: var(--text-secondary);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
+.oc-cuenta-txt { color: var(--text-secondary); }
+.oc-cuenta-total { color: var(--text-primary); }
+.oc-cuenta-total strong { font-size: 1.15rem; margin-left: 0.2rem; }
 
-.oferta-total-nuevo {
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.oferta-ahorro {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--success-color, #2e9d5b);
-}
-
+/* ---------- Botones ---------- */
 .oferta-btn-aceptar,
 .oferta-btn-rechazar {
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
+  min-height: 2.9rem;
   transition: filter 0.15s, border-color 0.15s;
 }
 
 .oferta-btn-aceptar {
-  padding: 0.55rem 1rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
   border: none;
-  background: var(--accent-color);
-  color: var(--text-primary);
+  background: var(--oc-color, var(--accent-color));
+  color: #fff;
 }
 
-.oferta-btn-aceptar:hover:not(:disabled) { filter: brightness(1.15); }
+.oferta-btn-aceptar:hover:not(:disabled) { filter: brightness(1.12); }
+.oferta-btn-aceptar:active:not(:disabled) { transform: scale(0.99); }
 
 .oferta-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.9rem 1.25rem;
+  padding: 0.85rem 1.25rem;
   border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
 }
 
 .oferta-btn-rechazar {
+  width: 100%;
   padding: 0.6rem 1.1rem;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
@@ -315,12 +372,20 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
 .oferta-btn-aceptar:disabled,
 .oferta-btn-rechazar:disabled { opacity: 0.5; cursor: not-allowed; }
 
-@media (max-width: 480px) {
-  .oferta-overlay { padding: 0.5rem; }
-  .oferta-header, .oferta-lista, .oferta-footer { padding-left: 0.9rem; padding-right: 0.9rem; }
-  .oferta-buscar { padding: 0.75rem 0.9rem 0; }
-  .oferta-card { grid-template-columns: auto minmax(0, 1fr); }
-  .oferta-btn-aceptar { grid-column: 1 / -1; width: 100%; }
-  .oferta-btn-rechazar { width: 100%; }
+/* ---------- Celular ---------- */
+@media (max-width: 560px) {
+  .oferta-overlay { padding: 0; align-items: end; }
+  .oferta-modal { max-width: none; max-height: 94dvh; border-radius: 18px 18px 0 0; border-bottom: none; }
+  .oferta-header { padding: 0.85rem 1rem 0.7rem; }
+  .oferta-header h2 { font-size: 1.05rem; }
+  .oferta-buscar { padding: 0.6rem 1rem 0; }
+  .oferta-lista { padding: 0.85rem 1rem; gap: 0.75rem; }
+  .oferta-footer { padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom, 0px)); }
+  /* Etiqueta y precio arriba, nombre completo debajo para que se lea entero. */
+  .oc-producto { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "etq precio" "nom nom"; row-gap: 0.5rem; }
+  .oc-etiqueta { grid-area: etq; justify-self: start; }
+  .oc-precios { grid-area: precio; flex-direction: row-reverse; align-items: baseline; justify-content: flex-start; gap: 0.5rem; justify-self: end; }
+  .oc-nombre-wrap { grid-area: nom; }
+  .oc-nombre { -webkit-line-clamp: 4; line-clamp: 4; }
 }
 </style>
