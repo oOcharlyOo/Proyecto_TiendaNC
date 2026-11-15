@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import type { ProductoVendido } from '../logica/useCorte';
+import { computed } from 'vue';
+import type { ProductoVendido, VentaDetalleDTO } from '../logica/useCorte';
 import { Bar } from 'vue-chartjs';
-defineProps<{
+import CorteTabla, { type Columna } from './CorteTabla.vue';
+import { resumenMensual, filasSemanas } from '../logica/corteReportes';
+const props = defineProps<{
+  detallesMensual: VentaDetalleDTO[]; formatearCantidad: (c: number, g: boolean) => string;
   abierto: boolean; mesMensual: string; fechaRangoInicio: string; fechaRangoFin: string;
   cargando: boolean; tipoGraficaMensual: 'unitario' | 'gramaje';
   mensualTotalVentas: number; mensualTotalGanancias: number;
@@ -15,6 +19,61 @@ defineProps<{
   formatoMoneda: (v: number) => string;
   buildMensualTimelineChart: (g: boolean) => any; getMensualTimelineOptions: (g: boolean) => any;
 }>();
+
+const resumen = computed(() => resumenMensual(props.detallesMensual, props.formatearCantidad));
+const kpis = computed(() => resumen.value.kpis);
+const semanas = computed(() => filasSemanas(props.mensualSemanas));
+const esGranel = computed(() => props.tipoGraficaMensual === 'gramaje');
+const productosDetalle = computed(() => (esGranel.value ? resumen.value.granel : resumen.value.unitarios));
+
+const diasPie = computed(() => ({
+  fecha: 'Total del periodo', tickets: kpis.value.tickets, ventas: kpis.value.ventas, costo: kpis.value.costo,
+  ganancia: kpis.value.ganancia, margen: kpis.value.margen,
+  efectivo: resumen.value.dias.reduce((s, d) => s + d.efectivo, 0),
+  transferencia: resumen.value.dias.reduce((s, d) => s + d.transferencia, 0),
+  tarjeta: resumen.value.dias.reduce((s, d) => s + d.tarjeta, 0),
+}));
+const productosPie = computed(() => {
+  const l = productosDetalle.value;
+  const venta = l.reduce((s, p) => s + p.venta, 0), costo = l.reduce((s, p) => s + p.costo, 0);
+  return { nombre: `Total (${l.length})`, cantidadTxt: '', venta, costo, ganancia: venta - costo, margen: venta > 0 ? ((venta - costo) / venta) * 100 : 0, porcentaje: 100 };
+});
+
+const colDias: Columna[] = [
+  { key: 'fecha', label: 'Día', subKey: 'dia' },
+  { key: 'tickets', label: 'Tickets', tipo: 'numero' },
+  { key: 'ventas', label: 'Ventas', tipo: 'moneda', tono: 'info' },
+  { key: 'costo', label: 'Costo', tipo: 'moneda', tono: 'costo' },
+  { key: 'ganancia', label: 'Ganancia', tipo: 'moneda', tono: 'ok' },
+  { key: 'margen', label: 'Margen', tipo: 'margen' },
+  { key: 'efectivo', label: 'Efectivo', tipo: 'moneda' },
+  { key: 'transferencia', label: 'Transf.', tipo: 'moneda' },
+  { key: 'tarjeta', label: 'Tarjeta', tipo: 'moneda' },
+];
+const colSemanas: Columna[] = [
+  { key: 'semana', label: 'Semana', subKey: 'dias' },
+  { key: 'ventas', label: 'Ventas', tipo: 'moneda', tono: 'info' },
+  { key: 'ganancia', label: 'Ganancia', tipo: 'moneda', tono: 'ok' },
+  { key: 'margen', label: 'Margen', tipo: 'margen' },
+  { key: 'variacion', label: 'vs. anterior', tipo: 'variacion' },
+];
+const colMetodos: Columna[] = [
+  { key: 'metodo', label: 'Método' },
+  { key: 'tickets', label: 'Tickets', tipo: 'numero' },
+  { key: 'monto', label: 'Monto', tipo: 'moneda', tono: 'info' },
+  { key: 'porcentaje', label: '% del total', tipo: 'pct' },
+  { key: 'ticketPromedio', label: 'Ticket prom.', tipo: 'moneda' },
+];
+const colProductos: Columna[] = [
+  { key: 'nombre', label: 'Producto' },
+  { key: 'cantidadTxt', label: 'Cantidad' },
+  { key: 'venta', label: 'Venta', tipo: 'moneda', tono: 'info' },
+  { key: 'costo', label: 'Costo', tipo: 'moneda', tono: 'costo' },
+  { key: 'ganancia', label: 'Ganancia', tipo: 'moneda', tono: 'ok' },
+  { key: 'margen', label: 'Margen', tipo: 'margen' },
+  { key: 'porcentaje', label: '% de ventas', tipo: 'pct' },
+];
+
 defineEmits<{
   'cerrar': []; 'cambiar-mes': [mes: string]; 'generar-mensual': [];
   'cambiar-rango-inicio': [f: string]; 'cambiar-rango-fin': [f: string]; 'generar-rango': [];
@@ -46,8 +105,22 @@ defineEmits<{
             <div class="resumen-item c-transferencia"><div class="ri-glow"></div><span>Transferencia</span><strong>{{ formatoMoneda(mensualTotalTransferencia) }}</strong></div>
             <div class="resumen-item c-tarjeta"><div class="ri-glow"></div><span>Tarjeta</span><strong>{{ formatoMoneda(mensualTotalTarjeta) }}</strong></div>
           </div>
+          <div class="kpi-grid">
+            <div class="kpi"><span>Costo de lo vendido</span><strong class="t-costo">{{ formatoMoneda(kpis.costo) }}</strong></div>
+            <div class="kpi"><span>Margen de ganancia</span><strong :class="kpis.margen >= 30 ? 't-ok' : 't-warn'">{{ kpis.margen.toFixed(1) }}%</strong></div>
+            <div class="kpi"><span>Tickets</span><strong>{{ kpis.tickets.toLocaleString('es-MX') }}</strong></div>
+            <div class="kpi"><span>Ticket promedio</span><strong>{{ formatoMoneda(kpis.ticketPromedio) }}</strong></div>
+            <div class="kpi"><span>Promedio por día ({{ kpis.diasConVenta }} días)</span><strong>{{ formatoMoneda(kpis.promedioDiario) }}</strong></div>
+            <div class="kpi" v-if="kpis.mejorDia"><span>🔥 Mejor día</span><strong class="t-ok">{{ formatoMoneda(kpis.mejorDia.ventas) }}</strong><small>{{ kpis.mejorDia.dia }} {{ kpis.mejorDia.fecha }}</small></div>
+            <div class="kpi" v-if="kpis.peorDia"><span>🧊 Día más bajo</span><strong class="t-costo">{{ formatoMoneda(kpis.peorDia.ventas) }}</strong><small>{{ kpis.peorDia.dia }} {{ kpis.peorDia.fecha }}</small></div>
+          </div>
           <h4>Progreso Semanal</h4>
           <div class="chart-wrapper"><Bar :data="weeklyChartData" :options="weeklyChartOptions" /></div>
+          <CorteTabla :columnas="colSemanas" :filas="semanas" :formato-moneda="formatoMoneda" />
+          <h4>Ventas por día</h4>
+          <CorteTabla :columnas="colDias" :filas="resumen.dias" :pie="diasPie" :limite-movil="7" :formato-moneda="formatoMoneda" vacio="No hay ventas por día en este periodo." />
+          <h4>Métodos de pago</h4>
+          <CorteTabla :columnas="colMetodos" :filas="resumen.metodos" :formato-moneda="formatoMoneda" />
           <h4>Productos</h4>
           <div class="toggle-buttons">
             <button :class="{ active: tipoGraficaMensual === 'unitario' }" @click="$emit('cambiar-tipo-grafica', 'unitario')">Unitarios</button>
@@ -59,6 +132,8 @@ defineEmits<{
           <div class="chart-box" v-if="tipoGraficaMensual === 'gramaje' && productosGranelMensual.length">
             <div class="chart-wrapper"><Bar :data="chartDataMensualGranel" :options="chartOptionsMensualGranel" /></div>
           </div>
+          <h4>Detalle de {{ esGranel ? 'granel' : 'unitarios' }} ({{ productosDetalle.length }})</h4>
+          <CorteTabla :columnas="colProductos" :filas="productosDetalle" :pie="productosPie" :limite="10" :formato-moneda="formatoMoneda" max-alto-desktop="32rem" />
           <div v-if="uniqueHorariosMensual.length">
             <h4>Productos por Horario</h4>
             <div class="chart-wrapper timeline"><Bar :data="buildMensualTimelineChart(tipoGraficaMensual === 'gramaje')" :options="getMensualTimelineOptions(tipoGraficaMensual === 'gramaje')" /></div>
@@ -90,7 +165,9 @@ defineEmits<{
   width: 100%;
   max-width: 1100px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.5rem 2rem;
   position: relative;
   animation: modalSlideIn 0.3s ease;
@@ -291,6 +368,14 @@ defineEmits<{
   font-size: 0.9rem;
 }
 
+/* Indicadores adicionales */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; }
+.kpi { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.65rem 0.8rem; border-radius: 12px; background: var(--color-bg-primary); box-shadow: 2px 2px 6px rgba(0,0,0,.1); min-width: 0; }
+.kpi span { font-size: 0.68rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .03em; }
+.kpi strong { font-size: 1.1rem; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.kpi small { font-size: 0.68rem; color: var(--color-text-secondary); text-transform: capitalize; }
+.t-ok { color: var(--color-success) !important; } .t-costo { color: var(--color-error) !important; } .t-warn { color: #c99234 !important; }
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalSlideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -319,6 +404,9 @@ defineEmits<{
 }
 
 @media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .kpi { padding: 0.5rem 0.6rem; }
+  .kpi strong { font-size: 0.95rem; }
   .modal-container { max-width: 100vw; border-radius: 12px; padding: 0.65rem; }
   .modal-header { margin-bottom: 1rem; }
   .modal-header h2 { font-size: 1rem; }

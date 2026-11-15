@@ -438,7 +438,7 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
             <div class="chart-card">
               <h3 class="chart-title">📦 Detalle Unitarios</h3>
               <div class="tabla-container">
-                <table class="tabla-productos">
+                <table class="tabla-productos tabla-detalle">
                   <thead>
                     <tr>
                       <th>Producto</th>
@@ -450,11 +450,11 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                   </thead>
                   <tbody>
                     <tr v-for="p in r.productosUnitarios.value.slice(0, limiteUnitarios)" :key="p.nombre">
-                      <td>{{ p.nombre }}</td>
-                      <td class="text-right">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
-                      <td class="text-right monto">{{ r.formatoMoneda(p.montoTotal) }}</td>
-                      <td class="text-right costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
-                      <td class="text-right ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
+                      <td class="td-nombre" data-label="Producto">{{ p.nombre }}</td>
+                      <td class="text-right" data-label="Cantidad">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
+                      <td class="text-right monto" data-label="Venta">{{ r.formatoMoneda(p.montoTotal) }}</td>
+                      <td class="text-right costo" data-label="Costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
+                      <td class="text-right ganancia" data-label="Ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -466,7 +466,7 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
             <div class="chart-card">
               <h3 class="chart-title">⚖️ Detalle Gramaje</h3>
               <div class="tabla-container">
-                <table class="tabla-productos">
+                <table class="tabla-productos tabla-detalle">
                   <thead>
                     <tr>
                       <th>Producto</th>
@@ -478,11 +478,11 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                   </thead>
                   <tbody>
                     <tr v-for="p in r.productosGramaje.value.slice(0, limiteGramaje)" :key="p.nombre">
-                      <td>{{ p.nombre }}</td>
-                      <td class="text-right">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
-                      <td class="text-right monto">{{ r.formatoMoneda(p.montoTotal) }}</td>
-                      <td class="text-right costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
-                      <td class="text-right ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
+                      <td class="td-nombre" data-label="Producto">{{ p.nombre }}</td>
+                      <td class="text-right" data-label="Cantidad">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
+                      <td class="text-right monto" data-label="Venta">{{ r.formatoMoneda(p.montoTotal) }}</td>
+                      <td class="text-right costo" data-label="Costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
+                      <td class="text-right ganancia" data-label="Ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -513,7 +513,7 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
               <Bar :data="r.chartProductosCategoria.value" :options="r.chartOptionsProductosCategoria" />
             </div>
             <div class="tabla-modal">
-              <table>
+              <table class="tabla-detalle">
                 <thead>
                   <tr>
                     <th>Producto</th>
@@ -525,11 +525,11 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
                 </thead>
                 <tbody>
                   <tr v-for="p in r.productosCategoriaSeleccionada.value" :key="p.nombre">
-                    <td>{{ p.nombre }}</td>
-                    <td class="text-right">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
-                    <td class="text-right monto">{{ r.formatoMoneda(p.montoTotal) }}</td>
-                    <td class="text-right costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
-                    <td class="text-right ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
+                    <td class="td-nombre" data-label="Producto">{{ p.nombre }}</td>
+                    <td class="text-right" data-label="Cantidad">{{ r.formatoCantidad(p.cantidadTotal, p.isGramaje) }}</td>
+                    <td class="text-right monto" data-label="Venta">{{ r.formatoMoneda(p.montoTotal) }}</td>
+                    <td class="text-right costo" data-label="Costo">{{ r.formatoMoneda(p.costoTotal) }}</td>
+                    <td class="text-right ganancia" data-label="Ganancia">{{ r.formatoMoneda(p.gananciaTotal) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -745,4 +745,24 @@ function toggleLimite(tipo: 'unitarios' | 'gramaje') {
 @media(max-width:1024px){.reporte-ventas :deep(.chart-tall .chart-container){height:300px}}
 @media(max-width:768px){.reporte-ventas :deep(.section-cards){grid-template-columns:repeat(2,1fr)}.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:1fr}.reporte-ventas :deep(.chart-tall .chart-container){height:280px}}
 @media(max-width:480px){.reporte-ventas{padding:.4rem}.reporte-ventas :deep(.reporte-header){flex-direction:column;align-items:stretch}.reporte-ventas :deep(.reporte-controls){flex-direction:column}.reporte-ventas :deep(.section-cards){grid-template-columns:1fr 1fr;gap:.35rem}.reporte-ventas :deep(.card-section),.reporte-ventas :deep(.chart-section){padding:.5rem .6rem}.reporte-ventas :deep(.section-title){font-size:.75rem}.reporte-ventas :deep(.chart-container){height:240px}.reporte-ventas :deep(.chart-tall .chart-container){height:260px}.reporte-ventas :deep(.tabla-container){max-height:280px}}
+
+/* Tablas de detalle (Unitarios, Gramaje, productos de categoría): en celular cada fila es una tarjeta. */
+.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:repeat(2,minmax(0,1fr))}
+.reporte-ventas :deep(.chart-card){min-width:0}
+@media(max-width:640px){
+.reporte-ventas :deep(.section-charts.charts-2col){grid-template-columns:minmax(0,1fr)}
+.reporte-ventas :deep(.tabla-container){max-height:70vh;overflow-x:hidden}
+.reporte-ventas :deep(.tabla-detalle){display:block;font-size:.75rem}
+.reporte-ventas :deep(.tabla-detalle thead){display:none}
+.reporte-ventas :deep(.tabla-detalle tbody){display:flex;flex-direction:column;gap:.4rem}
+.reporte-ventas :deep(.tabla-detalle tbody tr){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.15rem .75rem;padding:.5rem .65rem;background:var(--color-bg-primary);border-radius:10px;box-shadow:2px 2px 5px rgba(0,0,0,.08)}
+.reporte-ventas :deep(.tabla-detalle tbody td){display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;padding:.1rem 0;border:none;text-align:right;min-width:0}
+.reporte-ventas :deep(.tabla-detalle tbody td::before){content:attr(data-label);font-size:.58rem;font-weight:800;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.03em;text-align:left;flex-shrink:0}
+.reporte-ventas :deep(.tabla-detalle tbody td.td-nombre){grid-column:1/-1;justify-content:flex-start;text-align:left;font-weight:700;font-size:.82rem;padding-bottom:.25rem;margin-bottom:.15rem;border-bottom:1px solid var(--color-border);overflow-wrap:anywhere}
+.reporte-ventas :deep(.tabla-detalle tbody td.td-nombre::before){display:none}
+.reporte-ventas :deep(.tabla-detalle tbody tr:hover td){background:transparent}
+.reporte-ventas :deep(.tabla-modal){overflow-x:hidden}
+.reporte-ventas :deep(.modal-card-cat){width:100%;max-height:94dvh}
+.reporte-ventas :deep(.table-more-btn){width:100%;min-height:2.5rem;margin-top:.5rem}
+}
 </style>

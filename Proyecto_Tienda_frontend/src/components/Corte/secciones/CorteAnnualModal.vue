@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Bar } from 'vue-chartjs';
-defineProps<{
+import CorteTabla, { type Columna } from './CorteTabla.vue';
+import { resumenAnual } from '../logica/corteReportes';
+const props = defineProps<{
   abierto: boolean; anioReporte: number; cargando: boolean;
   reporteAnualData: any;
   annualMonthlyChartData: any; annualMonthlyChartOptions: any;
@@ -10,6 +13,51 @@ defineProps<{
   buildHorarioTimelineChart: (g: boolean) => any; getHorarioTimelineOptions: (g: boolean) => any;
   getProductosPorHorario: (h: string, g: boolean) => any[];
 }>();
+
+const resumen = computed(() => resumenAnual(props.reporteAnualData, props.formatearCantidad));
+const kpis = computed(() => resumen.value?.kpis ?? null);
+const topUnitarios = computed(() => (resumen.value?.topUnitarios ?? []).map((r, i) => ({ ...r, posTxt: `${props.getRankIcon(i)} #${r.pos}` })));
+const topGranel = computed(() => (resumen.value?.topGranel ?? []).map((r, i) => ({ ...r, posTxt: `${props.getRankIcon(i)} #${r.pos}` })));
+const mesesPie = computed(() => {
+  const r = resumen.value;
+  if (!r) return null;
+  return { mes: 'Total del año', tickets: r.kpis.tickets, ventas: r.kpis.ventas, ganancia: r.kpis.ganancia, margen: r.kpis.margen, ticketPromedio: r.kpis.ticketPromedio, participacion: 100, variacion: null };
+});
+
+const colMeses: Columna[] = [
+  { key: 'mes', label: 'Mes' },
+  { key: 'tickets', label: 'Tickets', tipo: 'numero' },
+  { key: 'ventas', label: 'Ventas', tipo: 'moneda', tono: 'info' },
+  { key: 'ganancia', label: 'Ganancia', tipo: 'moneda', tono: 'ok' },
+  { key: 'margen', label: 'Margen', tipo: 'margen' },
+  { key: 'ticketPromedio', label: 'Ticket prom.', tipo: 'moneda' },
+  { key: 'participacion', label: '% del año', tipo: 'pct' },
+  { key: 'variacion', label: 'vs. mes anterior', tipo: 'variacion' },
+];
+const colMetodos: Columna[] = [
+  { key: 'metodo', label: 'Método' },
+  { key: 'monto', label: 'Monto', tipo: 'moneda', tono: 'info' },
+  { key: 'porcentaje', label: '% de ventas', tipo: 'pct' },
+];
+const colHorarios: Columna[] = [
+  { key: 'horario', label: 'Horario' },
+  { key: 'tickets', label: 'Tickets', tipo: 'numero' },
+  { key: 'ventas', label: 'Ventas', tipo: 'moneda', tono: 'info' },
+  { key: 'ticketPromedio', label: 'Ticket prom.', tipo: 'moneda' },
+  { key: 'porcentaje', label: '% de ventas', tipo: 'pct' },
+];
+const colLideres: Columna[] = [
+  { key: 'horario', label: 'Horario' },
+  { key: 'unitario', label: 'Unitario líder', subKey: 'unitarioQty' },
+  { key: 'granel', label: 'Granel líder', subKey: 'granelQty' },
+];
+const colTop: Columna[] = [
+  { key: 'nombre', label: 'Producto', subKey: 'posTxt' },
+  { key: 'cantidadTxt', label: 'Cantidad' },
+  { key: 'total', label: 'Total vendido', tipo: 'moneda', tono: 'info' },
+  { key: 'porcentaje', label: '% de ventas', tipo: 'pct' },
+];
+
 defineEmits<{
   'cerrar': []; 'cambiar-anio': [a: number]; 'generar': [];
 }>();
@@ -35,30 +83,40 @@ defineEmits<{
             <div class="resumen-item c-transferencia"><div class="ri-glow"></div><span>Transferencia</span><strong>{{ formatoMoneda(reporteAnualData.ventasTransferencia) }}</strong></div>
             <div class="resumen-item c-tarjeta"><div class="ri-glow"></div><span>Tarjeta</span><strong>{{ formatoMoneda(reporteAnualData.ventasTarjeta) }}</strong></div>
           </div>
+          <div class="kpi-grid" v-if="kpis">
+            <div class="kpi"><span>Margen de ganancia</span><strong :class="kpis.margen >= 30 ? 't-ok' : 't-warn'">{{ kpis.margen.toFixed(1) }}%</strong></div>
+            <div class="kpi"><span>Tickets del año</span><strong>{{ kpis.tickets.toLocaleString('es-MX') }}</strong></div>
+            <div class="kpi"><span>Ticket promedio</span><strong>{{ formatoMoneda(kpis.ticketPromedio) }}</strong></div>
+            <div class="kpi"><span>Promedio mensual</span><strong>{{ formatoMoneda(kpis.promedioMensual) }}</strong></div>
+            <div class="kpi" v-if="kpis.mejorMes"><span>🔥 Mejor mes</span><strong class="t-ok">{{ formatoMoneda(kpis.mejorMes.ventas) }}</strong><small>{{ kpis.mejorMes.nombre }}</small></div>
+            <div class="kpi" v-if="kpis.peorMes"><span>🧊 Mes más bajo</span><strong class="t-costo">{{ formatoMoneda(kpis.peorMes.ventas) }}</strong><small>{{ kpis.peorMes.nombre }}</small></div>
+          </div>
           <h3>Ventas Mensuales</h3>
           <div class="chart-wrapper"><Bar :data="annualMonthlyChartData" :options="annualMonthlyChartOptions" /></div>
-          <div class="top-products-grid" v-if="reporteAnualData.topProductosUnitarios?.length || reporteAnualData.topProductosGranel?.length">
-            <div class="top-list top-unitarios" v-if="reporteAnualData.topProductosUnitarios?.length">
-              <h4>🏆 Top Unitarios</h4>
-              <div class="product-item" v-for="(p, i) in reporteAnualData.topProductosUnitarios.slice(0, 5)" :key="i">
-                <span class="product-rank" :class="getRankClass(i)">{{ getRankIcon(i) }}</span>
-                <span class="product-name">{{ p.nombreProducto }}</span>
-                <span class="product-qty">{{ formatearCantidad(p.cantidadVendida, false) }}</span>
-              </div>
-            </div>
-            <div class="top-list top-granel" v-if="reporteAnualData.topProductosGranel?.length">
-              <h4>🏆 Top Granel</h4>
-              <div class="product-item" v-for="(p, i) in reporteAnualData.topProductosGranel.slice(0, 5)" :key="i">
-                <span class="product-rank" :class="getRankClass(i)">{{ getRankIcon(i) }}</span>
-                <span class="product-name">{{ p.nombreProducto }}</span>
-                <span class="product-qty">{{ formatearCantidad(p.cantidadVendida, true) }}</span>
-              </div>
-            </div>
-          </div>
+          <h4>Detalle por mes</h4>
+          <CorteTabla v-if="resumen" :columnas="colMeses" :filas="resumen.meses" :pie="mesesPie" :limite-movil="6" :formato-moneda="formatoMoneda" max-alto-desktop="30rem" />
+          <h4>Métodos de pago</h4>
+          <CorteTabla v-if="resumen" :columnas="colMetodos" :filas="resumen.metodos" :formato-moneda="formatoMoneda" />
+          <template v-if="topUnitarios.length">
+            <h4>🏆 Top unitarios</h4>
+            <CorteTabla :columnas="colTop" :filas="topUnitarios" :formato-moneda="formatoMoneda" />
+          </template>
+          <template v-if="topGranel.length">
+            <h4>🏆 Top granel</h4>
+            <CorteTabla :columnas="colTop" :filas="topGranel" :formato-moneda="formatoMoneda" />
+          </template>
           <div v-if="uniqueHorarios.length">
             <h3>Productos por Horario</h3>
             <div class="chart-wrapper timeline"><Bar :data="buildHorarioTimelineChart(false)" :options="getHorarioTimelineOptions(false)" /></div>
           </div>
+          <template v-if="resumen?.horarios.length">
+            <h4>Ventas por horario</h4>
+            <CorteTabla :columnas="colHorarios" :filas="resumen.horarios" :formato-moneda="formatoMoneda" />
+          </template>
+          <template v-if="resumen?.liderPorHorario.length">
+            <h4>Producto líder por horario</h4>
+            <CorteTabla :columnas="colLideres" :filas="resumen.liderPorHorario" :formato-moneda="formatoMoneda" />
+          </template>
         </template>
       </div>
     </div>
@@ -86,7 +144,9 @@ defineEmits<{
   width: 100%;
   max-width: 1100px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.5rem 2rem;
   position: relative;
   animation: modalSlideIn 0.3s ease;
@@ -304,6 +364,14 @@ defineEmits<{
   margin: 0;
 }
 
+/* Indicadores adicionales */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; }
+.kpi { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.65rem 0.8rem; border-radius: 12px; background: var(--color-bg-primary); box-shadow: 2px 2px 6px rgba(0,0,0,.1); min-width: 0; }
+.kpi span { font-size: 0.68rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .03em; }
+.kpi strong { font-size: 1.1rem; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.kpi small { font-size: 0.68rem; color: var(--color-text-secondary); text-transform: capitalize; }
+.t-ok { color: var(--color-success) !important; } .t-costo { color: var(--color-error) !important; } .t-warn { color: #c99234 !important; }
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalSlideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -333,6 +401,9 @@ defineEmits<{
 }
 
 @media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .kpi { padding: 0.5rem 0.6rem; }
+  .kpi strong { font-size: 0.95rem; }
   .modal-container { max-width: 100vw; border-radius: 12px; padding: 0.65rem; }
   .modal-header { margin-bottom: 1rem; }
   .modal-header h2 { font-size: 0.95rem; }
