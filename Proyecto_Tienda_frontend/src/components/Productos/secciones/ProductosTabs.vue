@@ -125,13 +125,13 @@ function cajasDe(producto: ProductoDTO): number[] {
 
   <div v-else-if="tabActiva === 'inactivos'" class="tab-content">
     <div class="inactivos-search">
-      <div class="search-wrapper">
-        <span class="search-icon">🔍</span>
+      <label class="ia-box">
+        <span class="ia-icon" aria-hidden="true">🔍</span>
         <input :value="busquedaInactivos" @input="$emit('update:busquedaInactivos', ($event.target as HTMLInputElement).value)"
           @keydown.enter="($event.target as HTMLInputElement).select()"
-          type="text" placeholder="Escanea un código o busca por nombre..." class="search-input" data-escaner />
-        <button v-if="busquedaInactivos" type="button" class="search-clear" @click="$emit('update:busquedaInactivos', '')">✕</button>
-      </div>
+          type="search" enterkeyhint="search" autocomplete="off" placeholder="Escanea un código o busca por nombre" class="ia-input" data-escaner />
+        <button v-if="busquedaInactivos" type="button" class="ia-clear" aria-label="Limpiar búsqueda" @click.prevent="$emit('update:busquedaInactivos', '')">✕</button>
+      </label>
     </div>
     <div class="table-container">
       <div v-if="cargandoInactivos" class="estado-loading"><div class="loading-spinner"></div><span>Cargando productos inactivos...</span></div>
@@ -178,6 +178,14 @@ function cajasDe(producto: ProductoDTO): number[] {
   </div>
 </template>
 <style scoped>
-.inactivos-search{display:flex;justify-content:flex-end;margin-bottom:.75rem}
-.inactivos-search .search-wrapper{width:100%;max-width:26rem}
+.inactivos-search{padding:.75rem 1rem;border-bottom:1px solid var(--color-border)}
+.ia-box{display:flex;align-items:center;gap:.6rem;width:100%;max-width:32rem;box-sizing:border-box;padding:0 .5rem 0 .9rem;min-height:2.75rem;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:.75rem;box-shadow:inset 2px 2px 4px rgba(0,0,0,.12);transition:border-color .2s,box-shadow .2s;cursor:text}
+.ia-box:focus-within{border-color:var(--color-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-accent) 35%,transparent)}
+.ia-icon{flex-shrink:0;font-size:1rem;opacity:.7}
+.ia-input{flex:1;min-width:0;width:100%;padding:.6rem 0;border:none;outline:none;background:transparent;color:var(--color-text-primary);font:inherit;font-size:.95rem;-webkit-appearance:none;appearance:none}
+.ia-input::placeholder{color:var(--color-text-secondary);opacity:.65}
+.ia-input::-webkit-search-cancel-button{display:none}
+.ia-clear{flex-shrink:0;width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border:none;border-radius:50%;background:transparent;color:var(--color-text-secondary);cursor:pointer;font-size:.9rem}
+.ia-clear:hover{background:var(--color-border);color:var(--color-text-primary)}
+@media(max-width:768px){.inactivos-search{padding:.6rem}.ia-box{max-width:none}.ia-input{font-size:1rem}}
 </style>
