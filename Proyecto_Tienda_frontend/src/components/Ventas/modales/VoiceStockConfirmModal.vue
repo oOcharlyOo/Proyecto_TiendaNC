@@ -430,8 +430,12 @@ watch(() => props.open, (val) => {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  max-width: 480px;
+  max-width: 30rem;
   width: 100%;
+  max-height: 92vh;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -451,6 +455,8 @@ watch(() => props.open, (val) => {
 
 .stock-modal-body {
   padding: 1.2rem 1.5rem;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .stock-modal-footer {
@@ -569,7 +575,7 @@ watch(() => props.open, (val) => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 45vh;
+  max-height: 40vh;
   overflow-y: auto;
 }
 
@@ -651,7 +657,10 @@ watch(() => props.open, (val) => {
 .stock-btn-secondary:hover { border-color: var(--accent-color); }
 
 @media (max-width: 480px) {
-  .stock-modal { max-width: 100%; margin: 0.5rem; }
+  .stock-modal { max-width: 100%; }
+  .stock-modal-overlay { padding: 0.5rem; }
+  .stock-modal-footer { padding: 0.8rem 1rem; }
+  .stock-modal-footer > button { flex: 1 1 auto; }
   .stock-modal-header { padding: 0.8rem 1rem; }
   .stock-modal-body { padding: 0.8rem 1rem; }
 }

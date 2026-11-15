@@ -114,6 +114,7 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
   width: 100%;
   max-width: 34rem;
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -315,6 +316,9 @@ const restantes = computed(() => filtradas.value.length - mostradas.value.length
 .oferta-btn-rechazar:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 480px) {
+  .oferta-overlay { padding: 0.5rem; }
+  .oferta-header, .oferta-lista, .oferta-footer { padding-left: 0.9rem; padding-right: 0.9rem; }
+  .oferta-buscar { padding: 0.75rem 0.9rem 0; }
   .oferta-card { grid-template-columns: auto minmax(0, 1fr); }
   .oferta-btn-aceptar { grid-column: 1 / -1; width: 100%; }
   .oferta-btn-rechazar { width: 100%; }

@@ -52,6 +52,10 @@ const emit = defineEmits<{
       <button class="tm-btn tm-btn-new" @click="emit('nuevo-ticket')" title="Nuevo ticket">＋</button>
       <button class="tm-btn tm-btn-pending" @click="emit('abrir-pendientes')" title="Pendientes">📋</button>
       <button class="tm-btn tm-btn-credits" @click="emit('abrir-creditos')" title="Créditos">👤</button>
+      <div v-if="saldoCajaDia != null" class="tm-caja" title="Efectivo que hay en caja ahora">
+        <span class="tm-caja-label">💵 Caja hoy</span>
+        <span class="tm-caja-monto">{{ formatoMoneda(saldoCajaDia) }}</span>
+      </div>
       <button class="tm-btn tm-btn-toggle" @click="emit('toggle-ticket-mobile')" title="Ver ticket">
         <span class="tm-toggle-icon">🛒</span>
         <span class="tm-toggle-text">{{ ticketInfoText }}</span>
@@ -99,7 +103,7 @@ const emit = defineEmits<{
         <span class="provision-label">Total por apartar (7 días)</span>
         <span class="provision-amount">{{ formatoMoneda(provisionSemanalTotal) }}</span>
       </div>
-      <div v-if="saldoCajaDia != null" class="provision-total-badge caja-dia-badge" title="Efectivo que hay en caja ahora">
+      <div v-if="saldoCajaDia != null" class="provision-total-badge caja-dia-badge caja-dia-desktop" title="Efectivo que hay en caja ahora">
         <span class="provision-label">Total en caja hoy</span>
         <span class="provision-amount">{{ formatoMoneda(saldoCajaDia) }}</span>
       </div>
@@ -192,7 +196,10 @@ const emit = defineEmits<{
 .pos-container .tm-toggle-text{font-weight:600;overflow:hidden;text-overflow:ellipsis}
 .pos-container .tm-toggle-total{margin-left:auto;font-weight:700;color:var(--color-success);font-family:monospace}
 
-@media(max-width:991px){.pos-container .tickets-bar-mobile{display:flex}}
+.pos-container .tm-caja{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;line-height:1.1;padding:.15rem .5rem;border:1px solid var(--success-color);border-radius:6px;color:var(--success-color);background:color-mix(in srgb,var(--success-color) 8%,transparent)}
+.pos-container .tm-caja-label{font-size:.55rem;font-weight:600;white-space:nowrap}
+.pos-container .tm-caja-monto{font-size:.8rem;font-weight:800;font-family:monospace;white-space:nowrap}
+@media(max-width:991px){.pos-container .tickets-bar-mobile{display:flex}.pos-container .provision-total-badge.caja-dia-desktop{display:none}.pos-container .caja-badges:not(:has(.provision-total-badge:not(.caja-dia-desktop))){display:none}}
 @media(max-width:400px){.pos-container .tm-btn{font-size:.75rem}.pos-container .tm-btn-new,.pos-container .tm-btn-pending,.pos-container .tm-btn-credits{width:28px;height:28px}.pos-container .tm-btn-toggle{height:28px;font-size:.68rem}}
 
 .pos-container .catalog-header {
@@ -216,7 +223,7 @@ const emit = defineEmits<{
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
   border: 1px solid;
-  min-width: 160px;
+  min-width: 10rem;
   text-align: right;
 }
 
