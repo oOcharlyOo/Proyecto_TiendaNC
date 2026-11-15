@@ -1,4 +1,5 @@
 import { ref, shallowRef, computed, markRaw } from 'vue';
+import { codigoCoincide, tieneCodigo, codigosDe } from '@/utils/codigos';
 import type { ApiRespuesta, ProductoDTO, Producto, TicketItem } from './usePosTipos';
 import { getJson, mostrarMensaje, crearNuevoTicket, ticketActual, crearDetalleVenta } from './usePosTicket';
 import { playSound } from './usePosSonido';
@@ -107,12 +108,11 @@ const productosParaMostrar = computed(() => {
     const queryNorm = normalizarTexto(query);
     resultados = resultados.filter(p =>
       normalizarTexto(p.nombre).includes(queryNorm) ||
-      (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
-      ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
+      codigoCoincide(p.codigo_barras, query)
     );
     resultados.sort((a, b) => {
-      const aExact = (a.codigo_barras || '').toLowerCase() === query || ((a.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
-      const bExact = (b.codigo_barras || '').toLowerCase() === query || ((b.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+      const aExact = tieneCodigo(a.codigo_barras, query);
+      const bExact = tieneCodigo(b.codigo_barras, query);
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
       return a.nombre.localeCompare(b.nombre);
@@ -131,12 +131,11 @@ const sugerenciasPorNombre = computed(() => {
   return productos.value.filter(p =>
     !esCategoriaGaming(p.idCategoria) && (
       normalizarTexto(p.nombre).includes(queryNorm) ||
-      (p.codigo_barras && p.codigo_barras.toLowerCase().includes(query)) ||
-      ((p.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado
+      codigoCoincide(p.codigo_barras, query)
     )
   ).sort((a, b) => {
-    const aExact = (a.codigo_barras || '').toLowerCase() === query || ((a.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
-    const bExact = (b.codigo_barras || '').toLowerCase() === query || ((b.codigo_barras || '').replace(/^0+/, '') || '0') === queryNormalizado;
+    const aExact = tieneCodigo(a.codigo_barras, query);
+    const bExact = tieneCodigo(b.codigo_barras, query);
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
     return 0;
@@ -149,7 +148,7 @@ const productosAccesoRapido = computed(() => {
     const stock = p.dto?.stock;
     if (stock !== undefined && stock !== null && stock <= 0) return false;
     if (!p.codigo_barras) return false;
-    const codigoLimpio = p.codigo_barras.replace(/^0+/, '') || '0';
+    const codigoLimpio = (codigosDe(p.codigo_barras)[0] || '').replace(/^0+/, '') || '0';
     return codigoLimpio.length >= 1 && codigoLimpio.length <= 2;
   }).sort((a, b) => {
     const aLimpio = (a.codigo_barras || '').replace(/^0+/, '') || '0';
@@ -170,7 +169,7 @@ async function buscarProducto(termino: string): Promise<Producto | undefined> {
   const query = termino.trim().toLowerCase();
   if (!query) return undefined;
   const queryNorm = normalizarTexto(query);
-  const porCodigo = productos.value.find((p) => (p.codigo_barras || '').toLowerCase() === query);
+  const porCodigo = productos.value.find((p) => tieneCodigo(p.codigo_barras, query));
   if (porCodigo) return porCodigo;
   const porNombreExacto = productos.value.find((p) => normalizarTexto(p.nombre) === queryNorm);
   if (porNombreExacto) return porNombreExacto;

@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { codigoCoincide, tieneCodigo, codigosDe } from '@/utils/codigos';
 
 export type ApiRespuesta<T> = {
   codigo: number;
@@ -115,8 +116,8 @@ export function useProductos() {
     if (termino) {
       results = results.filter(p =>
         (p.nombre || '').toLowerCase().includes(termino) ||
-        (p.codigoBarras || '').toLowerCase().includes(termino) ||
-        normalizarCodigo(p.codigoBarras || '') === normalizarCodigo(termino)
+        codigoCoincide(p.codigoBarras, termino) ||
+        codigosDe(p.codigoBarras).some(c => normalizarCodigo(c) === normalizarCodigo(termino))
       );
     }
 
@@ -136,8 +137,8 @@ export function useProductos() {
 
     if (termino) {
       results.sort((a, b) => {
-        const aExact = (a.codigoBarras || '').toLowerCase() === termino || normalizarCodigo(a.codigoBarras || '') === normalizarCodigo(termino);
-        const bExact = (b.codigoBarras || '').toLowerCase() === termino || normalizarCodigo(b.codigoBarras || '') === normalizarCodigo(termino);
+        const aExact = tieneCodigo(a.codigoBarras, termino);
+        const bExact = tieneCodigo(b.codigoBarras, termino);
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         return 0;
@@ -153,7 +154,7 @@ export function useProductos() {
     const codigo = normalizarCodigo(termino);
     // Si el término coincide exacto con un código de barras (escaneo), solo se muestra ese producto.
     const porCodigo = productosInactivos.value.filter(p =>
-      !!p.codigoBarras && (p.codigoBarras.toLowerCase() === termino || normalizarCodigo(p.codigoBarras.toLowerCase()) === codigo)
+      tieneCodigo(p.codigoBarras, termino) || codigosDe(p.codigoBarras).some(c => normalizarCodigo(c.toLowerCase()) === codigo)
     );
     if (porCodigo.length > 0) return porCodigo;
     return productosInactivos.value.filter(p => (p.nombre || '').toLowerCase().includes(termino));
@@ -537,13 +538,12 @@ export function useProductos() {
     const codigoNormalizado = normalizarCodigo(codigoLimpio);
 
     const productoEncontrado = productos.value.find(p => {
-      if (!p.codigoBarras) return false;
-      const codigoProducto = normalizarCodigo(p.codigoBarras);
-      return codigoProducto === codigoNormalizado || p.codigoBarras === codigoLimpio;
+      return codigosDe(p.codigoBarras).some(c => normalizarCodigo(c) === codigoNormalizado || c === codigoLimpio);
     });
 
     if (productoEncontrado) {
-      terminoBusqueda.value = productoEncontrado.codigoBarras || productoEncontrado.nombre;
+      // Se busca por el código principal (el primero) para que el escaneo con cualquier código lo muestre.
+      terminoBusqueda.value = codigosDe(productoEncontrado.codigoBarras)[0] || productoEncontrado.nombre;
     } else {
       terminoBusqueda.value = codigoLimpio;
       // El código no está en la lista de activos: puede ser un producto inactivo → consulta al backend.
@@ -564,7 +564,7 @@ export function useProductos() {
       if (!productos.value.some(x => x.idProducto === p.idProducto)) {
         productos.value = [...productos.value, p];
       }
-      terminoBusqueda.value = p.codigoBarras || p.nombre;
+      terminoBusqueda.value = codigosDe(p.codigoBarras)[0] || p.nombre;
 
       if (p.estatus === 'I') {
         escaneoInactivoId.value = p.idProducto;

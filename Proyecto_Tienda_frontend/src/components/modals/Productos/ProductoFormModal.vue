@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { codigosDe, unirCodigos, MAX_CODIGOS } from '@/utils/codigos';
 import { computed, watch, ref } from 'vue';
 
 type CategoriaDTO = {
@@ -71,6 +72,7 @@ watch(
   (open) => {
     if (!open) return;
     setFormFromData();
+    cargarListaCodigos();
   },
   { immediate: true }
 );
@@ -80,6 +82,7 @@ watch(
   (value) => {
     if (!props.open || !value) return;
     form.value.codigoBarras = value.trim();
+    cargarListaCodigos();
   }
 );
 
@@ -98,6 +101,20 @@ watch(
     });
   }
 );
+
+/** Hasta 3 códigos de barras por producto; se guardan juntos en codigoBarras separados por coma. */
+const codigosLista = ref<string[]>(['']);
+function cargarListaCodigos() {
+  const lista = codigosDe(form.value.codigoBarras);
+  codigosLista.value = lista.length ? lista : [''];
+}
+function agregarCodigo() {
+  if (codigosLista.value.length < MAX_CODIGOS) codigosLista.value.push('');
+}
+function quitarCodigo(i: number) {
+  codigosLista.value.splice(i, 1);
+  if (!codigosLista.value.length) codigosLista.value.push('');
+}
 
 function setFormFromData() {
   const source = props.data;
@@ -166,7 +183,7 @@ function handleSubmit() {
   
   emit('submit', {
     ...form.value,
-    codigoBarras: form.value.codigoBarras?.trim() || null,
+    codigoBarras: unirCodigos(codigosLista.value) || null,
     nombre: form.value.nombre.trim(),
     presentacion_caja: presentacionCaja,
     cajas
@@ -238,13 +255,19 @@ const esCategoriaGaming = computed(() => {
           <h4 class="section-title">📋 Identificación</h4>
           <div class="modal-grid">
             <label>Código de Barras / PIN</label>
-            <div class="barcode-row">
-              <input v-model="form.codigoBarras" type="text" placeholder="750000000001" class="input-field">
-              <button type="button" class="btn-scan" @click="emit('scan')">
+            <div v-for="(_c, i) in codigosLista" :key="i" class="barcode-row">
+              <input v-model="codigosLista[i]" type="text" :placeholder="i === 0 ? '750000000001' : 'Otro código del mismo producto'" class="input-field" autocomplete="off">
+              <button v-if="i === 0" type="button" class="btn-scan" @click="emit('scan')">
                 <span>📷</span>
                 <span>Escanear</span>
               </button>
+              <button v-else type="button" class="btn-scan btn-quitar-codigo" aria-label="Quitar código" @click="quitarCodigo(i)">
+                <span>✕</span>
+              </button>
             </div>
+            <button v-if="codigosLista.length < MAX_CODIGOS" type="button" class="btn-mas-codigo" @click="agregarCodigo">
+              ＋ Agregar otro código <small>(el mismo producto con otro empaque, máx. {{ MAX_CODIGOS }})</small>
+            </button>
 
             <label>Nombre del producto <span class="required">*</span></label>
             <input v-model="form.nombre" type="text" required placeholder="Ej: Chocolate Ferrero" class="input-field">
@@ -481,4 +504,5 @@ const esCategoriaGaming = computed(() => {
 .btn-secondary:active{transform:translateY(1px);box-shadow:inset 2px 2px 4px rgba(0,0,0,.15)}
 .modal-actions button:disabled{opacity:.5;cursor:not-allowed;transform:none}
 @media(max-width:600px){.modal-card{max-height:95vh;padding:.9rem;border-radius:14px}.modal-grid,.prices-grid,.inventory-grid{grid-template-columns:1fr}.modal-grid label,.modal-grid .input-field,.barcode-row,.price-field label,.price-field .input-field,.stock-field label,.stock-field .input-field,.checkbox-field{grid-column:span 1}.barcode-row{grid-template-columns:1fr}.btn-scan{justify-content:center}.modal-actions{flex-direction:column}.modal-actions button{width:100%;justify-content:center}}
+.btn-mas-codigo{grid-column:1/-1;justify-self:start;background:transparent;border:1px dashed var(--color-border);border-radius:8px;color:var(--color-accent);padding:.4rem .75rem;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;text-align:left}.btn-mas-codigo:hover{border-color:var(--color-accent)}.btn-mas-codigo small{color:var(--color-text-secondary);font-weight:400}.barcode-row+.barcode-row{margin-top:-.15rem}
 </style>

@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { tieneCodigo } from '@/utils/codigos';
 import { useTheme } from '../../../composables/useTheme';
 import Quagga from '@ericblade/quagga2';
 
@@ -335,7 +336,7 @@ function procesarEscaneoPedido(codigo: string) {
   if (!codigoLimpio) return;
   const prod = productosDisponibles.value.find(p =>
     p.idProducto.toString() === codigoLimpio ||
-    p.codigoBarras?.toString() === codigoLimpio
+    tieneCodigo(p.codigoBarras, codigoLimpio)
   );
   if (prod) {
     newDetalle.value.idProducto = prod.idProducto;
