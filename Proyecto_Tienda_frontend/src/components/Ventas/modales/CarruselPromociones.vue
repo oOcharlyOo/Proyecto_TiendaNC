@@ -7,6 +7,7 @@ let autoPlayTimer: ReturnType<typeof setInterval> | null = null;
 function startAutoPlay() {
   if (autoPlayTimer) clearInterval(autoPlayTimer);
   autoPlayTimer = setInterval(() => {
+    if (document.hidden) return;
     next();
   }, 6000);
 }

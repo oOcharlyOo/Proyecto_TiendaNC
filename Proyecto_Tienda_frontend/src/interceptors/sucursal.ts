@@ -105,7 +105,7 @@ const pendingBase = (async () => {
   return currentBase;
 })();
 
-setInterval(() => void reProbe(), REPROBE_INTERVAL);
+setInterval(() => { if (!document.hidden) void reProbe(); }, REPROBE_INTERVAL);
 
 async function baseActiva(): Promise<string> {
   await pendingBase;

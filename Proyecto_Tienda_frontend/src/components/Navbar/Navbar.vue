@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useNavbar } from './logica/useNavbar';
+import { useRendimiento } from '../../composables/useRendimiento';
 import { usarApariencia } from '@/composables/useApariencia';
 import AparienciaModal from '../modals/AparienciaModal.vue';
 import type { Theme } from '@/composables/useTheme';
 const { route, menuAbierto, esAdministrador, sucursalIcon, sucursalLabel, avatarUsuario, nombreUsuario, links, toggleMenu, cerrarMenu, cerrarSesion, currentTheme, elegirTema } = useNavbar();
 const { nombreNegocio } = usarApariencia();
+const { modo: modoRendimiento, ligeroActivo, setModo: setModoRendimiento } = useRendimiento();
 
 const aparienciaAbierta = ref(false);
 
@@ -124,6 +126,15 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
             <span class="personalizar-icon">🎨</span>
             <span>Personalizar apariencia</span>
           </button>
+
+          <div class="perf-toggle" title="Automático detecta si el equipo es lento y quita efectos visuales">
+            <span class="perf-label">⚡ Rendimiento{{ modoRendimiento === 'auto' ? (ligeroActivo ? ' (auto: ligero)' : ' (auto: completo)') : '' }}</span>
+            <div class="perf-opts">
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'auto' }" @click="setModoRendimiento('auto')">Auto</button>
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'lite' }" @click="setModoRendimiento('lite')">Ligero</button>
+              <button type="button" class="sync-btn" :class="{ active: modoRendimiento === 'full' }" @click="setModoRendimiento('full')">Completo</button>
+            </div>
+          </div>
 
           <div class="theme-selector">
             <div class="theme-label">
@@ -1167,4 +1178,5 @@ const themeOptions: Array<{ id: Theme; icon: string; label: string }> = [
     height: 54px;
   }
 }
+.navbar-wrap .perf-toggle{display:flex;flex-direction:column;gap:.35rem;margin:.5rem 0}.navbar-wrap .perf-label{font-size:.75rem;opacity:.85}.navbar-wrap .perf-opts{display:flex;gap:.35rem}.navbar-wrap .perf-opts .sync-btn{flex:1}.navbar-wrap .perf-opts .sync-btn.active{outline:2px solid var(--zelda-gold)}
 </style>
