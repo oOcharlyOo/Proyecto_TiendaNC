@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { tieneCodigo } from '@/utils/codigos';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
@@ -315,7 +316,7 @@ function handleBarcodeInput(e: KeyboardEvent) {
     const code = scannerBuffer.trim();
     scannerBuffer = '';
     const match = productosDisponibles.value.find(
-      p => p.codigoBarras === code
+      p => tieneCodigo(p.codigoBarras, code)
     );
     if (match) {
       if (idsAsignados.value.has(match.idProducto)) {

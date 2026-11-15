@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { ProductoDTO } from '../logica/useProductos';
-defineProps<{  tabActiva: string; cargando: boolean; productosFiltrados: ProductoDTO[]; vistaLista: boolean;
+import { mostrarCodigos } from '@/utils/codigos';
+const props = defineProps<{  tabActiva: string; cargando: boolean; productosFiltrados: ProductoDTO[]; vistaLista: boolean;
   terminoBusqueda: string; categoriaFiltro: number | null;
   selectedProductos: Set<number>; escaneando: boolean; escanerActivo: boolean;
   productosInactivos: ProductoDTO[]; inactivosFiltrados: ProductoDTO[]; busquedaInactivos: string; cargandoInactivos: boolean; escaneoInactivoId: number | null;
@@ -18,6 +20,33 @@ defineEmits<{
   'iniciar-escaneo': []; 'detener-escaneo': [];
   'editar-cajas': [p: ProductoDTO];
 }>();
+
+/**
+ * Render por tandas: con cientos de productos, pintarlos todos de golpe traba el scroll.
+ * Se muestran 60 y, al acercarse al final, se agregan 60 más (no cambia filtros ni selección).
+ */
+const TANDA = 60;
+const limite = ref(TANDA);
+const productosVisibles = computed(() => props.productosFiltrados.slice(0, limite.value));
+const hayMas = computed(() => limite.value < props.productosFiltrados.length);
+watch(() => props.productosFiltrados, () => { limite.value = TANDA; });
+
+const centinela = ref<HTMLElement | null>(null);
+let observador: IntersectionObserver | null = null;
+watch(centinela, (el) => {
+  observador?.disconnect();
+  observador = null;
+  if (!el) return;
+  observador = new IntersectionObserver((entradas) => {
+    if (entradas.some(e => e.isIntersecting) && hayMas.value) {
+      limite.value += TANDA;
+      // Si la pantalla sigue sin llenarse, el observador se re-evalúa al reconectarlo.
+      void nextTick(() => { if (centinela.value && observador) { observador.unobserve(centinela.value); observador.observe(centinela.value); } });
+    }
+  }, { rootMargin: '600px 0px' });
+  observador.observe(el);
+});
+onBeforeUnmount(() => observador?.disconnect());
 
 function cajasDe(producto: ProductoDTO): number[] {
   if (!producto.presentacion_caja) return [];
@@ -52,13 +81,13 @@ function cajasDe(producto: ProductoDTO): number[] {
           <th class="col-acciones text-center">Acciones</th>
         </tr></thead>
         <tbody>
-          <tr v-for="producto in productosFiltrados" :key="producto.idProducto" class="producto-row" :class="{ 'low-stock': producto.estatus !== 'I' && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out-of-stock': producto.estatus !== 'I' && Number(producto.stock || 0) === 0, 'selected': selectedProductos.has(producto.idProducto!), 'inactivo-scan': producto.estatus === 'I', 'inactivo-glow': escaneoInactivoId === producto.idProducto }">
+          <tr v-for="producto in productosVisibles" :key="producto.idProducto" class="producto-row" :class="{ 'low-stock': producto.estatus !== 'I' && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out-of-stock': producto.estatus !== 'I' && Number(producto.stock || 0) === 0, 'selected': selectedProductos.has(producto.idProducto!), 'inactivo-scan': producto.estatus === 'I', 'inactivo-glow': escaneoInactivoId === producto.idProducto }">
             <td class="col-check"><input type="checkbox" class="row-checkbox" :checked="selectedProductos.has(producto.idProducto!)" @change="$emit('toggle-seleccion', producto.idProducto!)" /></td>
             <td class="col-icon"><div class="icon-cell">{{ obtenerEmojiDulce(producto.idProducto) }}</div></td>
             <td class="col-nombre">{{ producto.nombre }}<span v-if="producto.estatus === 'I'" class="badge-inactivo">⚠️ Producto inactivo</span></td>
             <td class="col-categoria">{{ categoriaNombre(producto.idCategoria) }}</td>
             <td class="col-subcategoria">{{ subcategoriaNombre(producto.idSubcategoria) }}</td>
-            <td class="col-codigo"><span class="codigo-badge">{{ producto.codigoBarras || '—' }}</span></td>
+            <td class="col-codigo"><span class="codigo-badge">{{ mostrarCodigos(producto.codigoBarras) || '—' }}</span></td>
             <td class="col-precio text-right">{{ formatMoneda(producto.precio_venta) }}</td>
             <td class="col-stock text-center">
               <template v-if="esCategoriaGaming(producto.idCategoria)"><span class="stock-badge gaming">∞</span></template>
@@ -87,7 +116,7 @@ function cajasDe(producto: ProductoDTO): number[] {
         </tbody>
       </table>
       <div v-else class="productos-grid">
-        <div v-for="producto in productosFiltrados" :key="producto.idProducto" class="producto-card" :class="{ 'low-stock': producto.estatus !== 'I' && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out-of-stock': producto.estatus !== 'I' && Number(producto.stock || 0) === 0, 'inactivo-scan': producto.estatus === 'I' }">
+        <div v-for="producto in productosVisibles" :key="producto.idProducto" class="producto-card" :class="{ 'low-stock': producto.estatus !== 'I' && Number(producto.stock || 0) <= Number(producto.cantidad_min || 0) && Number(producto.stock || 0) > 0, 'out-of-stock': producto.estatus !== 'I' && Number(producto.stock || 0) === 0, 'inactivo-scan': producto.estatus === 'I' }">
           <div class="pc-top">
             <input type="checkbox" class="row-checkbox" :checked="selectedProductos.has(producto.idProducto!)" @change="$emit('toggle-seleccion', producto.idProducto!)" />
             <div v-if="producto.is_gramaje || producto.requiere_envase" class="pc-badges">
@@ -112,6 +141,7 @@ function cajasDe(producto: ProductoDTO): number[] {
           </div>
         </div>
       </div>
+      <div v-if="hayMas && !cargando && productosFiltrados.length > 0" ref="centinela" class="lista-centinela" aria-hidden="true">Cargando más productos…</div>
       <div class="bulk-info" v-if="selectedProductos.size > 0">
         <span>{{ selectedProductos.size }} producto(s) seleccionado(s)</span>
         <button type="button" class="btn-danger btn-sm" @click="$emit('eliminar', undefined)">Eliminar seleccionados</button>
@@ -160,7 +190,7 @@ function cajasDe(producto: ProductoDTO): number[] {
             <td class="col-nombre">{{ producto.nombre }}<span class="badge-inactivo">Inactivo</span></td>
             <td class="col-categoria">{{ categoriaNombre(producto.idCategoria) }}</td>
             <td class="col-subcategoria">{{ subcategoriaNombre(producto.idSubcategoria) }}</td>
-            <td class="col-codigo"><span class="codigo-badge">{{ producto.codigoBarras || '—' }}</span></td>
+            <td class="col-codigo"><span class="codigo-badge">{{ mostrarCodigos(producto.codigoBarras) || '—' }}</span></td>
             <td class="col-precio text-right">{{ formatMoneda(producto.precio_venta) }}</td>
             <td class="col-stock text-center"><span class="stock-badge muted">{{ producto.stock }}</span></td>
             <td class="col-acciones text-center">
