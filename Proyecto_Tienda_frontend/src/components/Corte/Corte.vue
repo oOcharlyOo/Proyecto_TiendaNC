@@ -188,6 +188,8 @@ const nombreApartadoActivo = apartadosActivos.value.length > 0 ? apartadosActivo
     />
 
     <CorteMonthlyModal
+      :detallesMensual="detallesMensual"
+      :formatearCantidad="formatearCantidad"
       :abierto="modalMensualAbierto"
       :mesMensual="mesMensual"
       :fechaRangoInicio="fechaRangoInicio"

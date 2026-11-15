@@ -371,6 +371,18 @@ const emit = defineEmits<{
 .pp-detalle-row{display:flex;align-items:center;gap:.5rem;padding:.4rem;background:var(--color-bg-secondary);border-radius:var(--radius-sm);margin-bottom:.3rem;font-size:.85rem}
 .pp-detalle-name{flex:1}
 .pp-checkbox-label{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--color-text-secondary);cursor:pointer}
-@media(max-width:768px){.pos-modal-card{width:95vw}.pp-tabs{gap:.2rem}.pp-tab{flex:1;padding:.35rem .3rem;font-size:.72rem;text-align:center}.pp-tab-text{display:none}.pp-tab-icon{font-size:.95rem}.pp-form-card{width:95vw;padding:1rem}}
-@media(max-width:480px){.pp-tabs{padding:.4rem .5rem;gap:.15rem}.pp-tab{padding:.3rem .2rem}.pp-tab-icon{font-size:.85rem}}
+@media(max-width:768px){.pos-modal-card{width:100%}.pp-tabs{gap:.35rem}.proveedores-pedidos-modal .pp-tabs .pp-tab{padding:.45rem .75rem;font-size:.8rem}.pp-tab-icon{font-size:1rem}.pp-form-card{width:95vw;padding:1rem}}
+@media(max-width:480px){.pp-tabs{padding:.4rem .5rem}.proveedores-pedidos-modal .pp-tabs .pp-tab{padding:.4rem .65rem}.pos-modal-card{width:100%;max-height:100dvh;border-radius:0}}
+
+/* Barra de pestañas: nunca se aplastan; si no caben, se desplazan (v-submenu). */
+.proveedores-pedidos-modal .pp-tabs{flex-wrap:nowrap}
+.proveedores-pedidos-modal .pp-tabs .pp-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap}
+.proveedores-pedidos-modal .pp-tabs .pp-tab-text{display:inline}
+/* Altura y scroll del modal: el cuerpo es el que se desplaza hasta el final. */
+.pos-modal-card.proveedores-pedidos-modal{max-height:94vh;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden}
+.pos-modal-card.proveedores-pedidos-modal .pp-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.pos-modal-card.proveedores-pedidos-modal .pp-section{min-height:0}
+/* La pantalla de inteligencia trae su propio scroll (height:100%) para las páginas completas;
+   aquí crece libre y el que se desplaza es .pp-body. */
+.pp-section-sugerido :deep(.ii){height:auto;overflow:visible}
 </style>
