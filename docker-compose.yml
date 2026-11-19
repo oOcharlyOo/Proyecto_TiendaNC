@@ -1,4 +1,4 @@
-﻿name: proyecto_tiendanc_panaderia
+name: proyecto_tiendanc_panaderia
 
 services:
   backend:
@@ -6,6 +6,7 @@ services:
       context: ./Proyecto_TiendaNC
       dockerfile: Dockerfile.jvm
     container_name: panaderia-backend
+    mem_limit: 1g
     restart: unless-stopped
     env_file:
       - .env
@@ -20,6 +21,8 @@ services:
       - QUARKUS_HTTP_CORS_ORIGINS=http://localhost:18081,http://127.0.0.1:18081,http://localhost:8080,http://127.0.0.1:8080,https://panaderia.laleyendadeldulce.com,https://frontendPanaderia.laleyendadeldulce.com,https://minioPanaderia.laleyendadeldulce.com,https://minioDashPanaderia.laleyendadeldulce.com
       - OLLAMA_URL=http://panaderia-ollama:11434
       - OLLAMA_MODEL=qwen2.5:7b
+      - OLLAMA_KEEP_ALIVE=5m
+      - JAVA_OPTS_APPEND=-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Xms128m -Xmx640m -XX:+UseSerialGC -Xss512k
       - SUCURSAL_MASTER_KEY=${SUCURSAL_MASTER_KEY:-}
     ports:
       - "18080:8080"
@@ -140,14 +143,16 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: panaderia-ollama
+    mem_limit: 6g
     restart: unless-stopped
     ports:
       - "11435:11434"
     volumes:
       - panaderia-ollama-data:/root/.ollama
     environment:
-      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_KEEP_ALIVE=5m
       - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_HOST=0.0.0.0
     networks:
       - panaderia-red

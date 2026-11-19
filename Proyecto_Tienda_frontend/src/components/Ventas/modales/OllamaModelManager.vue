@@ -21,6 +21,32 @@ const pulling = ref(false);
 const pullProgress = ref('');
 const pullStatus = ref('');
 
+type IaEstado = { activa: boolean; ollamaConectado: boolean; ramBytes: number; cargados: string[] };
+const ia = ref<IaEstado>({ activa: false, ollamaConectado: false, ramBytes: 0, cargados: [] });
+const iaBusy = ref(false);
+
+async function fetchIaEstado() {
+  try {
+    const resp = await fetch(`${API_BASE}/voice/ia/estado`);
+    ia.value = { ...ia.value, ...(await resp.json()) };
+  } catch { /* sin conexion: se muestra apagada */ }
+}
+
+async function toggleIa() {
+  iaBusy.value = true;
+  error.value = '';
+  try {
+    const resp = await fetch(`${API_BASE}/voice/ia/${ia.value.activa ? 'apagar' : 'activar'}`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) error.value = data.error;
+    else ia.value = { ...ia.value, ...data };
+  } catch (e: any) {
+    error.value = 'No se pudo cambiar la IA: ' + (e.message || e);
+  } finally {
+    iaBusy.value = false;
+    fetchIaEstado();
+  }
+}
 function formatSize(bytes: number): string {
   if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + ' MB';
   return (bytes / 1024 ** 3).toFixed(1) + ' GB';
@@ -105,7 +131,7 @@ async function pullModel() {
 }
 
 watch(() => props.open, (val) => {
-  if (val) fetchModels();
+  if (val) { fetchModels(); fetchIaEstado(); }
   else { pullName.value = ''; pullStatus.value = ''; pullProgress.value = ''; pulling.value = false; }
 });
 </script>
@@ -122,6 +148,22 @@ watch(() => props.open, (val) => {
         <div class="ia-modal-body">
           <p v-if="error" class="ia-error">{{ error }}</p>
           <p v-if="loading" class="ia-loading">Cargando modelos...</p>
+
+          <section class="ia-section">
+            <h3>IA de voz</h3>
+            <div class="ia-model-row">
+              <div class="ia-model-info">
+                <span class="ia-model-name">{{ ia.activa ? 'Encendida' : 'Apagada' }}</span>
+                <span class="ia-model-size">
+                  {{ ia.ramBytes ? 'Usando ' + formatSize(ia.ramBytes) + ' de RAM' : 'Sin modelo cargado en RAM' }}
+                  &middot; {{ ia.activa ? 'se descarga sola tras 5 min sin uso' : 'la voz busca sin IA' }}
+                </span>
+              </div>
+              <button class="ia-btn ia-btn-sm" :class="ia.activa ? 'ia-btn-danger' : 'ia-btn-primary'" :disabled="iaBusy" @click="toggleIa">
+                {{ iaBusy ? (ia.activa ? 'Apagando...' : 'Cargando modelo...') : (ia.activa ? 'Apagar' : 'Encender') }}
+              </button>
+            </div>
+          </section>
 
           <div v-if="!loading">
             <section class="ia-section">
