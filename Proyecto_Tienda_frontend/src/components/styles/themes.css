@@ -594,10 +594,19 @@
    El autofill de Chrome pinta fondo y texto propios e ignora `color`; con
    un fondo claro dejaba texto claro sobre blanco. Forzamos el color del
    token y el caret, y repintamos el fondo del autofill con el del tema. */
+/* Los temas base son oscuros: sin declarar color-scheme, Chrome pinta el
+   desplegable de credenciales guardadas con fondo claro y toma el texto
+   claro del input (queda blanco sobre blanco). Con fondo propio claro,
+   useApariencia lo cambia a `light` en linea sobre <html>. */
+:root {
+  color-scheme: dark;
+}
+
 input,
 select,
 textarea {
   caret-color: var(--text-primary);
+  color-scheme: inherit;
 }
 
 input:-webkit-autofill,
