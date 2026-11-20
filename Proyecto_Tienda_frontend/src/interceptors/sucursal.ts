@@ -2,8 +2,10 @@
 
 const originalFetch = window.fetch;
 
-const LOCAL_BASE = 'http://localhost:8080';
-const REMOTE_BASE = import.meta.env.VITE_API_URL || 'https://panaderia.laleyendadeldulce.com';
+// Backend local de este equipo. En docker-compose se publica en 18080 (VITE_LOCAL_API_URL en .env.production);
+// en desarrollo (quarkus:dev) sigue siendo 8080.
+const LOCAL_BASE: string = import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:8080';
+const REMOTE_BASE: string = import.meta.env.VITE_API_URL || 'https://panaderia.laleyendadeldulce.com';
 const CACHE_KEY = 'api_base_activo';
 const PROBE_TIMEOUT = 1200;
 const REPROBE_INTERVAL = 30000;

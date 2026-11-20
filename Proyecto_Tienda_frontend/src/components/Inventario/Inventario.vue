@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useInventario } from './logica/useInventario';
-const { cargando, cargandoMas, mensaje, categorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, verInactivos, verPorValidar, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, restaurar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
+const { cargando, cargandoMas, mensaje, categorias, subcategorias, refrescarCategorias, filtroBusqueda, filtroCategoria, ordenarPor, verSoloProblemas, verInactivos, verPorValidar, modalFormOpen, modalProductoEditando, guardando, vistaLista, pagina, totalPaginas, cargar, cargarMas, guardar, editar, restaurar, productosFiltrados, bajoStock, productosAgotados, costoTotal, gananciaPot, totalItems, catsConTodas } = useInventario();
 
 import InvHeader from './secciones/InvHeader.vue';
 import InvKpisBar from './secciones/InvKpisBar.vue';
@@ -38,8 +38,8 @@ import ProductoFormModal from '../modals/Productos/ProductoFormModal.vue';
     </div>
 
     <ProductoFormModal :open="modalFormOpen" :data="modalProductoEditando" :loading="guardando"
-      :categorias="categorias" @close="modalFormOpen = false; modalProductoEditando = undefined"
-      @submit="guardar" />
+      :categorias="categorias" :subcategorias="subcategorias" @close="modalFormOpen = false; modalProductoEditando = undefined"
+      @submit="guardar" @categorias-changed="refrescarCategorias" />
   </div>
 </template>
 

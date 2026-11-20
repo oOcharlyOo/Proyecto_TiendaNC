@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { codigosDe, unirCodigos, MAX_CODIGOS } from '@/utils/codigos';
-import { computed, watch, ref } from 'vue';
+import { computed, nextTick, watch, ref } from 'vue';
+import CategoriaRapidaModal from './CategoriaRapidaModal.vue';
 
 type CategoriaDTO = {
   idCategoria: number;
@@ -48,6 +49,8 @@ const emit = defineEmits<{
   (event: 'submit', payload: ProductoPayload): void;
   (event: 'delete'): void;
   (event: 'scan'): void;
+  /** Se creó una categoría/subcategoría desde aquí: el padre debe recargar ambas listas. */
+  (event: 'categorias-changed'): void;
 }>();
 
 const form = ref<ProductoPayload>({
@@ -199,6 +202,70 @@ const subcategoriasFiltradas = computed(() => {
   return (props.subcategorias || []).filter(s => s.idCategoria === form.value.idCategoria);
 });
 
+/* ---- Alta rápida de categoría / subcategoría sin salir del formulario ---- */
+type TipoRapido = 'categoria' | 'subcategoria';
+
+const rapidoOpen = ref(false);
+const rapidoTipo = ref<TipoRapido>('categoria');
+/** El backend no devuelve el id al crear: se recuerda el nombre y se selecciona cuando llega la lista recargada. */
+const pendiente = ref<{ tipo: TipoRapido; nombre: string; idCategoria: number | null } | null>(null);
+
+// "Sin asignar" (id 1) siempre existe; si solo está esa, aún no hay categorías propias.
+const sinCategoriasPropias = computed(() => (props.categorias || []).length <= 1);
+const sinSubcategorias = computed(() => subcategoriasFiltradas.value.length === 0);
+
+function abrirRapido(tipo: TipoRapido) {
+  rapidoTipo.value = tipo;
+  rapidoOpen.value = true;
+}
+
+function alCrearRapido(p: { tipo: TipoRapido; nombre: string; idCategoria: number | null }) {
+  pendiente.value = p;
+  // Si la subcategoría se creó en otra categoría, el formulario salta a esa categoría.
+  if (p.tipo === 'subcategoria' && p.idCategoria && p.idCategoria !== form.value.idCategoria) {
+    form.value.idCategoria = p.idCategoria;
+  }
+  emit('categorias-changed');
+}
+
+async function alExistenteRapido(p: { tipo: TipoRapido; idCategoria: number | null; idSubcategoria: number | null }) {
+  if (p.idCategoria) form.value.idCategoria = p.idCategoria;
+  if (p.tipo === 'subcategoria') {
+    // Cambiar de categoría limpia la subcategoría (watch de arriba): se asigna después de ese ciclo.
+    await nextTick();
+    form.value.idSubcategoria = p.idSubcategoria;
+  }
+}
+
+function aplicarPendiente() {
+  const p = pendiente.value;
+  if (!p) return;
+  const mismo = (nombre: string) => nombre.trim().toLowerCase() === p.nombre.trim().toLowerCase();
+
+  if (p.tipo === 'categoria') {
+    const nueva = (props.categorias || []).filter(c => mismo(c.nombre)).sort((a, b) => b.idCategoria - a.idCategoria)[0];
+    if (!nueva) return;
+    form.value.idCategoria = nueva.idCategoria;
+    pendiente.value = null;
+    return;
+  }
+
+  const nueva = (props.subcategorias || [])
+    .filter(s => s.idCategoria === p.idCategoria && mismo(s.nombre))
+    .sort((a, b) => b.idSubcategoria - a.idSubcategoria)[0];
+  if (!nueva) return;
+  form.value.idSubcategoria = nueva.idSubcategoria;
+  pendiente.value = null;
+}
+
+watch(() => [props.categorias, props.subcategorias], aplicarPendiente);
+watch(() => props.open, (open) => {
+  if (!open) {
+    pendiente.value = null;
+    rapidoOpen.value = false;
+  }
+});
+
 const CAJA_SIZES: readonly number[] = [4, 6, 8, 12, 24];
 const cajasSeleccionadas = ref<number[]>([]);
 const cajasPrecios = ref<Record<number, number>>({});
@@ -273,19 +340,31 @@ const esCategoriaGaming = computed(() => {
             <input v-model="form.nombre" type="text" required placeholder="Ej: Chocolate Ferrero" class="input-field">
 
             <label>Categoría</label>
-            <select v-model="form.idCategoria" class="input-field select-field">
-              <option v-for="cat in props.categorias" :key="cat.idCategoria" :value="cat.idCategoria">
-                {{ cat.nombre }}
-              </option>
-            </select>
+            <div class="select-row">
+              <select v-model="form.idCategoria" class="input-field select-field">
+                <option v-for="cat in props.categorias" :key="cat.idCategoria" :value="cat.idCategoria">
+                  {{ cat.nombre }}
+                </option>
+              </select>
+              <button type="button" class="btn-nuevo" title="Crear una categoría nueva" @click="abrirRapido('categoria')">
+                <span>＋</span><span class="btn-nuevo-texto">Nueva</span>
+              </button>
+            </div>
+            <p v-if="sinCategoriasPropias" class="field-hint full-width">Aún no hay categorías creadas. Usa «＋ Nueva» para crear la primera.</p>
 
             <label>Subcategoría</label>
-            <select v-model="form.idSubcategoria" class="input-field select-field">
-              <option :value="null">Sin subcategoría</option>
-              <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
-                {{ sub.nombre }}
-              </option>
-            </select>
+            <div class="select-row">
+              <select v-model="form.idSubcategoria" class="input-field select-field">
+                <option :value="null">Sin subcategoría</option>
+                <option v-for="sub in subcategoriasFiltradas" :key="sub.idSubcategoria" :value="sub.idSubcategoria">
+                  {{ sub.nombre }}
+                </option>
+              </select>
+              <button type="button" class="btn-nuevo" title="Crear una subcategoría nueva" @click="abrirRapido('subcategoria')">
+                <span>＋</span><span class="btn-nuevo-texto">Nueva</span>
+              </button>
+            </div>
+            <p v-if="sinSubcategorias" class="field-hint full-width">Esta categoría aún no tiene subcategorías. Usa «＋ Nueva» para crear una.</p>
           </div>
         </div>
 
@@ -415,6 +494,17 @@ const esCategoriaGaming = computed(() => {
         </button>
       </footer>
     </section>
+
+    <CategoriaRapidaModal
+      :open="rapidoOpen"
+      :tipo="rapidoTipo"
+      :categorias="props.categorias"
+      :subcategorias="props.subcategorias"
+      :id-categoria-inicial="form.idCategoria ?? null"
+      @close="rapidoOpen = false"
+      @creada="alCrearRapido"
+      @existente="alExistenteRapido"
+    />
   </div>
 </template>
 
@@ -505,4 +595,10 @@ const esCategoriaGaming = computed(() => {
 .modal-actions button:disabled{opacity:.5;cursor:not-allowed;transform:none}
 @media(max-width:600px){.modal-card{max-height:95vh;padding:.9rem;border-radius:14px}.modal-grid,.prices-grid,.inventory-grid{grid-template-columns:1fr}.modal-grid label,.modal-grid .input-field,.barcode-row,.price-field label,.price-field .input-field,.stock-field label,.stock-field .input-field,.checkbox-field{grid-column:span 1}.barcode-row{grid-template-columns:1fr}.btn-scan{justify-content:center}.modal-actions{flex-direction:column}.modal-actions button{width:100%;justify-content:center}}
 .btn-mas-codigo{grid-column:1/-1;justify-self:start;background:transparent;border:1px dashed var(--color-border);border-radius:8px;color:var(--color-accent);padding:.4rem .75rem;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;text-align:left}.btn-mas-codigo:hover{border-color:var(--color-accent)}.btn-mas-codigo small{color:var(--color-text-secondary);font-weight:400}.barcode-row+.barcode-row{margin-top:-.15rem}
+.select-row{grid-column:span 2;display:grid;grid-template-columns:1fr auto;gap:.45rem;align-items:stretch}
+.modal-grid .select-row > .select-field{grid-column:auto}
+.btn-nuevo{border:none;border-radius:8px;padding:0 .8rem;background:var(--accent-fill,var(--color-accent));color:var(--color-on-brand);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:.3rem;box-shadow:3px 3px 8px rgba(0,0,0,.2);transition:all .15s}
+.btn-nuevo:hover{transform:translateY(-1px);box-shadow:5px 5px 10px rgba(0,0,0,.25)}
+.btn-nuevo:active{transform:translateY(1px);box-shadow:inset 2px 2px 4px rgba(0,0,0,.2)}
+@media(max-width:600px){.select-row{grid-column:1/-1}}
 </style>

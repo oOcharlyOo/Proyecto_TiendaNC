@@ -1,5 +1,5 @@
 import { computed, onMounted, ref, shallowRef, watch } from 'vue';
-import type { ApiRespuesta, CategoriaDTO, PaginatedResponse, ProductoDTO, ResumenInventarioDTO } from './useInvTipos';
+import type { ApiRespuesta, CategoriaDTO, SubcategoriaDTO, PaginatedResponse, ProductoDTO, ResumenInventarioDTO } from './useInvTipos';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.laleyendadeldulce.com';
 
@@ -8,6 +8,7 @@ const cargandoMas = ref(false);
 const mensaje = ref('');
 const productos = shallowRef<ProductoDTO[]>([]);
 const categorias = shallowRef<CategoriaDTO[]>([]);
+const subcategorias = shallowRef<SubcategoriaDTO[]>([]);
 const filtroBusqueda = ref('');
 const filtroCategoria = ref<number | null>(null);
 const ordenarPor = ref('nombre');
@@ -82,6 +83,16 @@ async function cargar() {
 async function cargarCats() {
   try { const d = await api<ApiRespuesta<CategoriaDTO[]>>(`${API_BASE}/categorias/listarCategorias`); categorias.value = Array.isArray(d?.datos) ? d.datos : []; }
   catch { categorias.value = []; }
+}
+
+async function cargarSubs() {
+  try { const d = await api<ApiRespuesta<SubcategoriaDTO[]>>(`${API_BASE}/subcategorias/listarSubcategorias`); subcategorias.value = Array.isArray(d?.datos) ? d.datos : []; }
+  catch { subcategorias.value = []; }
+}
+
+/** Recarga categorías y subcategorías (p. ej. tras crear una desde el formulario de producto). */
+async function refrescarCategorias() {
+  await Promise.all([cargarCats(), cargarSubs()]);
 }
 
 let debounceTimer: ReturnType<typeof setTimeout>;
@@ -204,10 +215,10 @@ export function numero(v: number) { return new Intl.NumberFormat('es-MX').format
 
 export function useInventario() {
 
-  onMounted(async () => { await cargar(); await cargarCats(); });
+  onMounted(async () => { await cargar(); await refrescarCategorias(); });
 
   return {
-    cargando, cargandoMas, mensaje, productos, categorias, filtroBusqueda, filtroCategoria,
+    cargando, cargandoMas, mensaje, productos, categorias, subcategorias, refrescarCategorias, filtroBusqueda, filtroCategoria,
     ordenarPor, verSoloProblemas, verInactivos, verPorValidar, modalFormOpen, modalProductoEditando, guardando, vistaLista,
     pagina, totalPaginas, resumen,
     cargarMas, cargar, guardar, editar, restaurar, esGaming, stockClass, stockLabel, requiereValidarStock,

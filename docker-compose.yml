@@ -22,7 +22,8 @@ services:
       - OLLAMA_URL=http://panaderia-ollama:11434
       - OLLAMA_MODEL=qwen2.5:7b
       - OLLAMA_KEEP_ALIVE=5m
-      - JAVA_OPTS_APPEND=-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Xms128m -Xmx640m -XX:+UseSerialGC -Xss512k
+      - GC_CONTAINER_OPTIONS=-XX:+UseSerialGC
+      - JAVA_OPTS_APPEND=-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Xms128m -Xmx640m -Xss512k
       - SUCURSAL_MASTER_KEY=${SUCURSAL_MASTER_KEY:-}
     ports:
       - "18080:8080"

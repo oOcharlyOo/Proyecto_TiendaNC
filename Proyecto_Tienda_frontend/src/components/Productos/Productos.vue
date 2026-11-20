@@ -26,12 +26,17 @@ const {
   exportarCSV, exportarXLSX, triggerImport, handleImport, vaciarInventario,
   obtenerNombreCategoria, obtenerNombreSubcategoria, formatoMoneda,
   esCategoriaGaming, obtenerEmojiDulce,
-  cargarProductos, cargarCategorias, restaurarProducto,
+  cargarProductos, cargarCategorias, cargarSubcategorias, restaurarProducto,
   abrirModalNuevoProducto, abrirModalEditarProducto,
   handleSubmitProducto, handleDeleteProducto, handleScannerApply,
   toggleSeleccionProducto, toggleSeleccionTodos,
   abrirModalCategoria, aplicarCambioCategoria
 } = useProductos();
+
+/** Se creó una categoría/subcategoría desde el formulario de producto: recarga ambas listas. */
+async function refrescarCategorias() {
+  await Promise.all([cargarCategorias(), cargarSubcategorias()]);
+}
 
 type TabActiva = 'productos' | 'inactivos' | 'inteligencia' | 'categorias' | 'subcategorias' | 'proveedores' | 'reporte' | 'ajustePrecio';
 
@@ -144,6 +149,7 @@ async function onCajasGuardadas(cajas: number[]) {
       @delete="handleDeleteProducto"
       @close="modalFormOpen = false"
       @scan="modalScannerOpen = true"
+      @categorias-changed="refrescarCategorias"
     />
 
     <ProductoScannerModal
