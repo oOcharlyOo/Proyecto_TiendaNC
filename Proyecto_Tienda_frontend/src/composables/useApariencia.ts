@@ -27,6 +27,8 @@ export type AparienciaConfig = {
 
 const config = ref<AparienciaConfig | null>(null);
 const cargada = ref(false);
+/** Se incrementa cada vez que se aplican colores; los consumidores que leen el CSS desde JS (graficas) dependen de el para repintarse. */
+export const aparienciaVersion = ref(0);
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -435,6 +437,7 @@ export function usarApariencia() {
     // Ultimo paso: deriva tokens legibles (texto, iconos y tinta de botones)
     // a partir de lo que acaba de quedar en <html>.
     normalizarContraste(root);
+    aparienciaVersion.value++;
   }
 
   function aplicar(forzarTema = false) {

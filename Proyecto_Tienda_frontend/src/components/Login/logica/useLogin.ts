@@ -30,7 +30,14 @@ const errorSucursal = ref('');
 
 export function useLogin() {
   const router = useRouter();
-  const { currentTheme, setTheme } = useTheme();
+  const { currentTheme, setTheme: setThemeBase } = useTheme();
+  // En el login el visitante elige el tema a mano: se descartan el acento y
+  // los colores derivados de la apariencia previa (inline en <html>) para que
+  // se vea el acento propio del tema elegido al instante.
+  const setTheme = (t: Parameters<typeof setThemeBase>[0]) => {
+    setThemeBase(t);
+    usarApariencia().aplicarValores(null, null, null);
+  };
   const { setSucursal, getHeader, clearSucursal } = useSucursal();
 
   onMounted(() => {

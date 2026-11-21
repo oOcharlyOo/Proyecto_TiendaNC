@@ -1,3 +1,4 @@
+import { aparienciaVersion } from '@/composables/useApariencia';
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import {
@@ -116,16 +117,16 @@ function getCSSVar(name: string, fallback: string): string {
   return style.getPropertyValue(name).trim() || fallback;
 }
 const currentTheme = ref(localStorage.getItem('theme') || 'classic');
-function getZeldaGoldColor() { currentTheme.value; return getCSSVar('--zelda-gold', '#c99234'); }
+function getZeldaGoldColor() { currentTheme.value; aparienciaVersion.value; return getCSSVar('--zelda-gold', '#c99234'); }
 function getChartBackgroundColor() {
-  currentTheme.value; const bg = getCSSVar('--chart-bg', '#1a1a2e');
+  currentTheme.value; aparienciaVersion.value; const bg = getCSSVar('--chart-bg', '#1a1a2e');
   if (bg.startsWith('linear-gradient')) { const m = bg.match(/#[a-fA-F0-9]{6}/); return m ? m[0] : '#1a1a2e'; }
   return bg;
 }
-function getChartTextColor() { currentTheme.value; return getCSSVar('--chart-text', '#f6f2de'); }
-function getSuccessColor() { currentTheme.value; return getCSSVar('--success-color', '#28a745'); }
-function getAccentColor() { currentTheme.value; return getCSSVar('--accent-color', '#c99234'); }
-function getErrorColor() { currentTheme.value; return getCSSVar('--error-color', '#dc3545'); }
+function getChartTextColor() { currentTheme.value; aparienciaVersion.value; return getCSSVar('--chart-text', '#f6f2de'); }
+function getSuccessColor() { currentTheme.value; aparienciaVersion.value; return getCSSVar('--success-color', '#28a745'); }
+function getAccentColor() { currentTheme.value; aparienciaVersion.value; return getCSSVar('--accent-color', '#c99234'); }
+function getErrorColor() { currentTheme.value; aparienciaVersion.value; return getCSSVar('--error-color', '#dc3545'); }
 
 // --- Message toast ---
 const mensaje = ref('');
